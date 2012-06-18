@@ -1,3 +1,9 @@
+"""
+A set of utilities used throughout the mongo-connector project
+"""
+
+from pymongo import ReplicaSetConnection, errors
+
 #Name of the oplog collection in a Master/Slave configuration
 MASTER_SLAVE_OPLOG_COLL_NAME = "oplog.$main"
 
@@ -17,9 +23,11 @@ def verify_url(url):
     """
     Verifies the validity of a given url
     """
-    ret = true
-    try: resp= open(url)
-    except: ret = false   
+    ret = True
+    try: 
+        open(url)
+    except IOError: 
+        ret = False   
     return ret
     
 
@@ -31,18 +39,21 @@ def upgrade_to_replset(mongo_conn):
     stat = mongo_conn['admin'].command({'replSetGetStatus':1})
     members = stat['members']
     member_list = ""
+    
     for member in members:
         member_list += member['name'] + ', '
     
     member_list = member_list[-1:]          # delete trailing comma
-    set = stat['set']
-    try: mongo_conn = ReplicaSetConnection(member_list, replicaSet=set)
-    except:     #do nothing
-    
+    repl_set = stat['set']
+    try: 
+        mongo_conn = ReplicaSetConnection(member_list, replicaSet=repl_set)
+    except errors.ConnectionFailure: 
+        pass  #do nothing
+
     return mongo_conn
     
 
-def get_oplog_colletion(mongo_conn, mode)
+def get_oplog_coll(mongo_conn, mode):
     """
     Returns the oplog collection for a mongo instance, depending on mode (replica set or 
     master/slave).
@@ -55,7 +66,7 @@ def get_oplog_colletion(mongo_conn, mode)
         oplog_coll_name = MASTER_SLAVE_OPLOG_COLL_NAME
         
     oplog_db = mongo_conn.db['local']
-    reply = oplog_db.command('collstats', oplog_coll_name, checkResponse=None)
+    #reply = oplog_db.command('collstats', oplog_coll_name, checkResponse=None)
     oplog_coll = oplog_db[oplog_coll_name]
     
     return oplog_coll

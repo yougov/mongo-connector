@@ -1,25 +1,29 @@
-import Queue
-import time
-import sphinxapi
+"""
+Mongoreader.py contains the relevant thread classes and run() methods
+that form the infinite loop for the program 
+"""
+
+from sphinx_synchronizer import SphinxSynchronizer
+from sphinxapi import SphinxClient
+from util import get_oplog_coll, upgrade_to_replset, verify_url
 from threading import Thread
-from pymongo import Connection
+from pymongo import Connection, ReplicaSetConnection
 
-#initialize Queue that stores addresses i.e. 'host:port' combos
-addrPool = Queue.Queue(0)
-
-#set number of workers
-num_workers = 2
 
 class SphinxSyncThread(Thread):
+    """
+    SphinxSyncThread is a wrapper for the sphinx synchronizer and can be
+    used to start and stop syncing. 
+    """
 
-    def __init__(self, sphinx):
+    def __init__(self, sphinx_sync):
         """
         Initialize thread and sphinx server
         """
     
         Thread.__init__(self)
         self.thread = None
-        self.sphinx = sphinx
+        self.sphinx_sync = sphinx_sync
         
     def start(self):
         """
@@ -27,8 +31,8 @@ class SphinxSyncThread(Thread):
         """
     
         if self.thread is None:
-            self.thread = Thread.start()
-            self.sphinx.sync()
+            self.thread = True
+            self.sphinx_sync.sync()
     
     def stop(self):
         """
@@ -36,13 +40,16 @@ class SphinxSyncThread(Thread):
         """
         
         if self.thread is not None:
-            self.sphinx.stop()
+            self.sphinx_sync.stop()
         
-        self.thread.join()
         self.thread = None
 
 
 class DaemonThread(Thread):
+    """
+    DaemonThread is a wrapper class for the daemon that coordinates
+    reading oplogs and storing them in the backend.
+    """
     
     def __init__(self, daemon, host):
         """
@@ -52,7 +59,7 @@ class DaemonThread(Thread):
         Thread.__init__(self)
         self.daemon = daemon
         self.host = host
-        self.thread = False
+        self.thread = None
         
     def start(self, *args):
         """ 
@@ -60,7 +67,7 @@ class DaemonThread(Thread):
         """
     
         if self.thread is None:
-            self.thread = Thread.start() 
+            self.thread = True 
             self.daemon.run(*args)
 
     def stop(self):
@@ -71,34 +78,44 @@ class DaemonThread(Thread):
         if self.thread is not None:
             self.daemon.stop()
             
-        self.thread.join()
         self.thread = None
         
         
 class Daemon():
+    """
+    The Daemon class has the main run method which runs forever and
+    coordinates the oplog records with the backend synchronizer.
+    """
     
     def __init__(self):
         """
         Initialize the Daemon.
         """
-    
-        self.stop = None
+        self.stop = False
         
-    def run(mongo_connection, oplog_collection, is_sharded):
+    def __stop__(self):
+        """
+        Stop the Daemon.
+        """
+        self.stop = True
+        
+    
+        
+    def run(self, mongo_connection, oplog_collection, is_sharded):
         """
         Connect to the external service, and send information. 
         """
         
         sphinx_sync_set = {}
     
-        while True:
+        while self.stop is False:
             new_sphinx_sync_set = {}
 
-            #we will assume that we are passed in the host/port for sphinx servers
+            #we will assume that we are passed the host/port for sphinx servers
             url = "127.0.0.1:9312"
 
             new_ns_set = {}
-            host,port = url.split(":")
+            host, port = url.split(":")
             new_ns_set[host] = "port"
 
             if sphinx_sync_set.has_key(url):
@@ -106,15 +123,16 @@ class Daemon():
                 sphinx_sync.update_config({'ns_set':new_ns_set})
                 
                 del sphinx_sync_set[url]  
-            elif url_ok?(url):
-                sphinx = sphinxapi.SphinxClient()
-                sphinx.setServer(host, port)
+            elif verify_url(url):
+                sphinx = SphinxClient()
+                sphinx.SetServer(host, port)
 
-                sphinx_sync = SphinxSyncThread(new SphinxSynchronizer(sphinx, 
-                mongo_connection, oplog_collection, None, new_ns_set, is_sharded)
+                sync = SphinxSynchronizer(sphinx, mongo_connection, 
+                    oplog_collection, None, new_ns_set, is_sharded)
+                sphinx_sync = SphinxSyncThread(sync)
                 sphinx_sync.start()
             else:
-                sphinx_sync = nil
+                sphinx_sync = None
 
             if sphinx_sync is not None:
                 new_sphinx_sync_set[url] = sphinx_sync
@@ -124,10 +142,9 @@ class Daemon():
                 sphinx_thread.stop()
                 
             sphinx_sync_set = new_sphinx_sync_set
-            sleep 5 # some interval
             
   
-    def run_w_shard(mongo_conn):
+    def run_w_shard(self, mongo_conn):
         """
         Continuously collect doc information from a sharded cluster. 
         """
@@ -135,7 +152,7 @@ class Daemon():
         shard_set = {}
         shard_coll = mongo_conn['config']['shards']
         
-        while True: 
+        while self.stop is False: 
             new_shard_set = {}
             
             for shard_doc in shard_coll.find():
@@ -145,12 +162,12 @@ class Daemon():
                 if shard_set.has_key(shard_id):
                     shard = shard_set[shard_id]
                     del shard_set[shard_id]
-                elif: '/' in host:
+                elif '/' in host:
                     address = host.split('/')[0]
                 else: # not a replica set
                     address = host
                     
-                location,port = address.split(':')
+                location, port = address.split(':')
                 shard_conn = Connection(location, int(port))
                 shard_conn = upgrade_to_replset(shard_conn)
                 
@@ -159,67 +176,13 @@ class Daemon():
                 else:
                     oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
                 
-                shard = DaemonThread.new(Daemon.new(), host)
-                shard.start(mongo_conn, oplog_coll, True) #is sharded
+                DaemonThread(Daemon(), host).start(
+                    mongo_conn, oplog_coll, True) 
                 new_shard_set[shard_id] = shard
                 
-            for id, daemon_thread in shard_set:
+            for daemon_id, daemon_thread in shard_set:
                 daemon_thread.stop()
                 
             shard_set = new_shard_set
-            sleep 5 #wait some arbitrary amount of time        
+       
   
-  
-  """                                                 
-
-class oplogWorker():
-    while True:
-        addr = addrPool.get()
-        if addr == None:
-            time.sleep(2)
-            continue
-
-        host, port = addr.split(':')
-        conn = Connection(host, int(port))
-        oplog = conn['local']['oplog']
-        
-        for row in oplog.rs.find():
-            print 'Thread %s printing %s' % self.getName(), row
-        addrPool.put(addr)          # restore for the next thread
-        time.sleep(5)              # spend 5 secs before checking again
-
-
-
-conn = Connection('localhost', 27000)
-shards = conn['config']['shards']
-
-#set up queue with all the primary hosts
-for shard in shards.find():
-    shard_id = shard['_id']
-    mongods = shard['host'].split(',')
-    for mongod in mongods:
-        host = shard['host']
-        if '/' in host:
-            address = host.split('/')[0]
-        else:
-            # not a replica set
-            address = host
-        location, port = address.split(":")
-        shard_conn = Connection(location, int(port))
-        # upgrade to repl set? - no
-        oplog_coll = shard_conn['local']['oplog.rs']
-        #start daemon thread for shard
-      
-
-    
-def begin():
-    for i in range(num_workers):
-        t = Thread(target=oplogWorker)
-        t.daemon = True
-        t.setName(str(i));
-        t.start()
-            
-if __name__ == "__main__"
-    begin()
-    
-"""  
