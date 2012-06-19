@@ -3,7 +3,7 @@ mongo_internal.py contains all the code that discovers the mongo cluster
 and starts the worker threads. 
 """
 
-from util import get_oplog_coll, upgrade_to_replset
+from util import get_oplog_coll, upgrade_to_replset, get_connection
 from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
 from oplog_manager import OplogThread
@@ -35,8 +35,7 @@ class DaemonThread(Thread):
         """
         if self.running is False:
             self.running = True 
-            mongos_conn = prepare_daemon_args(self.host)
-            self.daemon.run(mongos_conn)
+            self.daemon.run(self.host)
 
 
     def stop(self):
@@ -69,10 +68,11 @@ class Daemon():
         self.running = True
   
   
-    def run(self, mongos_conn):
+    def run(self, address):
         """
         Continuously collect doc information from a sharded cluster. 
         """
+        mongos_conn = get_connection(address)
         shard_set = {}
         shard_coll = mongos_conn['config']['shards']
         self.running = True
@@ -99,17 +99,8 @@ class Daemon():
                 else:
                     oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
                 
-                oplog = OplogThread(shard_conn, oplog_coll, True).start() 
+                oplog = OplogThread(shard_conn, address, oplog_coll, True).start() 
                 shard_set[shard_id] = oplog
             
             
-def prepare_daemon_args(address):
-    """
-    For now, it takes in an address and returns the mongos connection to it.
-    
-    Needs error checking. 
-    """
-    host, port = address.split(':')
-    conn = Connection(host, int(port))
-    return conn
        

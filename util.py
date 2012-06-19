@@ -71,6 +71,16 @@ def get_oplog_coll(mongo_conn, mode):
     
     return oplog_coll
     
+def get_connection(address):
+    """
+    For now, it takes in an address and returns the mongos connection to it.
+    
+    Needs error checking. 
+    """
+    host, port = address.split(':')
+    conn = Connection(host, int(port))
+    return conn
+    
     
         
     

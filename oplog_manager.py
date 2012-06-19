@@ -8,7 +8,7 @@ to the specified layer above.
 
 from threading import Thread
 import pymongo
-from util import get_namespace_details
+from util import get_namespace_details, get_connection
 from checkpoint import Checkpoint
 
 
@@ -17,12 +17,13 @@ class OplogThread(Thread):
     OplogThread gathers the updates for a single oplog. 
     """
     
-    def __init__(self, mongo_conn, oplog_coll, is_sharded):
+    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded):
         """
         Initialize the oplog thread.
         """
         Thread.__init__(self)
-        self.mongo_connection = mongo_conn
+        self.primary_connection = primary_conn
+        self.mongos_address = mongos_address
         self.oplog = oplog_coll
         self.is_sharded = is_sharded
         self.running = False
@@ -56,77 +57,62 @@ class OplogThread(Thread):
             
             self.retrieve_docs(oplog_doc_batch)
     
+    
     def stop(self):
         """
         Stop this thread from managing the oplog.
         """
-        if self.running is True:
-            self.running = False
+        self.running = False
+            
             
     def retrieve_docs(self, oplog_doc_entries):
         """
         Given the doc ID's, retrieve those documents from the mongos.
         """
-    
+        
+        #boot up new mongos_connection for this thread
+        mongos_connection = get_connection(self.mongos_address)
+        doc_map = {}
         update_list = {}
-      #  timestamp = None
         
         for entry in oplog_doc_entries:
             namespace = entry['ns']
             doc = entry['o']
-         #   timestamp = entry['ts']
             operation = entry['op']
             
             if operation == 'i':  #insert
-                if self.is_sharded:
-                    doc_id = entry['o']['_id']
-                    db_name, coll_name = get_namespace_details(namespace)
+            
+                #from a migration, so ignore for now
+                if entry.has_key('fromMigrate'):
+                    continue
                     
-                    cursor_db = self.mongo_connection[db_name]
-                    cursor = cursor_db[coll_name].find({'_id':doc_id})
-                    count = cursor.count
-                    if count != 0: # it's in mongos => part of a migration
-                        continue
-                
-                #prepare and add sphinx doc
-                #update configuration writer
+                doc_id = entry['o']['_id']
+                db_name, coll_name = get_namespace_details(namespace)
+                doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
+                doc_map[doc_id] = namespace
                 
             elif operation == 'u': #update
-                update_list[namespace] = update_list[namespace] or []
-                to_update = update_list[namespace]
-                to_update.append(entry['o2']['_id'])
+                doc_id = entry['o']['_id']
+                doc_map[doc_id] = namespace
                 
             elif operation == 'd': #delete
-                update_list[namespace] = update_list[namespace] or []
-                to_update = update_list[namespace]
+                #from a migration, so ignore for now
+                if entry.has_key('fromMigrate'):
+                     continue
+               # update_list[namespace] = update_list[namespace] or []
+               # to_update = update_list[namespace]
                 doc_id = entry['o']['_id']
-                
-                if self.is_sharded:
-                    db_name, coll_name = get_namespace_details(namespace)
-                    cursor_db = self.mongo_connection[db_name]
-                    cursor = cursor_db[coll_name].find({'_id':id})
-                    count = cursor.count
-                    
-                    if count != 0:
-                        continue
-                
-                to_update.remove(id)
-                #prepare and add doc to sphinx
+                #need more logic here
                 
             elif operation == 'n':
                 pass #do nothing here
             
-            for namespace, id_list in update_list:
-                database, collection = get_namespace_details(namespace)
+            for doc_id, namespace in doc_map:
+                db_name, coll_name = get_namespace_details(namespace)
+                doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
+                doc_map[doc_id] = doc
                 
-                to_update = self.mongo_connection.db(database).collection(
-                    collection).find({'_id':{'in':id_list}})
-                
-                for doc in to_update:
-                    #prepare and add doc to sphinx
-                    pass
-                    
-                id_list.remove(doc['_id'])
+            #at this point, doc_map has a full doc for every doc_id updated/inserted
     
     def get_oplog_cursor(self, timestamp):
         """
