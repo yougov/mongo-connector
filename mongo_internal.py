@@ -1,43 +1,46 @@
 """
-mongo_internal.py contains all the code that connects to the mongo cluster, gets status of
-updated documents. 
+mongo_internal.py contains all the code that discovers the mongo cluster and starts the
+worker threads. 
 """
 
-from util import get_oplog_coll, upgrade_to_replset, verify_url
+from util import get_oplog_coll, upgrade_to_replset, verify_url, 
 from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
+
+ 
+    
 
 
 class DaemonThread(Thread):
     """
-    DaemonThread is a wrapper class for the daemon that coordinates
-    reading oplogs and storing them.
+    DaemonThread is a wrapper class for the daemon.
     """
     
-    def __init__(self, daemon, host):
+    
+    def __init__(self, address):
         """
         Initialize the daemon thread
         """
-    
         Thread.__init__(self)
-        self.daemon = daemon
-        self.host = host
+        self.daemon = Daemon()
+        self.address = address
         self.running = False
         
-    def start(self, *args):
+        
+    def run(self):
         """ 
         Start the thread, run the daemon. 
         """
-    
         if self.running is False:
             self.running = True 
-            self.daemon.run(*args)
+            mongos_conn = prepare_daemon_args(host)
+            self.daemon.run(mongos_conn)
+
 
     def stop(self):
         """
         Stop the thread and daemon (if it's running). 
         """
-        
         if self.running is True:
             self.daemon.stop()
             
@@ -54,77 +57,32 @@ class Daemon():
         """
         Initialize the Daemon.
         """
-        self.stop = False
+        self.running = False
         
-    def __stop__(self):
+        
+    def stop(self):
         """
         Stop the Daemon.
         """
-        self.stop = True
-        
-    
-        
-    def run(self, mongo_connection, oplog_collection, is_sharded):
-        """
-        Connect to the external service, and send information. 
-        """
-        
-        sync_set = {}
-    
-        while self.stop is False:
-            new_sync_set = {}
-
-            #we will assume that we are passed the host/port for sphinx servers
-            url = "127.0.0.1:9312"
-
-            new_ns_set = {}
-            host, port = url.split(":")
-            new_ns_set[host] = "port"
-
-            if sphinx_sync_set.has_key(url):
-                sphinx_sync = sphinx_sync_set[url]
-                sphinx_sync.update_config({'ns_set':new_ns_set})
-                
-                del sphinx_sync_set[url]  
-            elif verify_url(url):
-                sphinx = SphinxClient()
-                sphinx.SetServer(host, port)
-
-                sync = SphinxSynchronizer(sphinx, mongo_connection, 
-                    oplog_collection, None, new_ns_set, is_sharded)
-                sphinx_sync = SphinxSyncThread(sync)
-                sphinx_sync.start()
-            else:
-                sphinx_sync = None
-
-            if sphinx_sync is not None:
-                new_sphinx_sync_set[url] = sphinx_sync
-                    
-            #clear out the old config threads    
-            for url, sphinx_thread in sphinx_sync_set:
-                sphinx_thread.stop()
-                
-            sphinx_sync_set = new_sphinx_sync_set
-            
+        self.running = True
   
-    def run_w_shard(self, mongo_conn):
+  
+    def run(self, mongos_conn):
         """
         Continuously collect doc information from a sharded cluster. 
         """
-        
         shard_set = {}
-        shard_coll = mongo_conn['config']['shards']
+        shard_coll = mongos_conn['config']['shards']
+        self.running = True
         
-        while self.stop is False: 
-            new_shard_set = {}
+        while self.running is True: 
             
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
                 host = shard_doc['host'].split(',')[0]
                 
                 if shard_set.has_key(shard_id):
-                    shard = shard_set[shard_id]
-                    del shard_set[shard_id]
+                    continue
                 elif '/' in host:
                     address = host.split('/')[0]
                 else: # not a replica set
@@ -139,12 +97,17 @@ class Daemon():
                 else:
                     oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
                 
-                DaemonThread(Daemon(), host).start(
-                    mongo_conn, oplog_coll, True) 
-                new_shard_set[shard_id] = shard
-                
-            for daemon_thread in shard_set.values():
-                daemon_thread.stop()
-                
-            shard_set = new_shard_set
+                oplog_thread = #.start(mongo_conn, oplog_coll, True) 
+                shard_set[shard_id] = oplog_thread
+            
+            
+def prepare_daemon_args(address):
+    """
+    For now, it takes in an address and returns the mongos connection to it.
+    
+    Needs error checking. 
+    """
+    host,port = address.split(':')
+    conn = Connection(host, int(port))
+    return conn
        
