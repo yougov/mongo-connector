@@ -1,6 +1,15 @@
+"""
+The oplog_manager class handles connecting to mongo clusters and getting docs.
+
+An OplogThread is a thread that polls a primary on a single shard and 
+gathers all recent updates, and then retrieves the relevant docs and sends it 
+to the specified layer above.
+"""
+
 from threading import Thread
-from pymongo import Connection, ReplicaSetConnection
-import checkpoint
+import pymongo
+from util import get_namespace_details
+from checkpoint import Checkpoint
 
 
 class OplogThread(Thread):
@@ -13,7 +22,7 @@ class OplogThread(Thread):
         Initialize the oplog thread.
         """
         Thread.__init__(self)
-        self.mongo_conn = mongo_conn
+        self.mongo_connection = mongo_conn
         self.oplog = oplog_coll
         self.is_sharded = is_sharded
         self.running = False
@@ -33,14 +42,14 @@ class OplogThread(Thread):
             
             cursor = self.init_sync()
             oplog_doc_batch = []
-            oplog_doc_count = 0
+            #oplog_doc_count = 0
             
             for doc in cursor:
                 if doc is None:
                     break
                 
                 oplog_doc_batch.append(doc)
-                oplog_doc_count += 1
+               # oplog_doc_count += 1
             
                 last_timestamp = doc['ts']
                 self.checkpoint.commit_ts = last_timestamp
@@ -51,18 +60,21 @@ class OplogThread(Thread):
         """
         Stop this thread from managing the oplog.
         """
-        if self.running = True:
+        if self.running is True:
             self.running = False
             
-    def retrieve_docs(self, oplog_ids):
+    def retrieve_docs(self, oplog_doc_entries):
+        """
+        Given the doc ID's, retrieve those documents from the mongos.
+        """
     
         update_list = {}
-        timestamp = None
+      #  timestamp = None
         
         for entry in oplog_doc_entries:
             namespace = entry['ns']
             doc = entry['o']
-            timestamp = entry['ts']
+         #   timestamp = entry['ts']
             operation = entry['op']
             
             if operation == 'i':  #insert
