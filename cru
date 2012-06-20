@@ -1,0 +1,12 @@
+#!/bin/bash
+
+PYTHON=python
+UPLOAD_PY="$HOME/upload.py"
+CR_SERVER="codereview.10gen.com"
+
+SHORT_EMAIL=$(echo $EMAIL \| sed \-E 's/.*<(.*)>/\1/')
+
+"$PYTHON" "$UPLOAD_PY" \
+\--server "$CR_SERVER" \
+\--email "$SHORT_EMAIL" \
+"$@"

@@ -6,10 +6,13 @@ gathers all recent updates, and then retrieves the relevant docs and sends it
 to the specified layer above.
 """
 
-from threading import Thread
 import pymongo
-from util import get_namespace_details, get_connection
+import time
+from bson.objectid import ObjectId
+from threading import Thread
+from util import get_namespace_details, get_connection, get_next_document
 from checkpoint import Checkpoint
+from doc_manager import DocManager
 
 
 class OplogThread(Thread):
@@ -17,7 +20,7 @@ class OplogThread(Thread):
     OplogThread gathers the updates for a single oplog. 
     """
     
-    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded):
+    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded, doc_manager):
         """
         Initialize the oplog thread.
         """
@@ -26,6 +29,7 @@ class OplogThread(Thread):
         self.mongos_address = mongos_address
         self.oplog = oplog_coll
         self.is_sharded = is_sharded
+        self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
         
@@ -45,9 +49,8 @@ class OplogThread(Thread):
             oplog_doc_batch = []
             #oplog_doc_count = 0
             
+            
             for doc in cursor:
-                if doc is None:
-                    break
                 
                 oplog_doc_batch.append(doc)
                # oplog_doc_count += 1
@@ -56,6 +59,9 @@ class OplogThread(Thread):
                 self.checkpoint.commit_ts = last_timestamp
             
             self.retrieve_docs(oplog_doc_batch)
+            #ran through one oplog, gonna do more later
+            time.sleep(2)   
+            
     
     
     def stop(self):
@@ -106,13 +112,19 @@ class OplogThread(Thread):
                 
             elif operation == 'n':
                 pass #do nothing here
+                       
+        for doc_id in doc_map:
+        
+            #done to avoid issue with iterating over ObjectId's
+            namespace = doc_map[doc_id] 
             
-            for doc_id, namespace in doc_map:
-                db_name, coll_name = get_namespace_details(namespace)
-                doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
-                doc_map[doc_id] = doc
+            db_name, coll_name = get_namespace_details(namespace)
+            doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
+            self.doc_manager.add_doc(doc_id, doc)
+        
+        doc_map.clear()
                 
-            #at this point, doc_map has a full doc for every doc_id updated/inserted
+            #at this point, all docs are added to the queue
     
     def get_oplog_cursor(self, timestamp):
         """
@@ -123,11 +135,14 @@ class OplogThread(Thread):
         
         if timestamp is not None:
             cursor = self.oplog.find(spec={'op':{'$ne':'n'}, 
-            'ts':{'$gte':0}}, tailable=True, order={'$natural':'asc'})
-            doc = cursor.next_document     
+            'ts':{'$gte':timestamp}}, tailable=True, order={'$natural':'asc'})
+            doc = get_next_document(cursor)     
+            ret = cursor
             
-        #means we didn't get anything from the cursor, or no timestamp 
-        if doc is None or cursor.__getitem__() is None:
+        #means we didn't get anything from the cursor, or no timestamp
+        """ 
+        if doc is None or cursor[0] is None:
+            print 'in get_oplog_cursor, doc is None or cursor[0] is None'
             entry = self.oplog.find_one(spec={'ts':timestamp})
             
             if entry is None:
@@ -140,6 +155,7 @@ class OplogThread(Thread):
             
         elif timestamp == doc['ts']:
             ret = cursor
+        """
         
         return ret
         
@@ -147,21 +163,28 @@ class OplogThread(Thread):
         """
         Return the timestamp of the latest entry in the oplog.
         """
-        curr = self.oplog.find(sort={'$natural':'desc'}, limit=1)
-        return curr.__getitem__('ts')
-            
-            
-    def full_dump(self):
+        curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
+        return curr[0]['ts']
+        
+        
+    def get_first_oplog_timestamp(self):
         """
-        Dumps the database, returns the cursor to the latest entry just before the dump
-        is performed.
+        Return the timestamp of the latest entry in the oplog.
         """
-        timestamp = self.get_last_oplog_timestamp()
+        curr = self.oplog.find().sort('$natural',pymongo.ASCENDING).limit(1)
+        return curr[0]['ts']
+        
+    def init_cursor(self):
+        """
+        Position the cursor to the beginning of the oplog.
+        """
+        timestamp = self.get_first_oplog_timestamp()
         self.checkpoint = Checkpoint()
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)
         
         return cursor
+            
         
     def init_sync(self):
         """ 
@@ -172,14 +195,14 @@ class OplogThread(Thread):
         last_commit = None
         
         if self.checkpoint is None:
-            cursor = self.full_dump()
+            cursor = self.init_cursor()
         else:
           #  self.restore_checkpoint(self.checkpoint)
             last_commit = self.checkpoint.commit_ts
             
             cursor = self.get_oplog_cursor(last_commit)
             if cursor is None:
-                cursor = self.full_dump()
+                cursor = self.init_cursor()
                 
         return cursor
     

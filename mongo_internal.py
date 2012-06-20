@@ -4,6 +4,8 @@ and starts the worker threads.
 """
 
 from util import get_oplog_coll, upgrade_to_replset, get_connection
+import doc_manager
+import time
 from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
 from oplog_manager import OplogThread
@@ -18,13 +20,12 @@ class DaemonThread(Thread):
     """
     
     
-    def __init__(self, host, address):
+    def __init__(self, address, doc_man):
         """
         Initialize the daemon thread
         """
         Thread.__init__(self)
-        self.daemon = Daemon()
-        self.host = host
+        self.daemon = Daemon(doc_man)
         self.address = address
         self.running = False
         
@@ -35,7 +36,7 @@ class DaemonThread(Thread):
         """
         if self.running is False:
             self.running = True 
-            self.daemon.run(self.host)
+            self.daemon.run(self.address)
 
 
     def stop(self):
@@ -54,11 +55,12 @@ class Daemon():
     gathers documents that have been updated for the synchronizer.
     """
     
-    def __init__(self):
+    def __init__(self, doc_man):
         """
         Initialize the Daemon.
         """
         self.running = False
+        self.doc_manager = doc_man
         
         
     def stop(self):
@@ -86,9 +88,11 @@ class Daemon():
                 if shard_set.has_key(shard_id):
                     continue
                 elif '/' in host:
-                    address = host.split('/')[0]
+                    address = host.split('/')[1]
                 else: # not a replica set
                     address = host
+                    
+                print 'address = ' + address
                     
                 location, port = address.split(':')
                 shard_conn = Connection(location, int(port))
@@ -99,8 +103,11 @@ class Daemon():
                 else:
                     oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
                 
-                oplog = OplogThread(shard_conn, address, oplog_coll, True).start() 
+                oplog = OplogThread(shard_conn, address, oplog_coll,
+                 True, self.doc_manager).start() 
                 shard_set[shard_id] = oplog
             
+            print 'sleeping for a bit now...'
+            time.sleep(2)
             
        

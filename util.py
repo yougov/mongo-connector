@@ -2,7 +2,7 @@
 A set of utilities used throughout the mongo-connector project
 """
 
-from pymongo import ReplicaSetConnection, errors
+from pymongo import Connection, ReplicaSetConnection, errors
 
 #Name of the oplog collection in a Master/Slave configuration
 MASTER_SLAVE_OPLOG_COLL_NAME = "oplog.$main"
@@ -37,14 +37,16 @@ def upgrade_to_replset(mongo_conn):
     """   
      
     stat = mongo_conn['admin'].command({'replSetGetStatus':1})
+    
     members = stat['members']
     member_list = ""
     
     for member in members:
-        member_list += member['name'] + ', '
+        member_list += member['name'] + ','
     
-    member_list = member_list[-1:]          # delete trailing comma
+    member_list = member_list[:-1]          # delete trailing comma
     repl_set = stat['set']
+        
     try: 
         mongo_conn = ReplicaSetConnection(member_list, replicaSet=repl_set)
     except errors.ConnectionFailure: 
@@ -65,7 +67,7 @@ def get_oplog_coll(mongo_conn, mode):
     else:
         oplog_coll_name = MASTER_SLAVE_OPLOG_COLL_NAME
         
-    oplog_db = mongo_conn.db['local']
+    oplog_db = mongo_conn['local']
     #reply = oplog_db.command('collstats', oplog_coll_name, checkResponse=None)
     oplog_coll = oplog_db[oplog_coll_name]
     
@@ -80,6 +82,19 @@ def get_connection(address):
     host, port = address.split(':')
     conn = Connection(host, int(port))
     return conn
+    
+    
+def get_next_document(cursor):
+    """
+    Returns the next document in the cursor and returns it. 
+    """
+    doc = None
+    for item in cursor:
+        doc = item
+        break
+        
+    return doc
+    
     
     
         
