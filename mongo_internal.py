@@ -108,6 +108,6 @@ class Daemon():
                 shard_set[shard_id] = oplog
             
             print 'sleeping for a bit now...'
-            time.sleep(2)
+            time.sleep(5)
             
        

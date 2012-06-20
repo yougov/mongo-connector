@@ -8,6 +8,8 @@ to the specified layer above.
 
 import pymongo
 import time
+import os
+import simplejson as json
 from bson.objectid import ObjectId
 from threading import Thread
 from util import get_namespace_details, get_connection, get_next_document
@@ -32,6 +34,7 @@ class OplogThread(Thread):
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
+        self.config = None
         
     def run(self):
         """
@@ -47,19 +50,16 @@ class OplogThread(Thread):
             
             cursor = self.init_sync()
             oplog_doc_batch = []
-            #oplog_doc_count = 0
-            
-            
+
             for doc in cursor:
                 
                 oplog_doc_batch.append(doc)
-               # oplog_doc_count += 1
             
                 last_timestamp = doc['ts']
                 self.checkpoint.commit_ts = last_timestamp
             
             self.retrieve_docs(oplog_doc_batch)
-            #ran through one oplog, gonna do more later
+
             time.sleep(2)   
             
     
@@ -75,11 +75,9 @@ class OplogThread(Thread):
         """
         Given the doc ID's, retrieve those documents from the mongos.
         """
-        
         #boot up new mongos_connection for this thread
         mongos_connection = get_connection(self.mongos_address)
         doc_map = {}
-        update_list = {}
         
         for entry in oplog_doc_entries:
             namespace = entry['ns']
@@ -105,8 +103,7 @@ class OplogThread(Thread):
                 #from a migration, so ignore for now
                 if entry.has_key('fromMigrate'):
                      continue
-               # update_list[namespace] = update_list[namespace] or []
-               # to_update = update_list[namespace]
+
                 doc_id = entry['o']['_id']
                 #need more logic here
                 
@@ -194,6 +191,9 @@ class OplogThread(Thread):
         cursor = None
         last_commit = None
         
+        if self.config is not None:
+            pass        # do stuff here 
+        
         if self.checkpoint is None:
             cursor = self.init_cursor()
         else:
@@ -205,4 +205,63 @@ class OplogThread(Thread):
                 cursor = self.init_cursor()
                 
         return cursor
+        
+    def write_config(self):
+        """
+        Write the updated config to the config file. 
+        
+        This is done by duplicating the old config file, editing the relevant
+        timestamp, and then copying the new config onto the old file. 
+        """
+        os.rename(self.config, self.config+'~')  # '~' indicates temp file
+        dest = open(self.config, 'w')
+        source = open(self.config+'~', 'r')
+        oplog_str = str(self.oplog.database.connection)
+        json_str = json.dumps([oplog_str, self.checkpoint.commit_ts])
+            
+        for line in source:
+            if oplog_str in line:
+                dest.write(json_str)        # write updated timestamp
+            else:
+                dest.write(line)
+        
+        source.close()
+        dest.close()
+        os.remove(self.config+'~')
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     
