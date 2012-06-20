@@ -8,14 +8,13 @@ documents.
 """
 
 class DocManager():
-"""
-The DocManager class contains a dictionary that stores id/doc pairs. 
+    """
+    The DocManager class contains a dictionary that stores id/doc pairs. 
 
-The reason for storing id/doc pairs as opposed to doc's is so that multiple 
-updates to the same doc reflect the most up to date version as opposed to 
-multiple, slightly different versions of a doc. 
-                                                                                
-"""
+    The reason for storing id/doc pairs as opposed to doc's is so that multiple 
+    updates to the same doc reflect the most up to date version as opposed to 
+    multiple, slightly different versions of a doc.                                                                           
+    """
     
     def __init__(self):
         """
@@ -39,7 +38,7 @@ multiple, slightly different versions of a doc.
         Returns the documents as a list, and clears the dictionary.
         """
         doc_list = self.doc_dict.values()
-        doc_dict.clear()
+        self.doc_dict.clear()
         return doc_list
     
     
