@@ -1,12 +1,13 @@
 """Tails the oplog of a shard and returns entries"""
 
-import pymongo
-import time
 import os
+import time
 import json
+import pymongo
 
 from bson.objectid import ObjectId
-from threading import Thread
+from bson.timestamp import Timestamp
+from threading import Thread, Timer
 from util import (get_namespace_details,
                   get_connection, 
                   get_next_document)
@@ -73,7 +74,7 @@ class OplogThread(Thread):
         doc_map = {}
         oplog_batch_size = len(self.oplog_doc_batch)
         
-        for entry in oplog_doc_entries:
+        for entry in self.oplog_doc_batch:
             namespace = entry['ns']
             doc = entry['o']
             operation = entry['op']
@@ -120,7 +121,7 @@ class OplogThread(Thread):
         del self.oplog_doc_batch[:oplog_batch_size] 
         
         #run this function every second
-        threading.Timer(1, retrieve_docs).start()      
+        Timer(1, self.retrieve_docs).start()      
                 
             #at this point, all docs are added to the queue
     
@@ -203,7 +204,7 @@ class OplogThread(Thread):
             
         for line in source:
             if oplog_str in line:
-                dest.write(json_str)        # write updated timestamp
+                dest.write(json_str)              # write updated timestamp
             else:
                 dest.write(line)
         
@@ -222,16 +223,19 @@ class OplogThread(Thread):
             return None
         
         source = open(self.oplog_file, 'r')
-        data = json.load(source)
+        try: 
+            data = json.load(source)
+        except:                                             # empty file
+            return None
         oplog_str = str(self.oplog.database.connection)
         
         count = 0
         while (count < len(data)):
-            if oplog_str in data[count]:  #next line has timestamp
+            if oplog_str in data[count]:                    #next line has time
                 count = count + 1
                 self.checkpoint.commit_ts = data[count]
                 break
-            count = count + 2 # skip current coll and timestmap
+            count = count + 2                               # skip to next set
                 
         
         

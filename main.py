@@ -6,7 +6,7 @@ from doc_manager import DocManager
 from time import sleep
 
 dm = DocManager()
-dt = DaemonThread('localhost:27000', dm)
+dt = DaemonThread('localhost:27000', dm, 'config.txt')
 dt.start()
 
 rows = dm.retrieve_docs()

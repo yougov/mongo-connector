@@ -2,6 +2,7 @@
 """
 
 from pymongo import Connection, ReplicaSetConnection, errors
+from bson.timestamp import Timestamp
 
 #Name of the oplog collection in a Replica Set configuration
 REPL_SET_OPLOG_COLL_NAME = "oplog.rs"
@@ -52,9 +53,22 @@ def get_next_document(cursor):
         break
         
     return doc
+
+def timestamp_to_long(timestamp):
+    """Convert BSON timestamp into integer.
     
+    Conversion rule is based from the specs (http://bsonspec.org/#/specification). 
+    """
+    return ((timestamp.seconds << 32) + timestamp.increment)
     
+def long_to_bson_timestamp(val):
+    """Convert integer into BSON timestamp. 
+    """
+    seconds = val >> 32
+    increment = val & 0xffffffff
     
-        
+    return Timestamp(seconds, increment)
+
+
     
     

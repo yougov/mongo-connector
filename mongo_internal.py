@@ -1,9 +1,10 @@
 """Discovers the mongo cluster and starts the daemon. 
 """
 
-from util import get_oplog_coll, upgrade_to_replset, get_connection
 import doc_manager
 import time
+
+from util import get_oplog_coll, get_connection
 from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
 from oplog_manager import OplogThread
@@ -76,7 +77,8 @@ class Daemon():
                 shard_conn = Connection(shard_doc['host'])
                 stat = shard_conn['admin'].command({'replSetGetStatus':1})
                 repl_set = stat['set']
-                shard_conn = ReplicaSetConnection(host, replicaSet = repl_set)
+                shard_conn = ReplicaSetConnection(shard_doc['host'],
+                    replicaSet = repl_set)
                 
                 oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
 
