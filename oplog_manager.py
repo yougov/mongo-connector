@@ -44,7 +44,7 @@ class OplogThread(Thread):
               
         while self.running is True:    
             
-            cursor = self.init_sync()
+            cursor = self.prepare_for_sync()
             last_ts = None
             self.retrieve_docs()
             
@@ -151,8 +151,12 @@ class OplogThread(Thread):
         curr = self.oplog.find().sort('$natural',pymongo.ASCENDING).limit(1)
         return curr[0]['ts']
         
+        
     def init_cursor(self):
-        """Position the cursor to the beginning of the oplog.
+        """Position the cursor appropriately.
+        
+        The cursor is set to either the beginning of the oplog, or wherever it was 
+        last left off. 
         """
         timestamp = self.read_config()
         
@@ -166,7 +170,7 @@ class OplogThread(Thread):
         return cursor
             
         
-    def init_sync(self):
+    def prepare_for_sync(self):
         """ Initializes the cursor for the sync method. 
         """
         cursor = None
