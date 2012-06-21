@@ -20,7 +20,7 @@ class DocManager():
         """
         Just create a dict
         """
-        self.doc_dict = {}              
+        self.doc_dict = {}               
         
         
     def add_doc(self, id, doc):

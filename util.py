@@ -4,8 +4,6 @@ A set of utilities used throughout the mongo-connector project
 
 from pymongo import Connection, ReplicaSetConnection, errors
 
-#Name of the oplog collection in a Master/Slave configuration
-MASTER_SLAVE_OPLOG_COLL_NAME = "oplog.$main"
 
 #Name of the oplog collection in a Replica Set configuration
 REPL_SET_OPLOG_COLL_NAME = "oplog.rs"

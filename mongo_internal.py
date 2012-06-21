@@ -84,26 +84,17 @@ class Daemon():
             
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
-                host = shard_doc['host'].split(',')[0]
                 
                 if shard_set.has_key(shard_id):
                     continue
-                elif '/' in host:
-                    address = host.split('/')[1]
-                else: # not a replica set
-                    address = host
-                    
-                print 'address = ' + address
-                    
-                location, port = address.split(':')
-                shard_conn = Connection(location, int(port))
-                shard_conn = upgrade_to_replset(shard_conn)
+    
+                shard_conn = Connection(shard_doc['host'])
+                stat = shard_conn['admin'].command({'replSetGetStatus':1})
+                repl_set = stat['set']
+                shard_conn = ReplicaSetConnection(host, replicaSet = repl_set)
                 
-                if isinstance(shard_conn, ReplicaSetConnection):
-                    oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
-                else:
-                    oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
-                
+                oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
+
                 oplog = OplogThread(shard_conn, address, oplog_coll,
                  True, self.doc_manager, self.oplog_checkpoint).start() 
                 shard_set[shard_id] = oplog
