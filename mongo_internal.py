@@ -20,12 +20,12 @@ class DaemonThread(Thread):
     """
     
     
-    def __init__(self, address, doc_man):
+    def __init__(self, address, doc_man, oplog_checkpoint):
         """
         Initialize the daemon thread
         """
         Thread.__init__(self)
-        self.daemon = Daemon(doc_man)
+        self.daemon = Daemon(doc_man, oplog_checkpoint)
         self.address = address
         self.running = False
         
@@ -55,12 +55,13 @@ class Daemon():
     gathers documents that have been updated for the synchronizer.
     """
     
-    def __init__(self, doc_man):
+    def __init__(self, doc_man, oplog_checkpoint):
         """
         Initialize the Daemon.
         """
         self.running = False
         self.doc_manager = doc_man
+        self.oplog_checkpoint = oplog_checkpoint
         
         
     def stop(self):
@@ -104,7 +105,7 @@ class Daemon():
                     oplog_coll = get_oplog_coll(shard_conn, 'master_slave')
                 
                 oplog = OplogThread(shard_conn, address, oplog_coll,
-                 True, self.doc_manager).start() 
+                 True, self.doc_manager, self.oplog_checkpoint).start() 
                 shard_set[shard_id] = oplog
             
             print 'sleeping for a bit now...'

@@ -9,7 +9,7 @@ to the specified layer above.
 import pymongo
 import time
 import os
-import simplejson as json
+import json
 from bson.objectid import ObjectId
 from threading import Thread
 from util import get_namespace_details, get_connection, get_next_document
@@ -22,7 +22,8 @@ class OplogThread(Thread):
     OplogThread gathers the updates for a single oplog. 
     """
     
-    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded, doc_manager):
+    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
+     doc_manager, oplog_file):
         """
         Initialize the oplog thread.
         """
@@ -34,7 +35,7 @@ class OplogThread(Thread):
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
-        self.config = None
+        self.oplog_file = oplog_file
         
     def run(self):
         """
@@ -50,13 +51,14 @@ class OplogThread(Thread):
             
             cursor = self.init_sync()
             oplog_doc_batch = []
+            last_ts = None
 
             for doc in cursor:
-                
                 oplog_doc_batch.append(doc)
+                last_ts = doc['ts']
             
-                last_timestamp = doc['ts']
-                self.checkpoint.commit_ts = last_timestamp
+            self.checkpoint.commit_ts = last_ts
+            self.write_config()
             
             self.retrieve_docs(oplog_doc_batch)
 
@@ -175,7 +177,11 @@ class OplogThread(Thread):
         """
         Position the cursor to the beginning of the oplog.
         """
-        timestamp = self.get_first_oplog_timestamp()
+        timestamp = self.read_config()
+        
+        if timestamp is None:
+            timestamp = self.get_first_oplog_timestamp()
+            
         self.checkpoint = Checkpoint()
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)
@@ -190,14 +196,10 @@ class OplogThread(Thread):
         
         cursor = None
         last_commit = None
-        
-        if self.config is not None:
-            pass        # do stuff here 
-        
+
         if self.checkpoint is None:
             cursor = self.init_cursor()
         else:
-          #  self.restore_checkpoint(self.checkpoint)
             last_commit = self.checkpoint.commit_ts
             
             cursor = self.get_oplog_cursor(last_commit)
@@ -206,6 +208,7 @@ class OplogThread(Thread):
                 
         return cursor
         
+        
     def write_config(self):
         """
         Write the updated config to the config file. 
@@ -213,9 +216,9 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file. 
         """
-        os.rename(self.config, self.config+'~')  # '~' indicates temp file
-        dest = open(self.config, 'w')
-        source = open(self.config+'~', 'r')
+        os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
+        dest = open(self.oplog_file, 'w')
+        source = open(self.oplog_file + '~', 'r')
         oplog_str = str(self.oplog.database.connection)
         json_str = json.dumps([oplog_str, self.checkpoint.commit_ts])
             
@@ -230,6 +233,28 @@ class OplogThread(Thread):
         os.remove(self.config+'~')
         
         
+    def read_config(self):
+        """
+        Read the config file for the relevant timestamp, if possible.
+        """      
+        config_file = self.oplog_file
+        if config_file is None:
+            print 'Need a config file!'
+            return None
+        
+        source = open(self.oplog_file, 'r')
+        data = json.load(source)
+        oplog_str = str(self.oplog.database.connection)
+        
+        count = 0
+        while (count < len(data)):
+            if oplog_str in data[count]:  #next line has timestamp
+                count = count + 1
+                self.checkpoint.commit_ts = data[count]
+                break
+            count = count + 2 # skip current coll and timestmap
+                
+                        
         
         
         
