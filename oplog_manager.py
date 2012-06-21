@@ -10,7 +10,9 @@ from bson.timestamp import Timestamp
 from threading import Thread, Timer
 from util import (get_namespace_details,
                   get_connection, 
-                  get_next_document)
+                  get_next_document,
+                  bson_ts_to_long,
+                  long_to_bson_ts)
 from checkpoint import Checkpoint
 from doc_manager import DocManager
 
@@ -53,8 +55,9 @@ class OplogThread(Thread):
                 self.oplog_doc_batch.append(doc)
                 last_ts = doc['ts']
             
-            self.checkpoint.commit_ts = last_ts
-            self.write_config()
+            if last_ts is not None:                 #we actually processed docs
+                self.checkpoint.commit_ts = last_ts
+                self.write_config()
 
             time.sleep(2)   #for testing purposes
             
@@ -121,7 +124,7 @@ class OplogThread(Thread):
         del self.oplog_doc_batch[:oplog_batch_size] 
         
         #run this function every second
-        Timer(1, self.retrieve_docs).start()      
+        Timer(10, self.retrieve_docs).start()      
                 
             #at this point, all docs are added to the queue
     
@@ -132,20 +135,19 @@ class OplogThread(Thread):
         
         if timestamp is not None:
             cursor = self.oplog.find(spec={'op':{'$ne':'n'}, 
-            'ts':{'$gte':timestamp}}, tailable=True, order={'$natural':'asc'})
+            'ts':{'$gt':timestamp}}, tailable=True, order={'$natural':'asc'})
           #  doc = get_next_document(cursor)     
             ret = cursor
             
         return ret
         
-    #never used, will probably get rid of soon
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
         return curr[0]['ts']
         
-        
+    #used here for testing, eventually we will use last_oplog_ts() + full_dump()
     def get_first_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
@@ -161,10 +163,10 @@ class OplogThread(Thread):
         """
         timestamp = self.read_config()
         
+        #TODO: need a way to dump the collection here 
         if timestamp is None:
             timestamp = self.get_first_oplog_timestamp()
             
-        self.checkpoint = Checkpoint()
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)
         
@@ -178,11 +180,14 @@ class OplogThread(Thread):
         last_commit = None
 
         if self.checkpoint is None:
+            self.checkpoint = Checkpoint()
             cursor = self.init_cursor()
         else:
             last_commit = self.checkpoint.commit_ts
             
             cursor = self.get_oplog_cursor(last_commit)
+            
+            
             if cursor is None:
                 cursor = self.init_cursor()
                 
@@ -200,17 +205,21 @@ class OplogThread(Thread):
         dest = open(self.oplog_file, 'w')
         source = open(self.oplog_file + '~', 'r')
         oplog_str = str(self.oplog.database.connection)
-        json_str = json.dumps([oplog_str, self.checkpoint.commit_ts])
+        
+        timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
+        json_str = json.dumps([oplog_str, timestamp])
+        dest.write(json_str) 
             
         for line in source:
             if oplog_str in line:
-                dest.write(json_str)              # write updated timestamp
+                continue                        # we've already updated
             else:
                 dest.write(line)
+  
         
         source.close()
         dest.close()
-        os.remove(self.config+'~')
+        os.remove(self.oplog_file+'~')
         
         
         #need to consider how to get one global config file for all primary oplogs
@@ -227,13 +236,14 @@ class OplogThread(Thread):
             data = json.load(source)
         except:                                             # empty file
             return None
+        
         oplog_str = str(self.oplog.database.connection)
         
         count = 0
         while (count < len(data)):
             if oplog_str in data[count]:                    #next line has time
                 count = count + 1
-                self.checkpoint.commit_ts = data[count]
+                self.checkpoint.commit_ts = long_to_bson_ts(data[count])
                 break
             count = count + 2                               # skip to next set
                 

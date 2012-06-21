@@ -9,6 +9,7 @@ dm = DocManager()
 dt = DaemonThread('localhost:27000', dm, 'config.txt')
 dt.start()
 
+sleep(3)
 rows = dm.retrieve_docs()
 
 for line in rows:

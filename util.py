@@ -54,14 +54,14 @@ def get_next_document(cursor):
         
     return doc
 
-def timestamp_to_long(timestamp):
+def bson_ts_to_long(timestamp):
     """Convert BSON timestamp into integer.
     
     Conversion rule is based from the specs (http://bsonspec.org/#/specification). 
     """
-    return ((timestamp.seconds << 32) + timestamp.increment)
+    return ((timestamp.time << 32) + timestamp.inc)
     
-def long_to_bson_timestamp(val):
+def long_to_bson_ts(val):
     """Convert integer into BSON timestamp. 
     """
     seconds = val >> 32
