@@ -1,31 +1,26 @@
-"""
-The oplog_manager class handles connecting to mongo clusters and getting docs.
-
-An OplogThread is a thread that polls a primary on a single shard and 
-gathers all recent updates, and then retrieves the relevant docs and sends it 
-to the specified layer above.
-"""
+"""Tails the oplog of a shard and returns entries"""
 
 import pymongo
 import time
 import os
 import json
+
 from bson.objectid import ObjectId
 from threading import Thread
-from util import get_namespace_details, get_connection, get_next_document
+from util import (get_namespace_details,
+                  get_connection, 
+                  get_next_document)
 from checkpoint import Checkpoint
 from doc_manager import DocManager
 
 
 class OplogThread(Thread):
-    """
-    OplogThread gathers the updates for a single oplog. 
+    """OplogThread gathers the updates for a single oplog. 
     """
     
     def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
      doc_manager, oplog_file):
-        """
-        Initialize the oplog thread.
+        """Initialize the oplog thread.
         """
         Thread.__init__(self)
         self.primary_connection = primary_conn
@@ -35,11 +30,11 @@ class OplogThread(Thread):
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
+        self.oplog_doc_batch = []
         self.oplog_file = oplog_file
         
     def run(self):
-        """
-        Start the oplog worker.
+        """Start the oplog worker.
         """
         self.running = True  
         
@@ -50,36 +45,33 @@ class OplogThread(Thread):
         while self.running is True:    
             
             cursor = self.init_sync()
-            oplog_doc_batch = []
             last_ts = None
-
+            self.retrieve_docs()
+            
             for doc in cursor:
-                oplog_doc_batch.append(doc)
+                self.oplog_doc_batch.append(doc)
                 last_ts = doc['ts']
             
             self.checkpoint.commit_ts = last_ts
             self.write_config()
-            
-            self.retrieve_docs(oplog_doc_batch)
 
-            time.sleep(2)   
+            time.sleep(2)   #for testing purposes
             
     
     
     def stop(self):
-        """
-        Stop this thread from managing the oplog.
+        """Stop this thread from managing the oplog.
         """
         self.running = False
             
             
-    def retrieve_docs(self, oplog_doc_entries):
-        """
-        Given the doc ID's, retrieve those documents from the mongos.
+    def retrieve_docs(self):
+        """Given the doc ID's, retrieve those documents from the mongos.
         """
         #boot up new mongos_connection for this thread
         mongos_connection = get_connection(self.mongos_address)
         doc_map = {}
+        oplog_batch_size = len(self.oplog_doc_batch)
         
         for entry in oplog_doc_entries:
             namespace = entry['ns']
@@ -122,60 +114,45 @@ class OplogThread(Thread):
             self.doc_manager.add_doc(doc_id, doc)
         
         doc_map.clear()
+        
+        
+        # get rid of docs we've already seen
+        del self.oplog_doc_batch[:oplog_batch_size] 
+        
+        #run this function every second
+        threading.Timer(1, retrieve_docs).start()      
                 
             #at this point, all docs are added to the queue
     
     def get_oplog_cursor(self, timestamp):
-        """
-        Returns the cursor to the place in the oplog just after the last recorded 
-        timestamp 
+        """Move cursor to the proper place in the oplog. 
         """
         ret = None
         
         if timestamp is not None:
             cursor = self.oplog.find(spec={'op':{'$ne':'n'}, 
             'ts':{'$gte':timestamp}}, tailable=True, order={'$natural':'asc'})
-            doc = get_next_document(cursor)     
+          #  doc = get_next_document(cursor)     
             ret = cursor
             
-        #means we didn't get anything from the cursor, or no timestamp
-        """ 
-        if doc is None or cursor[0] is None:
-            print 'in get_oplog_cursor, doc is None or cursor[0] is None'
-            entry = self.oplog.find_one(spec={'ts':timestamp})
-            
-            if entry is None:
-                sub_doc = self.oplog.find_one(
-                spec={'ts':{'$lt':timestamp}})      
-            if sub_doc is None:
-                pass #uh oh - rollback
-            
-            ret = cursor
-            
-        elif timestamp == doc['ts']:
-            ret = cursor
-        """
-        
         return ret
         
+    #never used, will probably get rid of soon
     def get_last_oplog_timestamp(self):
-        """
-        Return the timestamp of the latest entry in the oplog.
+        """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
         return curr[0]['ts']
         
         
     def get_first_oplog_timestamp(self):
-        """
-        Return the timestamp of the latest entry in the oplog.
+        """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.ASCENDING).limit(1)
         return curr[0]['ts']
         
     def init_cursor(self):
-        """
-        Position the cursor to the beginning of the oplog.
+        """Position the cursor to the beginning of the oplog.
         """
         timestamp = self.read_config()
         
@@ -190,10 +167,8 @@ class OplogThread(Thread):
             
         
     def init_sync(self):
-        """ 
-        Initializes the cursor for the sync method. 
+        """ Initializes the cursor for the sync method. 
         """
-        
         cursor = None
         last_commit = None
 
@@ -233,9 +208,9 @@ class OplogThread(Thread):
         os.remove(self.config+'~')
         
         
+        #need to consider how to get one global config file for all primary oplogs
     def read_config(self):
-        """
-        Read the config file for the relevant timestamp, if possible.
+        """Read the config file for the relevant timestamp, if possible.
         """      
         config_file = self.oplog_file
         if config_file is None:
@@ -254,10 +229,6 @@ class OplogThread(Thread):
                 break
             count = count + 2 # skip current coll and timestmap
                 
-                        
-        
-        
-        
         
         
         

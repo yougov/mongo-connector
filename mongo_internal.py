@@ -1,6 +1,4 @@
-"""
-mongo_internal.py contains all the code that discovers the mongo cluster
-and starts the worker threads. 
+"""Discovers the mongo cluster and starts the daemon. 
 """
 
 from util import get_oplog_coll, upgrade_to_replset, get_connection
@@ -15,14 +13,12 @@ from oplog_manager import OplogThread
 
 
 class DaemonThread(Thread):
-    """
-    DaemonThread is a wrapper class for the daemon.
+    """ DaemonThread is a wrapper class for the daemon.
     """
     
     
     def __init__(self, address, doc_man, oplog_checkpoint):
-        """
-        Initialize the daemon thread
+        """Initialize the daemon thread
         """
         Thread.__init__(self)
         self.daemon = Daemon(doc_man, oplog_checkpoint)
@@ -31,8 +27,7 @@ class DaemonThread(Thread):
         
         
     def run(self):
-        """ 
-        Start the thread, run the daemon. 
+        """ Start the thread, which runs the daemon. 
         """
         if self.running is False:
             self.running = True 
@@ -40,8 +35,7 @@ class DaemonThread(Thread):
 
 
     def stop(self):
-        """
-        Stop the thread and daemon (if it's running). 
+        """Stop the thread and daemon (if it's running). 
         """
         if self.running is True:
             self.daemon.stop()
@@ -50,30 +44,21 @@ class DaemonThread(Thread):
         
         
 class Daemon():
-    """
-    The Daemon class has the main run method which runs forever and
-    gathers documents that have been updated for the synchronizer.
+    """Checks the cluster for shards to tail. 
     """
     
     def __init__(self, doc_man, oplog_checkpoint):
-        """
-        Initialize the Daemon.
-        """
         self.running = False
         self.doc_manager = doc_man
         self.oplog_checkpoint = oplog_checkpoint
         
         
     def stop(self):
-        """
-        Stop the Daemon.
-        """
         self.running = True
   
   
     def run(self, address):
-        """
-        Continuously collect doc information from a sharded cluster. 
+        """Continuously collect information about the sharded cluster. 
         """
         mongos_conn = get_connection(address)
         shard_set = {}
@@ -99,7 +84,7 @@ class Daemon():
                  True, self.doc_manager, self.oplog_checkpoint).start() 
                 shard_set[shard_id] = oplog
             
-            print 'sleeping for a bit now...'
-            time.sleep(5)
+            print 'sleeping for a bit now...' 
+            time.sleep(5) # for testing purposes 
             
        

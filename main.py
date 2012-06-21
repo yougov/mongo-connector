@@ -1,5 +1,4 @@
-"""
-Temp file that lets you run the system 
+"""Temp file that lets you run the system 
 """
 
 from mongo_internal import DaemonThread
