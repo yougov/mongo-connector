@@ -86,8 +86,7 @@ class Daemon():
                  True, doc_manager, self.oplog_checkpoint, 
                  {'test.test'}).start() 
                 shard_set[shard_id] = oplog
-            
-            print 'sleeping for a bit now...' 
+             
             time.sleep(5) # for testing purposes 
             
        

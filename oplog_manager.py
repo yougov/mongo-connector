@@ -53,6 +53,7 @@ class OplogThread(Thread):
             self.retrieve_docs()
             
             for doc in cursor:
+                print doc
                 self.oplog_doc_batch.append(doc)
                 last_ts = doc['ts']
             
@@ -83,6 +84,7 @@ class OplogThread(Thread):
             namespace = entry['ns']
             doc = entry['o']
             operation = entry['op']
+            doc_id = entry['o']['_id']
             
             if operation == 'i':  #insert
             
@@ -90,7 +92,6 @@ class OplogThread(Thread):
                 if entry.has_key('fromMigrate'):
                     continue
                     
-                doc_id = entry['o']['_id']
                 db_name, coll_name = get_namespace_details(namespace)
                 doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
                 doc_map[doc_id] = namespace
@@ -99,7 +100,6 @@ class OplogThread(Thread):
                     del_list.remove(doc_id) 
                 
             elif operation == 'u': #update
-                doc_id = entry['o']['_id']
                 doc_map[doc_id] = namespace
                 
             elif operation == 'd': #delete
@@ -107,16 +107,16 @@ class OplogThread(Thread):
                 if entry.has_key('fromMigrate'):
                      continue
 
-                doc_id = entry['o']['_id']
                 if doc_id in doc_map.keys():
                     del doc_map[doc_id]         # delete if pending insertion
                 
-                del_list.append(doc_id)              
+                del_list.append(doc_id) 
+                print 'appended doc_id ' + str(doc_id)             
                 
             elif operation == 'n':
                 pass #do nothing here
                 
-        doc_list = []
+        insert_list = []
                        
         for doc_id in doc_map:
         
@@ -125,18 +125,21 @@ class OplogThread(Thread):
             
             db_name, coll_name = get_namespace_details(namespace)
             doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
-            doc_list.append(doc)
+            insert_list.append(doc)
         
         doc_map.clear()
         
-        self.doc_manager.upsert(doc_list)
-        self.doc_manager.remove(del_list)
+        if insert_list:
+            self.doc_manager.upsert(insert_list)
+            
+        if del_list:
+            self.doc_manager.remove(del_list)
         
         # get rid of docs we've already seen
         del self.oplog_doc_batch[:oplog_batch_size] 
         
         #run this function every second
-        Timer(10, self.retrieve_docs).start()      
+        Timer(1, self.retrieve_docs).start()      
     
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 

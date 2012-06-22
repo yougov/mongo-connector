@@ -30,8 +30,7 @@ class SolrDocManager():
         """Removes documents from Solr
         """
         for id in doc_id_list:
-            delete_str = 'id=' + str(id)
-            self.solr.delete(delete_str)
+            self.solr.delete(id=str(id))
             
 
         
