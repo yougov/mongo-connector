@@ -22,9 +22,18 @@ class SolrDocManager():
 
 
     def upsert(self, docs):
-        """Update or insert a document into Solr
+        """Update or insert documents into Solr
         """
         self.solr.add(docs)
+        
+    def remove(self, doc_id_list):
+        """Removes documents from Solr
+        """
+        for id in doc_id_list:
+            delete_str = 'id=' + str(id)
+            self.solr.delete(delete_str)
+            
+
         
     
         

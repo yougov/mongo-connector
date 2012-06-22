@@ -76,6 +76,7 @@ class OplogThread(Thread):
         #boot up new mongos_connection for this thread
         mongos_connection = get_connection(self.mongos_address)
         doc_map = {}
+        del_list = []
         oplog_batch_size = len(self.oplog_doc_batch)
         
         for entry in self.oplog_doc_batch:
@@ -94,6 +95,9 @@ class OplogThread(Thread):
                 doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
                 doc_map[doc_id] = namespace
                 
+                if doc_id in del_list:          #previous pegged for deletion
+                    del_list.remove(doc_id) 
+                
             elif operation == 'u': #update
                 doc_id = entry['o']['_id']
                 doc_map[doc_id] = namespace
@@ -104,7 +108,10 @@ class OplogThread(Thread):
                      continue
 
                 doc_id = entry['o']['_id']
-                #need more logic here
+                if doc_id in doc_map.keys():
+                    del doc_map[doc_id]         # delete if pending insertion
+                
+                del_list.append(doc_id)              
                 
             elif operation == 'n':
                 pass #do nothing here
@@ -121,15 +128,15 @@ class OplogThread(Thread):
             doc_list.append(doc)
         
         doc_map.clear()
+        
         self.doc_manager.upsert(doc_list)
+        self.doc_manager.remove(del_list)
         
         # get rid of docs we've already seen
         del self.oplog_doc_batch[:oplog_batch_size] 
         
         #run this function every second
         Timer(10, self.retrieve_docs).start()      
-                
-        #at this point, all docs are added to the queue
     
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
