@@ -5,7 +5,9 @@ and provides an API for backends like Solr/Sphinx/etc to use to gather
 documents. 
 """
 
-class DocManager():
+from pysolr import Solr
+
+class SolrDocManager():
     """The DocManager class contains a dictionary that stores id/doc pairs. 
 
     The reason for storing id/doc pairs as opposed to doc's is so that multiple 
@@ -13,27 +15,20 @@ class DocManager():
     multiple, slightly different versions of a doc.                                                                           
     """
     
-    def __init__(self):
+    def __init__(self, url):
         """Just create a dict
         """
-        self.doc_dict = {}               
-        
-        
-    def add_doc(self, id, doc):
-        """Since docs have distinct IDs, there's no overlap.
-        
-        Thus, we have no need for locking here. Overwrites an existing doc
-        if needed. 
+        self.solr = Solr(url)              
+
+
+    def upsert(self, docs):
+        """Update or insert a document into Solr
         """
-        self.doc_dict[id] = doc  
+        self.solr.add(docs)
+        
+    
         
         
-    def retrieve_docs(self):
-        """Returns the documents as a list, and clears the dictionary.
-        """
-        doc_list = self.doc_dict.values()
-        self.doc_dict.clear()
-        return doc_list
     
     
     

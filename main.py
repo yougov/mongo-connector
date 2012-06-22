@@ -4,17 +4,16 @@
 from mongo_internal import DaemonThread
 from doc_manager import DocManager
 from time import sleep
+from pysolr import Solr
 
-dm = DocManager()
-dt = DaemonThread('localhost:27000', dm, 'config.txt')
+dt = DaemonThread('localhost:27000', 'config.txt')
 dt.start()
 
 sleep(3)
-rows = dm.retrieve_docs()
 
-for line in rows:
-    print line
-    
+
+
+
 
 
     

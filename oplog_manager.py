@@ -8,13 +8,13 @@ import pymongo
 from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from threading import Thread, Timer
+from checkpoint import Checkpoint
+from solr_doc_manager import SolrDocManager
 from util import (get_namespace_details,
                   get_connection, 
                   get_next_document,
                   bson_ts_to_long,
                   long_to_bson_ts)
-from checkpoint import Checkpoint
-from doc_manager import DocManager
 
 
 class OplogThread(Thread):
@@ -22,7 +22,7 @@ class OplogThread(Thread):
     """
     
     def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
-     doc_manager, oplog_file):
+     doc_manager, oplog_file, namespace_set):
         """Initialize the oplog thread.
         """
         Thread.__init__(self)
@@ -35,6 +35,7 @@ class OplogThread(Thread):
         self.checkpoint = None
         self.oplog_doc_batch = []
         self.oplog_file = oplog_file
+        self.namespace_set = namespace_set 
         
     def run(self):
         """Start the oplog worker.
@@ -107,6 +108,8 @@ class OplogThread(Thread):
                 
             elif operation == 'n':
                 pass #do nothing here
+                
+        doc_list = []
                        
         for doc_id in doc_map:
         
@@ -115,10 +118,10 @@ class OplogThread(Thread):
             
             db_name, coll_name = get_namespace_details(namespace)
             doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
-            self.doc_manager.add_doc(doc_id, doc)
+            doc_list.append(doc)
         
         doc_map.clear()
-        
+        self.doc_manager.upsert(doc_list)
         
         # get rid of docs we've already seen
         del self.oplog_doc_batch[:oplog_batch_size] 
@@ -126,7 +129,7 @@ class OplogThread(Thread):
         #run this function every second
         Timer(10, self.retrieve_docs).start()      
                 
-            #at this point, all docs are added to the queue
+        #at this point, all docs are added to the queue
     
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
@@ -154,6 +157,24 @@ class OplogThread(Thread):
         curr = self.oplog.find().sort('$natural',pymongo.ASCENDING).limit(1)
         return curr[0]['ts']
         
+    
+    def dump_collection(self):
+        """Dumps collection into backend engine.
+        
+        This method is called when we're initializing the cursor and have no
+        configs i.e. when we're starting for the first time.
+        """
+        for namespace in self.namespace_set:
+            db, coll = get_namespace_details(namespace)
+            cursor = self.primary_connection[db][coll].find()
+            
+            doc_list = []
+            
+            for doc in cursor:
+                doc_list.append(doc)
+            
+            self.doc_manager.upsert(doc_list)
+            
         
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -162,10 +183,10 @@ class OplogThread(Thread):
         last left off. 
         """
         timestamp = self.read_config()
-        
-        #TODO: need a way to dump the collection here 
+         
         if timestamp is None:
-            timestamp = self.get_first_oplog_timestamp()
+            timestamp = self.get_last_oplog_timestamp()
+            self.dump_collection()
             
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)

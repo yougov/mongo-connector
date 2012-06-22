@@ -1,7 +1,7 @@
 """Discovers the mongo cluster and starts the daemon. 
 """
 
-import doc_manager
+from solr_doc_manager import SolrDocManager
 import time
 
 from util import get_oplog_coll, get_connection
@@ -18,11 +18,11 @@ class DaemonThread(Thread):
     """
     
     
-    def __init__(self, address, doc_man, oplog_checkpoint):
+    def __init__(self, address, oplog_checkpoint):
         """Initialize the daemon thread
         """
         Thread.__init__(self)
-        self.daemon = Daemon(doc_man, oplog_checkpoint)
+        self.daemon = Daemon(oplog_checkpoint)
         self.address = address
         self.running = False
         
@@ -48,9 +48,8 @@ class Daemon():
     """Checks the cluster for shards to tail. 
     """
     
-    def __init__(self, doc_man, oplog_checkpoint):
+    def __init__(self, oplog_checkpoint):
         self.running = False
-        self.doc_manager = doc_man
         self.oplog_checkpoint = oplog_checkpoint
         
         
@@ -81,9 +80,11 @@ class Daemon():
                     replicaSet = repl_set)
                 
                 oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
-
+                
+                doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, address, oplog_coll,
-                 True, self.doc_manager, self.oplog_checkpoint).start() 
+                 True, doc_manager, self.oplog_checkpoint, 
+                 {'test.test'}).start() 
                 shard_set[shard_id] = oplog
             
             print 'sleeping for a bit now...' 
