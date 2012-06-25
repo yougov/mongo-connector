@@ -6,6 +6,7 @@ documents.
 """
 
 from pysolr import Solr
+from threading import Timer
 
 class SolrDocManager():
     """The DocManager class contains a dictionary that stores id/doc pairs. 
@@ -18,19 +19,31 @@ class SolrDocManager():
     def __init__(self, url):
         """Just create a dict
         """
-        self.solr = Solr(url)              
+        self.solr = Solr(url)   
+        self.solr_commit()          
 
 
     def upsert(self, docs):
         """Update or insert documents into Solr
         """
-        self.solr.add(docs)
+        print 'doc adding'
+        print docs
+        self.solr.add(docs, commit=False)
         
-    def remove(self, doc_id_list):
+    def remove(self, doc_id):
         """Removes documents from Solr
         """
-        for id in doc_id_list:
-            self.solr.delete(id=str(id))
+        print 'doc removing'
+        print doc_id
+        self.solr.delete(id=str(doc_id), commit=False)
+           
+    def solr_commit(self):
+        """Periodically commits to the Solr server.
+        """
+        self.solr.commit()
+        print 'just committed to solr'
+    
+        Timer(10, self.solr_commit).start() 
             
 
         

@@ -33,9 +33,9 @@ class OplogThread(Thread):
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
-        self.oplog_doc_batch = []
         self.oplog_file = oplog_file
         self.namespace_set = namespace_set 
+        self.mongos_connection = get_connection(mongos_address)
         
     def run(self):
         """Start the oplog worker.
@@ -50,17 +50,26 @@ class OplogThread(Thread):
             
             cursor = self.prepare_for_sync()
             last_ts = None
-            self.retrieve_docs()
             
-            for doc in cursor:
-                print doc
-                self.oplog_doc_batch.append(doc)
-                last_ts = doc['ts']
+            for entry in cursor:  
+                print entry                           #debugging purposes
+                operation = entry['op']
+
+                if operation == 'd':
+                    doc_id = entry['o']['_id']
+                    self.doc_manager.remove(doc_id)
+                
+                elif operation == 'i' or operation == 'u':
+                    doc = self.retrieve_doc(entry)
+                    self.doc_manager.upsert([doc])
+                    
+                last_ts = entry['ts']
             
             if last_ts is not None:                 #we actually processed docs
                 self.checkpoint.commit_ts = last_ts
+                print 'writing TS because last_ts is not None'
                 self.write_config()
-
+                
             time.sleep(2)   #for testing purposes
             
     
@@ -71,75 +80,17 @@ class OplogThread(Thread):
         self.running = False
             
             
-    def retrieve_docs(self):
+    def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
         """
-        #boot up new mongos_connection for this thread
-        mongos_connection = get_connection(self.mongos_address)
-        doc_map = {}
-        del_list = []
-        oplog_batch_size = len(self.oplog_doc_batch)
-        
-        for entry in self.oplog_doc_batch:
-            namespace = entry['ns']
-            doc = entry['o']
-            operation = entry['op']
-            doc_id = entry['o']['_id']
-            
-            if operation == 'i':  #insert
-            
-                #from a migration, so ignore for now
-                if entry.has_key('fromMigrate'):
-                    continue
-                    
-                db_name, coll_name = get_namespace_details(namespace)
-                doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
-                doc_map[doc_id] = namespace
-                
-                if doc_id in del_list:          #previous pegged for deletion
-                    del_list.remove(doc_id) 
-                
-            elif operation == 'u': #update
-                doc_map[doc_id] = namespace
-                
-            elif operation == 'd': #delete
-                #from a migration, so ignore for now
-                if entry.has_key('fromMigrate'):
-                     continue
+        namespace = entry['ns']
+        doc_id = entry['o']['_id']
 
-                if doc_id in doc_map.keys():
-                    del doc_map[doc_id]         # delete if pending insertion
-                
-                del_list.append(doc_id) 
-                print 'appended doc_id ' + str(doc_id)             
-                
-            elif operation == 'n':
-                pass #do nothing here
-                
-        insert_list = []
-                       
-        for doc_id in doc_map:
-        
-            #done to avoid issue with iterating over ObjectId's
-            namespace = doc_map[doc_id] 
-            
-            db_name, coll_name = get_namespace_details(namespace)
-            doc = mongos_connection[db_name][coll_name].find_one({'_id':doc_id})
-            insert_list.append(doc)
-        
-        doc_map.clear()
-        
-        if insert_list:
-            self.doc_manager.upsert(insert_list)
-            
-        if del_list:
-            self.doc_manager.remove(del_list)
-        
-        # get rid of docs we've already seen
-        del self.oplog_doc_batch[:oplog_batch_size] 
-        
-        #run this function every second
-        Timer(1, self.retrieve_docs).start()      
+        db_name, coll_name = get_namespace_details(namespace)
+        coll = self.mongos_connection[db_name][coll_name]
+        doc = coll.find_one({'_id':doc_id})
+      
+        return doc
     
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
@@ -181,9 +132,8 @@ class OplogThread(Thread):
             doc_list = []
             
             for doc in cursor:
-                doc_list.append(doc)
+                self.doc_manager.upsert(doc)
             
-            self.doc_manager.upsert(doc_list)
             
         
     def init_cursor(self):
@@ -215,10 +165,8 @@ class OplogThread(Thread):
             cursor = self.init_cursor()
         else:
             last_commit = self.checkpoint.commit_ts
-            
             cursor = self.get_oplog_cursor(last_commit)
-            
-            
+                    
             if cursor is None:
                 cursor = self.init_cursor()
                 
@@ -277,6 +225,8 @@ class OplogThread(Thread):
                 self.checkpoint.commit_ts = long_to_bson_ts(data[count])
                 break
             count = count + 2                               # skip to next set
+            
+        return self.checkpoint.commit_ts
                 
         
         

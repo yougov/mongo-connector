@@ -9,9 +9,6 @@ from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
 from oplog_manager import OplogThread
 
- 
-    
-
 
 class DaemonThread(Thread):
     """ DaemonThread is a wrapper class for the daemon.
@@ -72,13 +69,13 @@ class Daemon():
                 
                 if shard_set.has_key(shard_id):
                     continue
-    
-                shard_conn = Connection(shard_doc['host'])
-                stat = shard_conn['admin'].command({'replSetGetStatus':1})
-                repl_set = stat['set']
-                shard_conn = ReplicaSetConnection(shard_doc['host'],
+                if '/' in shard_doc['host']:        #it's a replica set
+                    repl_set = shard_doc['host'].split('/')[0]
+                    shard_conn = ReplicaSetConnection(shard_doc['host'],
                     replicaSet = repl_set)
-                
+                else:
+                    shard_conn = Connection(shard_doc['host'])
+
                 oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
                 
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')

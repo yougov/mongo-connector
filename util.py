@@ -9,7 +9,9 @@ REPL_SET_OPLOG_COLL_NAME = "oplog.rs"
 
 
 def get_namespace_details(namespace):
-    """ Returns the database name and collection name for a given namespace
+    """ Returns the database name and collection name for a given namespace.
+    
+    Need to adjust so it works with namespaces with a '.' in them
     """
     db_name, collection_name = namespace.split(".")
     return db_name, collection_name
