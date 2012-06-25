@@ -26,23 +26,17 @@ class SolrDocManager():
     def upsert(self, docs):
         """Update or insert documents into Solr
         """
-        print 'doc adding'
-        print docs
         self.solr.add(docs, commit=False)
         
     def remove(self, doc_id):
         """Removes documents from Solr
         """
-        print 'doc removing'
-        print doc_id
         self.solr.delete(id=str(doc_id), commit=False)
            
     def solr_commit(self):
         """Periodically commits to the Solr server.
-        """
+        """ 
         self.solr.commit()
-        print 'just committed to solr'
-    
         Timer(10, self.solr_commit).start() 
             
 

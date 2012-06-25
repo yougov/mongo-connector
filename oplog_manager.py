@@ -67,7 +67,6 @@ class OplogThread(Thread):
             
             if last_ts is not None:                 #we actually processed docs
                 self.checkpoint.commit_ts = last_ts
-                print 'writing TS because last_ts is not None'
                 self.write_config()
                 
             time.sleep(2)   #for testing purposes
@@ -98,10 +97,8 @@ class OplogThread(Thread):
         ret = None
         
         if timestamp is not None:
-            cursor = self.oplog.find(spec={'op':{'$ne':'n'}, 
-            'ts':{'$gt':timestamp}}, tailable=True, order={'$natural':'asc'})
-          #  doc = get_next_document(cursor)     
-            ret = cursor
+            ret = self.oplog.find(spec={'op':{'$ne':'n'}, 
+            'ts':{'$gt':timestamp}}, tailable=True, order={'$natural':'asc'})  
             
         return ret
         
@@ -200,8 +197,7 @@ class OplogThread(Thread):
         dest.close()
         os.remove(self.oplog_file+'~')
         
-        
-        #need to consider how to get one global config file for all primary oplogs
+
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
         """      
