@@ -52,7 +52,6 @@ class OplogThread(Thread):
             last_ts = None
             
             for entry in cursor:  
-                print entry                           #debugging purposes
                 operation = entry['op']
 
                 if operation == 'd':
@@ -61,7 +60,9 @@ class OplogThread(Thread):
                 
                 elif operation == 'i' or operation == 'u':
                     doc = self.retrieve_doc(entry)
-                    self.doc_manager.upsert([doc])
+                    if doc is not None:
+                        doc['ts'] = bson_ts_to_long(entry['ts'])
+                        self.doc_manager.upsert([doc])
                     
                 last_ts = entry['ts']
             
@@ -223,7 +224,32 @@ class OplogThread(Thread):
             count = count + 2                               # skip to next set
             
         return self.checkpoint.commit_ts
-                
+        
+    
+    def rollback(self):
+        """Rollback backend engine to consistent state. 
+        
+        The strategy is to find the latest timestamp in the backend and 
+        the largest timestamp in the oplog less than the latest backend
+        timestamp. This defines the rollback window and we just roll these
+        back until the oplog and backend are in consistent states. 
+        """
+        last_inserted_doc = self.doc_manager.get_last_doc()
+        if last_doc is None:
+            return None
+            
+        backend_ts = last_inserted_doc['ts']
+        last_oplog_entry = self.oplog.find_one(spec={'ts':{'$lt':backend_ts}}, 
+        order={'$natural':'desc'})  
+        
+        if last_oplog_entry is None:
+            return None
+            
+        rollback_cutoff_ts = last_oplog_entry['ts']
+        start_ts = bson_ts_to_long(rollback_cutoff_ts)
+        end_ts = backend_ts    
+        
+                    
         
         
         
