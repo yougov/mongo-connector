@@ -10,10 +10,7 @@ from bson.timestamp import Timestamp
 from threading import Thread, Timer
 from checkpoint import Checkpoint
 from solr_doc_manager import SolrDocManager
-from util import (get_namespace_details,
-                  get_connection, 
-                  get_next_document,
-                  bson_ts_to_long,
+from util import (bson_ts_to_long,
                   long_to_bson_ts)
 
 
@@ -25,7 +22,7 @@ class OplogThread(Thread):
      doc_manager, oplog_file, namespace_set):
         """Initialize the oplog thread.
         """
-        Thread.__init__(self)
+        super(OplogThread, self).__init__()
         self.primary_connection = primary_conn
         self.mongos_address = mongos_address
         self.oplog = oplog_coll
@@ -35,7 +32,7 @@ class OplogThread(Thread):
         self.checkpoint = None
         self.oplog_file = oplog_file
         self.namespace_set = namespace_set 
-        self.mongos_connection = get_connection(mongos_address)
+        self.mongos_connection = Connection(mongos_address)
         
     def run(self):
         """Start the oplog worker.
@@ -86,22 +83,19 @@ class OplogThread(Thread):
         namespace = entry['ns']
         doc_id = entry['o']['_id']
 
-        db_name, coll_name = get_namespace_details(namespace)
+        db_name, coll_name = namespace.split('.',1)
         coll = self.mongos_connection[db_name][coll_name]
         doc = coll.find_one({'_id':doc_id})
       
         return doc
     
+    
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
         """
-        ret = None
-        
-        if timestamp is not None:
-            ret = self.oplog.find(spec={'op':{'$ne':'n'}, 
-            'ts':{'$gt':timestamp}}, tailable=True, order={'$natural':'asc'})  
-            
-        return ret
+        return self.oplog.find({'ts': {'$gt': timestamp}}, tailable=True,
+            await_data=True).sort('$natural', pymongo.ASCENDING) 
+
         
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
@@ -124,7 +118,7 @@ class OplogThread(Thread):
         configs i.e. when we're starting for the first time.
         """
         for namespace in self.namespace_set:
-            db, coll = get_namespace_details(namespace)
+            db, coll = namespace.split('.', 1)
             cursor = self.primary_connection[db][coll].find()
             
             doc_list = []

@@ -4,60 +4,33 @@
 from solr_doc_manager import SolrDocManager
 import time
 
-from util import get_oplog_coll, get_connection
+from util import get_oplog_coll
 from threading import Thread
 from pymongo import Connection, ReplicaSetConnection 
 from oplog_manager import OplogThread
-
-
-class DaemonThread(Thread):
-    """ DaemonThread is a wrapper class for the daemon.
-    """
-    
-    
-    def __init__(self, address, oplog_checkpoint):
-        """Initialize the daemon thread
-        """
-        Thread.__init__(self)
-        self.daemon = Daemon(oplog_checkpoint)
-        self.address = address
-        self.running = False
         
         
-    def run(self):
-        """ Start the thread, which runs the daemon. 
-        """
-        if self.running is False:
-            self.running = True 
-            self.daemon.run(self.address)
-
-
-    def stop(self):
-        """Stop the thread and daemon (if it's running). 
-        """
-        if self.running is True:
-            self.daemon.stop()
-            
-        self.running = False
-        
-        
-class Daemon():
+class Daemon(Thread):
     """Checks the cluster for shards to tail. 
     """
     
-    def __init__(self, oplog_checkpoint):
+    def __init__(self, address, oplog_checkpoint):
+        
+        super(Daemon, self).__init__()
         self.running = False
         self.oplog_checkpoint = oplog_checkpoint
-        
+        self.address = address
+        self.setDaemon(True)
+           
         
     def stop(self):
-        self.running = True
+        self.running = False
   
   
-    def run(self, address):
+    def run(self):
         """Continuously collect information about the sharded cluster. 
         """
-        mongos_conn = get_connection(address)
+        mongos_conn = Connection(self.address)
         shard_set = {}
         shard_coll = mongos_conn['config']['shards']
         self.running = True
@@ -69,14 +42,9 @@ class Daemon():
                 
                 if shard_set.has_key(shard_id):
                     continue
-                if '/' in shard_doc['host']:        #it's a replica set
-                    repl_set = shard_doc['host'].split('/')[0]
-                    shard_conn = ReplicaSetConnection(shard_doc['host'],
-                    replicaSet = repl_set)
-                else:
-                    shard_conn = Connection(shard_doc['host'])
 
-                oplog_coll = get_oplog_coll(shard_conn, 'repl_set')
+                shard_conn = Connection(shard_doc['host'])
+                oplog_coll = shard_conn.local.oplog.rs
                 
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, address, oplog_coll,
