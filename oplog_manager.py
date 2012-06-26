@@ -5,6 +5,7 @@ import time
 import json
 import pymongo
 
+from pymongo import Connection
 from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from threading import Thread, Timer
@@ -93,9 +94,33 @@ class OplogThread(Thread):
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
         """
-        return self.oplog.find({'ts': {'$gt': timestamp}}, tailable=True,
+        ret = None
+        
+        if timestamp is None:
+            return None
+            
+        cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
             await_data=True).sort('$natural', pymongo.ASCENDING) 
-
+            
+        try: 
+            doc = cursor.next()
+        except:
+            entry = self.oplog.find_one({'ts':timestamp})
+            
+            if entry is None:
+                less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
+                if less_than_doc:
+                    ret = get_oplog_cursor(rollback())
+            else:
+                ret = cursor
+                
+        if timestamp == doc['ts']:   
+            ret = cursor 
+        else:
+            print 'oplog stale'
+            return None
+        
+        return ret
         
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
@@ -125,7 +150,6 @@ class OplogThread(Thread):
             
             for doc in cursor:
                 self.doc_manager.upsert(doc)
-            
             
         
     def init_cursor(self):
@@ -243,33 +267,54 @@ class OplogThread(Thread):
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
         end_ts = backend_ts    
         
-                    
+        query = 'ts: [%s TO %s]' % (start_ts, end_ts)
+        docs_to_rollback = self.solr.search(query)   
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        rollback_set = {}
+        for doc in docs_to_rollback:
+            ns = doc['ns']
+            
+            if rollback_set.has_key(ns):
+                rollback_set[ns].append(doc['_id'])
+            else:
+                rollback_set[ns] = [doc['_id']]
+                
+        for namespace, id_list in rollback_set:
+            db, coll = namespace.split('.', 1)
+            bson_obj_id_list = [ObjectId(x) for x in id_list]
+            
+            to_update = [self.mongos_connection.db.coll.find({'_id': 
+            {'$in': bson_obj_id_list}})]
+            
+            id_list_set = set(id_list)
+            to_index = []
+            for doc in to_update:
+                id_list.set.remove(str(doc['_id']))
+                to_index.append(doc)
+            
+            #delete the inconsistent documents
+            for id in id_list_set:
+                self.doc_manager.remove(id)
+                
+            for doc in to_index:
+                doc['ts'] = rollback_cutoff_timestamp
+                self.doc_manager.upsert(doc)
+                
+        return rollback_cutoff_timestamp
+                       
+                
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
         
         
         

@@ -3,10 +3,8 @@
 
 from solr_doc_manager import SolrDocManager
 import time
-
-from util import get_oplog_coll
 from threading import Thread
-from pymongo import Connection, ReplicaSetConnection 
+from pymongo import Connection
 from oplog_manager import OplogThread
         
         
@@ -28,7 +26,7 @@ class Daemon(Thread):
   
   
     def run(self):
-        """Continuously collect information about the sharded cluster. 
+        """Continuously collect information about the sharded cluster.          
         """
         mongos_conn = Connection(self.address)
         shard_set = {}
@@ -47,7 +45,7 @@ class Daemon(Thread):
                 oplog_coll = shard_conn.local.oplog.rs
                 
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
-                oplog = OplogThread(shard_conn, address, oplog_coll,
+                oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, 
                  {'test.test'}).start() 
                 shard_set[shard_id] = oplog
