@@ -13,9 +13,6 @@ solr.delete(q="*:*")        #delete everything in solr
 dt = Daemon('localhost:27000', 'config.txt')
 dt.start()
 
-conn17 = Connection('localhost', 27017)
-conn18 = Connection('localhost', 27018)
-conn19 = Connection('localhost', 27019)
 
 
 

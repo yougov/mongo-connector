@@ -102,18 +102,27 @@ class OplogThread(Thread):
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
             await_data=True).sort('$natural', pymongo.ASCENDING) 
             
+        
         try: 
+            print 'attempting to get doc'
             doc = cursor.next()
+            print 'next doc is ' 
+            print doc
+            print 'timestamp is'
+            print timestamp
         except:
+            print 'attempting to get entry'
             entry = self.oplog.find_one({'ts':timestamp})
             
             if entry is None:
+                print 'entry is None'
                 less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
                 if less_than_doc:
+                    print 'going for rollback'
                     ret = get_oplog_cursor(rollback())
             else:
                 ret = cursor
-                
+          
         if timestamp == doc['ts']:   
             ret = cursor 
         else:
@@ -130,7 +139,7 @@ class OplogThread(Thread):
         
     #used here for testing, eventually we will use last_oplog_ts() + full_dump()
     def get_first_oplog_timestamp(self):
-        """Return the timestamp of the latest entry in the oplog.
+        """Return the timestamp of the first entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.ASCENDING).limit(1)
         return curr[0]['ts']
@@ -145,11 +154,9 @@ class OplogThread(Thread):
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
             cursor = self.primary_connection[db][coll].find()
-            
-            doc_list = []
-            
+
             for doc in cursor:
-                self.doc_manager.upsert(doc)
+                self.doc_manager.upsert([doc])
             
         
     def init_cursor(self):
@@ -159,12 +166,13 @@ class OplogThread(Thread):
         last left off. 
         """
         timestamp = self.read_config()
-         
+        
         if timestamp is None:
             timestamp = self.get_last_oplog_timestamp()
             self.dump_collection()
             
         self.checkpoint.commit_ts = timestamp
+        self.write_config()
         cursor = self.get_oplog_cursor(timestamp)
         
         return cursor
