@@ -61,6 +61,7 @@ class OplogThread(Thread):
                     doc = self.retrieve_doc(entry)
                     if doc is not None:
                         doc['ts'] = bson_ts_to_long(entry['ts'])
+                        doc['ns'] = entry['ns']
                         self.doc_manager.upsert([doc])
                     
                 last_ts = entry['ts']

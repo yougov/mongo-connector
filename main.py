@@ -9,7 +9,6 @@ from pymongo import Connection
 import commands
 
 #commands.getstatusoutput('rm config.txt; touch config.txt')
-
 #solr = Solr('http://127.0.0.1:8080/solr/')
 #solr.delete(q="*:*")        #delete everything in solr
 
@@ -17,10 +16,6 @@ dt = Daemon('localhost:27000', 'config.txt')
 dt.start()
 
 
-
-#commands.getstatusoutput('rm config.txt; touch config.txt')
-#solr = Solr('http://127.0.0.1:8080/solr/')
-#solr.delete(q="*:*")        #delete everything in solr
 
 
 
