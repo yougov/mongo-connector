@@ -32,7 +32,13 @@ class SolrDocManager():
         """Removes documents from Solr
         """
         self.solr.delete(id=str(doc_id), commit=False)
-           
+        
+    def search(self, query):
+        """Called by oplog_manager to query Solr
+        """
+        return self.solr.search(query)
+    
+              
     def solr_commit(self):
         """Periodically commits to the Solr server.
         """ 
@@ -48,8 +54,7 @@ class SolrDocManager():
         if len(result) == 0:
             return None
             
-        for it in result:
-            return it
+        return list(result)[0]
             
     
             

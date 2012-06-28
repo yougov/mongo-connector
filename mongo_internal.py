@@ -26,12 +26,11 @@ class Daemon(Thread):
   
   
     def run(self):
-        """Continuously collect information about the sharded cluster.          
-        """
         mongos_conn = Connection(self.address)
         shard_set = {}
         shard_coll = mongos_conn['config']['shards']
         self.running = True
+        
         
         while self.running is True: 
             

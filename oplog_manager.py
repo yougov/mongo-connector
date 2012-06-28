@@ -49,6 +49,7 @@ class OplogThread(Thread):
             cursor = self.prepare_for_sync()
             last_ts = None
             
+
             for entry in cursor:  
                 operation = entry['op']
 
@@ -99,35 +100,34 @@ class OplogThread(Thread):
         if timestamp is None:
             return None
             
+        print 'timestamp is'
+        print timestamp
+            
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
             await_data=True).sort('$natural', pymongo.ASCENDING) 
-            
-        
+    
         try: 
-            print 'attempting to get doc'
-            doc = cursor.next()
-            print 'next doc is ' 
-            print doc
-            print 'timestamp is'
-            print timestamp
+            # we should re-read the last committed document
+            doc = cursor.next() 
+            if timestamp == doc['ts']:   
+                ret = cursor 
+            else:
+                print 'oplog stale'
+                return None
         except:
-            print 'attempting to get entry'
             entry = self.oplog.find_one({'ts':timestamp})
             
             if entry is None:
                 print 'entry is None'
+                time.sleep(2)
                 less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
+                print 'lt doc is '
+                print less_than_doc
                 if less_than_doc:
-                    print 'going for rollback'
-                    ret = get_oplog_cursor(rollback())
+                    time.sleep(1)
+                    ret = self.get_oplog_cursor(self.rollback())
             else:
                 ret = cursor
-          
-        if timestamp == doc['ts']:   
-            ret = cursor 
-        else:
-            print 'oplog stale'
-            return None
         
         return ret
         
@@ -261,22 +261,28 @@ class OplogThread(Thread):
         back until the oplog and backend are in consistent states. 
         """
         last_inserted_doc = self.doc_manager.get_last_doc()
-        if last_doc is None:
+        print 'last inserted doc is '
+        print last_inserted_doc
+        if last_inserted_doc is None:
             return None
-            
-        backend_ts = last_inserted_doc['ts']
-        last_oplog_entry = self.oplog.find_one(spec={'ts':{'$lt':backend_ts}}, 
-        order={'$natural':'desc'})  
+
+        backend_ts = long_to_bson_ts(last_inserted_doc['ts'])
+        last_oplog_entry = self.oplog.find_one({ 'ts': { '$lt':backend_ts} }, 
+        sort= [('$natural',pymongo.DESCENDING)])
         
+        print 'last oplog entry is'
+        print last_oplog_entry
+        time.sleep(1)
         if last_oplog_entry is None:
             return None
             
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
-        end_ts = backend_ts    
+        end_ts = last_inserted_doc['ts']    
         
         query = 'ts: [%s TO %s]' % (start_ts, end_ts)
-        docs_to_rollback = self.solr.search(query)   
+        print 'start_ts %s, end_ts %s' % (start_ts, end_ts)
+        docs_to_rollback = self.doc_manager.search(query)   
         
         rollback_set = {}
         for doc in docs_to_rollback:
