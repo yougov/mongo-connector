@@ -304,7 +304,7 @@ class OplogThread(Thread):
             id_list_set = set(id_list)
             to_index = []
             for doc in to_update:
-                id_list.set.remove(str(doc['_id']))
+                id_list_set.remove(str(doc['_id']))
                 to_index.append(doc)
             
             #delete the inconsistent documents
