@@ -18,9 +18,9 @@ dt.start()
 
 
 
-commands.getstatusoutput('rm config.txt; touch config.txt')
-solr = Solr('http://127.0.0.1:8080/solr/')
-solr.delete(q="*:*")        #delete everything in solr
+#commands.getstatusoutput('rm config.txt; touch config.txt')
+#solr = Solr('http://127.0.0.1:8080/solr/')
+#solr.delete(q="*:*")        #delete everything in solr
 
 
 
