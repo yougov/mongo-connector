@@ -282,11 +282,11 @@ class OplogThread(Thread):
         end_ts = last_inserted_doc['ts']    
         
         query = 'ts: [%s TO %s]' % (start_ts, end_ts)
-        print 'start_ts %s, end_ts %s' % (start_ts, end_ts)
         docs_to_rollback = self.doc_manager.search(query)   
         
         rollback_set = {}
         for doc in docs_to_rollback:
+            print doc
             ns = doc['ns']
             
             if rollback_set.has_key(ns):
@@ -294,7 +294,7 @@ class OplogThread(Thread):
             else:
                 rollback_set[ns] = [doc['_id']]
                 
-        for namespace, id_list in rollback_set:
+        for namespace, id_list in rollback_set.items():
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(x) for x in id_list]
             
