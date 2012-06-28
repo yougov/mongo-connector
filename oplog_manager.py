@@ -148,7 +148,7 @@ class OplogThread(Thread):
         return curr[0]['ts']
         
     
-    def dump_collection(self):
+    def dump_collection(self, timestamp):
         """Dumps collection into backend engine.
         
         This method is called when we're initializing the cursor and have no
@@ -157,8 +157,11 @@ class OplogThread(Thread):
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
             cursor = self.primary_connection[db][coll].find()
+            long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
+                doc['ns'] = namespace
+                doc['ts'] = long_ts
                 self.doc_manager.upsert([doc])
             
         
@@ -172,7 +175,7 @@ class OplogThread(Thread):
         
         if timestamp is None:
             timestamp = self.get_last_oplog_timestamp()
-            self.dump_collection()
+            self.dump_collection(timestamp)
             
         self.checkpoint.commit_ts = timestamp
         self.write_config()
