@@ -26,12 +26,11 @@ class Daemon(Thread):
   
   
     def run(self):
-        """Continuously collect information about the sharded cluster.          
-        """
         mongos_conn = Connection(self.address)
         shard_set = {}
         shard_coll = mongos_conn['config']['shards']
         self.running = True
+        
         
         while self.running is True: 
             
@@ -42,14 +41,18 @@ class Daemon(Thread):
                     continue
 
                 shard_conn = Connection(shard_doc['host'])
-                oplog_coll = shard_conn.local.oplog.rs
+		if type(shard_conn) is not Connection:
+			print 'shard_conn failure'
+			print shard_conn
+			return
+                oplog_coll = shard_conn['local']['oplog.rs']
                 
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, 
-                 {'test.test'}).start() 
+                 {'test.test'}).run() 
                 shard_set[shard_id] = oplog
              
-            time.sleep(5) # for testing purposes 
+            #time.sleep(5) # for testing purposes 
             
        

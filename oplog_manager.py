@@ -12,7 +12,9 @@ from threading import Thread, Timer
 from checkpoint import Checkpoint
 from solr_doc_manager import SolrDocManager
 from util import (bson_ts_to_long,
-                  long_to_bson_ts)
+                  long_to_bson_ts,
+		  retry_until_ok)
+
 
 
 class OplogThread(Thread):
@@ -49,6 +51,7 @@ class OplogThread(Thread):
             cursor = self.prepare_for_sync()
             last_ts = None
             
+
             for entry in cursor:  
                 operation = entry['op']
 
@@ -60,6 +63,7 @@ class OplogThread(Thread):
                     doc = self.retrieve_doc(entry)
                     if doc is not None:
                         doc['ts'] = bson_ts_to_long(entry['ts'])
+                        doc['ns'] = entry['ns']
                         self.doc_manager.upsert([doc])
                     
                 last_ts = entry['ts']
@@ -99,35 +103,37 @@ class OplogThread(Thread):
         if timestamp is None:
             return None
             
+        print 'timestamp is'
+        print timestamp
+
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
-            await_data=True).sort('$natural', pymongo.ASCENDING) 
-            
-        
+        await_data=True).sort('$natural', pymongo.ASCENDING) 
+    
         try: 
-            print 'attempting to get doc'
-            doc = cursor.next()
-            print 'next doc is ' 
+            # we should re-read the last committed document
+            doc = cursor.next() 
+            print 'oplog_cursor read doc is'
             print doc
-            print 'timestamp is'
-            print timestamp
+            if timestamp == doc['ts']:   
+                ret = cursor 
+            else:
+                print 'oplog stale'
+                return None
         except:
-            print 'attempting to get entry'
-            entry = self.oplog.find_one({'ts':timestamp})
+	    entry = retry_until_ok(self.oplog.find_one(), '{\'ts\':timestamp}')
+            # entry = self.oplog.find_one({'ts':timestamp})
             
             if entry is None:
                 print 'entry is None'
+                time.sleep(2)
                 less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
+                print 'lt doc is '
+                print less_than_doc
                 if less_than_doc:
-                    print 'going for rollback'
-                    ret = get_oplog_cursor(rollback())
+                    time.sleep(1)
+                    ret = self.get_oplog_cursor(self.rollback())
             else:
                 ret = cursor
-          
-        if timestamp == doc['ts']:   
-            ret = cursor 
-        else:
-            print 'oplog stale'
-            return None
         
         return ret
         
@@ -145,7 +151,7 @@ class OplogThread(Thread):
         return curr[0]['ts']
         
     
-    def dump_collection(self):
+    def dump_collection(self, timestamp):
         """Dumps collection into backend engine.
         
         This method is called when we're initializing the cursor and have no
@@ -154,8 +160,11 @@ class OplogThread(Thread):
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
             cursor = self.primary_connection[db][coll].find()
+            long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
+                doc['ns'] = namespace
+                doc['ts'] = long_ts
                 self.doc_manager.upsert([doc])
             
         
@@ -169,7 +178,7 @@ class OplogThread(Thread):
         
         if timestamp is None:
             timestamp = self.get_last_oplog_timestamp()
-            self.dump_collection()
+            self.dump_collection(timestamp)
             
         self.checkpoint.commit_ts = timestamp
         self.write_config()
@@ -261,22 +270,23 @@ class OplogThread(Thread):
         back until the oplog and backend are in consistent states. 
         """
         last_inserted_doc = self.doc_manager.get_last_doc()
-        if last_doc is None:
+        
+        if last_inserted_doc is None:
             return None
-            
-        backend_ts = last_inserted_doc['ts']
-        last_oplog_entry = self.oplog.find_one(spec={'ts':{'$lt':backend_ts}}, 
-        order={'$natural':'desc'})  
+
+        backend_ts = long_to_bson_ts(last_inserted_doc['ts'])
+        last_oplog_entry = self.oplog.find_one({ 'ts': { '$lt':backend_ts} }, 
+        sort= [('$natural',pymongo.DESCENDING)])
         
         if last_oplog_entry is None:
             return None
             
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
-        end_ts = backend_ts    
+        end_ts = last_inserted_doc['ts']    
         
         query = 'ts: [%s TO %s]' % (start_ts, end_ts)
-        docs_to_rollback = self.solr.search(query)   
+        docs_to_rollback = self.doc_manager.search(query)   
         
         rollback_set = {}
         for doc in docs_to_rollback:
@@ -287,17 +297,18 @@ class OplogThread(Thread):
             else:
                 rollback_set[ns] = [doc['_id']]
                 
-        for namespace, id_list in rollback_set:
+        for namespace, id_list in rollback_set.items():
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(x) for x in id_list]
             
-            to_update = [self.mongos_connection.db.coll.find({'_id': 
-            {'$in': bson_obj_id_list}})]
-            
+            to_update = self.mongos_connection[db][coll].find({'_id': 
+            {'$in': bson_obj_id_list}})
+
             id_list_set = set(id_list)
             to_index = []
+
             for doc in to_update:
-                id_list.set.remove(str(doc['_id']))
+                id_list_set.remove(str(doc['_id']))
                 to_index.append(doc)
             
             #delete the inconsistent documents
@@ -305,10 +316,11 @@ class OplogThread(Thread):
                 self.doc_manager.remove(id)
                 
             for doc in to_index:
-                doc['ts'] = rollback_cutoff_timestamp
-                self.doc_manager.upsert(doc)
-                
-        return rollback_cutoff_timestamp
+                doc['ts'] = bson_ts_to_long(rollback_cutoff_ts)
+                doc['ns'] = namespace
+                self.doc_manager.upsert([doc])
+         
+        return rollback_cutoff_ts
                        
                 
             

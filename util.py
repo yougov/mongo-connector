@@ -32,6 +32,14 @@ def long_to_bson_ts(val):
     
     return Timestamp(seconds, increment)
 
+def retry_until_ok(func, args):
+    """Retry code block until it succeeds.
+    """
+
+    try:
+	func(args)
+    except:
+	return retry_until_ok(func, args)
 
     
     
