@@ -51,23 +51,25 @@ class OplogThread(Thread):
             cursor = self.prepare_for_sync()
             last_ts = None
             
-
-            for entry in cursor:  
-                operation = entry['op']
-
-                if operation == 'd':
-                    doc_id = entry['o']['_id']
-                    self.doc_manager.remove(doc_id)
-                
-                elif operation == 'i' or operation == 'u':
-                    doc = self.retrieve_doc(entry)
-                    if doc is not None:
-                        doc['ts'] = bson_ts_to_long(entry['ts'])
-                        doc['ns'] = entry['ns']
-                        self.doc_manager.upsert([doc])
+            try:
+                for entry in cursor:  
+                    operation = entry['op']
+    
+                    if operation == 'd':
+                        doc_id = entry['o']['_id']
+                        self.doc_manager.remove(doc_id)
                     
-                last_ts = entry['ts']
-            
+                    elif operation == 'i' or operation == 'u':
+                        doc = self.retrieve_doc(entry)
+                        if doc is not None:
+                            doc['ts'] = bson_ts_to_long(entry['ts'])
+                            doc['ns'] = entry['ns']
+                            self.doc_manager.upsert([doc])
+                        
+                    last_ts = entry['ts']
+            except:
+                continue
+                
             if last_ts is not None:                 #we actually processed docs
                 self.checkpoint.commit_ts = last_ts
                 self.write_config()
@@ -105,15 +107,9 @@ class OplogThread(Thread):
             
         print 'timestamp is'
         print timestamp
-<<<<<<< HEAD
 
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
         await_data=True).sort('$natural', pymongo.ASCENDING) 
-=======
-            
-        cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
-            await_data=True).sort('$natural', pymongo.ASCENDING) 
->>>>>>> bbd63be93301fb424ec9a6dcf245e2bc147795da
     
         try: 
             # we should re-read the last committed document
@@ -126,13 +122,8 @@ class OplogThread(Thread):
                 print 'oplog stale'
                 return None
         except:
-<<<<<<< HEAD
-	    entry = retry_until_ok(self.oplog.find_one(), '{\'ts\':timestamp}')
+	        entry = retry_until_ok(self.oplog.find_one(), '{\'ts\':timestamp}')
             # entry = self.oplog.find_one({'ts':timestamp})
-=======
-            entry = self.oplog.find_one({'ts':timestamp})
->>>>>>> bbd63be93301fb424ec9a6dcf245e2bc147795da
-            
             if entry is None:
                 print 'entry is None'
                 time.sleep(2)
