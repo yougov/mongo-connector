@@ -4,9 +4,12 @@ It is meant as an intermediate layer that hides the details of sharding
 and provides an API for backends like Solr/Sphinx/etc to use to gather 
 documents. 
 """
+#!/usr/env/python
+import sys
 
 from pysolr import Solr
 from threading import Timer
+from util import verify_url
 
 class SolrDocManager():
     """The DocManager class contains a dictionary that stores id/doc pairs. 
@@ -19,6 +22,10 @@ class SolrDocManager():
     def __init__(self, url):
         """Just create a dict
         """
+	if verify_url(url) is False:
+		print 'Invalid Solr URL'
+		return None	
+
         self.solr = Solr(url)   
         self.solr_commit()          
 
