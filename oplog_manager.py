@@ -122,8 +122,7 @@ class OplogThread(Thread):
                 print 'oplog stale'
                 return None
         except:
-	        entry = retry_until_ok(self.oplog.find_one(), '{\'ts\':timestamp}')
-            # entry = self.oplog.find_one({'ts':timestamp})
+            entry = retry_until_ok(self.oplog.find_one, '{\'ts\':timestamp}')
             if entry is None:
                 print 'entry is None'
                 time.sleep(2)
