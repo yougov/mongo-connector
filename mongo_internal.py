@@ -22,7 +22,7 @@ class Daemon(Thread):
         
     def stop(self):
         self.canRun = False
-        for thread in self.shard_set:
+        for thread in self.shard_set.values():
             thread.stop()
 
   
@@ -44,7 +44,9 @@ class Daemon(Thread):
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, 
-                 {'test.test'}).run() #later change run to start
+                 {'test.test'})
                 self.shard_set[shard_id] = oplog
+                oplog.run()
+                
             
        
