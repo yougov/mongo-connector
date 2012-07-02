@@ -6,7 +6,6 @@ import time
 from threading import Thread
 from pymongo import Connection
 from oplog_manager import OplogThread
-import unittest        
         
 class Daemon(Thread):
     """Checks the cluster for shards to tail. 
@@ -29,9 +28,7 @@ class Daemon(Thread):
   
     def run(self):
         mongos_conn = Connection(self.address)
-        self.assertTrue(isinstance(mongos_conn, Connection))
         shard_coll = mongos_conn['config']['shards']
-        self.assertTrue(isinstance(shard_coll, Collection))
         self.running = True
         
         while self.running is True: 
@@ -43,7 +40,6 @@ class Daemon(Thread):
                     continue
 
                 shard_conn = Connection(shard_doc['host'])
-                self.assertTrue(isinstance(shard_conn, Connection))
                 oplog_coll = shard_conn['local']['oplog.rs']
                 
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
