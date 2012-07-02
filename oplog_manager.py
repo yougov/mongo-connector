@@ -13,7 +13,7 @@ from checkpoint import Checkpoint
 from solr_doc_manager import SolrDocManager
 from util import (bson_ts_to_long,
                   long_to_bson_ts,
-		  retry_until_ok)
+		          retry_until_ok)
 
 
 

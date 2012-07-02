@@ -14,14 +14,14 @@ class Daemon(Thread):
     def __init__(self, address, oplog_checkpoint):
         
         super(Daemon, self).__init__()
-        self.running = False
+        self.canRun = True
         self.oplog_checkpoint = oplog_checkpoint
         self.address = address
         self.setDaemon(True)
         self.shard_set = {}
         
     def stop(self):
-        self.running = False
+        self.canRun = False
         for thread in self.shard_set:
             thread.stop()
 
@@ -29,9 +29,8 @@ class Daemon(Thread):
     def run(self):
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        self.running = True
         
-        while self.running is True: 
+        while self.canRun is True: 
             
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']

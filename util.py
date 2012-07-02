@@ -3,26 +3,25 @@
 
 from pymongo import Connection
 from bson.timestamp import Timestamp
-import httplib
-import urlparse
+from urllib2 import urlopen
+import sys
 
     
 def verify_url(url):
-    """Verifies the validity of a given url
+    """Verifies the validity of a given url.
     """
-    host, path = urlparse.urlparse(url)[1:3]
     try:
-        conn = httplib.HTTPConnection(host)
-        conn.request('HEAD', path)
+        urlopen(url)
         return True
-    except StandardError:
-        return False 
+    except:
+        return False
     
 
 def bson_ts_to_long(timestamp):
     """Convert BSON timestamp into integer.
     
-    Conversion rule is based from the specs (http://bsonspec.org/#/specification). 
+    Conversion rule is based from the specs  
+    (http://bsonspec.org/#/specification). 
     """
     return ((timestamp.time << 32) + timestamp.inc)
     
@@ -35,14 +34,16 @@ def long_to_bson_ts(val):
     
     return Timestamp(seconds, increment)
 
-def retry_until_ok(func, args):
+def retry_until_ok(func, args = None):
     """Retry code block until it succeeds.
     """
-
+    
     try:
-	func(args)
+        if args is None:
+            func()
+        else:
+            func(args)
     except:
-	return retry_until_ok(func, args)
-
-    
-    
+        return retry_until_ok(func, args)
+        
+    return True
