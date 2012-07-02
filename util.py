@@ -3,17 +3,20 @@
 
 from pymongo import Connection
 from bson.timestamp import Timestamp
+import httplib
+import urlparse
 
     
 def verify_url(url):
     """Verifies the validity of a given url
     """
-    ret = True
-    try: 
-        open(url)
-    except IOError: 
-        ret = False   
-    return ret   
+    host, path = urlparse.urlparse(url)[1:3]
+    try:
+        conn = httplib.HTTPConnection(host)
+        conn.request('HEAD', path)
+        return True
+    except StandardError:
+        return False 
     
 
 def bson_ts_to_long(timestamp):
