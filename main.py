@@ -11,7 +11,7 @@ Quick start instructions:
 from mongo_internal import Daemon
 
 
-dt = Daemon('localhost:27000', 'config.txt')
+dt = Daemon('localhost:27217', 'config.txt')
 dt.start()
 
 
