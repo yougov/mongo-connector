@@ -22,8 +22,7 @@ class Daemon(Thread):
         
     def stop(self):
         self.canRun = False
-        for thread in self.shard_set.values():
-            thread.stop()
+
 
   
     def run(self):
@@ -47,6 +46,9 @@ class Daemon(Thread):
                  {'test.test'})
                 self.shard_set[shard_id] = oplog
                 oplog.run()
-                
+          
+        #time to stop running
+        for thread in self.shard_set.values():
+            thread.stop()      
             
        
