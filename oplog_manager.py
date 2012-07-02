@@ -62,11 +62,11 @@ class OplogThread(Thread):
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
                         if doc is not None:
-                            doc['ts'] = bson_ts_to_long(entry['ts'])
+                            doc['_ts'] = bson_ts_to_long(entry['_ts'])
                             doc['ns'] = entry['ns']
                             self.doc_manager.upsert([doc])
                         
-                    last_ts = entry['ts']
+                    last_ts = entry['_ts']
             except:
                 continue
                 
@@ -116,7 +116,7 @@ class OplogThread(Thread):
             doc = cursor.next() 
             print 'oplog_cursor read doc is'
             print doc
-            if timestamp == doc['ts']:   
+            if timestamp == doc['_ts']:   
                 ret = cursor 
             else:
                 print 'oplog stale'
@@ -164,7 +164,7 @@ class OplogThread(Thread):
 
             for doc in cursor:
                 doc['ns'] = namespace
-                doc['ts'] = long_ts
+                doc['_ts'] = long_ts
                 self.doc_manager.upsert([doc])
             
         
@@ -274,7 +274,7 @@ class OplogThread(Thread):
         if last_inserted_doc is None:
             return None
 
-        backend_ts = long_to_bson_ts(last_inserted_doc['ts'])
+        backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one({ 'ts': { '$lt':backend_ts} }, 
         sort= [('$natural',pymongo.DESCENDING)])
         
@@ -283,9 +283,9 @@ class OplogThread(Thread):
             
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
-        end_ts = last_inserted_doc['ts']    
+        end_ts = last_inserted_doc['_ts']    
         
-        query = 'ts: [%s TO %s]' % (start_ts, end_ts)
+        query = '_ts: [%s TO %s]' % (start_ts, end_ts)
         docs_to_rollback = self.doc_manager.search(query)   
         
         rollback_set = {}
@@ -316,7 +316,7 @@ class OplogThread(Thread):
                 self.doc_manager.remove(id)
                 
             for doc in to_index:
-                doc['ts'] = bson_ts_to_long(rollback_cutoff_ts)
+                doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
                 self.doc_manager.upsert([doc])
          

@@ -896,7 +896,7 @@
    <field name="created" type="string" indexed="true" stored="true" /> 
    <field name="author" type="string" indexed="true" stored="true" /> 
    <field name="_id" type="string" indexed="true" stored="true" /> 
-   <field name="ts" type="long" indexed="true" stored="true" />
+   <field name="_ts" type="long" indexed="true" stored="true" />
    <field name="ns" type="string" indexed="true" stored="true"/>
 
    <field name="id" type="string" indexed="true" stored="true" /> 
