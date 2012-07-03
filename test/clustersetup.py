@@ -17,27 +17,7 @@ MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port 27220"
 MONGOD_PORTS = ["27117", "27118", "27119", "27218",
                  "27219", "27220", "27017"]
-                 
-def killMongoProc(port):
-    cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
-    executeCommand(cmd)
-    
-def killMongosProc():
-    cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
-    executeCommand(cmd)
 
-def killAllMongoProc():
-    """Kill any existing mongods"""
-    for port in MONGOD_PORTS:
-        killMongoProc(port)
-
-def startMongoProc(port):
-    CMD = ["mongod --oplogSize 500 --fork --noprealloc --port " + str(port) + " --dbpath " +
-       DEMO_SERVER_DATA + "/standalone --rest --logpath " +
-       DEMO_SERVER_LOG + "/standalone.log &"]
-    executeCommand(CMD)
-    checkStarted(port)
-    
 def remove_dir(path):
     """Remove supplied directory"""
     command = ["rm", "-rf", path]
@@ -60,6 +40,28 @@ create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
 create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
 create_dir(DEMO_SERVER_DATA + "/config1/journal")
 create_dir(DEMO_SERVER_LOG)
+
+
+def killMongoProc(port):
+    cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
+    executeCommand(cmd)
+    
+def killMongosProc():
+    cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
+    executeCommand(cmd)
+
+def killAllMongoProc():
+    """Kill any existing mongods"""
+    for port in MONGOD_PORTS:
+        killMongoProc(port)
+
+def startMongoProc(port, name, data, log):
+    #Create the replica set
+    CMD = ["mongod --fork --replSet " + name + " --noprealloc --port " + port + " --dbpath "
+    + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
+    + DEMO_SERVER_LOG + log + " --logappend &"]
+    executeCommand(CMD)
+    checkStarted(int(port))
 
 
 def executeCommand(command):
@@ -91,8 +93,8 @@ def checkStarted(port):
     while not connected:
         error = tryConnection(port)
         if error:
-            # Check every 2 seconds
-            time.sleep(2)
+            #Check every 1 second
+            time.sleep(1)
         else:
             connected = True
 
@@ -114,25 +116,11 @@ class ReplSetManager():
         killMongosProc()
 
         # Create the replica set
-        CMD = ["mongod --fork --replSet demo-repl --noprealloc --port 27117 --dbpath "
-       + DEMO_SERVER_DATA + "/replset1a --shardsvr --rest --logpath "
-       + DEMO_SERVER_LOG + "/replset1a.log --logappend &"]
-        executeCommand(CMD)
-        checkStarted(27117)
-
-        CMD = ["mongod --fork --replSet demo-repl --noprealloc --port 27118 --dbpath "
-       + DEMO_SERVER_DATA + "/replset1b --shardsvr --rest --logpath "
-       + DEMO_SERVER_LOG + "/replset1b.log --logappend &"]
-        executeCommand(CMD)
-        checkStarted(27118)
-
-        CMD = ["mongod --fork --replSet demo-repl --noprealloc --port 27119 --dbpath "
-       + DEMO_SERVER_DATA + "/replset1c --shardsvr --rest --logpath "
-       + DEMO_SERVER_LOG + "/replset1c.log --logappend &"]
-        executeCommand(CMD)
-        checkStarted(27119)
-
-# Setup config server
+        startMongoProc("27117", "demo-repl", "/replset1a", "/replset1a.log")
+        startMongoProc("27118", "demo-repl", "/replset1b", "/replset1b.log")
+        startMongoProc("27119", "demo-repl", "/replset1c", "/replset1c.log")
+        
+        # Setup config server
         CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port 27220 --dbpath " +
         DEMO_SERVER_DATA + "/config1 --rest --logpath "
        + DEMO_SERVER_LOG + "/config1.log --logappend &"]
@@ -150,8 +138,10 @@ class ReplSetManager():
         executeCommand(CMD).wait()
 
         sys.exit(0)
+    #
+        #def testMongoInternal(self):
+#d = Daemon('localhost:27217', None)
         
-
 
 
 """
