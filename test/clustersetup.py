@@ -7,9 +7,10 @@ import sys
 import time
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
+from os import path
 
 # Global path variables
-SETUP_DIR = "/Users/aayushu/mongo-connector/test"
+SETUP_DIR = path.expanduser("~/mongo-connector/mongo-connector/test")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
@@ -133,13 +134,13 @@ class ReplSetManager():
 
 # Setup config server
         CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port 27220 --dbpath " +
-       + DEMO_SERVER_DATA + "/config1 --rest --logpath "
+        DEMO_SERVER_DATA + "/config1 --rest --logpath "
        + DEMO_SERVER_LOG + "/config1.log --logappend &"]
         executeCommand(CMD)
         checkStarted(27220)
 
 # Setup the mongos
-        CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " +
+        CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
        + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
         executeCommand(CMD)
         checkStarted(27217)

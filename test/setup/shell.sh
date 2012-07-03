@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOAD_DIR="/Users/aayushu/mongo-connector/test"
+LOAD_DIR="$HOME/mongo-connector/mongo-connector/test"
 DEMO_SERVER_DATA=$LOAD_DIR/data
 DEMO_SERVER_LOG=$LOAD_DIR/logs
 SETUP_DIR=$LOAD_DIR/setup
