@@ -12,7 +12,8 @@ from mongo_internal import Daemon
 from threading import Timer
 
 # Global path variables
-SETUP_DIR = path.expanduser("~/mongo-connector/test")
+
+SETUP_DIR = path.expanduser("~/mongo-connector/mongo-connector/test")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
