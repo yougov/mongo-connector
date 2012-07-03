@@ -33,16 +33,18 @@ class Daemon(Thread):
             
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
-                
                 if self.shard_set.has_key(shard_id):
                     continue
-                
                 shard_conn = Connection(shard_doc['host'])
+                print shard_conn
                 oplog_coll = shard_conn['local']['oplog.rs']
+                print oplog_coll
                 doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, {'test.test'})
                 self.shard_set[shard_id] = oplog
+                print "added"
+                print self.shard_set
                 oplog.start()
           
         #time to stop running

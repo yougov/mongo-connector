@@ -3,6 +3,9 @@
 //=========================================#
 //         Configure Mongos                #
 //=========================================#
-db._adminCommand({addShard: "demo-repl/localhost:27117"});
-db._adminCommand({enablesharding: "test"});
 
+print("starting");
+printjson(db._adminCommand({addShard: "demo-repl/localhost:27117"}));
+print("finished first command");
+//printjson(db._adminCommand({enablesharding: "demo-repl/localhost:27117/test"}));
+print("ending");

@@ -10,14 +10,13 @@ LOAD_SIM_PID_FILE=$LOAD_DIR/load_sim.pid
 #      Configure replica sets     #
 #=================================#
 
-mongo localhost:27117 --quiet $SETUP_DIR/configReplSet.js
+mongo localhost:27117  $SETUP_DIR/configReplSet.js
 
-sleep 10
+sleep 2
 
 #===================================#
 #   Add sharded cluster to mongos   #
 #===================================#
 
-mongo localhost:27217/load_db --quiet $SETUP_DIR/configMongos.js
-
-sleep 10
+echo $SETUP_DIR
+mongo --port 27217  $SETUP_DIR/configMongos.js
