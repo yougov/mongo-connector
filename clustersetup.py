@@ -10,6 +10,7 @@ from pymongo.errors import ConnectionFailure
 from os import path
 from mongo_internal import Daemon
 from threading import Timer
+from oplog_manager import OplogThread
 
 # Global path variables
 
@@ -151,7 +152,7 @@ class ReplSetManager():
         print 'test failed'
         sys.exit(1)
     
-    def testMongoInternal(self):
+    def test_mongo_internal(self):
         t = Timer(60, self.abort_test)
         t.start()
         d = Daemon('localhost:27217', None)
@@ -159,12 +160,66 @@ class ReplSetManager():
         while len(d.shard_set) == 0:
             pass
         t.cancel()
+                    
         d.stop()
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
         #we want to add several shards
         
+    def test_retrieve_doc(self):
+        #try sending invalid entry
+        primary_conn = Connection('localhost', 27117)
+        mongos_conn = "localhost:27217"
+        oplog_coll = primary_conn['local']['oplog.rs']
+        oplog_coll.drop()           # reset the oplog
+        primary_conn['local'].create_collection('oplog.rs', capped=True, size=10000)
+        namespace_set = ['test.test']
+        testOplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, None, None, namespace_set)
+        
+        #testing for entry as none type
+        entry = None
+        assert (testOplog.retrieve_doc(entry) is None)
+        
+        primary_conn['test']['test'].drop()
+        oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
+        oplog_cursor.next()  #skip first 'drop collection' operation
+        
+        
+        #insert a doc into the system
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        last_oplog_entry = oplog_cursor.next()
+        target_entry = primary_conn['test']['test'].find_one()
+        
+        assert (testOplog.retrieve_doc(last_oplog_entry) == target_entry)
+        
+        primary_conn['test']['test'].update({'name':'paulie'}, {"$set": {'name':'paul'}} )
+        
+        last_oplog_entry = oplog_cursor.next()
+        target_entry = primary_conn['test']['test'].find_one()        
+        
+        assert (testOplog.retrieve_doc(last_oplog_entry) == target_entry)
+        
+        primary_conn['test']['test'].remove( {'name':'paul'} )
+        last_oplog_entry = oplog_cursor.next()
+        
+        assert (testOplog.retrieve_doc(last_oplog_entry) == None)
+        
+        last_oplog_entry['o']['_id'] = 'badID'
+        
+        assert (testOplog.retrieve_doc(last_oplog_entry) == None)
+        
+        
 
+        
+        
+        #testing for valid entry
+        """
+            { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
+            { "ts" : { "t" : 1341347358000, "i" : 1 }, "h" : NumberLong("5704011229614309393"), "op" : "i", "ns" : "test.test", "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c"), "name" : "paulie" } }
+            { "ts" : { "t" : 1341347475000, "i" : 1 }, "h" : NumberLong("-1269638662509784076"), "op" : "u", "ns" : "test.test", "o2" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c") }, "o" : { "$set" : { "name" : "paul" } } }
+            { "ts" : { "t" : 1341347486000, "i" : 1 }, "h" : NumberLong("570562443735405485"), "op" : "d", "ns" : "test.test", "b" : true, "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c") } }
+        """
+        
 
 """
 # Create the sharded cluster

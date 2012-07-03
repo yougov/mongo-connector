@@ -87,13 +87,21 @@ class OplogThread(Thread):
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
         """
-        namespace = entry['ns']
-        doc_id = entry['o']['_id']
+        try :
+            namespace = entry['ns']
+            if entry.has_key('o2'):
+                doc_field = 'o2'
+            else:
+                doc_field = 'o'
+        	
+            doc_id = entry[doc_field]['_id']
+            db_name, coll_name = namespace.split('.',1)
+            coll = self.mongos_connection[db_name][coll_name]
+            doc = coll.find_one({'_id': doc_id})
+        
+        except : 
+            doc = None
 
-        db_name, coll_name = namespace.split('.',1)
-        coll = self.mongos_connection[db_name][coll_name]
-        doc = coll.find_one({'_id':doc_id})
-      
         return doc
     
     
