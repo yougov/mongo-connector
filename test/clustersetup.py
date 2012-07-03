@@ -136,11 +136,13 @@ class ReplSetManager():
 # Configure the shards and begin load simulation
         CMD = [SETUP_DIR + "/setup/shell.sh"]
         executeCommand(CMD).wait()
-
-        sys.exit(0)
-    #
-        #def testMongoInternal(self):
-#d = Daemon('localhost:27217', None)
+    
+    def testMongoInternal(self):
+        d = Daemon('localhost:27217', None)
+        d.start()
+        #the Daemon should recognize a single running shard
+        assert len(d.shard_set) == 1
+        
         
 
 
