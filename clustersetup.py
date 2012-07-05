@@ -17,6 +17,7 @@ from solr_doc_manager import SolrDocManager
 from pysolr import Solr
 from util import long_to_bson_ts
 from checkpoint import Checkpoint
+import json
 
 # Global path variables
 
@@ -343,6 +344,7 @@ class ReplSetManager():
         cursor = test_oplog.prepare_for_sync()
         search_ts = test_oplog.get_last_oplog_timestamp()
 
+        #make sure that the cursor is valid and the timestamp is updated properly
         assert (test_oplog.checkpoint.commit_ts == search_ts)
         assert (cursor != None)
         assert (cursor.count() == 1)
@@ -351,6 +353,7 @@ class ReplSetManager():
         cursor = test_oplog.prepare_for_sync()
         new_search_ts = test_oplog.get_last_oplog_timestamp()
         
+        #make sure that the newest document is in the cursor.
         assert (cursor.count() == 2)
         next_doc = cursor.next()
         assert (next_doc['o']['name'] == 'paulter')
@@ -358,7 +361,37 @@ class ReplSetManager():
 
         test_oplog.stop()
         
-    
+    def test_write_config(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog.checkpoint = Checkpoint()
+        
+        
+        #test that None is returned if there is no config file specified.
+        assert (test_oplog.write_config() == None)
+        
+        #create config file
+        os.system('touch temp_config.txt')
+        config_file_path = os.getcwd() + '/temp_config.txt'
+        test_oplog.oplog_file = config_file_path
+        
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        search_ts = test_oplog.get_last_oplog_timestamp()
+        test_oplog.checkpoint.commit_ts = search_ts
+        
+        test_oplog.write_config()
+        
+        data = json.load(open(config_file_path, 'r'))
+        oplog_str = str(oplog_coll.database.connection)
+        
+        assert (oplog_str in data[0])
+        assert (search_ts == long_to_bson_ts(data[1]))
+        
+        #ensure that the temporary file is deleted
+        assert (os.path.exists(config_file_path + '~') is False)
+        
+        test_oplog.stop()
+        
         """
             { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
             { "ts" : { "t" : 1341347358000, "i" : 1 }, "h" : NumberLong("5704011229614309393"), "op" : "i", "ns" : "test.test", "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c"), "name" : "paulie" } }

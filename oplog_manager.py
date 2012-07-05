@@ -214,8 +214,8 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file. 
         """
-	if self.oplog_file is None:
-	    return None
+        if self.oplog_file is None:
+            return None
 
         os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
         dest = open(self.oplog_file, 'w')
