@@ -14,6 +14,7 @@ from oplog_manager import OplogThread
 from solr_doc_manager import SolrDocManager
 from pysolr import Solr
 from util import long_to_bson_ts
+from checkpoint import Checkpoint
 
 # Global path variables
 
@@ -223,7 +224,37 @@ class ReplSetManager():
         assert (test_oplog.retrieve_doc(last_oplog_entry) == None)
         
         test_oplog.stop()
+        
+                
+    def test_get_oplog_cursor(self):
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        
+        #test None cursor
+        assert (test_oplog.get_oplog_cursor(None) == None)
+        
+        #test with one document
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        ts = test_oplog.get_last_oplog_timestamp()
+        cursor = test_oplog.get_oplog_cursor(ts)
+        assert (cursor.count() == 1)
+        
+        #test with two documents, one after the ts
+        primary_conn['test']['test'].insert ( {'name':'paul'} )
+        cursor = test_oplog.get_oplog_cursor(ts)
+        assert (cursor.count() == 2)
+        
+        #test case where timestamp is not in oplog which implies we're too behind 
+        oplog_coll = primary_conn['local']['oplog.rs']
+        oplog_coll.drop()           # reset the oplog
+        primary_conn['local'].create_collection('oplog.rs', capped=True, size=10000)
+        
+        primary_conn['test']['test'].insert ( {'name':'pauline'} )
+        assert (test_oplog.get_oplog_cursor(ts) == None)
+        test_oplog.stop()
             
+        #need to add tests for 'except' part of get_oplog_cursor
+            
+
     def test_get_last_oplog_timestamp(self):
         
         #test empty oplog
@@ -236,7 +267,9 @@ class ReplSetManager():
         last_oplog_entry = oplog_cursor.next()
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
         
+        test_oplog.stop()
         
+            
     def test_dump_collection(self):
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
@@ -260,17 +293,34 @@ class ReplSetManager():
         assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'test.test')
+        
         test_oplog.stop()
-            
-            
-    
-
-
+        
+    def test_init_cursor(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog.checkpoint = Checkpoint()            #needed for these tests
+        
+        #initial tests with no config file and empty oplog
+        assert (test_oplog.init_cursor() == None)
+        
+        #no config, single oplog entry
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        search_ts = test_oplog.get_last_oplog_timestamp()
+        cursor = test_oplog.init_cursor()
         
         
+        assert (cursor.count() == 1)
+        assert (test_oplog.checkpoint.commit_ts == search_ts)
+        
+        #with config file
+        os.system('touch temp_config.txt')
+        
+        test_oplog.config = 'temp_config.txt'
         
         
-
+        test_oplog.stop()
+        
         
         
         #testing for valid entry

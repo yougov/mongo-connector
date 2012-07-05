@@ -112,33 +112,22 @@ class OplogThread(Thread):
         
         if timestamp is None:
             return None
-            
-        print 'timestamp is'
-        print timestamp
-
+              
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
         await_data=True).sort('$natural', pymongo.ASCENDING) 
     
         try: 
             # we should re-read the last committed document
             doc = cursor.next() 
-            print 'oplog_cursor read doc is'
-            print doc
-            if timestamp == doc['_ts']:   
+            if timestamp == doc['ts']:   
                 ret = cursor 
             else:
-                print 'oplog stale'
                 return None
         except:
             entry = retry_until_ok(self.oplog.find_one, '{\'ts\':timestamp}')
             if entry is None:
-                print 'entry is None'
-                time.sleep(2)
                 less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
-                print 'lt doc is '
-                print less_than_doc
                 if less_than_doc:
-                    time.sleep(1)
                     ret = self.get_oplog_cursor(self.rollback())
             else:
                 ret = cursor
