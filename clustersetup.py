@@ -11,10 +11,12 @@ from os import path
 from mongo_internal import Daemon
 from threading import Timer
 from oplog_manager import OplogThread
+from solr_doc_manager import SolrDocManager
+from pysolr import Solr
 
 # Global path variables
 
-SETUP_DIR = path.expanduser("~/mongo-connector/mongo-connector/test")
+SETUP_DIR = path.expanduser("~/mongo-connector/test")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
@@ -166,47 +168,101 @@ class ReplSetManager():
         assert len(d.shard_set) == 1
         #we want to add several shards
         
-    def test_retrieve_doc(self):
+    def get_oplog_thread(self):
         #try sending invalid entry
         primary_conn = Connection('localhost', 27117)
+        primary_conn['test']['test'].drop()
         mongos_conn = "localhost:27217"
+        
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
+        
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=10000)
         namespace_set = ['test.test']
-        testOplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, None, None, namespace_set)
+        doc_manager = SolrDocManager('http://localhost:8080/solr')
+        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
         
+        return (oplog, primary_conn, oplog_coll)
+            
+    def test_retrieve_doc(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         #testing for entry as none type
         entry = None
-        assert (testOplog.retrieve_doc(entry) is None)
+        assert (test_oplog.retrieve_doc(entry) is None)
         
-        primary_conn['test']['test'].drop()
         oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        oplog_cursor.next()  #skip first 'drop collection' operation
+        #oplog_cursor.next()  #skip first 'drop collection' operation
         
         
-        #insert a doc into the system
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         last_oplog_entry = oplog_cursor.next()
         target_entry = primary_conn['test']['test'].find_one()
-        
-        assert (testOplog.retrieve_doc(last_oplog_entry) == target_entry)
+            
+        #testing for search after inserting a document
+        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
         primary_conn['test']['test'].update({'name':'paulie'}, {"$set": {'name':'paul'}} )
         
         last_oplog_entry = oplog_cursor.next()
         target_entry = primary_conn['test']['test'].find_one()        
         
-        assert (testOplog.retrieve_doc(last_oplog_entry) == target_entry)
+        #testing for search after updating a document
+        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
         primary_conn['test']['test'].remove( {'name':'paul'} )
         last_oplog_entry = oplog_cursor.next()
         
-        assert (testOplog.retrieve_doc(last_oplog_entry) == None)
+        #testing for search after deleting a document
+        assert (test_oplog.retrieve_doc(last_oplog_entry) == None)
         
         last_oplog_entry['o']['_id'] = 'badID'
         
-        assert (testOplog.retrieve_doc(last_oplog_entry) == None)
+        #testing for bad doc id as input
+        assert (test_oplog.retrieve_doc(last_oplog_entry) == None)
+        
+        test_oplog.stop()
+            
+    def test_get_last_oplog_timestamp(self):
+        
+        #test empty oplog
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        assert (test_oplog.get_last_oplog_timestamp() == None)
+        
+        #test non-empty oplog
+        oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        last_oplog_entry = oplog_cursor.next()
+        assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
+        
+        
+    def test_dump_collection(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        solr_url = "http://localhost:8080/solr"
+        solr = Solr(solr_url)
+        solr.delete(q='*:*')
+        
+        #for empty oplog, no documents added
+        assert (test_oplog.dump_collection(None) == None)
+        assert (len(solr.search('*')) == 0)
+        
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        search_ts = test_oplog.get_last_oplog_timestamp()
+        test_oplog.dump_collection(search_ts)
+            
+        solr_results = solr.search('*')
+        assert (len(solr_results) == 1)
+        solr_doc = solr_results[0]
+        assert (solr_doc['_ts'] == search_ts)
+        assert (solr_doc['name'] == 'paulie')
+
+            
+            
+
+
+        
+        
         
         
 

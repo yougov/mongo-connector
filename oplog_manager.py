@@ -149,6 +149,8 @@ class OplogThread(Thread):
         """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
+        if curr.count(with_limit_and_skip= True) == 0 :
+            return None
         return curr[0]['ts']
         
     #used here for testing, eventually we will use last_oplog_ts() + full_dump()
@@ -165,6 +167,8 @@ class OplogThread(Thread):
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
+        if timestamp == None:
+            return None
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
             cursor = self.primary_connection[db][coll].find()
