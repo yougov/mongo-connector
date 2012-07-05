@@ -390,7 +390,46 @@ class ReplSetManager():
         #ensure that the temporary file is deleted
         assert (os.path.exists(config_file_path + '~') is False)
         
+        search_ts = long_to_bson_ts(111111111111111)
+        test_oplog.checkpoint.commit_ts = search_ts
+        
+        test_oplog.write_config()
+        data = json.load(open(config_file_path, 'r'))
+        oplog_str = str(oplog_coll.database.connection)
+        
+        assert (oplog_str in data[0])
+        assert (search_ts == long_to_bson_ts(data[1]))
+        
         test_oplog.stop()
+        os.system('rm ' + config_file_path)
+        
+    def test_read_config(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog.checkpoint = Checkpoint()
+        
+        #testing with no file
+        assert(test_oplog.read_config() is None)
+        #create config file
+        os.system('touch temp_config.txt')
+        config_file_path = os.getcwd() + '/temp_config.txt'
+        test_oplog.oplog_file = config_file_path
+        
+        #testing with empty file
+        assert(test_oplog.read_config() is None)
+        
+        #testing with a non-empty file
+        search_ts = long_to_bson_ts(111111111111111)
+        test_oplog.checkpoint.commit_ts = search_ts
+        test_oplog.write_config()
+        assert (test_oplog.read_config() == search_ts)
+
+        #testing update
+        search_ts = long_to_bson_ts(999999999999999)
+        test_oplog.checkpoint.commit_ts = search_ts
+        test_oplog.write_config()
+        assert (test_oplog.read_config() == search_ts)
+        os.system('rm ' + config_file_path)        
         
         """
             { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
