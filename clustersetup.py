@@ -54,8 +54,12 @@ create_dir(DEMO_SERVER_LOG)
 
 
 def killMongoProc(port):
-    cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
-    executeCommand(cmd)
+    try:
+        conn = Connection(port)
+        con['admin'].command({'shutdown':1, force:True})
+    except:
+        cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
+        executeCommand(cmd)
     
 def killMongosProc():
     cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
@@ -66,9 +70,9 @@ def killAllMongoProc():
     for port in MONGOD_PORTS:
         killMongoProc(port)
 
-def startMongoProc(port, name, data, log):
+def startMongoProc(port, replSetName, data, log):
     #Create the replica set
-    CMD = ["mongod --fork --replSet " + name + " --noprealloc --port " + port + " --dbpath "
+    CMD = ["mongod --fork --replSet " + replSetName + " --noprealloc --port " + port + " --dbpath "
     + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
     + DEMO_SERVER_LOG + log + " --logappend &"]
     executeCommand(CMD)
@@ -175,7 +179,13 @@ class ReplSetManager():
         
     def get_oplog_thread(self):
         #try sending invalid entry
-        primary_conn = Connection('localhost', 27117)
+        try:
+            primary_conn = Connection('localhost', 27117)
+        except:
+            primary_conn = Connection('localhost', 27118)
+                #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
+                #primary_conn = Connection('localhost:27118')
+        
         primary_conn['test']['test'].drop()
         mongos_conn = "localhost:27217"
         
@@ -429,7 +439,35 @@ class ReplSetManager():
         test_oplog.checkpoint.commit_ts = search_ts
         test_oplog.write_config()
         assert (test_oplog.read_config() == search_ts)
-        os.system('rm ' + config_file_path)        
+        os.system('rm ' + config_file_path)   
+        
+    def test_rollback(self):
+        
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        
+        primary_port = primary_conn.port
+        char = None
+        
+        if primary_port == 27117:
+            secondary_port = 27118
+            char = "b"
+        else:
+            secondary_port = 27117
+            char = "a"
+        #try kill one, try restarting
+        killMongoProc(primary_port)
+        startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
+    
+        new_primary_conn = Connection(primary_conn.host + str(secondary_port))
+        new_secondary_conn = Connection(primary_conn.host + str(primary_port))
+    
+        assert (new_primary_conn.port == secondary_port)
+        assert (new_secondary_conn.port == primary_port)
+       
+    #       killMongoProc(27118)
+    #   startMongoProc("27118", "demo-repl", "/replset1a", "/replset1a.log")
+
+        
         
         """
             { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
@@ -449,7 +487,7 @@ executeCommand(CMD)
 checkStarted(27218)
 
 
-CMD = ["mongod --oplogSize 500 --fork --shardsvr --noprealloc --port 27219 "
+CMD = ,["mongod --oplogSize 500 --fork --shardsvr --noprealloc --port 27219 "
        "--dbpath "
        + DEMO_SERVER_DATA + "/shard1b --rest --logpath "
        + DEMO_SERVER_LOG + "/shard1b.log --logappend &"]
@@ -457,8 +495,3 @@ executeCommand(CMD)
 checkStarted(27219)
 
 """
-
-
-
-
-
