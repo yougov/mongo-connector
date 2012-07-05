@@ -326,12 +326,39 @@ class ReplSetManager():
         assert (cursor.count() == 1)
         assert (config_file_size != 0)
         
+        os.system('rm temp_config.txt')
+        test_oplog.stop()
+        #testing for valid entry
+    
+    def test_prepare_for_sync(self):
         
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        cursor = test_oplog.prepare_for_sync()
+        
+        assert (test_oplog.checkpoint != None)
+        assert (test_oplog.checkpoint.commit_ts == None)
+        assert (cursor == None)
+        
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        cursor = test_oplog.prepare_for_sync()
+        search_ts = test_oplog.get_last_oplog_timestamp()
+
+        assert (test_oplog.checkpoint.commit_ts == search_ts)
+        assert (cursor != None)
+        assert (cursor.count() == 1)
+        
+        primary_conn['test']['test'].insert ( {'name':'paulter'} )
+        cursor = test_oplog.prepare_for_sync()
+        new_search_ts = test_oplog.get_last_oplog_timestamp()
+        
+        assert (cursor.count() == 2)
+        next_doc = cursor.next()
+        assert (next_doc['o']['name'] == 'paulter')
+        assert (next_doc['ts'] == new_search_ts)
+
         test_oplog.stop()
         
-        
-        
-        #testing for valid entry
+    
         """
             { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
             { "ts" : { "t" : 1341347358000, "i" : 1 }, "h" : NumberLong("5704011229614309393"), "op" : "i", "ns" : "test.test", "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c"), "name" : "paulie" } }

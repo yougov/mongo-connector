@@ -200,10 +200,10 @@ class OplogThread(Thread):
         else:
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
-                    
+            
             if cursor is None:
                 cursor = self.init_cursor()
-                
+                    
         return cursor
         
         
