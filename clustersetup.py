@@ -13,6 +13,7 @@ from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import SolrDocManager
 from pysolr import Solr
+from util import long_to_bson_ts
 
 # Global path variables
 
@@ -247,18 +248,22 @@ class ReplSetManager():
         assert (test_oplog.dump_collection(None) == None)
         assert (len(solr.search('*')) == 0)
         
+        #with documents
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection(search_ts)
-            
+
+        test_oplog.doc_manager.commit()
         solr_results = solr.search('*')
         assert (len(solr_results) == 1)
-        solr_doc = solr_results[0]
-        assert (solr_doc['_ts'] == search_ts)
+        solr_doc = solr_results.docs[0]
+        assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
         assert (solr_doc['name'] == 'paulie')
-
+        assert (solr_doc['ns'] == 'test.test')
+        test_oplog.stop()
             
             
+    
 
 
         

@@ -45,7 +45,10 @@ class SolrDocManager():
         """
         return self.solr.search(query)
     
-              
+    
+    def commit(self):
+        self.solr.commit()
+
     def solr_commit(self):
         """Periodically commits to the Solr server.
         """ 

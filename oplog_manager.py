@@ -179,7 +179,7 @@ class OplogThread(Thread):
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert([doc])
             
-        
+    
     def init_cursor(self):
         """Position the cursor appropriately.
         
