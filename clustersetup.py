@@ -5,6 +5,8 @@
 import subprocess
 import sys
 import time
+import os
+
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
@@ -313,10 +315,16 @@ class ReplSetManager():
         assert (cursor.count() == 1)
         assert (test_oplog.checkpoint.commit_ts == search_ts)
         
-        #with config file
+        #with config file, assert that size != 0
         os.system('touch temp_config.txt')
         
-        test_oplog.config = 'temp_config.txt'
+        config_file_path = os.getcwd() + '/'+ 'temp_config.txt'
+        test_oplog.oplog_file = config_file_path
+        cursor = test_oplog.init_cursor()
+        config_file_size = os.stat(config_file_path)[6]
+        
+        assert (cursor.count() == 1)
+        assert (config_file_size != 0)
         
         
         test_oplog.stop()
