@@ -181,8 +181,11 @@ class ReplSetManager():
         #try sending invalid entry
         try:
             primary_conn = Connection('localhost', 27117)
+            if primary_conn['admin'].command("isMaster")['ismaster'] is False:
+                primary_conn = Connection('localhost', '27118')
         except:
             primary_conn = Connection('localhost', 27118)
+            print "connecting to 27118"
                 #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
                 #primary_conn = Connection('localhost:27118')
         
@@ -457,16 +460,14 @@ class ReplSetManager():
         #try kill one, try restarting
         killMongoProc(primary_port)
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
-    
-        new_primary_conn = Connection(primary_conn.host + str(secondary_port))
-        new_secondary_conn = Connection(primary_conn.host + str(primary_port))
+        
+            
+        new_primary_conn = Connection(primary_conn.host, secondary_port)
+        new_secondary_conn = Connection(primary_conn.host, primary_port)
     
         assert (new_primary_conn.port == secondary_port)
         assert (new_secondary_conn.port == primary_port)
        
-    #       killMongoProc(27118)
-    #   startMongoProc("27118", "demo-repl", "/replset1a", "/replset1a.log")
-
         
         
         """
