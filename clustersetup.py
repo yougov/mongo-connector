@@ -34,47 +34,40 @@ def remove_dir(path):
     command = ["rm", "-rf", path]
     subprocess.Popen(command).communicate()
 
-remove_dir(DEMO_SERVER_LOG)
-remove_dir(DEMO_SERVER_DATA)
-
-
 def create_dir(path):
     """Create supplied directory"""
     command = ["mkdir", "-p", path]
     subprocess.Popen(command).communicate()
 
-create_dir(DEMO_SERVER_DATA + "/standalone/journal")
-create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
-create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
-create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
-create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
-create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
-create_dir(DEMO_SERVER_DATA + "/config1/journal")
-create_dir(DEMO_SERVER_LOG)
 
-
-def killMongoProc(port):
+def killMongoProc(host, port):
     try:
-        conn = Connection(port)
-        con['admin'].command({'shutdown':1, force:True})
+        print host
+        print port
+        conn = Connection(host, int(port))
+        print conn
+        conn['admin'].command('shutdown',1, force=True)
     except:
+        print 'caught except'
         cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
         executeCommand(cmd)
-    
+
 def killMongosProc():
     cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
     executeCommand(cmd)
 
-def killAllMongoProc():
+def killAllMongoProc(host):
     """Kill any existing mongods"""
     for port in MONGOD_PORTS:
-        killMongoProc(port)
+        killMongoProc(host, port)
 
 def startMongoProc(port, replSetName, data, log):
     #Create the replica set
     CMD = ["mongod --fork --replSet " + replSetName + " --noprealloc --port " + port + " --dbpath "
     + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
     + DEMO_SERVER_LOG + log + " --logappend &"]
+    
+    print CMD
     executeCommand(CMD)
     checkStarted(int(port))
 
@@ -82,7 +75,8 @@ def startMongoProc(port, replSetName, data, log):
 def executeCommand(command):
     """Wait a little and then execute shell command"""
     time.sleep(1)
-    return subprocess.Popen(command, shell=True)
+    #return os.system(command)
+    subprocess.Popen(command, shell=True)
 
 
 #========================================= #
@@ -119,21 +113,50 @@ def checkStarted(port):
 #================================= #
 
     
-    
 
 class ReplSetManager():
 
     def startCluster(self):
         # Kill all spawned mongods
-        killAllMongoProc()
+        killAllMongoProc('localhost')
 
         # Kill all spawned mongos
         killMongosProc()
+        
+        remove_dir(DEMO_SERVER_LOG)
+        remove_dir(DEMO_SERVER_DATA)        
+
+        create_dir(DEMO_SERVER_DATA + "/standalone/journal")
+        create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
+        create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
+        create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
+        create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
+        create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
+        create_dir(DEMO_SERVER_DATA + "/config1/journal")
+        create_dir(DEMO_SERVER_LOG)
+            
 
         # Create the replica set
         startMongoProc("27117", "demo-repl", "/replset1a", "/replset1a.log")
         startMongoProc("27118", "demo-repl", "/replset1b", "/replset1b.log")
         startMongoProc("27119", "demo-repl", "/replset1c", "/replset1c.log")
+        
+        """
+        # Delete oplogs
+        for port in [27117, 27118, 27119]:    
+            primary_conn = Connection('localhost', port)
+            oplog_coll = primary_conn['local']['oplog.rs']
+            oplog_coll.drop()           # reset the oplog
+            primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
+        
+        killAllMongoProc('localhost')
+        
+        
+        # Create the replica set
+        startMongoProc("27117", "demo-repl", "/replset1a", "/replset1a.log")
+        startMongoProc("27118", "demo-repl", "/replset1b", "/replset1b.log")
+        startMongoProc("27119", "demo-repl", "/replset1c", "/replset1c.log")
+        """
         
         # Setup config server
         CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port 27220 --dbpath " +
@@ -189,13 +212,13 @@ class ReplSetManager():
                 #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
                 #primary_conn = Connection('localhost:27118')
         
-        primary_conn['test']['test'].drop()
+        #primary_conn['test']['test'].drop()
         mongos_conn = "localhost:27217"
         
         oplog_coll = primary_conn['local']['oplog.rs']
-        oplog_coll.drop()           # reset the oplog
+        #oplog_coll.drop()           # reset the oplog
         
-        primary_conn['local'].create_collection('oplog.rs', capped=True, size=10000)
+        #primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
         doc_manager = SolrDocManager('http://localhost:8080/solr')
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
@@ -448,17 +471,32 @@ class ReplSetManager():
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         
+        primary_conn['test']['test'].insert( {'name':'paulie'},w=2 )
+        
         primary_port = primary_conn.port
         char = None
+        altchar = None
         
         if primary_port == 27117:
             secondary_port = 27118
-            char = "b"
+            altchar = "b"
+            char = "a"
         else:
             secondary_port = 27117
-            char = "a"
+            altchar = "a"
+            char = "b"
         #try kill one, try restarting
-        killMongoProc(primary_port)
+                
+        
+        killMongoProc(primary_conn.host, secondary_port)
+                
+        primary_conn['test']['test'].insert ( {'name':'paul'})
+
+        killMongoProc(primary_conn.host, primary_port)  
+       	
+    #time.sleep(5)
+        startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + altchar + ".log")
+        time.sleep(5)
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
         
             
