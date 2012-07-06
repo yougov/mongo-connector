@@ -43,6 +43,8 @@ def create_dir(path):
 
 def killMongoProc(host, port):
     try:
+        print host
+        print port
         conn = Connection(host, int(port))
         conn['admin'].command('shutdown',1, force=True)
     except:
@@ -126,10 +128,10 @@ class ReplSetManager():
         create_dir(DEMO_SERVER_DATA + "/standalone/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
-        create_dir(DEMO_SERVER_DATA + "/replset1c/journal" )
-        create_dir(DEMO_SERVER_DATA + "/shard1a/journal") 
-        create_dir(DEMO_SERVER_DATA + "/shard1b/journal" )
-        create_dir(DEMO_SERVER_DATA + "/config1/journal ")
+        create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
+        create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
+        create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
+        create_dir(DEMO_SERVER_DATA + "/config1/journal")
         create_dir(DEMO_SERVER_LOG)
             
 
@@ -191,6 +193,7 @@ class ReplSetManager():
         while len(d.shard_set) == 0:
             pass
         t.cancel()
+                    
         d.stop()
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
@@ -198,6 +201,7 @@ class ReplSetManager():
         
     def get_oplog_thread(self):
         #try sending invalid entry
+        
         try:
             primary_conn = Connection('localhost', 27117)
             if primary_conn['admin'].command("isMaster")['ismaster'] is False:
@@ -207,6 +211,32 @@ class ReplSetManager():
             print "connecting to 27118"
                 #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
                 #primary_conn = Connection('localhost:27118')
+        
+        primary_conn['test']['test'].drop()
+        mongos_conn = "localhost:27217"
+        
+        oplog_coll = primary_conn['local']['oplog.rs']
+        oplog_coll.drop()           # reset the oplog
+        
+        primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
+        namespace_set = ['test.test']
+        doc_manager = SolrDocManager('http://localhost:8080/solr')
+        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
+        
+        return (oplog, primary_conn, oplog_coll)
+
+    def get_oplog_thread_new(self):
+        #try sending invalid entry
+        
+        try:
+            primary_conn = Connection('localhost', 27117)
+            if primary_conn['admin'].command("isMaster")['ismaster'] is False:
+                primary_conn = Connection('localhost', '27118')
+        except:
+            primary_conn = Connection('localhost', 27118)
+            print "connecting to 27118"
+        #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
+        #primary_conn = Connection('localhost:27118')
         
         #primary_conn['test']['test'].drop()
         mongos_conn = "localhost:27217"
@@ -220,17 +250,16 @@ class ReplSetManager():
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
         
         return (oplog, primary_conn, oplog_coll)
+
             
     def test_retrieve_doc(self):
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         #testing for entry as none type
-        primary_conn['test']['test'].remove({})
         entry = None
         assert (test_oplog.retrieve_doc(entry) is None)
         
         oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        oplog_cursor = oplog_cursor.skip(oplog_cursor.count())
         #oplog_cursor.next()  #skip first 'drop collection' operation
         
         
@@ -294,10 +323,12 @@ class ReplSetManager():
 
     def test_get_last_oplog_timestamp(self):
         
+        #test empty oplog
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        oplog_cursor.skip(oplog_cursor.count())
+        assert (test_oplog.get_last_oplog_timestamp() == None)
         
+        #test non-empty oplog
+        oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         last_oplog_entry = oplog_cursor.next()
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
@@ -308,7 +339,6 @@ class ReplSetManager():
     def test_dump_collection(self):
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        primary_conn['test']['test'].remove({})
         solr_url = "http://localhost:8080/solr"
         solr = Solr(solr_url)
         solr.delete(q='*:*')
@@ -318,7 +348,6 @@ class ReplSetManager():
         assert (len(solr.search('*')) == 0)
         
         #with documents
-        
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection(search_ts)
@@ -335,18 +364,9 @@ class ReplSetManager():
         
     def test_init_cursor(self):
         
-        # Delete oplogs
-        for port in [27117, 27118]:    
-            primary_conn = Connection('localhost', port)
-            oplog_coll = primary_conn['local']['oplog.rs']
-            oplog_coll.drop()           # reset the oplog
-            primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
-        
-        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        
         test_oplog.checkpoint = Checkpoint()            #needed for these tests
-
+        
         #initial tests with no config file and empty oplog
         assert (test_oplog.init_cursor() == None)
         
@@ -376,24 +396,13 @@ class ReplSetManager():
     
     def test_prepare_for_sync(self):
         
-        
-        # Delete oplogs
-        for port in [27117, 27118]:    
-            primary_conn = Connection('localhost', port)
-            oplog_coll = primary_conn['local']['oplog.rs']
-            oplog_coll.drop()           # reset the oplog
-            primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
-        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-                
-        primary_conn['test']['test'].remove({})
         cursor = test_oplog.prepare_for_sync()
         
         assert (test_oplog.checkpoint != None)
         assert (test_oplog.checkpoint.commit_ts == None)
         assert (cursor == None)
         
-                
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         cursor = test_oplog.prepare_for_sync()
         search_ts = test_oplog.get_last_oplog_timestamp()
@@ -487,7 +496,7 @@ class ReplSetManager():
         
     def test_rollback(self):
         
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
         solr = Solr('http://localhost:8080/solr')
