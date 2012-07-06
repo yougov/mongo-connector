@@ -59,12 +59,12 @@ class SolrDocManager():
         """Returns the last document stored in the Solr engine.
         """
         #search everything, sort by descending timestamp, return 1 row
-        result = self.solr.search('*:*', sort='ts desc', rows=1)
+        result = self.solr.search('*:*', sort='_ts desc', rows=1)
         
         if len(result) == 0:
             return None
             
-        return list(result)[0]
+        return result.docs[0]
             
     
             

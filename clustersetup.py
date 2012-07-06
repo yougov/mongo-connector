@@ -15,9 +15,10 @@ from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import SolrDocManager
 from pysolr import Solr
-from util import long_to_bson_ts
+from util import long_to_bson_ts, bson_ts_to_long
 from checkpoint import Checkpoint
 import json
+from bson.objectid import ObjectId
 
 # Global path variables
 
@@ -470,8 +471,17 @@ class ReplSetManager():
     def test_rollback(self):
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        #test_oplog.start()
         
-        primary_conn['test']['test'].insert( {'name':'paulie'},w=2 )
+        solr = Solr('http://localhost:8080/solr')
+        solr.delete(q='*:*')
+        obj1 = ObjectId('4ff74db3f646462b38000001')
+        primary_conn['test']['test'].remove({})
+        primary_conn['test']['test'].insert( {'_id':obj1,'name':'paulie'},w=2 )
+        cutoff_ts = test_oplog.get_last_oplog_timestamp()
+       
+        obj2 = ObjectId('4ff74db3f646462b38000002')
+        first_doc = {'name':'paulie', '_ts':bson_ts_to_long(cutoff_ts), 'ns':'test.test', '_id': obj1}
         
         primary_port = primary_conn.port
         char = None
@@ -490,24 +500,46 @@ class ReplSetManager():
         
         killMongoProc(primary_conn.host, secondary_port)
                 
-        primary_conn['test']['test'].insert ( {'name':'paul'})
+        primary_conn['test']['test'].insert ( {'_id': obj2, 'name':'paul'})
 
         killMongoProc(primary_conn.host, primary_port)  
        	
     #time.sleep(5)
         startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + altchar + ".log")
-        time.sleep(5)
+        time.sleep(15)
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
         
             
         new_primary_conn = Connection(primary_conn.host, secondary_port)
         new_secondary_conn = Connection(primary_conn.host, primary_port)
-    
+        killMongosProc()
+        CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
+               + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
+        executeCommand(CMD)
+        checkStarted(27217)
         assert (new_primary_conn.port == secondary_port)
         assert (new_secondary_conn.port == primary_port)
        
+        last_ts = test_oplog.get_last_oplog_timestamp()    
+        second_doc = {'name':'paul', '_ts':bson_ts_to_long(last_ts), 'ns':'test.test', '_id': obj2}
         
+        test_oplog.doc_manager.upsert([first_doc, second_doc])
+        test_oplog.doc_manager.commit()
+#time.sleep(30)
+        test_oplog.rollback()
+        test_oplog.doc_manager.commit()
+        results = solr.search('*')
         
+        assert (len(results) == 1)
+
+        results_doc = results.docs[0]
+        assert(results_doc['name'] == 'paulie')
+        assert(results_doc['_ts'] == bson_ts_to_long(cutoff_ts))
+
+
+#test_oplog.stop()
+                #        solr.delete(q='*:*')                #empty solr 
+                
         """
             { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
             { "ts" : { "t" : 1341347358000, "i" : 1 }, "h" : NumberLong("5704011229614309393"), "op" : "i", "ns" : "test.test", "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c"), "name" : "paulie" } }

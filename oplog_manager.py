@@ -310,15 +310,26 @@ class OplogThread(Thread):
 
             id_list_set = set(id_list)
             to_index = []
+            #print to_update.count()
+                #for doc in to_update:
+            #print doc
+            #to_update.rewind()
+            #print id_list_set
 
-            for doc in to_update:
-                id_list_set.remove(str(doc['_id']))
-                to_index.append(doc)
-            
+            try:
+                for doc in to_update:
+                    id_list_set.remove(str(doc['_id']))
+                    to_index.append(doc)
+            except:
+                pass
+                    
             #delete the inconsistent documents
-            for id in id_list_set:
-                self.doc_manager.remove(id)
-                
+            try:
+                for id in id_list_set:
+                    self.doc_manager.remove(id)
+            except:
+                pass
+                        
             for doc in to_index:
                 doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
