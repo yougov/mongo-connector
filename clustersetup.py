@@ -1,11 +1,13 @@
 """
-(C) Copyright 2012, 10gen
+Module with code to setup cluster and test oplog_manager functions.
+    
 """
 
 import subprocess
 import sys
 import time
 import os
+import json
 
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
@@ -15,20 +17,20 @@ from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import SolrDocManager
 from pysolr import Solr
-from util import long_to_bson_ts, bson_ts_to_long
+from util import (long_to_bson_ts, 
+                  bson_ts_to_long)
 from checkpoint import Checkpoint
-import json
 from bson.objectid import ObjectId
 
 # Global path variables
-
+PORTS = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
+    "CONFIG":"27220", "MONGOS":"27217"}
 SETUP_DIR = path.expanduser("~/mongo-connector/test")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port 27220"
-MONGOD_PORTS = ["27117", "27118", "27119", "27218",
-                 "27219", "27220", "27017"]
+MONGOS_KSTR = "mongos --port " + PORTS["CONFIG"]
+
 
 def remove_dir(path):
     """Remove supplied directory"""
@@ -55,7 +57,7 @@ def killMongosProc():
 
 def killAllMongoProc(host):
     """Kill any existing mongods"""
-    for port in MONGOD_PORTS:
+    for port in PORTS.values():
         killMongoProc(host, port)
 
 def startMongoProc(port, replSetName, data, log):
@@ -119,6 +121,7 @@ class ReplSetManager():
         # Kill all spawned mongos
         killMongosProc()
         
+        
         remove_dir(DEMO_SERVER_LOG)
         remove_dir(DEMO_SERVER_DATA)        
 
@@ -133,48 +136,31 @@ class ReplSetManager():
             
 
         # Create the replica set
-        startMongoProc("27117", "demo-repl", "/replset1a", "/replset1a.log")
-        startMongoProc("27118", "demo-repl", "/replset1b", "/replset1b.log")
-        startMongoProc("27119", "demo-repl", "/replset1c", "/replset1c.log")
-        
-        """
-        # Delete oplogs
-        for port in [27117, 27118, 27119]:    
-            primary_conn = Connection('localhost', port)
-            oplog_coll = primary_conn['local']['oplog.rs']
-            oplog_coll.drop()           # reset the oplog
-            primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
-        
-        killAllMongoProc('localhost')
-        
-        
-        # Create the replica set
-        startMongoProc("27117", "demo-repl", "/replset1a", "/replset1a.log")
-        startMongoProc("27118", "demo-repl", "/replset1b", "/replset1b.log")
-        startMongoProc("27119", "demo-repl", "/replset1c", "/replset1c.log")
-        """
+        startMongoProc(PORTS["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log")
+        startMongoProc(PORTS["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
+        startMongoProc(PORTS["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
         
         # Setup config server
-        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port 27220 --dbpath " +
+        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS["CONFIG"] + " --dbpath " +
         DEMO_SERVER_DATA + "/config1 --rest --logpath "
        + DEMO_SERVER_LOG + "/config1.log --logappend &"]
         executeCommand(CMD)
-        checkStarted(27220)
+        checkStarted(int(PORTS["CONFIG"]))
 
 # Setup the mongos
-        CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
+        CMD = ["mongos --port " + PORTS["MONGOS"] + " --fork --configdb localhost:" + PORTS["CONFIG"] + " --chunkSize 1  --logpath " 
        + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
         executeCommand(CMD)    
-        checkStarted(27217)
+        checkStarted(int(PORTS["MONGOS"]))
         
 # Configure the shards and begin load simulation
         #executeCommand(CMD).wait()
-        cmd1 = "mongo --port 27117 " + SETUP_DIR + "/setup/configReplSet.js"
-        cmd2 = "mongo --port 27217 " + SETUP_DIR + "/setup/configMongos.js"
+        cmd1 = "mongo --port " + PORTS["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
+        cmd2 = "mongo --port  "+ PORTS["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
         
         subprocess.call(cmd1, shell=True)
-        conn = Connection('localhost:27117')
-        sec_conn = Connection('localhost:27118')
+        conn = Connection('localhost:' + PORTS["PRIMARY"])
+        sec_conn = Connection('localhost:' + PORTS["SECONDARY"])
         
         while conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -191,7 +177,7 @@ class ReplSetManager():
     def test_mongo_internal(self):
         t = Timer(60, self.abort_test)
         t.start()
-        d = Daemon('localhost:27217', None)
+        d = Daemon('localhost:' + PORTS["MONGOS"], None)
         d.start()
         while len(d.shard_set) == 0:
             pass
@@ -206,12 +192,12 @@ class ReplSetManager():
         #try sending invalid entry
         
         
-        primary_conn = Connection('localhost', 27117)
+        primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', 27118)
+            primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
         
         primary_conn['test']['test'].drop()
-        mongos_conn = "localhost:27217"
+        mongos_conn = "localhost:" + PORTS["MONGOS"]
         
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -226,20 +212,13 @@ class ReplSetManager():
     def get_oplog_thread_new(self):
         #try sending invalid entry
         
-        primary_conn = Connection('localhost', 27117)
+        primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', 27118)
+            primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
 
-        #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-        #primary_conn = Connection('localhost:27118')
-        
-        #primary_conn['test']['test'].drop()
-        mongos_conn = "localhost:27217"
-        
+        mongos_conn = "localhost:" + PORTS["MONGOS"]
         oplog_coll = primary_conn['local']['oplog.rs']
-        #oplog_coll.drop()           # reset the oplog
         
-        #primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
         doc_manager = SolrDocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
@@ -508,12 +487,12 @@ class ReplSetManager():
         char = None
         altchar = None
         
-        if primary_port == 27117:
-            secondary_port = 27118
+        if primary_port == int(PORTS["PRIMARY"]):
+            secondary_port = int(PORTS["SECONDARY"])
             altchar = "b"
             char = "a"
         else:
-            secondary_port = 27117
+            secondary_port = int(PORTS["PRIMARY"])
             altchar = "a"
             char = "b"
         #try kill one, try restarting
@@ -533,15 +512,7 @@ class ReplSetManager():
         new_secondary_conn = Connection(primary_conn.host, primary_port)
         while new_secondary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
-            
-     
-                #killMongosProc()
-        CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
-               + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
-                #executeCommand(CMD)
-                #checkStarted(27217)
         
-                #test_oplog.mongos_conn = Connection('localhost', 27217)
         assert (new_primary_conn.port == secondary_port)
         assert (new_secondary_conn.port == primary_port)
        
