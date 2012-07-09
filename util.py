@@ -4,6 +4,7 @@
 from pymongo import Connection
 from bson.timestamp import Timestamp
 from urllib2 import urlopen
+import time
 import sys
 
     
@@ -38,12 +39,14 @@ def retry_until_ok(func, args = None):
     """Retry code block until it succeeds.
     """
     
-    try:
-        if args is None:
-            func()
-        else:
-            func(args)
-    except:
-        return retry_until_ok(func, args)
-        
+    while True:
+        try:
+            if args is None:
+                func()
+                break
+            else:
+                func(args)
+                break
+        except:
+            time.sleep(1)
     return True

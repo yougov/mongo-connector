@@ -305,9 +305,11 @@ class OplogThread(Thread):
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(x) for x in id_list]
             
+            retry_until_ok(self.mongos_connection[db][coll].find, {'_id': 
+            {'$in': bson_obj_id_list}})
+            
             to_update = self.mongos_connection[db][coll].find({'_id': 
             {'$in': bson_obj_id_list}})
-
             id_list_set = set(id_list)
             to_index = []
             #print to_update.count()

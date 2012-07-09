@@ -64,7 +64,6 @@ def startMongoProc(port, replSetName, data, log):
     + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
     + DEMO_SERVER_LOG + log + " --logappend &"]
     
-    print CMD
     executeCommand(CMD)
     checkStarted(int(port))
 
@@ -165,19 +164,25 @@ class ReplSetManager():
 # Setup the mongos
         CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
        + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
-        executeCommand(CMD)
+        executeCommand(CMD)    
         checkStarted(27217)
-
+        
 # Configure the shards and begin load simulation
         #executeCommand(CMD).wait()
         cmd1 = "mongo --port 27117 " + SETUP_DIR + "/setup/configReplSet.js"
         cmd2 = "mongo --port 27217 " + SETUP_DIR + "/setup/configMongos.js"
-        time.sleep(10)
+        
         subprocess.call(cmd1, shell=True)
-        time.sleep(20)
+        conn = Connection('localhost:27117')
+        sec_conn = Connection('localhost:27118')
+        
+        while conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        
+        while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+            time.sleep(1)
+        
         subprocess.call(cmd2, shell=True)
-        #time.sleep(10)
-        #subprocess.call(cmd2, shell=True)    
     
     def abort_test(self):
         print 'test failed'
@@ -200,15 +205,10 @@ class ReplSetManager():
     def get_oplog_thread(self):
         #try sending invalid entry
         
-        try:
-            primary_conn = Connection('localhost', 27117)
-            if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-                primary_conn = Connection('localhost', '27118')
-        except:
+        
+        primary_conn = Connection('localhost', 27117)
+        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', 27118)
-            print "connecting to 27118"
-                #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-                #primary_conn = Connection('localhost:27118')
         
         primary_conn['test']['test'].drop()
         mongos_conn = "localhost:27217"
@@ -226,13 +226,12 @@ class ReplSetManager():
     def get_oplog_thread_new(self):
         #try sending invalid entry
         
-        try:
-            primary_conn = Connection('localhost', 27117)
-            if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-                primary_conn = Connection('localhost', '27118')
-        except:
+        primary_conn = Connection('localhost', 27117)
+        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            print 'went into if'
             primary_conn = Connection('localhost', 27118)
-            print "connecting to 27118"
+            print 'changed primary'
+        
         #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
         #primary_conn = Connection('localhost:27118')
         
@@ -265,9 +264,6 @@ class ReplSetManager():
         last_oplog_entry = oplog_cursor.next()
         target_entry = primary_conn['test']['test'].find_one()
         
-        print last_oplog_entry
-        print target_entry
-        print test_oplog.retrieve_doc(last_oplog_entry)
         #testing for search after inserting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
@@ -531,19 +527,21 @@ class ReplSetManager():
 
         killMongoProc(primary_conn.host, primary_port)  
        	
-    #time.sleep(5)
         startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + altchar + ".log")
-        time.sleep(15)
+        new_primary_conn = Connection(primary_conn.host, secondary_port)
+        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
         
             
-        new_primary_conn = Connection(primary_conn.host, secondary_port)
         new_secondary_conn = Connection(primary_conn.host, primary_port)
-        killMongosProc()
+                #killMongosProc()
         CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
                + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
-        executeCommand(CMD)
-        checkStarted(27217)
+                #executeCommand(CMD)
+                #checkStarted(27217)
+        
+                #test_oplog.mongos_conn = Connection('localhost', 27217)
         assert (new_primary_conn.port == secondary_port)
         assert (new_secondary_conn.port == primary_port)
        
@@ -552,7 +550,7 @@ class ReplSetManager():
         
         test_oplog.doc_manager.upsert([first_doc, second_doc])
         test_oplog.doc_manager.commit()
-#time.sleep(30)
+
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')
