@@ -87,20 +87,26 @@ class OplogThread(Thread):
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
         """
-        try :
-            namespace = entry['ns']
-            if entry.has_key('o2'):
-                doc_field = 'o2'
-            else:
-                doc_field = 'o'
-        	
-            doc_id = entry[doc_field]['_id']
-            db_name, coll_name = namespace.split('.',1)
-            coll = self.mongos_connection[db_name][coll_name]
-            doc = coll.find_one({'_id': doc_id})
+        if (entry is None):
+            return None
+
+        namespace = entry['ns']
+        if entry.has_key('o2'):
+            doc_field = 'o2'
+        else:
+            doc_field = 'o'
         
-        except : 
-            doc = None
+        doc_id = entry[doc_field]['_id']
+        db_name, coll_name = namespace.split('.',1)
+
+        while True:
+            try :
+                coll = self.mongos_connection[db_name][coll_name]
+                doc = coll.find_one({'_id': doc_id})
+                break
+            except :
+                time.sleep(1)
+                continue
 
         return doc
     
@@ -305,18 +311,17 @@ class OplogThread(Thread):
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(x) for x in id_list]
             
-            retry_until_ok(self.mongos_connection[db][coll].find, {'_id': 
-            {'$in': bson_obj_id_list}})
-            
-            to_update = self.mongos_connection[db][coll].find({'_id': 
-            {'$in': bson_obj_id_list}})
+            while True:
+                try:
+                    to_update = self.mongos_connection[db][coll].find({'_id': 
+                        {'$in': bson_obj_id_list}})
+                    to_update.count()
+                    break
+                except:
+                    pass
             id_list_set = set(id_list)
             to_index = []
-            #print to_update.count()
-                #for doc in to_update:
-            #print doc
-            #to_update.rewind()
-            #print id_list_set
+
 
             try:
                 for doc in to_update:

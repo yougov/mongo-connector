@@ -228,10 +228,8 @@ class ReplSetManager():
         
         primary_conn = Connection('localhost', 27117)
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            print 'went into if'
             primary_conn = Connection('localhost', 27118)
-            print 'changed primary'
-        
+
         #if primary_conn['admin'].command("isMaster")['ismaster'] is False:
         #primary_conn = Connection('localhost:27118')
         
@@ -260,7 +258,7 @@ class ReplSetManager():
         #oplog_cursor.next()  #skip first 'drop collection' operation
         
         
-        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        primary_conn['test']['test'].insert ( {'name':'paulie'})
         last_oplog_entry = oplog_cursor.next()
         target_entry = primary_conn['test']['test'].find_one()
         
@@ -532,9 +530,11 @@ class ReplSetManager():
         while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
-        
-            
         new_secondary_conn = Connection(primary_conn.host, primary_port)
+        while new_secondary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+            time.sleep(1)
+            
+     
                 #killMongosProc()
         CMD = ["mongos --port 27217 --fork --configdb localhost:27220 --chunkSize 1  --logpath " 
                + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
@@ -550,7 +550,6 @@ class ReplSetManager():
         
         test_oplog.doc_manager.upsert([first_doc, second_doc])
         test_oplog.doc_manager.commit()
-
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')
