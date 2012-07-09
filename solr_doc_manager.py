@@ -9,7 +9,7 @@ import sys
 
 from pysolr import Solr
 from threading import Timer
-from util import verify_url
+from util import verify_url, retry_until_ok
 
 class SolrDocManager():
     """The DocManager class contains a dictionary that stores id/doc pairs. 
@@ -19,7 +19,7 @@ class SolrDocManager():
     multiple, slightly different versions of a doc.                                                                           
     """
     
-    def __init__(self, url):
+    def __init__(self, url, auto_commit = True):
         """Just create a dict
         """
 	if verify_url(url) is False:
@@ -27,7 +27,8 @@ class SolrDocManager():
 		return None	
 
         self.solr = Solr(url)   
-        self.solr_commit()          
+	if auto_commit:
+        	self.solr_commit()          
 
 
     def upsert(self, docs):
@@ -47,7 +48,7 @@ class SolrDocManager():
     
     
     def commit(self):
-        self.solr.commit()
+        retry_until_ok(self.solr.commit)
 
     def solr_commit(self):
         """Periodically commits to the Solr server.

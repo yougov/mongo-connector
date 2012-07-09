@@ -43,8 +43,6 @@ def create_dir(path):
 
 def killMongoProc(host, port):
     try:
-        print host
-        print port
         conn = Connection(host, int(port))
         conn['admin'].command('shutdown',1, force=True)
     except:
@@ -220,7 +218,7 @@ class ReplSetManager():
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
-        doc_manager = SolrDocManager('http://localhost:8080/solr')
+        doc_manager = SolrDocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
         
         return (oplog, primary_conn, oplog_coll)
@@ -246,7 +244,7 @@ class ReplSetManager():
         
         #primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
-        doc_manager = SolrDocManager('http://localhost:8080/solr')
+        doc_manager = SolrDocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
         
         return (oplog, primary_conn, oplog_coll)
@@ -266,7 +264,10 @@ class ReplSetManager():
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
         last_oplog_entry = oplog_cursor.next()
         target_entry = primary_conn['test']['test'].find_one()
-            
+        
+        print last_oplog_entry
+        print target_entry
+        print test_oplog.retrieve_doc(last_oplog_entry)
         #testing for search after inserting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
