@@ -44,6 +44,9 @@ class SolrDocManager():
     def search(self, query):
         """Called by oplog_manager to query Solr
         """
+        if query == "":
+            query = "*"
+        
         return self.solr.search(query)
     
     
@@ -54,7 +57,7 @@ class SolrDocManager():
         """Periodically commits to the Solr server.
         """ 
         self.solr.commit()
-        Timer(3, self.solr_commit).start() 
+        Timer(1, self.solr_commit).start() 
         
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.

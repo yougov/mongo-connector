@@ -8,16 +8,14 @@ PRIMARY_PORTS = [27117, 27317]
 #rsm = ReplSetManager()
 #rsm.startCluster()
 
-d = Daemon('localhost:27217', 'config.txt')
-d.start()
-
 solr = Solr('http://localhost:8080/solr')
 solr.delete(q='*:*')
 
-
-
 primary_one = Connection('localhost' , PRIMARY_PORTS[0])
 primary_two = Connection('localhost' , PRIMARY_PORTS[1])
+
+d = Daemon('localhost:27217', 'config.txt')
+d.start()
 
 primary_one['test']['test'].remove({})
 primary_two['test']['best'].remove({})
