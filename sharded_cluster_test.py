@@ -3,7 +3,7 @@ from mongo_internal import Daemon
 from pysolr import Solr
 from pymongo import Connection
 
-PRIMARY_PORTS = [27117, 27317]
+MONGOS_PORT = 27217
 
 #rsm = ReplSetManager()
 #rsm.startCluster()
@@ -11,9 +11,7 @@ PRIMARY_PORTS = [27117, 27317]
 solr = Solr('http://localhost:8080/solr')
 solr.delete(q='*:*')
 
-primary_one = Connection('localhost' , PRIMARY_PORTS[0])
-primary_two = Connection('localhost' , PRIMARY_PORTS[1])
-
+mongos = Connection('localhost' , MONGOS_PORT)
 d = Daemon('localhost:27217', 'config.txt')
 d.start()
 
@@ -22,8 +20,8 @@ primary_two['test']['best'].remove({})
 
 #general tests to verify that the Daemon is working properly.
 
-primary_one['test']['test'].insert({'name':'paulie'})
-primary_two['test']['best'].insert({'name':'jerome'})
+mongos['test']['test'].insert({'name':'paulie'})
+mongos['test']['best'].insert({'name':'jerome'})
 
 results = solr.search('*')
         
