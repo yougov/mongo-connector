@@ -24,14 +24,16 @@ from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
 """ Global path variables
-"""
-PORTS = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
+"""    
+PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
+    "CONFIG":"27220", "MONGOS":"27217"}
+PORTS_TWO = {"PRIMARY":"27317", "SECONDARY":"27318", "ARBITER":"27319", 
     "CONFIG":"27220", "MONGOS":"27217"}
 SETUP_DIR = path.expanduser("~/mongo-connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS["CONFIG"]
+MONGOS_KSTR = "mongos --port " + PORTS_ONE["CONFIG"]
 
 
 def remove_dir(path):
@@ -66,10 +68,10 @@ def killMongosProc():
     executeCommand(cmd)
 
 
-def killAllMongoProc(host):
+def killAllMongoProc(host, ports):
     """Kill any existing mongods
     """
-    for port in PORTS.values():
+    for port in ports.values():
         killMongoProc(host, port)
 
 
@@ -137,7 +139,8 @@ class ReplSetManager():
         """Sets up cluster with 1 shard, replica set with 3 members
         """
         # Kill all spawned mongods
-        killAllMongoProc('localhost')
+        killAllMongoProc('localhost', PORTS_ONE)
+        killAllMongoProc('localhost', PORTS_TWO)
 
         # Kill all spawned mongos
         killMongosProc()
@@ -146,50 +149,70 @@ class ReplSetManager():
         remove_dir(DEMO_SERVER_DATA)        
 
         create_dir(DEMO_SERVER_DATA + "/standalone/journal")
+        
         create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
+        
+        create_dir(DEMO_SERVER_DATA + "/replset2a/journal")
+        create_dir(DEMO_SERVER_DATA + "/replset2b/journal")
+        create_dir(DEMO_SERVER_DATA + "/replset2c/journal")
+        
         create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
         create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
         create_dir(DEMO_SERVER_DATA + "/config1/journal")
         create_dir(DEMO_SERVER_LOG)
             
         # Create the replica set
-        startMongoProc(PORTS["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log")
-        startMongoProc(PORTS["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
-        startMongoProc(PORTS["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
+        startMongoProc(PORTS_ONE["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log")
+        startMongoProc(PORTS_ONE["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
+        startMongoProc(PORTS_ONE["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
+        
+        startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log")
+        startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log")
+        startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log")
         
         # Setup config server
-        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS["CONFIG"]
-               + " --dbpath " +
-        DEMO_SERVER_DATA + "/config1 --rest --logpath "
+        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " +                 PORTS_ONE["CONFIG"] + " --dbpath " + DEMO_SERVER_DATA + "/config1 --rest --logpath "
        + DEMO_SERVER_LOG + "/config1.log --logappend &"]
         executeCommand(CMD)
-        checkStarted(int(PORTS["CONFIG"]))
+        checkStarted(int(PORTS_ONE["CONFIG"]))
 
-        # Setup the mongos
-        CMD = ["mongos --port " + PORTS["MONGOS"] + " --fork --configdb localhost:" +
-               PORTS["CONFIG"] + " --chunkSize 1  --logpath " 
-       + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
+        # Setup the mongos, same mongos for both shards
+        CMD = ["mongos --port " + PORTS_ONE["MONGOS"] + " --fork --configdb localhost:" +
+        PORTS_ONE["CONFIG"] + " --chunkSize 1  --logpath "  + DEMO_SERVER_LOG + 
+        "/mongos1.log --logappend &"]
+
         executeCommand(CMD)    
-        checkStarted(int(PORTS["MONGOS"]))
-        
+        checkStarted(int(PORTS_ONE["MONGOS"]))
+            
         # Configure the shards and begin load simulation
-        cmd1 = "mongo --port " + PORTS["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
-        cmd2 = "mongo --port  "+ PORTS["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
-        
+        cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSetSharded1.js"
+        cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR +         "/setup/configReplSetSharded2.js"
+        cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongosSharded.js"
+         
         subprocess.call(cmd1, shell=True)
-        conn = Connection('localhost:' + PORTS["PRIMARY"])
-        sec_conn = Connection('localhost:' + PORTS["SECONDARY"])
-        
+        conn = Connection('localhost:' + PORTS_ONE["PRIMARY"])
+        sec_conn = Connection('localhost:' + PORTS_ONE["SECONDARY"])
+                 
         while conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
-        
+                 
         while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
-        
+             
         subprocess.call(cmd2, shell=True)
-    
+        conn = Connection('localhost:' + PORTS_TWO["PRIMARY"])
+        sec_conn = Connection('localhost:' + PORTS_TWO["SECONDARY"])
+                 
+        while conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+                 
+        while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+            time.sleep(1)
+             
+        subprocess.call(cmd3, shell=True)
+
     
     def abort_test(self):
         print 'test failed'
@@ -201,7 +224,7 @@ class ReplSetManager():
         """
         t = Timer(60, self.abort_test)
         t.start()
-        d = Daemon('localhost:' + PORTS["MONGOS"], None)
+        d = Daemon('localhost:' + PORTS_ONE["MONGOS"], None)
         d.start()
         while len(d.shard_set) == 0:
             pass
@@ -217,12 +240,12 @@ class ReplSetManager():
             
             This function clears the oplog
         """
-        primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
+        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
+            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
         
         primary_conn['test']['test'].drop()
-        mongos_conn = "localhost:" + PORTS["MONGOS"]
+        mongos_conn = "localhost:" + PORTS_ONE["MONGOS"]
         
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -241,11 +264,11 @@ class ReplSetManager():
             
             This function does not clear the oplog
         """
-        primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
+        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
+            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
 
-        mongos_conn = "localhost:" + PORTS["MONGOS"]
+        mongos_conn = "localhost:" + PORTS_ONE["MONGOS"]
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test']
@@ -537,12 +560,12 @@ class ReplSetManager():
         altchar = None
         
         #make it more general so we can call it several times in a row
-        if primary_port == int(PORTS["PRIMARY"]):
-            secondary_port = int(PORTS["SECONDARY"])
+        if primary_port == int(PORTS_ONE["PRIMARY"]):
+            secondary_port = int(PORTS_ONE["SECONDARY"])
             altchar = "b"
             char = "a"
         else:
-            secondary_port = int(PORTS["PRIMARY"])
+            secondary_port = int(PORTS_ONE["PRIMARY"])
             altchar = "a"
             char = "b"
         

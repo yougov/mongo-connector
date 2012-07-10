@@ -54,7 +54,7 @@ class SolrDocManager():
         """Periodically commits to the Solr server.
         """ 
         self.solr.commit()
-        Timer(1, self.solr_commit).start() 
+        Timer(3, self.solr_commit).start() 
         
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.
