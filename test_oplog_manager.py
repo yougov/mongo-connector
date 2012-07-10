@@ -1,6 +1,7 @@
 """
 Module with code to setup cluster and test oplog_manager functions.
     
+This is the main tester method. All the functions can be called by finaltests.py
 """
 
 import subprocess
@@ -22,10 +23,11 @@ from util import (long_to_bson_ts,
 from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
-# Global path variables
+""" Global path variables
+"""
 PORTS = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
-SETUP_DIR = path.expanduser("~/mongo-connector/test")
+SETUP_DIR = path.expanduser("~/mongo-connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
@@ -33,17 +35,21 @@ MONGOS_KSTR = "mongos --port " + PORTS["CONFIG"]
 
 
 def remove_dir(path):
-    """Remove supplied directory"""
+    """Remove supplied directory
+    """
     command = ["rm", "-rf", path]
     subprocess.Popen(command).communicate()
 
 def create_dir(path):
-    """Create supplied directory"""
+    """Create supplied directory
+    """
     command = ["mkdir", "-p", path]
     subprocess.Popen(command).communicate()
 
 
 def killMongoProc(host, port):
+    """ Kill given port
+    """
     try:
         conn = Connection(host, int(port))
         conn['admin'].command('shutdown',1, force=True)
@@ -52,16 +58,20 @@ def killMongoProc(host, port):
         executeCommand(cmd)
 
 def killMongosProc():
+    """ Kill all mongos proc
+    """
     cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
     executeCommand(cmd)
 
 def killAllMongoProc(host):
-    """Kill any existing mongods"""
+    """Kill any existing mongods
+    """
     for port in PORTS.values():
         killMongoProc(host, port)
 
 def startMongoProc(port, replSetName, data, log):
-    #Create the replica set
+    """Create the replica set
+    """
     CMD = ["mongod --fork --replSet " + replSetName + " --noprealloc --port " + port + " --dbpath "
     + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
     + DEMO_SERVER_LOG + log + " --logappend &"]
@@ -71,7 +81,8 @@ def startMongoProc(port, replSetName, data, log):
 
 
 def executeCommand(command):
-    """Wait a little and then execute shell command"""
+    """Wait a little and then execute shell command
+    """
     time.sleep(1)
     #return os.system(command)
     subprocess.Popen(command, shell=True)
@@ -84,7 +95,8 @@ def executeCommand(command):
 
 
 def tryConnection(port):
-    """Uses pymongo to try to connect to mongod"""
+    """Uses pymongo to try to connect to mongod
+    """
     error = 0
     try:
         Connection('localhost', port)
@@ -94,7 +106,8 @@ def tryConnection(port):
 
 
 def checkStarted(port):
-    """Checks if our the mongod has started"""
+    """Checks if our the mongod has started
+    """
     connected = False
 
     while not connected:
@@ -113,8 +126,11 @@ def checkStarted(port):
     
 
 class ReplSetManager():
-
-    def startCluster(self):
+    """Defines all the testing methods, as well as a method that sets up the cluster
+        """
+    def start_cluster(self):
+        """Sets up cluster with 1 shard, replica set with 3 members
+        """
         # Kill all spawned mongods
         killAllMongoProc('localhost')
 
@@ -141,20 +157,21 @@ class ReplSetManager():
         startMongoProc(PORTS["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
         
         # Setup config server
-        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS["CONFIG"] + " --dbpath " +
+        CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS["CONFIG"]
+               + " --dbpath " +
         DEMO_SERVER_DATA + "/config1 --rest --logpath "
        + DEMO_SERVER_LOG + "/config1.log --logappend &"]
         executeCommand(CMD)
         checkStarted(int(PORTS["CONFIG"]))
 
-# Setup the mongos
-        CMD = ["mongos --port " + PORTS["MONGOS"] + " --fork --configdb localhost:" + PORTS["CONFIG"] + " --chunkSize 1  --logpath " 
+        # Setup the mongos
+        CMD = ["mongos --port " + PORTS["MONGOS"] + " --fork --configdb localhost:" +
+               PORTS["CONFIG"] + " --chunkSize 1  --logpath " 
        + DEMO_SERVER_LOG + "/mongos1.log --logappend &"]
         executeCommand(CMD)    
         checkStarted(int(PORTS["MONGOS"]))
         
-# Configure the shards and begin load simulation
-        #executeCommand(CMD).wait()
+        # Configure the shards and begin load simulation
         cmd1 = "mongo --port " + PORTS["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
         cmd2 = "mongo --port  "+ PORTS["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
         
@@ -175,6 +192,8 @@ class ReplSetManager():
         sys.exit(1)
     
     def test_mongo_internal(self):
+        """Test mongo_internal
+        """
         t = Timer(60, self.abort_test)
         t.start()
         d = Daemon('localhost:' + PORTS["MONGOS"], None)
@@ -189,9 +208,10 @@ class ReplSetManager():
         #we want to add several shards
         
     def get_oplog_thread(self):
-        #try sending invalid entry
-        
-        
+        """ Set up connection with mongo. Returns oplog, the connection and oplog collection
+            
+            This function clears the oplog
+        """
         primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
@@ -205,13 +225,16 @@ class ReplSetManager():
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
         doc_manager = SolrDocManager('http://localhost:8080/solr', False)
-        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
+        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
+                            namespace_set)
         
         return (oplog, primary_conn, oplog_coll)
 
     def get_oplog_thread_new(self):
-        #try sending invalid entry
-        
+        """ Set up connection with mongo. Returns oplog, the connection and oplog collection
+            
+            This function does not clear the oplog
+        """
         primary_conn = Connection('localhost', int(PORTS["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS["SECONDARY"]))
@@ -221,21 +244,22 @@ class ReplSetManager():
         
         namespace_set = ['test.test']
         doc_manager = SolrDocManager('http://localhost:8080/solr', False)
-        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, namespace_set)
+        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
+                            namespace_set)
         
         return (oplog, primary_conn, oplog_coll)
 
             
     def test_retrieve_doc(self):
-        
+        """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         #testing for entry as none type
         entry = None
         assert (test_oplog.retrieve_doc(entry) is None)
         
         oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        #oplog_cursor.next()  #skip first 'drop collection' operation
-        
         
         primary_conn['test']['test'].insert ( {'name':'paulie'})
         last_oplog_entry = oplog_cursor.next()
@@ -267,6 +291,9 @@ class ReplSetManager():
         
                 
     def test_get_oplog_cursor(self):
+        """Test get_oplog_cursor in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         
         #test None cursor
@@ -296,7 +323,9 @@ class ReplSetManager():
             
 
     def test_get_last_oplog_timestamp(self):
-        
+        """Test get_last_oplog_timestamp in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         #test empty oplog
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         assert (test_oplog.get_last_oplog_timestamp() == None)
@@ -311,7 +340,9 @@ class ReplSetManager():
         
             
     def test_dump_collection(self):
-        
+        """Test dump_collection in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         solr_url = "http://localhost:8080/solr"
         solr = Solr(solr_url)
@@ -337,7 +368,9 @@ class ReplSetManager():
         test_oplog.stop()
         
     def test_init_cursor(self):
-        
+        """Test init_cursor in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()            #needed for these tests
         
@@ -369,7 +402,9 @@ class ReplSetManager():
         #testing for valid entry
     
     def test_prepare_for_sync(self):
-        
+        """Test prepare_for_sync in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         cursor = test_oplog.prepare_for_sync()
         
@@ -399,7 +434,9 @@ class ReplSetManager():
         test_oplog.stop()
         
     def test_write_config(self):
-        
+        """Test write_config in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
         
@@ -441,7 +478,9 @@ class ReplSetManager():
         os.system('rm ' + config_file_path)
         
     def test_read_config(self):
-        
+        """Test read_config in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
         
@@ -469,7 +508,9 @@ class ReplSetManager():
         os.system('rm ' + config_file_path)   
         
     def test_rollback(self):
-        
+        """Test rollback in oplog_manager. Assertion failure if it doesn't pass
+            
+        """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
@@ -481,12 +522,14 @@ class ReplSetManager():
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
-        first_doc = {'name':'paulie', '_ts':bson_ts_to_long(cutoff_ts), 'ns':'test.test', '_id': obj1}
+        first_doc = {'name':'paulie', '_ts':bson_ts_to_long(cutoff_ts), 'ns':'test.test', 
+            '_id': obj1}
         
         primary_port = primary_conn.port
         char = None
         altchar = None
         
+        #make it more general so we can call it several times in a row
         if primary_port == int(PORTS["PRIMARY"]):
             secondary_port = int(PORTS["SECONDARY"])
             altchar = "b"
@@ -495,21 +538,26 @@ class ReplSetManager():
             secondary_port = int(PORTS["PRIMARY"])
             altchar = "a"
             char = "b"
-        #try kill one, try restarting
-                
         
+        #try kill one, try restarting
         killMongoProc(primary_conn.host, secondary_port)
                 
         primary_conn['test']['test'].insert ( {'_id': obj2, 'name':'paul'})
 
         killMongoProc(primary_conn.host, primary_port)  
        	
-        startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + altchar + ".log")
+        startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + 
+                       altchar + ".log")
         new_primary_conn = Connection(primary_conn.host, secondary_port)
+    
+        #wait for master to be established
         while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
-        startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + ".log")
+        startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + 
+            ".log")
         new_secondary_conn = Connection(primary_conn.host, primary_port)
+                
+        #wait for secondary to be established
         while new_secondary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
         
@@ -530,34 +578,3 @@ class ReplSetManager():
         results_doc = results.docs[0]
         assert(results_doc['name'] == 'paulie')
         assert(results_doc['_ts'] == bson_ts_to_long(cutoff_ts))
-
-
-#test_oplog.stop()
-                #        solr.delete(q='*:*')                #empty solr 
-                
-        """
-            { "ts" : { "t" : 1341343596000, "i" : 1 }, "h" : NumberLong(0), "op" : "n", "ns" : "", "o" : { "msg" : "initiating set" } }
-            { "ts" : { "t" : 1341347358000, "i" : 1 }, "h" : NumberLong("5704011229614309393"), "op" : "i", "ns" : "test.test", "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c"), "name" : "paulie" } }
-            { "ts" : { "t" : 1341347475000, "i" : 1 }, "h" : NumberLong("-1269638662509784076"), "op" : "u", "ns" : "test.test", "o2" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c") }, "o" : { "$set" : { "name" : "paul" } } }
-            { "ts" : { "t" : 1341347486000, "i" : 1 }, "h" : NumberLong("570562443735405485"), "op" : "d", "ns" : "test.test", "b" : true, "o" : { "_id" : ObjectId("4ff3561efb3d8f91f511da5c") } }
-        """
-        
-
-"""
-# Create the sharded cluster
-CMD = ["mongod --oplogSize 500 --fork --shardsvr --noprealloc --port 27218 "
-       "--dbpath "
-       + DEMO_SERVER_DATA + "/shard1a --rest --logpath "
-       + DEMO_SERVER_LOG + "/shard1a.log --logappend &"]
-executeCommand(CMD)
-checkStarted(27218)
-
-
-CMD = ,["mongod --oplogSize 500 --fork --shardsvr --noprealloc --port 27219 "
-       "--dbpath "
-       + DEMO_SERVER_DATA + "/shard1b --rest --logpath "
-       + DEMO_SERVER_LOG + "/shard1b.log --logappend &"]
-executeCommand(CMD)
-checkStarted(27219)
-
-"""

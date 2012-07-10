@@ -1,4 +1,5 @@
-"""Tails the oplog of a shard and returns entries"""
+"""Tails the oplog of a shard and returns entries
+"""
 
 import os
 import time
