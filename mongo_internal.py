@@ -25,11 +25,11 @@ class Daemon(Thread):
 
   
     def run(self):
-        """Discovers the mongo cluster and creates an oplog thread for each thread
-            
+        """Discovers the mongo cluster and creates an oplog thread for each thread 
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
+        doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
         
         while self.canRun is True: 
             
@@ -37,9 +37,9 @@ class Daemon(Thread):
                 shard_id = shard_doc['_id']
                 if self.shard_set.has_key(shard_id):
                     continue
+                    
                 shard_conn = Connection(shard_doc['host'])
                 oplog_coll = shard_conn['local']['oplog.rs']
-                doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, {'test.test'})
                 self.shard_set[shard_id] = oplog
