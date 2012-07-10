@@ -40,6 +40,7 @@ def remove_dir(path):
     command = ["rm", "-rf", path]
     subprocess.Popen(command).communicate()
 
+
 def create_dir(path):
     """Create supplied directory
     """
@@ -57,17 +58,20 @@ def killMongoProc(host, port):
         cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
         executeCommand(cmd)
 
+
 def killMongosProc():
     """ Kill all mongos proc
     """
     cmd = ["pgrep -f \"" + MONGOS_KSTR + "\" | xargs kill -9"]
     executeCommand(cmd)
 
+
 def killAllMongoProc(host):
     """Kill any existing mongods
     """
     for port in PORTS.values():
         killMongoProc(host, port)
+
 
 def startMongoProc(port, replSetName, data, log):
     """Create the replica set
@@ -127,7 +131,8 @@ def checkStarted(port):
 
 class ReplSetManager():
     """Defines all the testing methods, as well as a method that sets up the cluster
-        """
+    """
+    
     def start_cluster(self):
         """Sets up cluster with 1 shard, replica set with 3 members
         """
@@ -136,7 +141,6 @@ class ReplSetManager():
 
         # Kill all spawned mongos
         killMongosProc()
-        
         
         remove_dir(DEMO_SERVER_LOG)
         remove_dir(DEMO_SERVER_DATA)        
@@ -150,7 +154,6 @@ class ReplSetManager():
         create_dir(DEMO_SERVER_DATA + "/config1/journal")
         create_dir(DEMO_SERVER_LOG)
             
-
         # Create the replica set
         startMongoProc(PORTS["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log")
         startMongoProc(PORTS["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
@@ -187,9 +190,11 @@ class ReplSetManager():
         
         subprocess.call(cmd2, shell=True)
     
+    
     def abort_test(self):
         print 'test failed'
         sys.exit(1)
+    
     
     def test_mongo_internal(self):
         """Test mongo_internal
@@ -205,8 +210,8 @@ class ReplSetManager():
         d.stop()
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
-        #we want to add several shards
         
+    
     def get_oplog_thread(self):
         """ Set up connection with mongo. Returns oplog, the connection and oplog collection
             
@@ -230,6 +235,7 @@ class ReplSetManager():
         
         return (oplog, primary_conn, oplog_coll)
 
+    
     def get_oplog_thread_new(self):
         """ Set up connection with mongo. Returns oplog, the connection and oplog collection
             
@@ -252,8 +258,8 @@ class ReplSetManager():
             
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         #testing for entry as none type
         entry = None
@@ -292,7 +298,6 @@ class ReplSetManager():
                 
     def test_get_oplog_cursor(self):
         """Test get_oplog_cursor in oplog_manager. Assertion failure if it doesn't pass
-            
         """
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         
@@ -324,8 +329,8 @@ class ReplSetManager():
 
     def test_get_last_oplog_timestamp(self):
         """Test get_last_oplog_timestamp in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         #test empty oplog
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         assert (test_oplog.get_last_oplog_timestamp() == None)
@@ -341,8 +346,8 @@ class ReplSetManager():
             
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         solr_url = "http://localhost:8080/solr"
         solr = Solr(solr_url)
@@ -369,8 +374,8 @@ class ReplSetManager():
         
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()            #needed for these tests
         
@@ -399,12 +404,11 @@ class ReplSetManager():
         
         os.system('rm temp_config.txt')
         test_oplog.stop()
-        #testing for valid entry
     
     def test_prepare_for_sync(self):
         """Test prepare_for_sync in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         cursor = test_oplog.prepare_for_sync()
         
@@ -433,10 +437,11 @@ class ReplSetManager():
 
         test_oplog.stop()
         
+    
     def test_write_config(self):
         """Test write_config in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
         
@@ -477,10 +482,11 @@ class ReplSetManager():
         test_oplog.stop()
         os.system('rm ' + config_file_path)
         
+    
     def test_read_config(self):
         """Test read_config in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
         
@@ -507,10 +513,11 @@ class ReplSetManager():
         assert (test_oplog.read_config() == search_ts)
         os.system('rm ' + config_file_path)   
         
+    
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
-            
         """
+        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         

@@ -1,0 +1,1489 @@
+
+
+***** SERVER RESTARTED *****
+
+
+Tue Jul 10 10:46:30 mongos db version v2.0.6, pdfile version 4.5 starting (--help for usage)
+Tue Jul 10 10:46:30 git version: e1c0cbc25863f6356aa4e31375add7bb49fb05bc
+Tue Jul 10 10:46:30 build info: Darwin erh2.10gen.cc 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386 BOOST_LIB_VERSION=1_40
+Tue Jul 10 10:46:30 [Balancer] about to contact config servers and shards
+Tue Jul 10 10:46:30 [websvr] admin web console waiting for connections on port 28217
+Tue Jul 10 10:46:30 [mongosMain] waiting for connections on port 27217
+Tue Jul 10 10:46:30 [Balancer] config servers and shards contacted successfully
+Tue Jul 10 10:46:30 [Balancer] balancer id: Leonardos-MacBook-Air.local:27217 started at Jul 10 10:46:30
+Tue Jul 10 10:46:30 [Balancer] created new distributed lock for balancer on localhost:27220 ( lock timeout : 900000, ping interval : 30000, process : 0 )
+Tue Jul 10 10:46:30 [Balancer] creating WriteBackListener for: localhost:27220 serverID: 4ffc40465aed26d38727c643
+Tue Jul 10 10:46:30 [LockPinger] creating distributed lock ping thread for localhost:27220 and process Leonardos-MacBook-Air.local:27217:1341931590:16807 (sleeping for 30000ms)
+Tue Jul 10 10:46:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40465aed26d38727c644
+Tue Jul 10 10:46:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:46:31 [mongosMain] connection accepted from 127.0.0.1:51140 #1
+Tue Jul 10 10:46:31 [conn1] couldn't find database [admin] in config db
+Tue Jul 10 10:46:31 [conn1] 	 put [admin] on: config:localhost:27220
+Tue Jul 10 10:46:31 [conn1] end connection 127.0.0.1:51140
+Tue Jul 10 10:46:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40505aed26d38727c645
+Tue Jul 10 10:46:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:46:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc405a5aed26d38727c646
+Tue Jul 10 10:46:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:47:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40645aed26d38727c647
+Tue Jul 10 10:47:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:47:06 [mongosMain] connection accepted from 127.0.0.1:51157 #2
+Tue Jul 10 10:47:06 [conn2] starting new replica set monitor for replica set demo-repl with seed of localhost:27117
+Tue Jul 10 10:47:06 [conn2] successfully connected to seed localhost:27117 for replica set demo-repl
+Tue Jul 10 10:47:06 [conn2] changing hosts to { 0: "localhost:27117", 1: "localhost:27118" } from demo-repl/
+Tue Jul 10 10:47:06 [conn2] trying to add new host localhost:27117 to replica set demo-repl
+Tue Jul 10 10:47:06 [conn2] successfully connected to new host localhost:27117 in replica set demo-repl
+Tue Jul 10 10:47:06 [conn2] trying to add new host localhost:27118 to replica set demo-repl
+Tue Jul 10 10:47:06 [conn2] successfully connected to new host localhost:27118 in replica set demo-repl
+Tue Jul 10 10:47:06 [conn2] replica set monitor for replica set demo-repl started, address is demo-repl/localhost:27117,localhost:27118
+Tue Jul 10 10:47:06 [ReplicaSetMonitorWatcher] starting
+Tue Jul 10 10:47:06 [conn2] going to add shard: { _id: "demo-repl", host: "demo-repl/localhost:27117,localhost:27118" }
+Tue Jul 10 10:47:06 [conn2] end connection 127.0.0.1:51157
+Tue Jul 10 10:47:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc406e5aed26d38727c648
+Tue Jul 10 10:47:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:47:11 [mongosMain] connection accepted from 127.0.0.1:51171 #3
+Tue Jul 10 10:47:16 [ReplicaSetMonitorWatcher] DBClientCursor::init call() failed
+Tue Jul 10 10:47:16 [ReplicaSetMonitorWatcher] trying reconnect to localhost:27117
+Tue Jul 10 10:47:16 [ReplicaSetMonitorWatcher] reconnect localhost:27117 failed couldn't connect to server localhost:27117
+Tue Jul 10 10:47:16 [ReplicaSetMonitorWatcher] DBClientCursor::init call() failed
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] ReplicaSetMonitor::_checkConnection: caught exception localhost:27117 socket exception
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] trying reconnect to localhost:27118
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] reconnect localhost:27118 ok
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] ReplicaSetMonitor::_checkConnection: localhost:27118 { setName: "demo-repl", ismaster: false, secondary: true, hosts: [ "localhost:27118", "localhost:27117" ], arbiters: [ "localhost:27119" ], me: "localhost:27118", maxBsonObjectSize: 16777216, ok: 1.0 }
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] DBClientCursor::init call() failed
+Tue Jul 10 10:47:17 [ReplicaSetMonitorWatcher] ReplicaSetMonitor::_checkConnection: caught exception localhost:27118 DBClientBase::findN: transport error: localhost:27118 query: { replSetGetStatus: 1 }
+Tue Jul 10 10:47:20 [Balancer] DBClientCursor::init call() failed
+Tue Jul 10 10:47:20 [Balancer] scoped connection to localhost:27220 not being returned to the pool
+Tue Jul 10 10:47:20 [Balancer] caught exception while doing balance: DBClientBase::findN: transport error: localhost:27117 query: { features: 1 }
+Tue Jul 10 10:47:26 [conn3] couldn't find database [test] in config db
+Tue Jul 10 10:47:26 [conn3] 	 put [test] on: demo-repl:demo-repl/localhost:27117,localhost:27118
+Tue Jul 10 10:47:26 [conn3] creating WriteBackListener for: localhost:27117 serverID: 4ffc40465aed26d38727c643
+Tue Jul 10 10:47:26 [conn3] creating WriteBackListener for: localhost:27118 serverID: 4ffc40465aed26d38727c643
+Tue Jul 10 10:47:26 [WriteBackListener-localhost:27117] Socket recv() errno:54 Connection reset by peer 127.0.0.1:27117
+Tue Jul 10 10:47:26 [WriteBackListener-localhost:27117] SocketException: remote: 127.0.0.1:27117 error: 9001 socket exception [1] server [127.0.0.1:27117] 
+Tue Jul 10 10:47:26 [WriteBackListener-localhost:27117] DBClientCursor::init call() failed
+Tue Jul 10 10:47:26 [WriteBackListener-localhost:27117] WriteBackListener exception : DBClientBase::findN: transport error: localhost:27117 query: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') }
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51225 #4
+Tue Jul 10 10:47:26 [conn4] end connection 127.0.0.1:51225
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51228 #5
+Tue Jul 10 10:47:26 [conn5] end connection 127.0.0.1:51228
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51230 #6
+Tue Jul 10 10:47:26 [conn6] end connection 127.0.0.1:51230
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51232 #7
+Tue Jul 10 10:47:26 [conn7] end connection 127.0.0.1:51232
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51234 #8
+Tue Jul 10 10:47:26 [conn8] end connection 127.0.0.1:51234
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51236 #9
+Tue Jul 10 10:47:26 [conn9] end connection 127.0.0.1:51236
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51238 #10
+Tue Jul 10 10:47:26 [conn10] end connection 127.0.0.1:51238
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51240 #11
+Tue Jul 10 10:47:26 [conn11] end connection 127.0.0.1:51240
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51242 #12
+Tue Jul 10 10:47:26 [conn12] end connection 127.0.0.1:51242
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51244 #13
+Tue Jul 10 10:47:26 [conn13] end connection 127.0.0.1:51244
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51246 #14
+Tue Jul 10 10:47:26 [conn14] end connection 127.0.0.1:51246
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51248 #15
+Tue Jul 10 10:47:26 [conn15] end connection 127.0.0.1:51248
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51250 #16
+Tue Jul 10 10:47:26 [conn16] end connection 127.0.0.1:51250
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51252 #17
+Tue Jul 10 10:47:26 [conn17] end connection 127.0.0.1:51252
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51254 #18
+Tue Jul 10 10:47:26 [conn18] end connection 127.0.0.1:51254
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51256 #19
+Tue Jul 10 10:47:26 [conn19] end connection 127.0.0.1:51256
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51258 #20
+Tue Jul 10 10:47:26 [conn20] end connection 127.0.0.1:51258
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51260 #21
+Tue Jul 10 10:47:26 [conn21] end connection 127.0.0.1:51260
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51262 #22
+Tue Jul 10 10:47:26 [conn22] end connection 127.0.0.1:51262
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51264 #23
+Tue Jul 10 10:47:26 [conn23] end connection 127.0.0.1:51264
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51266 #24
+Tue Jul 10 10:47:26 [conn24] end connection 127.0.0.1:51266
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51268 #25
+Tue Jul 10 10:47:26 [conn25] end connection 127.0.0.1:51268
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51270 #26
+Tue Jul 10 10:47:26 [conn26] end connection 127.0.0.1:51270
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51272 #27
+Tue Jul 10 10:47:26 [conn27] end connection 127.0.0.1:51272
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51274 #28
+Tue Jul 10 10:47:26 [conn28] end connection 127.0.0.1:51274
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51276 #29
+Tue Jul 10 10:47:26 [conn29] end connection 127.0.0.1:51276
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51278 #30
+Tue Jul 10 10:47:26 [conn30] end connection 127.0.0.1:51278
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51280 #31
+Tue Jul 10 10:47:26 [conn31] end connection 127.0.0.1:51280
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51282 #32
+Tue Jul 10 10:47:26 [conn32] end connection 127.0.0.1:51282
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51284 #33
+Tue Jul 10 10:47:26 [conn33] end connection 127.0.0.1:51284
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51286 #34
+Tue Jul 10 10:47:26 [conn34] end connection 127.0.0.1:51286
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51288 #35
+Tue Jul 10 10:47:26 [conn35] end connection 127.0.0.1:51288
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51290 #36
+Tue Jul 10 10:47:26 [conn36] end connection 127.0.0.1:51290
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51292 #37
+Tue Jul 10 10:47:26 [conn37] end connection 127.0.0.1:51292
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51294 #38
+Tue Jul 10 10:47:26 [conn38] end connection 127.0.0.1:51294
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51296 #39
+Tue Jul 10 10:47:26 [conn39] end connection 127.0.0.1:51296
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51298 #40
+Tue Jul 10 10:47:26 [conn40] end connection 127.0.0.1:51298
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51300 #41
+Tue Jul 10 10:47:26 [conn41] end connection 127.0.0.1:51300
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51302 #42
+Tue Jul 10 10:47:26 [conn42] end connection 127.0.0.1:51302
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51304 #43
+Tue Jul 10 10:47:26 [conn43] end connection 127.0.0.1:51304
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51306 #44
+Tue Jul 10 10:47:26 [conn44] end connection 127.0.0.1:51306
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51308 #45
+Tue Jul 10 10:47:26 [conn45] end connection 127.0.0.1:51308
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51310 #46
+Tue Jul 10 10:47:26 [conn46] end connection 127.0.0.1:51310
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51312 #47
+Tue Jul 10 10:47:26 [conn47] end connection 127.0.0.1:51312
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51314 #48
+Tue Jul 10 10:47:26 [conn48] end connection 127.0.0.1:51314
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51316 #49
+Tue Jul 10 10:47:26 [conn49] end connection 127.0.0.1:51316
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51318 #50
+Tue Jul 10 10:47:26 [conn50] end connection 127.0.0.1:51318
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51320 #51
+Tue Jul 10 10:47:26 [conn51] end connection 127.0.0.1:51320
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51322 #52
+Tue Jul 10 10:47:26 [conn52] end connection 127.0.0.1:51322
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51324 #53
+Tue Jul 10 10:47:26 [conn53] end connection 127.0.0.1:51324
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51326 #54
+Tue Jul 10 10:47:26 [conn54] end connection 127.0.0.1:51326
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51328 #55
+Tue Jul 10 10:47:26 [conn55] end connection 127.0.0.1:51328
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51330 #56
+Tue Jul 10 10:47:26 [conn56] end connection 127.0.0.1:51330
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51332 #57
+Tue Jul 10 10:47:26 [conn57] end connection 127.0.0.1:51332
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51334 #58
+Tue Jul 10 10:47:26 [conn58] end connection 127.0.0.1:51334
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51336 #59
+Tue Jul 10 10:47:26 [conn59] end connection 127.0.0.1:51336
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51338 #60
+Tue Jul 10 10:47:26 [conn60] end connection 127.0.0.1:51338
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51340 #61
+Tue Jul 10 10:47:26 [conn61] end connection 127.0.0.1:51340
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51342 #62
+Tue Jul 10 10:47:26 [conn62] end connection 127.0.0.1:51342
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51344 #63
+Tue Jul 10 10:47:26 [conn63] end connection 127.0.0.1:51344
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51346 #64
+Tue Jul 10 10:47:26 [conn64] end connection 127.0.0.1:51346
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51348 #65
+Tue Jul 10 10:47:26 [conn65] end connection 127.0.0.1:51348
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51350 #66
+Tue Jul 10 10:47:26 [conn66] end connection 127.0.0.1:51350
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51352 #67
+Tue Jul 10 10:47:26 [conn67] end connection 127.0.0.1:51352
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51354 #68
+Tue Jul 10 10:47:26 [conn68] end connection 127.0.0.1:51354
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51356 #69
+Tue Jul 10 10:47:26 [conn69] end connection 127.0.0.1:51356
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51358 #70
+Tue Jul 10 10:47:26 [conn70] end connection 127.0.0.1:51358
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51360 #71
+Tue Jul 10 10:47:26 [conn71] end connection 127.0.0.1:51360
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51362 #72
+Tue Jul 10 10:47:26 [conn72] end connection 127.0.0.1:51362
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51364 #73
+Tue Jul 10 10:47:26 [conn73] end connection 127.0.0.1:51364
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51366 #74
+Tue Jul 10 10:47:26 [conn74] end connection 127.0.0.1:51366
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51368 #75
+Tue Jul 10 10:47:26 [conn75] end connection 127.0.0.1:51368
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51370 #76
+Tue Jul 10 10:47:26 [conn76] end connection 127.0.0.1:51370
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51372 #77
+Tue Jul 10 10:47:26 [conn77] end connection 127.0.0.1:51372
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51374 #78
+Tue Jul 10 10:47:26 [conn78] end connection 127.0.0.1:51374
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51376 #79
+Tue Jul 10 10:47:26 [conn79] end connection 127.0.0.1:51376
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51378 #80
+Tue Jul 10 10:47:26 [conn80] end connection 127.0.0.1:51378
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51380 #81
+Tue Jul 10 10:47:26 [conn81] end connection 127.0.0.1:51380
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51382 #82
+Tue Jul 10 10:47:26 [conn82] end connection 127.0.0.1:51382
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51384 #83
+Tue Jul 10 10:47:26 [conn83] end connection 127.0.0.1:51384
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51386 #84
+Tue Jul 10 10:47:26 [conn84] end connection 127.0.0.1:51386
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51388 #85
+Tue Jul 10 10:47:26 [conn85] end connection 127.0.0.1:51388
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51390 #86
+Tue Jul 10 10:47:26 [conn86] end connection 127.0.0.1:51390
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51392 #87
+Tue Jul 10 10:47:26 [conn87] end connection 127.0.0.1:51392
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51394 #88
+Tue Jul 10 10:47:26 [conn88] end connection 127.0.0.1:51394
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51396 #89
+Tue Jul 10 10:47:26 [conn89] end connection 127.0.0.1:51396
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51398 #90
+Tue Jul 10 10:47:26 [conn90] end connection 127.0.0.1:51398
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51400 #91
+Tue Jul 10 10:47:26 [conn91] end connection 127.0.0.1:51400
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51402 #92
+Tue Jul 10 10:47:26 [conn92] end connection 127.0.0.1:51402
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51404 #93
+Tue Jul 10 10:47:26 [conn93] end connection 127.0.0.1:51404
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51406 #94
+Tue Jul 10 10:47:26 [conn94] end connection 127.0.0.1:51406
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51408 #95
+Tue Jul 10 10:47:26 [conn95] end connection 127.0.0.1:51408
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51410 #96
+Tue Jul 10 10:47:26 [conn96] end connection 127.0.0.1:51410
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51412 #97
+Tue Jul 10 10:47:26 [conn97] end connection 127.0.0.1:51412
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51414 #98
+Tue Jul 10 10:47:26 [conn98] end connection 127.0.0.1:51414
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51416 #99
+Tue Jul 10 10:47:26 [conn99] end connection 127.0.0.1:51416
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51418 #100
+Tue Jul 10 10:47:26 [conn100] end connection 127.0.0.1:51418
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51420 #101
+Tue Jul 10 10:47:26 [conn101] end connection 127.0.0.1:51420
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51422 #102
+Tue Jul 10 10:47:26 [conn102] end connection 127.0.0.1:51422
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51424 #103
+Tue Jul 10 10:47:26 [conn103] end connection 127.0.0.1:51424
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51426 #104
+Tue Jul 10 10:47:26 [conn104] end connection 127.0.0.1:51426
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51428 #105
+Tue Jul 10 10:47:26 [conn105] end connection 127.0.0.1:51428
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51430 #106
+Tue Jul 10 10:47:26 [conn106] end connection 127.0.0.1:51430
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51432 #107
+Tue Jul 10 10:47:26 [conn107] end connection 127.0.0.1:51432
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51434 #108
+Tue Jul 10 10:47:26 [conn108] end connection 127.0.0.1:51434
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51436 #109
+Tue Jul 10 10:47:26 [conn109] end connection 127.0.0.1:51436
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51438 #110
+Tue Jul 10 10:47:26 [conn110] end connection 127.0.0.1:51438
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51440 #111
+Tue Jul 10 10:47:26 [conn111] end connection 127.0.0.1:51440
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51442 #112
+Tue Jul 10 10:47:26 [conn112] end connection 127.0.0.1:51442
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51444 #113
+Tue Jul 10 10:47:26 [conn113] end connection 127.0.0.1:51444
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51446 #114
+Tue Jul 10 10:47:26 [conn114] end connection 127.0.0.1:51446
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51448 #115
+Tue Jul 10 10:47:26 [conn115] end connection 127.0.0.1:51448
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51450 #116
+Tue Jul 10 10:47:26 [conn116] end connection 127.0.0.1:51450
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51452 #117
+Tue Jul 10 10:47:26 [conn117] end connection 127.0.0.1:51452
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51454 #118
+Tue Jul 10 10:47:26 [conn118] end connection 127.0.0.1:51454
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51456 #119
+Tue Jul 10 10:47:26 [conn119] end connection 127.0.0.1:51456
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51458 #120
+Tue Jul 10 10:47:26 [conn120] end connection 127.0.0.1:51458
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51460 #121
+Tue Jul 10 10:47:26 [conn121] end connection 127.0.0.1:51460
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51462 #122
+Tue Jul 10 10:47:26 [conn122] end connection 127.0.0.1:51462
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51464 #123
+Tue Jul 10 10:47:26 [conn123] end connection 127.0.0.1:51464
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51466 #124
+Tue Jul 10 10:47:26 [conn124] end connection 127.0.0.1:51466
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51468 #125
+Tue Jul 10 10:47:26 [conn125] end connection 127.0.0.1:51468
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51470 #126
+Tue Jul 10 10:47:26 [conn126] end connection 127.0.0.1:51470
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51472 #127
+Tue Jul 10 10:47:26 [conn127] end connection 127.0.0.1:51472
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51474 #128
+Tue Jul 10 10:47:26 [conn128] end connection 127.0.0.1:51474
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51476 #129
+Tue Jul 10 10:47:26 [conn129] end connection 127.0.0.1:51476
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51478 #130
+Tue Jul 10 10:47:26 [conn130] end connection 127.0.0.1:51478
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51480 #131
+Tue Jul 10 10:47:26 [conn131] end connection 127.0.0.1:51480
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51482 #132
+Tue Jul 10 10:47:26 [conn132] end connection 127.0.0.1:51482
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51484 #133
+Tue Jul 10 10:47:26 [conn133] end connection 127.0.0.1:51484
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51486 #134
+Tue Jul 10 10:47:26 [conn134] end connection 127.0.0.1:51486
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51488 #135
+Tue Jul 10 10:47:26 [conn135] end connection 127.0.0.1:51488
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51490 #136
+Tue Jul 10 10:47:26 [conn136] end connection 127.0.0.1:51490
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51492 #137
+Tue Jul 10 10:47:26 [conn137] end connection 127.0.0.1:51492
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51494 #138
+Tue Jul 10 10:47:26 [conn138] end connection 127.0.0.1:51494
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51496 #139
+Tue Jul 10 10:47:26 [conn139] end connection 127.0.0.1:51496
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51498 #140
+Tue Jul 10 10:47:26 [conn140] end connection 127.0.0.1:51498
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51500 #141
+Tue Jul 10 10:47:26 [conn141] end connection 127.0.0.1:51500
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51502 #142
+Tue Jul 10 10:47:26 [conn142] end connection 127.0.0.1:51502
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51504 #143
+Tue Jul 10 10:47:26 [conn143] end connection 127.0.0.1:51504
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51506 #144
+Tue Jul 10 10:47:26 [conn144] end connection 127.0.0.1:51506
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51508 #145
+Tue Jul 10 10:47:26 [conn145] end connection 127.0.0.1:51508
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51510 #146
+Tue Jul 10 10:47:26 [conn146] end connection 127.0.0.1:51510
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51512 #147
+Tue Jul 10 10:47:26 [conn147] end connection 127.0.0.1:51512
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51514 #148
+Tue Jul 10 10:47:26 [conn148] end connection 127.0.0.1:51514
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51516 #149
+Tue Jul 10 10:47:26 [conn149] end connection 127.0.0.1:51516
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51518 #150
+Tue Jul 10 10:47:26 [conn150] end connection 127.0.0.1:51518
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51520 #151
+Tue Jul 10 10:47:26 [conn151] end connection 127.0.0.1:51520
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51522 #152
+Tue Jul 10 10:47:26 [conn152] end connection 127.0.0.1:51522
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51524 #153
+Tue Jul 10 10:47:26 [conn153] end connection 127.0.0.1:51524
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51526 #154
+Tue Jul 10 10:47:26 [conn154] end connection 127.0.0.1:51526
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51528 #155
+Tue Jul 10 10:47:26 [conn155] end connection 127.0.0.1:51528
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51530 #156
+Tue Jul 10 10:47:26 [conn156] end connection 127.0.0.1:51530
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51532 #157
+Tue Jul 10 10:47:26 [conn157] end connection 127.0.0.1:51532
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51534 #158
+Tue Jul 10 10:47:26 [conn158] end connection 127.0.0.1:51534
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51536 #159
+Tue Jul 10 10:47:26 [conn159] end connection 127.0.0.1:51536
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51538 #160
+Tue Jul 10 10:47:26 [conn160] end connection 127.0.0.1:51538
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51540 #161
+Tue Jul 10 10:47:26 [conn161] end connection 127.0.0.1:51540
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51542 #162
+Tue Jul 10 10:47:26 [conn162] end connection 127.0.0.1:51542
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51544 #163
+Tue Jul 10 10:47:26 [conn163] end connection 127.0.0.1:51544
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51546 #164
+Tue Jul 10 10:47:26 [conn164] end connection 127.0.0.1:51546
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51548 #165
+Tue Jul 10 10:47:26 [conn165] end connection 127.0.0.1:51548
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51550 #166
+Tue Jul 10 10:47:26 [conn166] end connection 127.0.0.1:51550
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51552 #167
+Tue Jul 10 10:47:26 [conn167] end connection 127.0.0.1:51552
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51554 #168
+Tue Jul 10 10:47:26 [conn168] end connection 127.0.0.1:51554
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51556 #169
+Tue Jul 10 10:47:26 [conn169] end connection 127.0.0.1:51556
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51558 #170
+Tue Jul 10 10:47:26 [conn170] end connection 127.0.0.1:51558
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51560 #171
+Tue Jul 10 10:47:26 [conn171] end connection 127.0.0.1:51560
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51562 #172
+Tue Jul 10 10:47:26 [conn172] end connection 127.0.0.1:51562
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51564 #173
+Tue Jul 10 10:47:26 [conn173] end connection 127.0.0.1:51564
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51566 #174
+Tue Jul 10 10:47:26 [conn174] end connection 127.0.0.1:51566
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51568 #175
+Tue Jul 10 10:47:26 [conn175] end connection 127.0.0.1:51568
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51570 #176
+Tue Jul 10 10:47:26 [conn176] end connection 127.0.0.1:51570
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51572 #177
+Tue Jul 10 10:47:26 [conn177] end connection 127.0.0.1:51572
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51574 #178
+Tue Jul 10 10:47:26 [conn178] end connection 127.0.0.1:51574
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51576 #179
+Tue Jul 10 10:47:26 [conn179] end connection 127.0.0.1:51576
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51578 #180
+Tue Jul 10 10:47:26 [conn180] end connection 127.0.0.1:51578
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51580 #181
+Tue Jul 10 10:47:26 [conn181] end connection 127.0.0.1:51580
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51582 #182
+Tue Jul 10 10:47:26 [conn182] end connection 127.0.0.1:51582
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51584 #183
+Tue Jul 10 10:47:26 [conn183] end connection 127.0.0.1:51584
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51586 #184
+Tue Jul 10 10:47:26 [conn184] end connection 127.0.0.1:51586
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51588 #185
+Tue Jul 10 10:47:26 [conn185] end connection 127.0.0.1:51588
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51590 #186
+Tue Jul 10 10:47:26 [conn186] end connection 127.0.0.1:51590
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51592 #187
+Tue Jul 10 10:47:26 [conn187] end connection 127.0.0.1:51592
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51594 #188
+Tue Jul 10 10:47:26 [conn188] end connection 127.0.0.1:51594
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51596 #189
+Tue Jul 10 10:47:26 [conn189] end connection 127.0.0.1:51596
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51598 #190
+Tue Jul 10 10:47:26 [conn190] end connection 127.0.0.1:51598
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51600 #191
+Tue Jul 10 10:47:26 [conn191] end connection 127.0.0.1:51600
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51602 #192
+Tue Jul 10 10:47:26 [conn192] end connection 127.0.0.1:51602
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51604 #193
+Tue Jul 10 10:47:26 [conn193] end connection 127.0.0.1:51604
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51606 #194
+Tue Jul 10 10:47:26 [conn194] end connection 127.0.0.1:51606
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51608 #195
+Tue Jul 10 10:47:26 [conn195] end connection 127.0.0.1:51608
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51610 #196
+Tue Jul 10 10:47:26 [conn196] end connection 127.0.0.1:51610
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51612 #197
+Tue Jul 10 10:47:26 [conn197] end connection 127.0.0.1:51612
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51614 #198
+Tue Jul 10 10:47:26 [conn198] end connection 127.0.0.1:51614
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51616 #199
+Tue Jul 10 10:47:26 [conn199] end connection 127.0.0.1:51616
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51618 #200
+Tue Jul 10 10:47:26 [conn200] end connection 127.0.0.1:51618
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51620 #201
+Tue Jul 10 10:47:26 [conn201] end connection 127.0.0.1:51620
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51622 #202
+Tue Jul 10 10:47:26 [conn202] end connection 127.0.0.1:51622
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51624 #203
+Tue Jul 10 10:47:26 [conn203] end connection 127.0.0.1:51624
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51626 #204
+Tue Jul 10 10:47:26 [conn204] end connection 127.0.0.1:51626
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51628 #205
+Tue Jul 10 10:47:26 [conn205] end connection 127.0.0.1:51628
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51630 #206
+Tue Jul 10 10:47:26 [conn206] end connection 127.0.0.1:51630
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51632 #207
+Tue Jul 10 10:47:26 [conn207] end connection 127.0.0.1:51632
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51634 #208
+Tue Jul 10 10:47:26 [conn208] end connection 127.0.0.1:51634
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51636 #209
+Tue Jul 10 10:47:26 [conn209] end connection 127.0.0.1:51636
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51638 #210
+Tue Jul 10 10:47:26 [conn210] end connection 127.0.0.1:51638
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51640 #211
+Tue Jul 10 10:47:26 [conn211] end connection 127.0.0.1:51640
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51642 #212
+Tue Jul 10 10:47:26 [conn212] end connection 127.0.0.1:51642
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51644 #213
+Tue Jul 10 10:47:26 [conn213] end connection 127.0.0.1:51644
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51646 #214
+Tue Jul 10 10:47:26 [conn214] end connection 127.0.0.1:51646
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51648 #215
+Tue Jul 10 10:47:26 [conn215] end connection 127.0.0.1:51648
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51650 #216
+Tue Jul 10 10:47:26 [conn216] end connection 127.0.0.1:51650
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51652 #217
+Tue Jul 10 10:47:26 [conn217] end connection 127.0.0.1:51652
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51654 #218
+Tue Jul 10 10:47:26 [conn218] end connection 127.0.0.1:51654
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51656 #219
+Tue Jul 10 10:47:26 [conn219] end connection 127.0.0.1:51656
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51658 #220
+Tue Jul 10 10:47:26 [conn220] end connection 127.0.0.1:51658
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51660 #221
+Tue Jul 10 10:47:26 [conn221] end connection 127.0.0.1:51660
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51662 #222
+Tue Jul 10 10:47:26 [conn222] end connection 127.0.0.1:51662
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51664 #223
+Tue Jul 10 10:47:26 [conn223] end connection 127.0.0.1:51664
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51666 #224
+Tue Jul 10 10:47:26 [conn224] end connection 127.0.0.1:51666
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51668 #225
+Tue Jul 10 10:47:26 [conn225] end connection 127.0.0.1:51668
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51670 #226
+Tue Jul 10 10:47:26 [conn226] end connection 127.0.0.1:51670
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51672 #227
+Tue Jul 10 10:47:26 [conn227] end connection 127.0.0.1:51672
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51674 #228
+Tue Jul 10 10:47:26 [conn228] end connection 127.0.0.1:51674
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51676 #229
+Tue Jul 10 10:47:26 [conn229] end connection 127.0.0.1:51676
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51678 #230
+Tue Jul 10 10:47:26 [conn230] end connection 127.0.0.1:51678
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51680 #231
+Tue Jul 10 10:47:26 [conn231] end connection 127.0.0.1:51680
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51682 #232
+Tue Jul 10 10:47:26 [conn232] end connection 127.0.0.1:51682
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51684 #233
+Tue Jul 10 10:47:26 [conn233] end connection 127.0.0.1:51684
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51686 #234
+Tue Jul 10 10:47:26 [conn234] end connection 127.0.0.1:51686
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51688 #235
+Tue Jul 10 10:47:26 [conn235] end connection 127.0.0.1:51688
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51690 #236
+Tue Jul 10 10:47:26 [conn236] end connection 127.0.0.1:51690
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51692 #237
+Tue Jul 10 10:47:26 [conn237] end connection 127.0.0.1:51692
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51694 #238
+Tue Jul 10 10:47:26 [conn238] end connection 127.0.0.1:51694
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51696 #239
+Tue Jul 10 10:47:26 [conn239] end connection 127.0.0.1:51696
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51698 #240
+Tue Jul 10 10:47:26 [conn240] end connection 127.0.0.1:51698
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51700 #241
+Tue Jul 10 10:47:26 [conn241] end connection 127.0.0.1:51700
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51702 #242
+Tue Jul 10 10:47:26 [conn242] end connection 127.0.0.1:51702
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51704 #243
+Tue Jul 10 10:47:26 [conn243] end connection 127.0.0.1:51704
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51706 #244
+Tue Jul 10 10:47:26 [conn244] end connection 127.0.0.1:51706
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51708 #245
+Tue Jul 10 10:47:26 [conn245] end connection 127.0.0.1:51708
+Tue Jul 10 10:47:26 [mongosMain] connection accepted from 127.0.0.1:51710 #246
+Tue Jul 10 10:47:26 [conn246] end connection 127.0.0.1:51710
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51715 #247
+Tue Jul 10 10:47:27 [conn247] end connection 127.0.0.1:51715
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51717 #248
+Tue Jul 10 10:47:27 [conn248] end connection 127.0.0.1:51717
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51719 #249
+Tue Jul 10 10:47:27 [conn249] end connection 127.0.0.1:51719
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51721 #250
+Tue Jul 10 10:47:27 [conn250] end connection 127.0.0.1:51721
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51723 #251
+Tue Jul 10 10:47:27 [conn251] end connection 127.0.0.1:51723
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51725 #252
+Tue Jul 10 10:47:27 [conn252] end connection 127.0.0.1:51725
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51727 #253
+Tue Jul 10 10:47:27 [conn253] end connection 127.0.0.1:51727
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51729 #254
+Tue Jul 10 10:47:27 [conn254] end connection 127.0.0.1:51729
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51731 #255
+Tue Jul 10 10:47:27 [conn255] end connection 127.0.0.1:51731
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51733 #256
+Tue Jul 10 10:47:27 [conn256] end connection 127.0.0.1:51733
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51735 #257
+Tue Jul 10 10:47:27 [conn257] end connection 127.0.0.1:51735
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51737 #258
+Tue Jul 10 10:47:27 [conn258] end connection 127.0.0.1:51737
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51739 #259
+Tue Jul 10 10:47:27 [conn259] end connection 127.0.0.1:51739
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51741 #260
+Tue Jul 10 10:47:27 [conn260] end connection 127.0.0.1:51741
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51743 #261
+Tue Jul 10 10:47:27 [conn261] end connection 127.0.0.1:51743
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51745 #262
+Tue Jul 10 10:47:27 [conn262] end connection 127.0.0.1:51745
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51747 #263
+Tue Jul 10 10:47:27 [conn263] end connection 127.0.0.1:51747
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51749 #264
+Tue Jul 10 10:47:27 [conn264] end connection 127.0.0.1:51749
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51751 #265
+Tue Jul 10 10:47:27 [conn265] end connection 127.0.0.1:51751
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51753 #266
+Tue Jul 10 10:47:27 [conn266] end connection 127.0.0.1:51753
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51755 #267
+Tue Jul 10 10:47:27 [conn267] end connection 127.0.0.1:51755
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51757 #268
+Tue Jul 10 10:47:27 [conn268] end connection 127.0.0.1:51757
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51759 #269
+Tue Jul 10 10:47:27 [conn269] end connection 127.0.0.1:51759
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51761 #270
+Tue Jul 10 10:47:27 [conn270] end connection 127.0.0.1:51761
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51763 #271
+Tue Jul 10 10:47:27 [conn271] end connection 127.0.0.1:51763
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51765 #272
+Tue Jul 10 10:47:27 [conn272] end connection 127.0.0.1:51765
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51767 #273
+Tue Jul 10 10:47:27 [conn273] end connection 127.0.0.1:51767
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51769 #274
+Tue Jul 10 10:47:27 [conn274] end connection 127.0.0.1:51769
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51771 #275
+Tue Jul 10 10:47:27 [conn275] end connection 127.0.0.1:51771
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51773 #276
+Tue Jul 10 10:47:27 [conn276] end connection 127.0.0.1:51773
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51775 #277
+Tue Jul 10 10:47:27 [conn277] end connection 127.0.0.1:51775
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51777 #278
+Tue Jul 10 10:47:27 [conn278] end connection 127.0.0.1:51777
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51779 #279
+Tue Jul 10 10:47:27 [conn279] end connection 127.0.0.1:51779
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51781 #280
+Tue Jul 10 10:47:27 [conn280] end connection 127.0.0.1:51781
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51783 #281
+Tue Jul 10 10:47:27 [conn281] end connection 127.0.0.1:51783
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51785 #282
+Tue Jul 10 10:47:27 [conn282] end connection 127.0.0.1:51785
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51787 #283
+Tue Jul 10 10:47:27 [conn283] end connection 127.0.0.1:51787
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51789 #284
+Tue Jul 10 10:47:27 [conn284] end connection 127.0.0.1:51789
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51791 #285
+Tue Jul 10 10:47:27 [conn285] end connection 127.0.0.1:51791
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51793 #286
+Tue Jul 10 10:47:27 [conn286] end connection 127.0.0.1:51793
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51795 #287
+Tue Jul 10 10:47:27 [conn287] end connection 127.0.0.1:51795
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51797 #288
+Tue Jul 10 10:47:27 [conn288] end connection 127.0.0.1:51797
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51799 #289
+Tue Jul 10 10:47:27 [conn289] end connection 127.0.0.1:51799
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51801 #290
+Tue Jul 10 10:47:27 [conn290] end connection 127.0.0.1:51801
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51803 #291
+Tue Jul 10 10:47:27 [conn291] end connection 127.0.0.1:51803
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51805 #292
+Tue Jul 10 10:47:27 [conn292] end connection 127.0.0.1:51805
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51807 #293
+Tue Jul 10 10:47:27 [conn293] end connection 127.0.0.1:51807
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51809 #294
+Tue Jul 10 10:47:27 [conn294] end connection 127.0.0.1:51809
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51811 #295
+Tue Jul 10 10:47:27 [conn295] end connection 127.0.0.1:51811
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51813 #296
+Tue Jul 10 10:47:27 [conn296] end connection 127.0.0.1:51813
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51815 #297
+Tue Jul 10 10:47:27 [conn297] end connection 127.0.0.1:51815
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51817 #298
+Tue Jul 10 10:47:27 [conn298] end connection 127.0.0.1:51817
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51819 #299
+Tue Jul 10 10:47:27 [conn299] end connection 127.0.0.1:51819
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51821 #300
+Tue Jul 10 10:47:27 [conn300] end connection 127.0.0.1:51821
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51823 #301
+Tue Jul 10 10:47:27 [conn301] end connection 127.0.0.1:51823
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51825 #302
+Tue Jul 10 10:47:27 [conn302] end connection 127.0.0.1:51825
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51827 #303
+Tue Jul 10 10:47:27 [conn303] end connection 127.0.0.1:51827
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51829 #304
+Tue Jul 10 10:47:27 [conn304] end connection 127.0.0.1:51829
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51831 #305
+Tue Jul 10 10:47:27 [conn305] end connection 127.0.0.1:51831
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51833 #306
+Tue Jul 10 10:47:27 [conn306] end connection 127.0.0.1:51833
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51835 #307
+Tue Jul 10 10:47:27 [conn307] end connection 127.0.0.1:51835
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51837 #308
+Tue Jul 10 10:47:27 [conn308] end connection 127.0.0.1:51837
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51839 #309
+Tue Jul 10 10:47:27 [conn309] end connection 127.0.0.1:51839
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51841 #310
+Tue Jul 10 10:47:27 [conn310] end connection 127.0.0.1:51841
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51843 #311
+Tue Jul 10 10:47:27 [conn311] end connection 127.0.0.1:51843
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51845 #312
+Tue Jul 10 10:47:27 [conn312] end connection 127.0.0.1:51845
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51847 #313
+Tue Jul 10 10:47:27 [conn313] end connection 127.0.0.1:51847
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51849 #314
+Tue Jul 10 10:47:27 [conn314] end connection 127.0.0.1:51849
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51851 #315
+Tue Jul 10 10:47:27 [conn315] end connection 127.0.0.1:51851
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51853 #316
+Tue Jul 10 10:47:27 [conn316] end connection 127.0.0.1:51853
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51855 #317
+Tue Jul 10 10:47:27 [conn317] end connection 127.0.0.1:51855
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51857 #318
+Tue Jul 10 10:47:27 [conn318] end connection 127.0.0.1:51857
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51859 #319
+Tue Jul 10 10:47:27 [conn319] end connection 127.0.0.1:51859
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51861 #320
+Tue Jul 10 10:47:27 [conn320] end connection 127.0.0.1:51861
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51863 #321
+Tue Jul 10 10:47:27 [conn321] end connection 127.0.0.1:51863
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51865 #322
+Tue Jul 10 10:47:27 [conn322] end connection 127.0.0.1:51865
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51867 #323
+Tue Jul 10 10:47:27 [conn323] end connection 127.0.0.1:51867
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51869 #324
+Tue Jul 10 10:47:27 [conn324] end connection 127.0.0.1:51869
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51871 #325
+Tue Jul 10 10:47:27 [conn325] end connection 127.0.0.1:51871
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51873 #326
+Tue Jul 10 10:47:27 [conn326] end connection 127.0.0.1:51873
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51875 #327
+Tue Jul 10 10:47:27 [conn327] end connection 127.0.0.1:51875
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51877 #328
+Tue Jul 10 10:47:27 [conn328] end connection 127.0.0.1:51877
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51879 #329
+Tue Jul 10 10:47:27 [conn329] end connection 127.0.0.1:51879
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51881 #330
+Tue Jul 10 10:47:27 [conn330] end connection 127.0.0.1:51881
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51883 #331
+Tue Jul 10 10:47:27 [conn331] end connection 127.0.0.1:51883
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51885 #332
+Tue Jul 10 10:47:27 [conn332] end connection 127.0.0.1:51885
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51887 #333
+Tue Jul 10 10:47:27 [conn333] end connection 127.0.0.1:51887
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51889 #334
+Tue Jul 10 10:47:27 [conn334] end connection 127.0.0.1:51889
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51891 #335
+Tue Jul 10 10:47:27 [conn335] end connection 127.0.0.1:51891
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51893 #336
+Tue Jul 10 10:47:27 [conn336] end connection 127.0.0.1:51893
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51895 #337
+Tue Jul 10 10:47:27 [conn337] end connection 127.0.0.1:51895
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51897 #338
+Tue Jul 10 10:47:27 [conn338] end connection 127.0.0.1:51897
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51899 #339
+Tue Jul 10 10:47:27 [conn339] end connection 127.0.0.1:51899
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51901 #340
+Tue Jul 10 10:47:27 [conn340] end connection 127.0.0.1:51901
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51903 #341
+Tue Jul 10 10:47:27 [conn341] end connection 127.0.0.1:51903
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51905 #342
+Tue Jul 10 10:47:27 [conn342] end connection 127.0.0.1:51905
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51907 #343
+Tue Jul 10 10:47:27 [conn343] end connection 127.0.0.1:51907
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51909 #344
+Tue Jul 10 10:47:27 [conn344] end connection 127.0.0.1:51909
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51911 #345
+Tue Jul 10 10:47:27 [conn345] end connection 127.0.0.1:51911
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51913 #346
+Tue Jul 10 10:47:27 [conn346] end connection 127.0.0.1:51913
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51915 #347
+Tue Jul 10 10:47:27 [conn347] end connection 127.0.0.1:51915
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51917 #348
+Tue Jul 10 10:47:27 [conn348] end connection 127.0.0.1:51917
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51919 #349
+Tue Jul 10 10:47:27 [conn349] end connection 127.0.0.1:51919
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51921 #350
+Tue Jul 10 10:47:27 [conn350] end connection 127.0.0.1:51921
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51923 #351
+Tue Jul 10 10:47:27 [conn351] end connection 127.0.0.1:51923
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51925 #352
+Tue Jul 10 10:47:27 [conn352] end connection 127.0.0.1:51925
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51927 #353
+Tue Jul 10 10:47:27 [conn353] end connection 127.0.0.1:51927
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51929 #354
+Tue Jul 10 10:47:27 [conn354] end connection 127.0.0.1:51929
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51931 #355
+Tue Jul 10 10:47:27 [conn355] end connection 127.0.0.1:51931
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51933 #356
+Tue Jul 10 10:47:27 [conn356] end connection 127.0.0.1:51933
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51935 #357
+Tue Jul 10 10:47:27 [conn357] end connection 127.0.0.1:51935
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51937 #358
+Tue Jul 10 10:47:27 [conn358] end connection 127.0.0.1:51937
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51939 #359
+Tue Jul 10 10:47:27 [conn359] end connection 127.0.0.1:51939
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51941 #360
+Tue Jul 10 10:47:27 [conn360] end connection 127.0.0.1:51941
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51943 #361
+Tue Jul 10 10:47:27 [conn361] end connection 127.0.0.1:51943
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51945 #362
+Tue Jul 10 10:47:27 [conn362] end connection 127.0.0.1:51945
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51947 #363
+Tue Jul 10 10:47:27 [conn363] end connection 127.0.0.1:51947
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51949 #364
+Tue Jul 10 10:47:27 [conn364] end connection 127.0.0.1:51949
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51951 #365
+Tue Jul 10 10:47:27 [conn365] end connection 127.0.0.1:51951
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51953 #366
+Tue Jul 10 10:47:27 [conn366] end connection 127.0.0.1:51953
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51955 #367
+Tue Jul 10 10:47:27 [conn367] end connection 127.0.0.1:51955
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51957 #368
+Tue Jul 10 10:47:27 [conn368] end connection 127.0.0.1:51957
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51959 #369
+Tue Jul 10 10:47:27 [conn369] end connection 127.0.0.1:51959
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51961 #370
+Tue Jul 10 10:47:27 [conn370] end connection 127.0.0.1:51961
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51963 #371
+Tue Jul 10 10:47:27 [conn371] end connection 127.0.0.1:51963
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51965 #372
+Tue Jul 10 10:47:27 [conn372] end connection 127.0.0.1:51965
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51967 #373
+Tue Jul 10 10:47:27 [conn373] end connection 127.0.0.1:51967
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51969 #374
+Tue Jul 10 10:47:27 [conn374] end connection 127.0.0.1:51969
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51971 #375
+Tue Jul 10 10:47:27 [conn375] end connection 127.0.0.1:51971
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51973 #376
+Tue Jul 10 10:47:27 [conn376] end connection 127.0.0.1:51973
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51975 #377
+Tue Jul 10 10:47:27 [conn377] end connection 127.0.0.1:51975
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51977 #378
+Tue Jul 10 10:47:27 [conn378] end connection 127.0.0.1:51977
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51979 #379
+Tue Jul 10 10:47:27 [conn379] end connection 127.0.0.1:51979
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51981 #380
+Tue Jul 10 10:47:27 [conn380] end connection 127.0.0.1:51981
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51983 #381
+Tue Jul 10 10:47:27 [conn381] end connection 127.0.0.1:51983
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51985 #382
+Tue Jul 10 10:47:27 [conn382] end connection 127.0.0.1:51985
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51987 #383
+Tue Jul 10 10:47:27 [conn383] end connection 127.0.0.1:51987
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51989 #384
+Tue Jul 10 10:47:27 [conn384] end connection 127.0.0.1:51989
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51991 #385
+Tue Jul 10 10:47:27 [conn385] end connection 127.0.0.1:51991
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51993 #386
+Tue Jul 10 10:47:27 [conn386] end connection 127.0.0.1:51993
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51995 #387
+Tue Jul 10 10:47:27 [conn387] end connection 127.0.0.1:51995
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51997 #388
+Tue Jul 10 10:47:27 [conn388] end connection 127.0.0.1:51997
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:51999 #389
+Tue Jul 10 10:47:27 [conn389] end connection 127.0.0.1:51999
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52001 #390
+Tue Jul 10 10:47:27 [conn390] end connection 127.0.0.1:52001
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52003 #391
+Tue Jul 10 10:47:27 [conn391] end connection 127.0.0.1:52003
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52005 #392
+Tue Jul 10 10:47:27 [conn392] end connection 127.0.0.1:52005
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52007 #393
+Tue Jul 10 10:47:27 [conn393] end connection 127.0.0.1:52007
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52009 #394
+Tue Jul 10 10:47:27 [conn394] end connection 127.0.0.1:52009
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52011 #395
+Tue Jul 10 10:47:27 [conn395] end connection 127.0.0.1:52011
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52013 #396
+Tue Jul 10 10:47:27 [conn396] end connection 127.0.0.1:52013
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52015 #397
+Tue Jul 10 10:47:27 [conn397] end connection 127.0.0.1:52015
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52017 #398
+Tue Jul 10 10:47:27 [conn398] end connection 127.0.0.1:52017
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52019 #399
+Tue Jul 10 10:47:27 [conn399] end connection 127.0.0.1:52019
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52021 #400
+Tue Jul 10 10:47:27 [conn400] end connection 127.0.0.1:52021
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52023 #401
+Tue Jul 10 10:47:27 [conn401] end connection 127.0.0.1:52023
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52025 #402
+Tue Jul 10 10:47:27 [conn402] end connection 127.0.0.1:52025
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52027 #403
+Tue Jul 10 10:47:27 [conn403] end connection 127.0.0.1:52027
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52029 #404
+Tue Jul 10 10:47:27 [conn404] end connection 127.0.0.1:52029
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52031 #405
+Tue Jul 10 10:47:27 [conn405] end connection 127.0.0.1:52031
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52033 #406
+Tue Jul 10 10:47:27 [conn406] end connection 127.0.0.1:52033
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52035 #407
+Tue Jul 10 10:47:27 [conn407] end connection 127.0.0.1:52035
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52037 #408
+Tue Jul 10 10:47:27 [conn408] end connection 127.0.0.1:52037
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52039 #409
+Tue Jul 10 10:47:27 [conn409] end connection 127.0.0.1:52039
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52041 #410
+Tue Jul 10 10:47:27 [conn410] end connection 127.0.0.1:52041
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52043 #411
+Tue Jul 10 10:47:27 [conn411] end connection 127.0.0.1:52043
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52045 #412
+Tue Jul 10 10:47:27 [conn412] end connection 127.0.0.1:52045
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52047 #413
+Tue Jul 10 10:47:27 [conn413] end connection 127.0.0.1:52047
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52049 #414
+Tue Jul 10 10:47:27 [conn414] end connection 127.0.0.1:52049
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52051 #415
+Tue Jul 10 10:47:27 [conn415] end connection 127.0.0.1:52051
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52053 #416
+Tue Jul 10 10:47:27 [conn416] end connection 127.0.0.1:52053
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52055 #417
+Tue Jul 10 10:47:27 [conn417] end connection 127.0.0.1:52055
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52057 #418
+Tue Jul 10 10:47:27 [conn418] end connection 127.0.0.1:52057
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52059 #419
+Tue Jul 10 10:47:27 [conn419] end connection 127.0.0.1:52059
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52061 #420
+Tue Jul 10 10:47:27 [conn420] end connection 127.0.0.1:52061
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52063 #421
+Tue Jul 10 10:47:27 [conn421] end connection 127.0.0.1:52063
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52065 #422
+Tue Jul 10 10:47:27 [conn422] end connection 127.0.0.1:52065
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52067 #423
+Tue Jul 10 10:47:27 [conn423] end connection 127.0.0.1:52067
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52069 #424
+Tue Jul 10 10:47:27 [conn424] end connection 127.0.0.1:52069
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52071 #425
+Tue Jul 10 10:47:27 [conn425] end connection 127.0.0.1:52071
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52073 #426
+Tue Jul 10 10:47:27 [conn426] end connection 127.0.0.1:52073
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52075 #427
+Tue Jul 10 10:47:27 [conn427] end connection 127.0.0.1:52075
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52077 #428
+Tue Jul 10 10:47:27 [conn428] end connection 127.0.0.1:52077
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52079 #429
+Tue Jul 10 10:47:27 [conn429] end connection 127.0.0.1:52079
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52081 #430
+Tue Jul 10 10:47:27 [conn430] end connection 127.0.0.1:52081
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52083 #431
+Tue Jul 10 10:47:27 [conn431] end connection 127.0.0.1:52083
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52085 #432
+Tue Jul 10 10:47:27 [conn432] end connection 127.0.0.1:52085
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52087 #433
+Tue Jul 10 10:47:27 [conn433] end connection 127.0.0.1:52087
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52089 #434
+Tue Jul 10 10:47:27 [conn434] end connection 127.0.0.1:52089
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52091 #435
+Tue Jul 10 10:47:27 [conn435] end connection 127.0.0.1:52091
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52093 #436
+Tue Jul 10 10:47:27 [conn436] end connection 127.0.0.1:52093
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52095 #437
+Tue Jul 10 10:47:27 [conn437] end connection 127.0.0.1:52095
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52097 #438
+Tue Jul 10 10:47:27 [conn438] end connection 127.0.0.1:52097
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52099 #439
+Tue Jul 10 10:47:27 [conn439] end connection 127.0.0.1:52099
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52101 #440
+Tue Jul 10 10:47:27 [conn440] end connection 127.0.0.1:52101
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52103 #441
+Tue Jul 10 10:47:27 [conn441] end connection 127.0.0.1:52103
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52105 #442
+Tue Jul 10 10:47:27 [conn442] end connection 127.0.0.1:52105
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52107 #443
+Tue Jul 10 10:47:27 [conn443] end connection 127.0.0.1:52107
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52109 #444
+Tue Jul 10 10:47:27 [conn444] end connection 127.0.0.1:52109
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52111 #445
+Tue Jul 10 10:47:27 [conn445] end connection 127.0.0.1:52111
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52113 #446
+Tue Jul 10 10:47:27 [conn446] end connection 127.0.0.1:52113
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52115 #447
+Tue Jul 10 10:47:27 [conn447] end connection 127.0.0.1:52115
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52117 #448
+Tue Jul 10 10:47:27 [conn448] end connection 127.0.0.1:52117
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52119 #449
+Tue Jul 10 10:47:27 [conn449] end connection 127.0.0.1:52119
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52121 #450
+Tue Jul 10 10:47:27 [conn450] end connection 127.0.0.1:52121
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52123 #451
+Tue Jul 10 10:47:27 [conn451] end connection 127.0.0.1:52123
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52125 #452
+Tue Jul 10 10:47:27 [conn452] end connection 127.0.0.1:52125
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52127 #453
+Tue Jul 10 10:47:27 [conn453] end connection 127.0.0.1:52127
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52129 #454
+Tue Jul 10 10:47:27 [conn454] end connection 127.0.0.1:52129
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52131 #455
+Tue Jul 10 10:47:27 [conn455] end connection 127.0.0.1:52131
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52133 #456
+Tue Jul 10 10:47:27 [conn456] end connection 127.0.0.1:52133
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52135 #457
+Tue Jul 10 10:47:27 [conn457] end connection 127.0.0.1:52135
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52137 #458
+Tue Jul 10 10:47:27 [conn458] end connection 127.0.0.1:52137
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52139 #459
+Tue Jul 10 10:47:27 [conn459] end connection 127.0.0.1:52139
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52141 #460
+Tue Jul 10 10:47:27 [conn460] end connection 127.0.0.1:52141
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52143 #461
+Tue Jul 10 10:47:27 [conn461] end connection 127.0.0.1:52143
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52145 #462
+Tue Jul 10 10:47:27 [conn462] end connection 127.0.0.1:52145
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52147 #463
+Tue Jul 10 10:47:27 [conn463] end connection 127.0.0.1:52147
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52149 #464
+Tue Jul 10 10:47:27 [conn464] end connection 127.0.0.1:52149
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52151 #465
+Tue Jul 10 10:47:27 [conn465] end connection 127.0.0.1:52151
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52153 #466
+Tue Jul 10 10:47:27 [conn466] end connection 127.0.0.1:52153
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52155 #467
+Tue Jul 10 10:47:27 [conn467] end connection 127.0.0.1:52155
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52157 #468
+Tue Jul 10 10:47:27 [conn468] end connection 127.0.0.1:52157
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52159 #469
+Tue Jul 10 10:47:27 [conn469] end connection 127.0.0.1:52159
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52161 #470
+Tue Jul 10 10:47:27 [conn470] end connection 127.0.0.1:52161
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52163 #471
+Tue Jul 10 10:47:27 [conn471] end connection 127.0.0.1:52163
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52165 #472
+Tue Jul 10 10:47:27 [conn472] end connection 127.0.0.1:52165
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52167 #473
+Tue Jul 10 10:47:27 [conn473] end connection 127.0.0.1:52167
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52169 #474
+Tue Jul 10 10:47:27 [conn474] end connection 127.0.0.1:52169
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52171 #475
+Tue Jul 10 10:47:27 [conn475] end connection 127.0.0.1:52171
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52173 #476
+Tue Jul 10 10:47:27 [conn476] end connection 127.0.0.1:52173
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52175 #477
+Tue Jul 10 10:47:27 [conn477] end connection 127.0.0.1:52175
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52177 #478
+Tue Jul 10 10:47:27 [conn478] end connection 127.0.0.1:52177
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52179 #479
+Tue Jul 10 10:47:27 [conn479] end connection 127.0.0.1:52179
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52181 #480
+Tue Jul 10 10:47:27 [conn480] end connection 127.0.0.1:52181
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52183 #481
+Tue Jul 10 10:47:27 [conn481] end connection 127.0.0.1:52183
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52185 #482
+Tue Jul 10 10:47:27 [conn482] end connection 127.0.0.1:52185
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52187 #483
+Tue Jul 10 10:47:27 [conn483] end connection 127.0.0.1:52187
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52189 #484
+Tue Jul 10 10:47:27 [conn484] end connection 127.0.0.1:52189
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52191 #485
+Tue Jul 10 10:47:27 [conn485] end connection 127.0.0.1:52191
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52193 #486
+Tue Jul 10 10:47:27 [conn486] end connection 127.0.0.1:52193
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52195 #487
+Tue Jul 10 10:47:27 [conn487] end connection 127.0.0.1:52195
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52197 #488
+Tue Jul 10 10:47:27 [conn488] end connection 127.0.0.1:52197
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52199 #489
+Tue Jul 10 10:47:27 [conn489] end connection 127.0.0.1:52199
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52201 #490
+Tue Jul 10 10:47:27 [conn490] end connection 127.0.0.1:52201
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52203 #491
+Tue Jul 10 10:47:27 [conn491] end connection 127.0.0.1:52203
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52205 #492
+Tue Jul 10 10:47:27 [conn492] end connection 127.0.0.1:52205
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52207 #493
+Tue Jul 10 10:47:27 [conn493] end connection 127.0.0.1:52207
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52209 #494
+Tue Jul 10 10:47:27 [conn494] end connection 127.0.0.1:52209
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52211 #495
+Tue Jul 10 10:47:27 [conn495] end connection 127.0.0.1:52211
+Tue Jul 10 10:47:27 [mongosMain] connection accepted from 127.0.0.1:52213 #496
+Tue Jul 10 10:47:27 [conn496] end connection 127.0.0.1:52213
+Tue Jul 10 10:47:28 [ReplicaSetMonitorWatcher] trying reconnect to localhost:27117
+Tue Jul 10 10:47:28 [ReplicaSetMonitorWatcher] reconnect localhost:27117 ok
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52218 #497
+Tue Jul 10 10:47:30 [conn497] end connection 127.0.0.1:52218
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52231 #498
+Tue Jul 10 10:47:30 [conn498] end connection 127.0.0.1:52231
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52239 #499
+Tue Jul 10 10:47:30 [conn499] end connection 127.0.0.1:52239
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52247 #500
+Tue Jul 10 10:47:30 [conn500] end connection 127.0.0.1:52247
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52255 #501
+Tue Jul 10 10:47:30 [conn501] end connection 127.0.0.1:52255
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52268 #502
+Tue Jul 10 10:47:30 [conn502] end connection 127.0.0.1:52268
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52278 #503
+Tue Jul 10 10:47:30 [conn503] end connection 127.0.0.1:52278
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52287 #504
+Tue Jul 10 10:47:30 [conn504] end connection 127.0.0.1:52287
+Tue Jul 10 10:47:30 [mongosMain] connection accepted from 127.0.0.1:52295 #505
+Tue Jul 10 10:47:30 [conn505] end connection 127.0.0.1:52295
+Tue Jul 10 10:47:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40965aed26d38727c649
+Tue Jul 10 10:47:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40a05aed26d38727c64a
+Tue Jul 10 10:48:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40aa5aed26d38727c64b
+Tue Jul 10 10:48:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40b45aed26d38727c64c
+Tue Jul 10 10:48:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40be5aed26d38727c64d
+Tue Jul 10 10:48:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40c85aed26d38727c64e
+Tue Jul 10 10:48:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:48:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40d25aed26d38727c64f
+Tue Jul 10 10:48:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40dc5aed26d38727c650
+Tue Jul 10 10:49:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40e65aed26d38727c651
+Tue Jul 10 10:49:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40f05aed26d38727c652
+Tue Jul 10 10:49:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc40fa5aed26d38727c653
+Tue Jul 10 10:49:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41045aed26d38727c654
+Tue Jul 10 10:49:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:49:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc410e5aed26d38727c655
+Tue Jul 10 10:49:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41185aed26d38727c656
+Tue Jul 10 10:50:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41225aed26d38727c657
+Tue Jul 10 10:50:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc412c5aed26d38727c658
+Tue Jul 10 10:50:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41365aed26d38727c659
+Tue Jul 10 10:50:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41405aed26d38727c65a
+Tue Jul 10 10:50:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:50:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc414a5aed26d38727c65b
+Tue Jul 10 10:50:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 10:51:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 10:51:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41545aed26d38727c65c
+Tue Jul 10 10:51:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc415e5aed26d38727c65d
+Tue Jul 10 10:51:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41685aed26d38727c65e
+Tue Jul 10 10:51:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41725aed26d38727c65f
+Tue Jul 10 10:51:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc417c5aed26d38727c660
+Tue Jul 10 10:51:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:51:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41865aed26d38727c661
+Tue Jul 10 10:51:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41905aed26d38727c662
+Tue Jul 10 10:52:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc419a5aed26d38727c663
+Tue Jul 10 10:52:10 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41a45aed26d38727c664
+Tue Jul 10 10:52:20 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41ae5aed26d38727c665
+Tue Jul 10 10:52:30 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41b85aed26d38727c666
+Tue Jul 10 10:52:40 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:52:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41c25aed26d38727c667
+Tue Jul 10 10:52:50 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41cc5aed26d38727c668
+Tue Jul 10 10:53:00 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41d75aed26d38727c669
+Tue Jul 10 10:53:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41e15aed26d38727c66a
+Tue Jul 10 10:53:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41eb5aed26d38727c66b
+Tue Jul 10 10:53:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41f55aed26d38727c66c
+Tue Jul 10 10:53:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:53:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc41ff5aed26d38727c66d
+Tue Jul 10 10:53:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42095aed26d38727c66e
+Tue Jul 10 10:54:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42135aed26d38727c66f
+Tue Jul 10 10:54:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc421d5aed26d38727c670
+Tue Jul 10 10:54:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42275aed26d38727c671
+Tue Jul 10 10:54:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42315aed26d38727c672
+Tue Jul 10 10:54:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:54:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc423b5aed26d38727c673
+Tue Jul 10 10:54:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42455aed26d38727c674
+Tue Jul 10 10:55:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc424f5aed26d38727c675
+Tue Jul 10 10:55:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42595aed26d38727c676
+Tue Jul 10 10:55:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42635aed26d38727c677
+Tue Jul 10 10:55:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc426d5aed26d38727c678
+Tue Jul 10 10:55:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:55:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42775aed26d38727c679
+Tue Jul 10 10:55:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 10:56:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 10:56:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42815aed26d38727c67a
+Tue Jul 10 10:56:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc428b5aed26d38727c67b
+Tue Jul 10 10:56:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42955aed26d38727c67c
+Tue Jul 10 10:56:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc429f5aed26d38727c67d
+Tue Jul 10 10:56:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42a95aed26d38727c67e
+Tue Jul 10 10:56:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:56:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42b35aed26d38727c67f
+Tue Jul 10 10:56:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42bd5aed26d38727c680
+Tue Jul 10 10:57:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42c75aed26d38727c681
+Tue Jul 10 10:57:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42d15aed26d38727c682
+Tue Jul 10 10:57:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42db5aed26d38727c683
+Tue Jul 10 10:57:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42e55aed26d38727c684
+Tue Jul 10 10:57:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:57:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42ef5aed26d38727c685
+Tue Jul 10 10:57:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc42f95aed26d38727c686
+Tue Jul 10 10:58:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43035aed26d38727c687
+Tue Jul 10 10:58:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc430d5aed26d38727c688
+Tue Jul 10 10:58:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43175aed26d38727c689
+Tue Jul 10 10:58:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43215aed26d38727c68a
+Tue Jul 10 10:58:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:58:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc432b5aed26d38727c68b
+Tue Jul 10 10:58:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43355aed26d38727c68c
+Tue Jul 10 10:59:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc433f5aed26d38727c68d
+Tue Jul 10 10:59:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43495aed26d38727c68e
+Tue Jul 10 10:59:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43535aed26d38727c68f
+Tue Jul 10 10:59:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc435d5aed26d38727c690
+Tue Jul 10 10:59:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 10:59:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43675aed26d38727c691
+Tue Jul 10 10:59:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43715aed26d38727c692
+Tue Jul 10 11:00:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc437b5aed26d38727c693
+Tue Jul 10 11:00:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43855aed26d38727c694
+Tue Jul 10 11:00:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc438f5aed26d38727c695
+Tue Jul 10 11:00:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43995aed26d38727c696
+Tue Jul 10 11:00:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:00:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43a35aed26d38727c697
+Tue Jul 10 11:00:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 11:01:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 11:01:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43ad5aed26d38727c698
+Tue Jul 10 11:01:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43b75aed26d38727c699
+Tue Jul 10 11:01:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43c15aed26d38727c69a
+Tue Jul 10 11:01:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43cb5aed26d38727c69b
+Tue Jul 10 11:01:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43d55aed26d38727c69c
+Tue Jul 10 11:01:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:01:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43df5aed26d38727c69d
+Tue Jul 10 11:01:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43e95aed26d38727c69e
+Tue Jul 10 11:02:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43f35aed26d38727c69f
+Tue Jul 10 11:02:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc43fd5aed26d38727c6a0
+Tue Jul 10 11:02:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44075aed26d38727c6a1
+Tue Jul 10 11:02:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44115aed26d38727c6a2
+Tue Jul 10 11:02:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:02:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc441b5aed26d38727c6a3
+Tue Jul 10 11:02:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44255aed26d38727c6a4
+Tue Jul 10 11:03:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc442f5aed26d38727c6a5
+Tue Jul 10 11:03:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44395aed26d38727c6a6
+Tue Jul 10 11:03:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44435aed26d38727c6a7
+Tue Jul 10 11:03:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc444d5aed26d38727c6a8
+Tue Jul 10 11:03:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:03:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44575aed26d38727c6a9
+Tue Jul 10 11:03:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44615aed26d38727c6aa
+Tue Jul 10 11:04:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc446b5aed26d38727c6ab
+Tue Jul 10 11:04:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44755aed26d38727c6ac
+Tue Jul 10 11:04:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc447f5aed26d38727c6ad
+Tue Jul 10 11:04:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44895aed26d38727c6ae
+Tue Jul 10 11:04:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:04:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44935aed26d38727c6af
+Tue Jul 10 11:04:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc449d5aed26d38727c6b0
+Tue Jul 10 11:05:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44a75aed26d38727c6b1
+Tue Jul 10 11:05:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44b15aed26d38727c6b2
+Tue Jul 10 11:05:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44bb5aed26d38727c6b3
+Tue Jul 10 11:05:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44c55aed26d38727c6b4
+Tue Jul 10 11:05:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:05:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44cf5aed26d38727c6b5
+Tue Jul 10 11:05:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 11:06:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 11:06:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44d95aed26d38727c6b6
+Tue Jul 10 11:06:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44e35aed26d38727c6b7
+Tue Jul 10 11:06:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44ed5aed26d38727c6b8
+Tue Jul 10 11:06:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc44f75aed26d38727c6b9
+Tue Jul 10 11:06:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45015aed26d38727c6ba
+Tue Jul 10 11:06:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:06:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc450b5aed26d38727c6bb
+Tue Jul 10 11:06:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45155aed26d38727c6bc
+Tue Jul 10 11:07:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc451f5aed26d38727c6bd
+Tue Jul 10 11:07:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45295aed26d38727c6be
+Tue Jul 10 11:07:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45335aed26d38727c6bf
+Tue Jul 10 11:07:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc453d5aed26d38727c6c0
+Tue Jul 10 11:07:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:07:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45475aed26d38727c6c1
+Tue Jul 10 11:07:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45515aed26d38727c6c2
+Tue Jul 10 11:08:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc455b5aed26d38727c6c3
+Tue Jul 10 11:08:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45655aed26d38727c6c4
+Tue Jul 10 11:08:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc456f5aed26d38727c6c5
+Tue Jul 10 11:08:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45795aed26d38727c6c6
+Tue Jul 10 11:08:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:08:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45835aed26d38727c6c7
+Tue Jul 10 11:08:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc458d5aed26d38727c6c8
+Tue Jul 10 11:09:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45975aed26d38727c6c9
+Tue Jul 10 11:09:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45a15aed26d38727c6ca
+Tue Jul 10 11:09:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45ab5aed26d38727c6cb
+Tue Jul 10 11:09:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45b55aed26d38727c6cc
+Tue Jul 10 11:09:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:09:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45bf5aed26d38727c6cd
+Tue Jul 10 11:09:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45c95aed26d38727c6ce
+Tue Jul 10 11:10:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45d35aed26d38727c6cf
+Tue Jul 10 11:10:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45dd5aed26d38727c6d0
+Tue Jul 10 11:10:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45e75aed26d38727c6d1
+Tue Jul 10 11:10:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45f15aed26d38727c6d2
+Tue Jul 10 11:10:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:10:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc45fb5aed26d38727c6d3
+Tue Jul 10 11:10:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 11:11:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 11:11:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46055aed26d38727c6d4
+Tue Jul 10 11:11:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc460f5aed26d38727c6d5
+Tue Jul 10 11:11:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46195aed26d38727c6d6
+Tue Jul 10 11:11:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46235aed26d38727c6d7
+Tue Jul 10 11:11:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc462d5aed26d38727c6d8
+Tue Jul 10 11:11:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:11:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46375aed26d38727c6d9
+Tue Jul 10 11:11:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46415aed26d38727c6da
+Tue Jul 10 11:12:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc464b5aed26d38727c6db
+Tue Jul 10 11:12:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46555aed26d38727c6dc
+Tue Jul 10 11:12:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc465f5aed26d38727c6dd
+Tue Jul 10 11:12:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46695aed26d38727c6de
+Tue Jul 10 11:12:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:12:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46735aed26d38727c6df
+Tue Jul 10 11:12:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc467d5aed26d38727c6e0
+Tue Jul 10 11:13:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46875aed26d38727c6e1
+Tue Jul 10 11:13:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46915aed26d38727c6e2
+Tue Jul 10 11:13:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc469b5aed26d38727c6e3
+Tue Jul 10 11:13:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46a55aed26d38727c6e4
+Tue Jul 10 11:13:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:13:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46af5aed26d38727c6e5
+Tue Jul 10 11:13:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46b95aed26d38727c6e6
+Tue Jul 10 11:14:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46c35aed26d38727c6e7
+Tue Jul 10 11:14:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46cd5aed26d38727c6e8
+Tue Jul 10 11:14:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46d75aed26d38727c6e9
+Tue Jul 10 11:14:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46e15aed26d38727c6ea
+Tue Jul 10 11:14:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:14:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46eb5aed26d38727c6eb
+Tue Jul 10 11:14:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46f55aed26d38727c6ec
+Tue Jul 10 11:15:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc46ff5aed26d38727c6ed
+Tue Jul 10 11:15:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47095aed26d38727c6ee
+Tue Jul 10 11:15:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47135aed26d38727c6ef
+Tue Jul 10 11:15:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc471d5aed26d38727c6f0
+Tue Jul 10 11:15:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:15:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47275aed26d38727c6f1
+Tue Jul 10 11:15:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 11:16:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 11:16:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47315aed26d38727c6f2
+Tue Jul 10 11:16:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc473b5aed26d38727c6f3
+Tue Jul 10 11:16:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47455aed26d38727c6f4
+Tue Jul 10 11:16:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc474f5aed26d38727c6f5
+Tue Jul 10 11:16:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47595aed26d38727c6f6
+Tue Jul 10 11:16:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:16:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47635aed26d38727c6f7
+Tue Jul 10 11:16:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc476d5aed26d38727c6f8
+Tue Jul 10 11:17:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47775aed26d38727c6f9
+Tue Jul 10 11:17:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47815aed26d38727c6fa
+Tue Jul 10 11:17:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc478b5aed26d38727c6fb
+Tue Jul 10 11:17:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47955aed26d38727c6fc
+Tue Jul 10 11:17:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:17:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc479f5aed26d38727c6fd
+Tue Jul 10 11:17:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47a95aed26d38727c6fe
+Tue Jul 10 11:18:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47b35aed26d38727c6ff
+Tue Jul 10 11:18:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47bd5aed26d38727c700
+Tue Jul 10 11:18:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47c75aed26d38727c701
+Tue Jul 10 11:18:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47d15aed26d38727c702
+Tue Jul 10 11:18:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:18:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47db5aed26d38727c703
+Tue Jul 10 11:18:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47e55aed26d38727c704
+Tue Jul 10 11:19:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47ef5aed26d38727c705
+Tue Jul 10 11:19:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc47f95aed26d38727c706
+Tue Jul 10 11:19:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48035aed26d38727c707
+Tue Jul 10 11:19:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc480d5aed26d38727c708
+Tue Jul 10 11:19:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:19:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48175aed26d38727c709
+Tue Jul 10 11:19:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48215aed26d38727c70a
+Tue Jul 10 11:20:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc482b5aed26d38727c70b
+Tue Jul 10 11:20:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48355aed26d38727c70c
+Tue Jul 10 11:20:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc483f5aed26d38727c70d
+Tue Jul 10 11:20:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48495aed26d38727c70e
+Tue Jul 10 11:20:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:20:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48535aed26d38727c70f
+Tue Jul 10 11:20:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:00 [LockPinger] cluster localhost:27220 pinged successfully at Tue Jul 10 11:21:00 2012 by distributed lock pinger 'localhost:27220/Leonardos-MacBook-Air.local:27217:1341931590:16807', sleeping for 30000ms
+Tue Jul 10 11:21:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc485d5aed26d38727c710
+Tue Jul 10 11:21:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48675aed26d38727c711
+Tue Jul 10 11:21:11 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48715aed26d38727c712
+Tue Jul 10 11:21:21 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc487b5aed26d38727c713
+Tue Jul 10 11:21:31 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48855aed26d38727c714
+Tue Jul 10 11:21:41 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:21:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc488f5aed26d38727c715
+Tue Jul 10 11:21:51 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 
+Tue Jul 10 11:22:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' acquired, ts : 4ffc48995aed26d38727c716
+Tue Jul 10 11:22:01 [Balancer] distributed lock 'balancer/Leonardos-MacBook-Air.local:27217:1341931590:16807' unlocked. 

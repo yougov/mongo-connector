@@ -1,0 +1,342 @@
+
+
+***** SERVER RESTARTED *****
+
+
+note: noprealloc may hurt performance in many applications
+Tue Jul 10 10:46:26 [initandlisten] MongoDB starting : pid=799 port=27119 dbpath=/Users/leostedile/mongo-connector/data/replset1c 64-bit host=Leonardos-MacBook-Air.local
+Tue Jul 10 10:46:26 [initandlisten] db version v2.0.6, pdfile version 4.5
+Tue Jul 10 10:46:26 [initandlisten] git version: e1c0cbc25863f6356aa4e31375add7bb49fb05bc
+Tue Jul 10 10:46:26 [initandlisten] build info: Darwin erh2.10gen.cc 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386 BOOST_LIB_VERSION=1_40
+Tue Jul 10 10:46:26 [initandlisten] options: { dbpath: "/Users/leostedile/mongo-connector/data/replset1c", fork: true, logappend: true, logpath: "/Users/leostedile/mongo-connector/logs/replset1c.log", noprealloc: true, port: 27119, replSet: "demo-repl", rest: true, shardsvr: true }
+Tue Jul 10 10:46:26 [initandlisten] journal dir=/Users/leostedile/mongo-connector/data/replset1c/journal
+Tue Jul 10 10:46:26 [initandlisten] recover : no journal files present, no recovery needed
+Tue Jul 10 10:46:26 [websvr] admin web console waiting for connections on port 28119
+Tue Jul 10 10:46:26 [initandlisten] waiting for connections on port 27119
+Tue Jul 10 10:46:26 [initandlisten] connection accepted from 127.0.0.1:51123 #1
+Tue Jul 10 10:46:26 [rsStart] replSet can't get local.system.replset config from self or any seed (EMPTYCONFIG)
+Tue Jul 10 10:46:26 [rsStart] replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done
+Tue Jul 10 10:46:27 [initandlisten] connection accepted from 127.0.0.1:51125 #2
+Tue Jul 10 10:46:27 [conn2] end connection 127.0.0.1:51125
+Tue Jul 10 10:46:31 [initandlisten] connection accepted from 127.0.0.1:51143 #3
+Tue Jul 10 10:46:36 [rsStart] trying to contact localhost:27117
+Tue Jul 10 10:46:36 [rsStart] replSet got config version 1 from a remote, saving locally
+Tue Jul 10 10:46:36 [rsStart] replSet info saving a newer config version to local.system.replset
+Tue Jul 10 10:46:36 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1c/local.ns, filling with zeroes...
+Tue Jul 10 10:46:36 [FileAllocator] creating directory /Users/leostedile/mongo-connector/data/replset1c/_tmp
+Tue Jul 10 10:46:36 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1c/local.ns, size: 16MB,  took 0.03 secs
+Tue Jul 10 10:46:36 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1c/local.0, filling with zeroes...
+Tue Jul 10 10:46:36 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1c/local.0, size: 64MB,  took 0.244 secs
+Tue Jul 10 10:46:36 [rsStart] replSet saveConfigLocally done
+Tue Jul 10 10:46:36 [rsStart] replSet STARTUP2
+Tue Jul 10 10:46:38 [rsHealthPoll] replSet member localhost:27117 is up
+Tue Jul 10 10:46:38 [rsHealthPoll] replSet member localhost:27117 is now in state SECONDARY
+Tue Jul 10 10:46:38 [rsHealthPoll] replSet member localhost:27118 is up
+Tue Jul 10 10:46:44 [initandlisten] connection accepted from 127.0.0.1:51151 #4
+Tue Jul 10 10:46:46 [rsHealthPoll] replSet member localhost:27118 is now in state STARTUP2
+Tue Jul 10 10:46:49 [conn3] replSet RECOVERING
+Tue Jul 10 10:46:49 [conn3] replSet info voting yea for localhost:27117 (0)
+Tue Jul 10 10:46:50 [rsHealthPoll] replSet member localhost:27118 is now in state RECOVERING
+Tue Jul 10 10:46:50 [rsHealthPoll] replSet member localhost:27117 is now in state PRIMARY
+Tue Jul 10 10:47:03 [conn3] end connection 127.0.0.1:51143
+Tue Jul 10 10:47:03 [initandlisten] connection accepted from 127.0.0.1:51155 #5
+Tue Jul 10 10:47:06 [rsHealthPoll] replSet member localhost:27118 is now in state SECONDARY
+Tue Jul 10 10:47:11 [conn4] end connection 127.0.0.1:51151
+Tue Jul 10 10:47:12 [rsHealthPoll] DBClientCursor::init call() failed
+Tue Jul 10 10:47:12 [rsHealthPoll] replSet info localhost:27118 is down (or slow to respond): DBClientBase::findN: transport error: localhost:27118 query: { replSetHeartbeat: "demo-repl", v: 1, pv: 1, checkEmpty: false, from: "localhost:27119" }
+Tue Jul 10 10:47:12 [rsHealthPoll] replSet member localhost:27118 is now in state DOWN
+Tue Jul 10 10:47:12 [conn5] end connection 127.0.0.1:51155
+Tue Jul 10 10:47:14 [rsHealthPoll] DBClientCursor::init call() failed
+Tue Jul 10 10:47:14 [rsHealthPoll] replSet info localhost:27117 is down (or slow to respond): DBClientBase::findN: transport error: localhost:27117 query: { replSetHeartbeat: "demo-repl", v: 1, pv: 1, checkEmpty: false, from: "localhost:27119" }
+Tue Jul 10 10:47:14 [rsHealthPoll] replSet member localhost:27117 is now in state DOWN
+Tue Jul 10 10:47:16 [rsHealthPoll] replSet member localhost:27118 is up
+Tue Jul 10 10:47:16 [rsHealthPoll] replSet member localhost:27118 is now in state SECONDARY
+Tue Jul 10 10:47:17 [initandlisten] connection accepted from 127.0.0.1:51190 #6
+Tue Jul 10 10:47:23 [conn6] replSet info voting yea for localhost:27118 (1)
+Tue Jul 10 10:47:24 [rsHealthPoll] replSet member localhost:27118 is now in state PRIMARY
+Tue Jul 10 10:47:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 10:47:26 [rsHealthPoll] replSet member localhost:27117 is up
+Tue Jul 10 10:47:26 [rsHealthPoll] replSet member localhost:27117 is now in state SECONDARY
+Tue Jul 10 10:47:27 [initandlisten] connection accepted from 127.0.0.1:51714 #7
+Tue Jul 10 10:47:45 [conn6] end connection 127.0.0.1:51190
+Tue Jul 10 10:47:45 [initandlisten] connection accepted from 127.0.0.1:52303 #8
+Tue Jul 10 10:47:55 [conn7] end connection 127.0.0.1:51714
+Tue Jul 10 10:47:55 [initandlisten] connection accepted from 127.0.0.1:52310 #9
+Tue Jul 10 10:48:15 [conn8] end connection 127.0.0.1:52303
+Tue Jul 10 10:48:15 [initandlisten] connection accepted from 127.0.0.1:52321 #10
+Tue Jul 10 10:48:25 [conn9] end connection 127.0.0.1:52310
+Tue Jul 10 10:48:25 [initandlisten] connection accepted from 127.0.0.1:52326 #11
+Tue Jul 10 10:48:45 [conn10] end connection 127.0.0.1:52321
+Tue Jul 10 10:48:45 [initandlisten] connection accepted from 127.0.0.1:52337 #12
+Tue Jul 10 10:48:55 [conn11] end connection 127.0.0.1:52326
+Tue Jul 10 10:48:55 [initandlisten] connection accepted from 127.0.0.1:52343 #13
+Tue Jul 10 10:49:15 [conn12] end connection 127.0.0.1:52337
+Tue Jul 10 10:49:15 [initandlisten] connection accepted from 127.0.0.1:52353 #14
+Tue Jul 10 10:49:25 [conn13] end connection 127.0.0.1:52343
+Tue Jul 10 10:49:25 [initandlisten] connection accepted from 127.0.0.1:52359 #15
+Tue Jul 10 10:49:45 [conn14] end connection 127.0.0.1:52353
+Tue Jul 10 10:49:45 [initandlisten] connection accepted from 127.0.0.1:52369 #16
+Tue Jul 10 10:49:55 [conn15] end connection 127.0.0.1:52359
+Tue Jul 10 10:49:55 [initandlisten] connection accepted from 127.0.0.1:52375 #17
+Tue Jul 10 10:50:15 [conn16] end connection 127.0.0.1:52369
+Tue Jul 10 10:50:15 [initandlisten] connection accepted from 127.0.0.1:52385 #18
+Tue Jul 10 10:50:25 [conn17] end connection 127.0.0.1:52375
+Tue Jul 10 10:50:25 [initandlisten] connection accepted from 127.0.0.1:52391 #19
+Tue Jul 10 10:50:45 [conn18] end connection 127.0.0.1:52385
+Tue Jul 10 10:50:45 [initandlisten] connection accepted from 127.0.0.1:52401 #20
+Tue Jul 10 10:50:55 [conn19] end connection 127.0.0.1:52391
+Tue Jul 10 10:50:55 [initandlisten] connection accepted from 127.0.0.1:52406 #21
+Tue Jul 10 10:51:15 [conn20] end connection 127.0.0.1:52401
+Tue Jul 10 10:51:15 [initandlisten] connection accepted from 127.0.0.1:52417 #22
+Tue Jul 10 10:51:25 [conn21] end connection 127.0.0.1:52406
+Tue Jul 10 10:51:25 [initandlisten] connection accepted from 127.0.0.1:52423 #23
+Tue Jul 10 10:51:45 [conn22] end connection 127.0.0.1:52417
+Tue Jul 10 10:51:45 [initandlisten] connection accepted from 127.0.0.1:52433 #24
+Tue Jul 10 10:51:55 [conn23] end connection 127.0.0.1:52423
+Tue Jul 10 10:51:55 [initandlisten] connection accepted from 127.0.0.1:52443 #25
+Tue Jul 10 10:52:15 [conn24] end connection 127.0.0.1:52433
+Tue Jul 10 10:52:15 [initandlisten] connection accepted from 127.0.0.1:52453 #26
+Tue Jul 10 10:52:25 [conn25] end connection 127.0.0.1:52443
+Tue Jul 10 10:52:25 [initandlisten] connection accepted from 127.0.0.1:52460 #27
+Tue Jul 10 10:52:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 10:52:45 [conn26] end connection 127.0.0.1:52453
+Tue Jul 10 10:52:45 [initandlisten] connection accepted from 127.0.0.1:52470 #28
+Tue Jul 10 10:52:55 [conn27] end connection 127.0.0.1:52460
+Tue Jul 10 10:52:55 [initandlisten] connection accepted from 127.0.0.1:52476 #29
+Tue Jul 10 10:53:15 [conn28] end connection 127.0.0.1:52470
+Tue Jul 10 10:53:15 [initandlisten] connection accepted from 127.0.0.1:52486 #30
+Tue Jul 10 10:53:25 [conn29] end connection 127.0.0.1:52476
+Tue Jul 10 10:53:25 [initandlisten] connection accepted from 127.0.0.1:52492 #31
+Tue Jul 10 10:53:45 [conn30] end connection 127.0.0.1:52486
+Tue Jul 10 10:53:45 [initandlisten] connection accepted from 127.0.0.1:52503 #32
+Tue Jul 10 10:53:55 [conn31] end connection 127.0.0.1:52492
+Tue Jul 10 10:53:55 [initandlisten] connection accepted from 127.0.0.1:52509 #33
+Tue Jul 10 10:54:15 [conn32] end connection 127.0.0.1:52503
+Tue Jul 10 10:54:15 [initandlisten] connection accepted from 127.0.0.1:52534 #34
+Tue Jul 10 10:54:25 [conn33] end connection 127.0.0.1:52509
+Tue Jul 10 10:54:25 [initandlisten] connection accepted from 127.0.0.1:52539 #35
+Tue Jul 10 10:54:45 [conn34] end connection 127.0.0.1:52534
+Tue Jul 10 10:54:45 [initandlisten] connection accepted from 127.0.0.1:52550 #36
+Tue Jul 10 10:54:55 [conn35] end connection 127.0.0.1:52539
+Tue Jul 10 10:54:55 [initandlisten] connection accepted from 127.0.0.1:52555 #37
+Tue Jul 10 10:55:15 [conn36] end connection 127.0.0.1:52550
+Tue Jul 10 10:55:15 [initandlisten] connection accepted from 127.0.0.1:52678 #38
+Tue Jul 10 10:55:25 [conn37] end connection 127.0.0.1:52555
+Tue Jul 10 10:55:25 [initandlisten] connection accepted from 127.0.0.1:52683 #39
+Tue Jul 10 10:55:45 [conn38] end connection 127.0.0.1:52678
+Tue Jul 10 10:55:45 [initandlisten] connection accepted from 127.0.0.1:52695 #40
+Tue Jul 10 10:55:55 [conn39] end connection 127.0.0.1:52683
+Tue Jul 10 10:55:55 [initandlisten] connection accepted from 127.0.0.1:52700 #41
+Tue Jul 10 10:56:15 [conn40] end connection 127.0.0.1:52695
+Tue Jul 10 10:56:15 [initandlisten] connection accepted from 127.0.0.1:52711 #42
+Tue Jul 10 10:56:25 [conn41] end connection 127.0.0.1:52700
+Tue Jul 10 10:56:25 [initandlisten] connection accepted from 127.0.0.1:52716 #43
+Tue Jul 10 10:56:45 [conn42] end connection 127.0.0.1:52711
+Tue Jul 10 10:56:45 [initandlisten] connection accepted from 127.0.0.1:52728 #44
+Tue Jul 10 10:56:55 [conn43] end connection 127.0.0.1:52716
+Tue Jul 10 10:56:55 [initandlisten] connection accepted from 127.0.0.1:52733 #45
+Tue Jul 10 10:57:15 [conn44] end connection 127.0.0.1:52728
+Tue Jul 10 10:57:15 [initandlisten] connection accepted from 127.0.0.1:52744 #46
+Tue Jul 10 10:57:25 [conn45] end connection 127.0.0.1:52733
+Tue Jul 10 10:57:25 [initandlisten] connection accepted from 127.0.0.1:52749 #47
+Tue Jul 10 10:57:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 10:57:45 [conn46] end connection 127.0.0.1:52744
+Tue Jul 10 10:57:45 [initandlisten] connection accepted from 127.0.0.1:52762 #48
+Tue Jul 10 10:57:55 [conn47] end connection 127.0.0.1:52749
+Tue Jul 10 10:57:55 [initandlisten] connection accepted from 127.0.0.1:52767 #49
+Tue Jul 10 10:58:15 [conn48] end connection 127.0.0.1:52762
+Tue Jul 10 10:58:15 [initandlisten] connection accepted from 127.0.0.1:52778 #50
+Tue Jul 10 10:58:25 [conn49] end connection 127.0.0.1:52767
+Tue Jul 10 10:58:25 [initandlisten] connection accepted from 127.0.0.1:52790 #51
+Tue Jul 10 10:58:45 [conn50] end connection 127.0.0.1:52778
+Tue Jul 10 10:58:45 [initandlisten] connection accepted from 127.0.0.1:52813 #52
+Tue Jul 10 10:58:55 [conn51] end connection 127.0.0.1:52790
+Tue Jul 10 10:58:55 [initandlisten] connection accepted from 127.0.0.1:52819 #53
+Tue Jul 10 10:59:15 [conn52] end connection 127.0.0.1:52813
+Tue Jul 10 10:59:15 [initandlisten] connection accepted from 127.0.0.1:52971 #54
+Tue Jul 10 10:59:25 [conn53] end connection 127.0.0.1:52819
+Tue Jul 10 10:59:25 [initandlisten] connection accepted from 127.0.0.1:53028 #55
+Tue Jul 10 10:59:45 [conn54] end connection 127.0.0.1:52971
+Tue Jul 10 10:59:45 [initandlisten] connection accepted from 127.0.0.1:53038 #56
+Tue Jul 10 10:59:55 [conn55] end connection 127.0.0.1:53028
+Tue Jul 10 10:59:55 [initandlisten] connection accepted from 127.0.0.1:53044 #57
+Tue Jul 10 11:00:15 [conn56] end connection 127.0.0.1:53038
+Tue Jul 10 11:00:15 [initandlisten] connection accepted from 127.0.0.1:53056 #58
+Tue Jul 10 11:00:25 [conn57] end connection 127.0.0.1:53044
+Tue Jul 10 11:00:25 [initandlisten] connection accepted from 127.0.0.1:53063 #59
+Tue Jul 10 11:00:45 [conn58] end connection 127.0.0.1:53056
+Tue Jul 10 11:00:45 [initandlisten] connection accepted from 127.0.0.1:53077 #60
+Tue Jul 10 11:00:55 [conn59] end connection 127.0.0.1:53063
+Tue Jul 10 11:00:55 [initandlisten] connection accepted from 127.0.0.1:53091 #61
+Tue Jul 10 11:01:15 [conn60] end connection 127.0.0.1:53077
+Tue Jul 10 11:01:15 [initandlisten] connection accepted from 127.0.0.1:53103 #62
+Tue Jul 10 11:01:25 [conn61] end connection 127.0.0.1:53091
+Tue Jul 10 11:01:25 [initandlisten] connection accepted from 127.0.0.1:53108 #63
+Tue Jul 10 11:01:45 [conn62] end connection 127.0.0.1:53103
+Tue Jul 10 11:01:45 [initandlisten] connection accepted from 127.0.0.1:53119 #64
+Tue Jul 10 11:01:55 [conn63] end connection 127.0.0.1:53108
+Tue Jul 10 11:01:55 [initandlisten] connection accepted from 127.0.0.1:53124 #65
+Tue Jul 10 11:02:15 [conn64] end connection 127.0.0.1:53119
+Tue Jul 10 11:02:15 [initandlisten] connection accepted from 127.0.0.1:53135 #66
+Tue Jul 10 11:02:25 [conn65] end connection 127.0.0.1:53124
+Tue Jul 10 11:02:25 [initandlisten] connection accepted from 127.0.0.1:53141 #67
+Tue Jul 10 11:02:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 11:02:45 [conn66] end connection 127.0.0.1:53135
+Tue Jul 10 11:02:45 [initandlisten] connection accepted from 127.0.0.1:53152 #68
+Tue Jul 10 11:02:55 [conn67] end connection 127.0.0.1:53141
+Tue Jul 10 11:02:55 [initandlisten] connection accepted from 127.0.0.1:53157 #69
+Tue Jul 10 11:03:15 [conn68] end connection 127.0.0.1:53152
+Tue Jul 10 11:03:15 [initandlisten] connection accepted from 127.0.0.1:53168 #70
+Tue Jul 10 11:03:25 [conn69] end connection 127.0.0.1:53157
+Tue Jul 10 11:03:25 [initandlisten] connection accepted from 127.0.0.1:53181 #71
+Tue Jul 10 11:03:45 [conn70] end connection 127.0.0.1:53168
+Tue Jul 10 11:03:45 [initandlisten] connection accepted from 127.0.0.1:53192 #72
+Tue Jul 10 11:03:55 [conn71] end connection 127.0.0.1:53181
+Tue Jul 10 11:03:55 [initandlisten] connection accepted from 127.0.0.1:53198 #73
+Tue Jul 10 11:04:15 [conn72] end connection 127.0.0.1:53192
+Tue Jul 10 11:04:15 [initandlisten] connection accepted from 127.0.0.1:53224 #74
+Tue Jul 10 11:04:25 [conn73] end connection 127.0.0.1:53198
+Tue Jul 10 11:04:25 [initandlisten] connection accepted from 127.0.0.1:53229 #75
+Tue Jul 10 11:04:45 [conn74] end connection 127.0.0.1:53224
+Tue Jul 10 11:04:45 [initandlisten] connection accepted from 127.0.0.1:53248 #76
+Tue Jul 10 11:04:55 [conn75] end connection 127.0.0.1:53229
+Tue Jul 10 11:04:55 [initandlisten] connection accepted from 127.0.0.1:53264 #77
+Tue Jul 10 11:05:15 [conn76] end connection 127.0.0.1:53248
+Tue Jul 10 11:05:15 [initandlisten] connection accepted from 127.0.0.1:53291 #78
+Tue Jul 10 11:05:25 [conn77] end connection 127.0.0.1:53264
+Tue Jul 10 11:05:25 [initandlisten] connection accepted from 127.0.0.1:53328 #79
+Tue Jul 10 11:05:45 [conn78] end connection 127.0.0.1:53291
+Tue Jul 10 11:05:45 [initandlisten] connection accepted from 127.0.0.1:53375 #80
+Tue Jul 10 11:05:55 [conn79] end connection 127.0.0.1:53328
+Tue Jul 10 11:05:55 [initandlisten] connection accepted from 127.0.0.1:53385 #81
+Tue Jul 10 11:06:15 [conn80] end connection 127.0.0.1:53375
+Tue Jul 10 11:06:15 [initandlisten] connection accepted from 127.0.0.1:53399 #82
+Tue Jul 10 11:06:25 [conn81] end connection 127.0.0.1:53385
+Tue Jul 10 11:06:25 [initandlisten] connection accepted from 127.0.0.1:53411 #83
+Tue Jul 10 11:06:45 [conn82] end connection 127.0.0.1:53399
+Tue Jul 10 11:06:45 [initandlisten] connection accepted from 127.0.0.1:53422 #84
+Tue Jul 10 11:06:55 [conn83] end connection 127.0.0.1:53411
+Tue Jul 10 11:06:55 [initandlisten] connection accepted from 127.0.0.1:53427 #85
+Tue Jul 10 11:07:15 [conn84] end connection 127.0.0.1:53422
+Tue Jul 10 11:07:15 [initandlisten] connection accepted from 127.0.0.1:53441 #86
+Tue Jul 10 11:07:25 [conn85] end connection 127.0.0.1:53427
+Tue Jul 10 11:07:25 [initandlisten] connection accepted from 127.0.0.1:53446 #87
+Tue Jul 10 11:07:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 11:07:45 [conn86] end connection 127.0.0.1:53441
+Tue Jul 10 11:07:45 [initandlisten] connection accepted from 127.0.0.1:53460 #88
+Tue Jul 10 11:07:55 [conn87] end connection 127.0.0.1:53446
+Tue Jul 10 11:07:55 [initandlisten] connection accepted from 127.0.0.1:53465 #89
+Tue Jul 10 11:08:15 [conn88] end connection 127.0.0.1:53460
+Tue Jul 10 11:08:15 [initandlisten] connection accepted from 127.0.0.1:53479 #90
+Tue Jul 10 11:08:25 [conn89] end connection 127.0.0.1:53465
+Tue Jul 10 11:08:25 [initandlisten] connection accepted from 127.0.0.1:53484 #91
+Tue Jul 10 11:08:45 [conn90] end connection 127.0.0.1:53479
+Tue Jul 10 11:08:45 [initandlisten] connection accepted from 127.0.0.1:53500 #92
+Tue Jul 10 11:08:55 [conn91] end connection 127.0.0.1:53484
+Tue Jul 10 11:08:55 [initandlisten] connection accepted from 127.0.0.1:53505 #93
+Tue Jul 10 11:09:15 [conn92] end connection 127.0.0.1:53500
+Tue Jul 10 11:09:15 [initandlisten] connection accepted from 127.0.0.1:53516 #94
+Tue Jul 10 11:09:25 [conn93] end connection 127.0.0.1:53505
+Tue Jul 10 11:09:25 [initandlisten] connection accepted from 127.0.0.1:53524 #95
+Tue Jul 10 11:09:45 [conn94] end connection 127.0.0.1:53516
+Tue Jul 10 11:09:45 [initandlisten] connection accepted from 127.0.0.1:53535 #96
+Tue Jul 10 11:09:55 [conn95] end connection 127.0.0.1:53524
+Tue Jul 10 11:09:55 [initandlisten] connection accepted from 127.0.0.1:53553 #97
+Tue Jul 10 11:10:15 [conn96] end connection 127.0.0.1:53535
+Tue Jul 10 11:10:15 [initandlisten] connection accepted from 127.0.0.1:53574 #98
+Tue Jul 10 11:10:25 [conn97] end connection 127.0.0.1:53553
+Tue Jul 10 11:10:25 [initandlisten] connection accepted from 127.0.0.1:53579 #99
+Tue Jul 10 11:10:45 [conn98] end connection 127.0.0.1:53574
+Tue Jul 10 11:10:45 [initandlisten] connection accepted from 127.0.0.1:53593 #100
+Tue Jul 10 11:10:55 [conn99] end connection 127.0.0.1:53579
+Tue Jul 10 11:10:55 [initandlisten] connection accepted from 127.0.0.1:53598 #101
+Tue Jul 10 11:11:15 [conn100] end connection 127.0.0.1:53593
+Tue Jul 10 11:11:15 [initandlisten] connection accepted from 127.0.0.1:53609 #102
+Tue Jul 10 11:11:25 [conn101] end connection 127.0.0.1:53598
+Tue Jul 10 11:11:25 [initandlisten] connection accepted from 127.0.0.1:53614 #103
+Tue Jul 10 11:11:46 [conn102] end connection 127.0.0.1:53609
+Tue Jul 10 11:11:46 [initandlisten] connection accepted from 127.0.0.1:53625 #104
+Tue Jul 10 11:11:56 [conn103] end connection 127.0.0.1:53614
+Tue Jul 10 11:11:56 [initandlisten] connection accepted from 127.0.0.1:53630 #105
+Tue Jul 10 11:12:16 [conn104] end connection 127.0.0.1:53625
+Tue Jul 10 11:12:16 [initandlisten] connection accepted from 127.0.0.1:53644 #106
+Tue Jul 10 11:12:26 [conn105] end connection 127.0.0.1:53630
+Tue Jul 10 11:12:26 [initandlisten] connection accepted from 127.0.0.1:53653 #107
+Tue Jul 10 11:12:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 11:12:46 [conn106] end connection 127.0.0.1:53644
+Tue Jul 10 11:12:46 [initandlisten] connection accepted from 127.0.0.1:53664 #108
+Tue Jul 10 11:12:56 [conn107] end connection 127.0.0.1:53653
+Tue Jul 10 11:12:56 [initandlisten] connection accepted from 127.0.0.1:53669 #109
+Tue Jul 10 11:13:16 [conn108] end connection 127.0.0.1:53664
+Tue Jul 10 11:13:16 [initandlisten] connection accepted from 127.0.0.1:53680 #110
+Tue Jul 10 11:13:26 [conn109] end connection 127.0.0.1:53669
+Tue Jul 10 11:13:26 [initandlisten] connection accepted from 127.0.0.1:53685 #111
+Tue Jul 10 11:13:46 [conn110] end connection 127.0.0.1:53680
+Tue Jul 10 11:13:46 [initandlisten] connection accepted from 127.0.0.1:53696 #112
+Tue Jul 10 11:13:56 [conn111] end connection 127.0.0.1:53685
+Tue Jul 10 11:13:56 [initandlisten] connection accepted from 127.0.0.1:53701 #113
+Tue Jul 10 11:14:16 [conn112] end connection 127.0.0.1:53696
+Tue Jul 10 11:14:16 [initandlisten] connection accepted from 127.0.0.1:53712 #114
+Tue Jul 10 11:14:26 [conn113] end connection 127.0.0.1:53701
+Tue Jul 10 11:14:26 [initandlisten] connection accepted from 127.0.0.1:53721 #115
+Tue Jul 10 11:14:46 [conn114] end connection 127.0.0.1:53712
+Tue Jul 10 11:14:46 [initandlisten] connection accepted from 127.0.0.1:53735 #116
+Tue Jul 10 11:14:56 [conn115] end connection 127.0.0.1:53721
+Tue Jul 10 11:14:56 [initandlisten] connection accepted from 127.0.0.1:53740 #117
+Tue Jul 10 11:15:16 [conn116] end connection 127.0.0.1:53735
+Tue Jul 10 11:15:16 [initandlisten] connection accepted from 127.0.0.1:53752 #118
+Tue Jul 10 11:15:26 [conn117] end connection 127.0.0.1:53740
+Tue Jul 10 11:15:26 [initandlisten] connection accepted from 127.0.0.1:53757 #119
+Tue Jul 10 11:15:46 [conn118] end connection 127.0.0.1:53752
+Tue Jul 10 11:15:46 [initandlisten] connection accepted from 127.0.0.1:53768 #120
+Tue Jul 10 11:15:56 [conn119] end connection 127.0.0.1:53757
+Tue Jul 10 11:15:56 [initandlisten] connection accepted from 127.0.0.1:53773 #121
+Tue Jul 10 11:16:16 [conn120] end connection 127.0.0.1:53768
+Tue Jul 10 11:16:16 [initandlisten] connection accepted from 127.0.0.1:53784 #122
+Tue Jul 10 11:16:26 [conn121] end connection 127.0.0.1:53773
+Tue Jul 10 11:16:26 [initandlisten] connection accepted from 127.0.0.1:53789 #123
+Tue Jul 10 11:16:46 [conn122] end connection 127.0.0.1:53784
+Tue Jul 10 11:16:46 [initandlisten] connection accepted from 127.0.0.1:53800 #124
+Tue Jul 10 11:16:56 [conn123] end connection 127.0.0.1:53789
+Tue Jul 10 11:16:56 [initandlisten] connection accepted from 127.0.0.1:53805 #125
+Tue Jul 10 11:17:16 [conn124] end connection 127.0.0.1:53800
+Tue Jul 10 11:17:16 [initandlisten] connection accepted from 127.0.0.1:53835 #126
+Tue Jul 10 11:17:26 [conn125] end connection 127.0.0.1:53805
+Tue Jul 10 11:17:26 [initandlisten] connection accepted from 127.0.0.1:53840 #127
+Tue Jul 10 11:17:26 [clientcursormon] mem (MB) res:20 virt:2630 mapped:80
+Tue Jul 10 11:17:46 [conn126] end connection 127.0.0.1:53835
+Tue Jul 10 11:17:46 [initandlisten] connection accepted from 127.0.0.1:53851 #128
+Tue Jul 10 11:17:56 [conn127] end connection 127.0.0.1:53840
+Tue Jul 10 11:17:56 [initandlisten] connection accepted from 127.0.0.1:53856 #129
+Tue Jul 10 11:18:16 [conn128] end connection 127.0.0.1:53851
+Tue Jul 10 11:18:16 [initandlisten] connection accepted from 127.0.0.1:53867 #130
+Tue Jul 10 11:18:26 [conn129] end connection 127.0.0.1:53856
+Tue Jul 10 11:18:26 [initandlisten] connection accepted from 127.0.0.1:53872 #131
+Tue Jul 10 11:18:46 [conn130] end connection 127.0.0.1:53867
+Tue Jul 10 11:18:46 [initandlisten] connection accepted from 127.0.0.1:53884 #132
+Tue Jul 10 11:18:56 [conn131] end connection 127.0.0.1:53872
+Tue Jul 10 11:18:56 [initandlisten] connection accepted from 127.0.0.1:53889 #133
+Tue Jul 10 11:19:16 [conn132] end connection 127.0.0.1:53884
+Tue Jul 10 11:19:16 [initandlisten] connection accepted from 127.0.0.1:53901 #134
+Tue Jul 10 11:19:26 [conn133] end connection 127.0.0.1:53889
+Tue Jul 10 11:19:26 [initandlisten] connection accepted from 127.0.0.1:53906 #135
+Tue Jul 10 11:19:46 [conn134] end connection 127.0.0.1:53901
+Tue Jul 10 11:19:46 [initandlisten] connection accepted from 127.0.0.1:53946 #136
+Tue Jul 10 11:19:56 [conn135] end connection 127.0.0.1:53906
+Tue Jul 10 11:19:56 [initandlisten] connection accepted from 127.0.0.1:53952 #137
+Tue Jul 10 11:20:16 [conn136] end connection 127.0.0.1:53946
+Tue Jul 10 11:20:16 [initandlisten] connection accepted from 127.0.0.1:53966 #138
+Tue Jul 10 11:20:26 [conn137] end connection 127.0.0.1:53952
+Tue Jul 10 11:20:26 [initandlisten] connection accepted from 127.0.0.1:53971 #139
+Tue Jul 10 11:20:46 [conn138] end connection 127.0.0.1:53966
+Tue Jul 10 11:20:46 [initandlisten] connection accepted from 127.0.0.1:53982 #140
+Tue Jul 10 11:20:56 [conn139] end connection 127.0.0.1:53971
+Tue Jul 10 11:20:56 [initandlisten] connection accepted from 127.0.0.1:53987 #141
+Tue Jul 10 11:21:16 [conn140] end connection 127.0.0.1:53982
+Tue Jul 10 11:21:16 [initandlisten] connection accepted from 127.0.0.1:53998 #142
+Tue Jul 10 11:21:26 [conn141] end connection 127.0.0.1:53987
+Tue Jul 10 11:21:26 [initandlisten] connection accepted from 127.0.0.1:54003 #143
+Tue Jul 10 11:21:46 [conn142] end connection 127.0.0.1:53998
+Tue Jul 10 11:21:46 [initandlisten] connection accepted from 127.0.0.1:54017 #144
+Tue Jul 10 11:21:56 [conn143] end connection 127.0.0.1:54003
+Tue Jul 10 11:21:56 [initandlisten] connection accepted from 127.0.0.1:54022 #145

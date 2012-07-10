@@ -1,0 +1,66 @@
+
+
+***** SERVER RESTARTED *****
+
+
+note: noprealloc may hurt performance in many applications
+Tue Jul 10 10:46:28 [initandlisten] MongoDB starting : pid=803 port=27220 dbpath=/Users/leostedile/mongo-connector/data/config1 64-bit host=Leonardos-MacBook-Air.local
+Tue Jul 10 10:46:28 [initandlisten] db version v2.0.6, pdfile version 4.5
+Tue Jul 10 10:46:28 [initandlisten] git version: e1c0cbc25863f6356aa4e31375add7bb49fb05bc
+Tue Jul 10 10:46:28 [initandlisten] build info: Darwin erh2.10gen.cc 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386 BOOST_LIB_VERSION=1_40
+Tue Jul 10 10:46:28 [initandlisten] options: { configsvr: true, dbpath: "/Users/leostedile/mongo-connector/data/config1", fork: true, logappend: true, logpath: "/Users/leostedile/mongo-connector/logs/config1.log", noprealloc: true, oplogSize: 500, port: 27220, rest: true }
+Tue Jul 10 10:46:28 [initandlisten] journal dir=/Users/leostedile/mongo-connector/data/config1/journal
+Tue Jul 10 10:46:28 [initandlisten] recover : no journal files present, no recovery needed
+Tue Jul 10 10:46:28 [websvr] admin web console waiting for connections on port 28220
+Tue Jul 10 10:46:28 [initandlisten] waiting for connections on port 27220
+Tue Jul 10 10:46:29 [initandlisten] connection accepted from 127.0.0.1:51130 #1
+Tue Jul 10 10:46:29 [conn1] end connection 127.0.0.1:51130
+Tue Jul 10 10:46:30 [initandlisten] connection accepted from 127.0.0.1:51134 #2
+Tue Jul 10 10:46:30 [initandlisten] connection accepted from 127.0.0.1:51135 #3
+Tue Jul 10 10:46:30 [initandlisten] connection accepted from 127.0.0.1:51136 #4
+Tue Jul 10 10:46:30 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/config1/config.ns, filling with zeroes...
+Tue Jul 10 10:46:30 [FileAllocator] creating directory /Users/leostedile/mongo-connector/data/config1/_tmp
+Tue Jul 10 10:46:30 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/config1/config.ns, size: 16MB,  took 0.03 secs
+Tue Jul 10 10:46:30 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/config1/config.0, filling with zeroes...
+Tue Jul 10 10:46:30 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/config1/config.0, size: 64MB,  took 0.237 secs
+Tue Jul 10 10:46:30 [conn4] build index config.version { _id: 1 }
+Tue Jul 10 10:46:30 [conn4] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn4] insert config.version 363ms
+Tue Jul 10 10:46:30 [conn3] build index config.settings { _id: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.chunks { _id: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [initandlisten] connection accepted from 127.0.0.1:51137 #5
+Tue Jul 10 10:46:30 [conn3] info: creating collection config.chunks on add index
+Tue Jul 10 10:46:30 [conn3] build index config.chunks { ns: 1, min: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn4] build index config.mongos { _id: 1 }
+Tue Jul 10 10:46:30 [conn4] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.chunks { ns: 1, shard: 1, min: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.chunks { ns: 1, lastmod: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.shards { _id: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] info: creating collection config.shards on add index
+Tue Jul 10 10:46:30 [conn3] build index config.shards { host: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [initandlisten] connection accepted from 127.0.0.1:51138 #6
+Tue Jul 10 10:46:30 [conn6] build index config.locks { _id: 1 }
+Tue Jul 10 10:46:30 [conn6] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.lockpings { _id: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:46:30 [conn3] build index config.lockpings { ping: 1 }
+Tue Jul 10 10:46:30 [conn3] build index done 1 records 0 secs
+Tue Jul 10 10:46:31 [conn3] build index config.databases { _id: 1 }
+Tue Jul 10 10:46:31 [conn3] build index done 0 records 0 secs
+Tue Jul 10 10:47:20 [conn4] end connection 127.0.0.1:51136
+Tue Jul 10 10:47:28 [clientcursormon] mem (MB) res:8 virt:2629 mapped:80
+Tue Jul 10 10:47:50 [initandlisten] connection accepted from 127.0.0.1:52308 #7
+Tue Jul 10 10:48:28 [clientcursormon] mem (MB) res:21 virt:2629 mapped:80
+Tue Jul 10 10:53:28 [clientcursormon] mem (MB) res:22 virt:2629 mapped:80
+Tue Jul 10 10:58:28 [clientcursormon] mem (MB) res:23 virt:2629 mapped:80
+Tue Jul 10 11:03:28 [clientcursormon] mem (MB) res:25 virt:2629 mapped:80
+Tue Jul 10 11:08:28 [clientcursormon] mem (MB) res:26 virt:2629 mapped:80
+Tue Jul 10 11:13:28 [clientcursormon] mem (MB) res:27 virt:2629 mapped:80
+Tue Jul 10 11:18:28 [clientcursormon] mem (MB) res:28 virt:2629 mapped:80

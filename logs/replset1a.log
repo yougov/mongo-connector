@@ -1,0 +1,1188 @@
+
+
+***** SERVER RESTARTED *****
+
+
+note: noprealloc may hurt performance in many applications
+Tue Jul 10 10:46:22 [initandlisten] MongoDB starting : pid=791 port=27117 dbpath=/Users/leostedile/mongo-connector/data/replset1a 64-bit host=Leonardos-MacBook-Air.local
+Tue Jul 10 10:46:22 [initandlisten] db version v2.0.6, pdfile version 4.5
+Tue Jul 10 10:46:22 [initandlisten] git version: e1c0cbc25863f6356aa4e31375add7bb49fb05bc
+Tue Jul 10 10:46:22 [initandlisten] build info: Darwin erh2.10gen.cc 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386 BOOST_LIB_VERSION=1_40
+Tue Jul 10 10:46:22 [initandlisten] options: { dbpath: "/Users/leostedile/mongo-connector/data/replset1a", fork: true, logappend: true, logpath: "/Users/leostedile/mongo-connector/logs/replset1a.log", noprealloc: true, port: 27117, replSet: "demo-repl", rest: true, shardsvr: true }
+Tue Jul 10 10:46:22 [initandlisten] journal dir=/Users/leostedile/mongo-connector/data/replset1a/journal
+Tue Jul 10 10:46:22 [initandlisten] recover : no journal files present, no recovery needed
+Tue Jul 10 10:46:22 [websvr] admin web console waiting for connections on port 28117
+Tue Jul 10 10:46:22 [initandlisten] waiting for connections on port 27117
+Tue Jul 10 10:46:22 [initandlisten] connection accepted from 127.0.0.1:51111 #1
+Tue Jul 10 10:46:22 [rsStart] replSet can't get local.system.replset config from self or any seed (EMPTYCONFIG)
+Tue Jul 10 10:46:22 [rsStart] replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done
+Tue Jul 10 10:46:23 [initandlisten] connection accepted from 127.0.0.1:51113 #2
+Tue Jul 10 10:46:23 [conn2] end connection 127.0.0.1:51113
+Tue Jul 10 10:46:31 [initandlisten] connection accepted from 127.0.0.1:51141 #3
+Tue Jul 10 10:46:31 [conn3] replSet replSetInitiate admin command received from client
+Tue Jul 10 10:46:31 [conn3] replSet replSetInitiate config object parses ok, 3 members specified
+Tue Jul 10 10:46:31 [conn3] replSet replSetInitiate all members seem up
+Tue Jul 10 10:46:31 [conn3] ******
+Tue Jul 10 10:46:31 [conn3] creating replication oplog of size: 183MB...
+Tue Jul 10 10:46:31 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1a/local.ns, filling with zeroes...
+Tue Jul 10 10:46:31 [FileAllocator] creating directory /Users/leostedile/mongo-connector/data/replset1a/_tmp
+Tue Jul 10 10:46:31 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1a/local.ns, size: 16MB,  took 0.029 secs
+Tue Jul 10 10:46:31 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1a/local.0, filling with zeroes...
+Tue Jul 10 10:46:31 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1a/local.0, size: 64MB,  took 0.227 secs
+Tue Jul 10 10:46:31 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1a/local.1, filling with zeroes...
+Tue Jul 10 10:46:32 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1a/local.1, size: 256MB,  took 1.028 secs
+Tue Jul 10 10:46:32 [conn3] ******
+Tue Jul 10 10:46:32 [conn3] replSet info saving a newer config version to local.system.replset
+Tue Jul 10 10:46:33 [conn3] replSet saveConfigLocally done
+Tue Jul 10 10:46:33 [conn3] replSet replSetInitiate config now saved locally.  Should come online in about a minute.
+Tue Jul 10 10:46:33 [conn3] command admin.$cmd command: { replSetInitiate: { _id: "demo-repl", members: [ { _id: 0.0, host: "localhost:27117" }, { _id: 1.0, host: "localhost:27118" }, { _id: 2.0, host: "localhost:27119", arbiterOnly: true } ] } } ntoreturn:1 reslen:112 1520ms
+Tue Jul 10 10:46:33 [rsStart] replSet STARTUP2
+Tue Jul 10 10:46:33 [rsSync] replSet SECONDARY
+Tue Jul 10 10:46:33 [conn3] end connection 127.0.0.1:51141
+Tue Jul 10 10:46:33 [initandlisten] connection accepted from 127.0.0.1:51145 #4
+Tue Jul 10 10:46:35 [rsHealthPoll] replSet member localhost:27118 is up
+Tue Jul 10 10:46:35 [rsHealthPoll] replSet member localhost:27119 is up
+Tue Jul 10 10:46:35 [rsMgr] replSet not electing self, not all members up and we have been up less than 5 minutes
+Tue Jul 10 10:46:35 [rsMgr] replSet not electing self, not all members up and we have been up less than 5 minutes
+Tue Jul 10 10:46:36 [initandlisten] connection accepted from 127.0.0.1:51148 #5
+Tue Jul 10 10:46:37 [rsHealthPoll] replSet member localhost:27119 is now in state STARTUP2
+Tue Jul 10 10:46:37 [rsMgr] not electing self, localhost:27119 would veto
+Tue Jul 10 10:46:43 [rsMgr] replSet not electing self, not all members up and we have been up less than 5 minutes
+Tue Jul 10 10:46:44 [initandlisten] connection accepted from 127.0.0.1:51150 #6
+Tue Jul 10 10:46:45 [rsHealthPoll] replSet member localhost:27118 is now in state STARTUP2
+Tue Jul 10 10:46:45 [rsMgr] not electing self, localhost:27118 would veto
+Tue Jul 10 10:46:49 [rsMgr] replSet info electSelf 0
+Tue Jul 10 10:46:49 [rsMgr] replSet PRIMARY
+Tue Jul 10 10:46:51 [rsHealthPoll] replSet member localhost:27118 is now in state RECOVERING
+Tue Jul 10 10:46:51 [rsHealthPoll] replSet member localhost:27119 is now in state ARBITER
+Tue Jul 10 10:47:01 [initandlisten] connection accepted from 127.0.0.1:51152 #7
+Tue Jul 10 10:47:01 [initandlisten] connection accepted from 127.0.0.1:51153 #8
+Tue Jul 10 10:47:02 [slaveTracking] build index local.slaves { _id: 1 }
+Tue Jul 10 10:47:02 [slaveTracking] build index done 0 records 0.001 secs
+Tue Jul 10 10:47:04 [conn8] end connection 127.0.0.1:51153
+Tue Jul 10 10:47:04 [conn7] end connection 127.0.0.1:51152
+Tue Jul 10 10:47:05 [initandlisten] connection accepted from 127.0.0.1:51156 #9
+Tue Jul 10 10:47:06 [initandlisten] connection accepted from 127.0.0.1:51158 #10
+Tue Jul 10 10:47:06 [initandlisten] connection accepted from 127.0.0.1:51159 #11
+Tue Jul 10 10:47:06 [initandlisten] connection accepted from 127.0.0.1:51161 #12
+Tue Jul 10 10:47:06 [conn10] end connection 127.0.0.1:51158
+Tue Jul 10 10:47:06 [initandlisten] connection accepted from 127.0.0.1:51163 #13
+Tue Jul 10 10:47:06 [conn4] end connection 127.0.0.1:51145
+Tue Jul 10 10:47:06 [conn5] end connection 127.0.0.1:51148
+Tue Jul 10 10:47:06 [initandlisten] connection accepted from 127.0.0.1:51164 #14
+Tue Jul 10 10:47:07 [rsHealthPoll] replSet member localhost:27118 is now in state SECONDARY
+Tue Jul 10 10:47:11 [initandlisten] connection accepted from 127.0.0.1:51167 #15
+Tue Jul 10 10:47:11 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1a/test.ns, filling with zeroes...
+Tue Jul 10 10:47:11 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1a/test.ns, size: 16MB,  took 0.03 secs
+Tue Jul 10 10:47:11 [FileAllocator] allocating new datafile /Users/leostedile/mongo-connector/data/replset1a/test.0, filling with zeroes...
+Tue Jul 10 10:47:11 [FileAllocator] done allocating datafile /Users/leostedile/mongo-connector/data/replset1a/test.0, size: 64MB,  took 0.231 secs
+Tue Jul 10 10:47:11 [conn15] build index test.test { _id: 1 }
+Tue Jul 10 10:47:11 [conn15] build index done 0 records 0 secs
+Tue Jul 10 10:47:11 [conn15] insert test.test 353ms
+Tue Jul 10 10:47:11 [conn15] command admin.$cmd command: { getlasterror: 1, w: 2 } ntoreturn:1 reslen:94 359ms
+Tue Jul 10 10:47:11 [conn6] end connection 127.0.0.1:51150
+Tue Jul 10 10:47:12 [conn9] end connection 127.0.0.1:51156
+Tue Jul 10 10:47:12 [initandlisten] connection accepted from 127.0.0.1:51176 #16
+Tue Jul 10 10:47:12 [conn16] terminating, shutdown command received
+Tue Jul 10 10:47:12 dbexit: shutdown called
+Tue Jul 10 10:47:12 [conn16] shutdown: going to close listening sockets...
+Tue Jul 10 10:47:12 [conn16] closing listening socket: 8
+Tue Jul 10 10:47:12 [conn16] closing listening socket: 9
+Tue Jul 10 10:47:12 [conn16] closing listening socket: 10
+Tue Jul 10 10:47:12 [conn16] removing socket file: /tmp/mongodb-27117.sock
+Tue Jul 10 10:47:12 [conn16] shutdown: going to flush diaglog...
+Tue Jul 10 10:47:12 [conn16] shutdown: going to close sockets...
+Tue Jul 10 10:47:12 [conn16] shutdown: waiting for fs preallocator...
+Tue Jul 10 10:47:12 [conn16] shutdown: lock for final commit...
+Tue Jul 10 10:47:12 [conn1] end connection 127.0.0.1:51111
+Tue Jul 10 10:47:12 [conn16] shutdown: final commit...
+Tue Jul 10 10:47:12 [conn14] end connection 127.0.0.1:51164
+Tue Jul 10 10:47:12 [conn11] end connection 127.0.0.1:51159
+Tue Jul 10 10:47:12 [conn12] end connection 127.0.0.1:51161
+Tue Jul 10 10:47:12 [conn13] end connection 127.0.0.1:51163
+Tue Jul 10 10:47:12 [conn15] end connection 127.0.0.1:51167
+Tue Jul 10 10:47:12 [slaveTracking] ERROR: Client::shutdown not called: slaveTracking
+Tue Jul 10 10:47:12 [conn16] shutdown: closing all files...
+Tue Jul 10 10:47:12 [conn16] closeAllFiles() finished
+Tue Jul 10 10:47:12 [conn16] journalCleanup...
+Tue Jul 10 10:47:12 [conn16] removeJournalFiles
+Tue Jul 10 10:47:12 [conn16] shutdown: removing fs lock...
+Tue Jul 10 10:47:12 dbexit: really exiting now
+
+
+***** SERVER RESTARTED *****
+
+
+note: noprealloc may hurt performance in many applications
+Tue Jul 10 10:47:24 [initandlisten] MongoDB starting : pid=825 port=27117 dbpath=/Users/leostedile/mongo-connector/data/replset1a 64-bit host=Leonardos-MacBook-Air.local
+Tue Jul 10 10:47:24 [initandlisten] db version v2.0.6, pdfile version 4.5
+Tue Jul 10 10:47:24 [initandlisten] git version: e1c0cbc25863f6356aa4e31375add7bb49fb05bc
+Tue Jul 10 10:47:24 [initandlisten] build info: Darwin erh2.10gen.cc 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386 BOOST_LIB_VERSION=1_40
+Tue Jul 10 10:47:24 [initandlisten] options: { dbpath: "/Users/leostedile/mongo-connector/data/replset1a", fork: true, logappend: true, logpath: "/Users/leostedile/mongo-connector/logs/replset1a.log", noprealloc: true, port: 27117, replSet: "demo-repl", rest: true, shardsvr: true }
+Tue Jul 10 10:47:24 [initandlisten] journal dir=/Users/leostedile/mongo-connector/data/replset1a/journal
+Tue Jul 10 10:47:24 [initandlisten] recover : no journal files present, no recovery needed
+Tue Jul 10 10:47:25 [websvr] admin web console waiting for connections on port 28117
+Tue Jul 10 10:47:25 [initandlisten] waiting for connections on port 27117
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51207 #1
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51208 #2
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51209 #3
+Tue Jul 10 10:47:25 [conn2] end connection 127.0.0.1:51208
+Tue Jul 10 10:47:25 [rsStart] trying to contact localhost:27118
+Tue Jul 10 10:47:25 [rsStart] replSet STARTUP2
+Tue Jul 10 10:47:25 [rsSync] replSet SECONDARY
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51212 #4
+Tue Jul 10 10:47:25 [conn4] end connection 127.0.0.1:51212
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51214 #5
+Tue Jul 10 10:47:25 [initandlisten] connection accepted from 127.0.0.1:51216 #6
+Tue Jul 10 10:47:26 [initandlisten] connection accepted from 127.0.0.1:51221 #7
+Tue Jul 10 10:47:26 [initandlisten] connection accepted from 127.0.0.1:51222 #8
+Tue Jul 10 10:47:26 [initandlisten] connection accepted from 127.0.0.1:51226 #9
+Tue Jul 10 10:47:26 [initandlisten] connection accepted from 127.0.0.1:51712 #10
+Tue Jul 10 10:47:27 [initandlisten] connection accepted from 127.0.0.1:51713 #11
+Tue Jul 10 10:47:27 [rsHealthPoll] replSet member localhost:27118 is up
+Tue Jul 10 10:47:27 [rsHealthPoll] replSet member localhost:27118 is now in state PRIMARY
+Tue Jul 10 10:47:27 [rsHealthPoll] replSet member localhost:27119 is up
+Tue Jul 10 10:47:27 [rsHealthPoll] replSet member localhost:27119 is now in state ARBITER
+Tue Jul 10 10:47:28 [initandlisten] connection accepted from 127.0.0.1:52215 #12
+Tue Jul 10 10:47:28 [initandlisten] connection accepted from 127.0.0.1:52216 #13
+Tue Jul 10 10:47:30 [conn9] end connection 127.0.0.1:51226
+Tue Jul 10 10:47:30 [conn6] end connection 127.0.0.1:51216
+Tue Jul 10 10:47:30 [conn5] end connection 127.0.0.1:51214
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52225 #14
+Tue Jul 10 10:47:30 [conn14] end connection 127.0.0.1:52225
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52233 #15
+Tue Jul 10 10:47:30 [conn15] end connection 127.0.0.1:52233
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52241 #16
+Tue Jul 10 10:47:30 [conn16] end connection 127.0.0.1:52241
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52249 #17
+Tue Jul 10 10:47:30 [conn17] end connection 127.0.0.1:52249
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52262 #18
+Tue Jul 10 10:47:30 [conn18] end connection 127.0.0.1:52262
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52272 #19
+Tue Jul 10 10:47:30 [conn19] end connection 127.0.0.1:52272
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52281 #20
+Tue Jul 10 10:47:30 [conn20] end connection 127.0.0.1:52281
+Tue Jul 10 10:47:30 [initandlisten] connection accepted from 127.0.0.1:52289 #21
+Tue Jul 10 10:47:30 [conn21] end connection 127.0.0.1:52289
+Tue Jul 10 10:47:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:47:31 [rsSync] build index local.me { _id: 1 }
+Tue Jul 10 10:47:31 [rsSync] build index done 0 records 0 secs
+Tue Jul 10 10:47:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:36 [conn10] end connection 127.0.0.1:51712
+Tue Jul 10 10:47:36 [initandlisten] connection accepted from 127.0.0.1:52298 #22
+Tue Jul 10 10:47:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:45 [conn3] end connection 127.0.0.1:51209
+Tue Jul 10 10:47:45 [initandlisten] connection accepted from 127.0.0.1:52304 #23
+Tue Jul 10 10:47:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:50 [conn7] end connection 127.0.0.1:51221
+Tue Jul 10 10:47:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:47:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:06 [conn22] end connection 127.0.0.1:52298
+Tue Jul 10 10:48:06 [initandlisten] connection accepted from 127.0.0.1:52317 #24
+Tue Jul 10 10:48:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:15 [conn23] end connection 127.0.0.1:52304
+Tue Jul 10 10:48:15 [initandlisten] connection accepted from 127.0.0.1:52322 #25
+Tue Jul 10 10:48:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:25 [clientcursormon] mem (MB) res:20 virt:3144 mapped:336
+Tue Jul 10 10:48:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:48:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:36 [conn24] end connection 127.0.0.1:52317
+Tue Jul 10 10:48:36 [initandlisten] connection accepted from 127.0.0.1:52332 #26
+Tue Jul 10 10:48:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:45 [conn25] end connection 127.0.0.1:52322
+Tue Jul 10 10:48:45 [initandlisten] connection accepted from 127.0.0.1:52338 #27
+Tue Jul 10 10:48:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:48:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:06 [conn26] end connection 127.0.0.1:52332
+Tue Jul 10 10:49:06 [initandlisten] connection accepted from 127.0.0.1:52349 #28
+Tue Jul 10 10:49:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:15 [conn27] end connection 127.0.0.1:52338
+Tue Jul 10 10:49:15 [initandlisten] connection accepted from 127.0.0.1:52354 #29
+Tue Jul 10 10:49:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:49:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:36 [conn28] end connection 127.0.0.1:52349
+Tue Jul 10 10:49:36 [initandlisten] connection accepted from 127.0.0.1:52364 #30
+Tue Jul 10 10:49:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:45 [conn29] end connection 127.0.0.1:52354
+Tue Jul 10 10:49:45 [initandlisten] connection accepted from 127.0.0.1:52370 #31
+Tue Jul 10 10:49:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:49:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:06 [conn30] end connection 127.0.0.1:52364
+Tue Jul 10 10:50:06 [initandlisten] connection accepted from 127.0.0.1:52380 #32
+Tue Jul 10 10:50:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:15 [conn31] end connection 127.0.0.1:52370
+Tue Jul 10 10:50:15 [initandlisten] connection accepted from 127.0.0.1:52386 #33
+Tue Jul 10 10:50:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:50:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:36 [conn32] end connection 127.0.0.1:52380
+Tue Jul 10 10:50:36 [initandlisten] connection accepted from 127.0.0.1:52397 #34
+Tue Jul 10 10:50:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:45 [conn33] end connection 127.0.0.1:52386
+Tue Jul 10 10:50:45 [initandlisten] connection accepted from 127.0.0.1:52402 #35
+Tue Jul 10 10:50:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:50:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:06 [conn34] end connection 127.0.0.1:52397
+Tue Jul 10 10:51:06 [initandlisten] connection accepted from 127.0.0.1:52413 #36
+Tue Jul 10 10:51:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:15 [conn35] end connection 127.0.0.1:52402
+Tue Jul 10 10:51:15 [initandlisten] connection accepted from 127.0.0.1:52418 #37
+Tue Jul 10 10:51:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:51:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:36 [conn36] end connection 127.0.0.1:52413
+Tue Jul 10 10:51:36 [initandlisten] connection accepted from 127.0.0.1:52428 #38
+Tue Jul 10 10:51:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:45 [conn37] end connection 127.0.0.1:52418
+Tue Jul 10 10:51:45 [initandlisten] connection accepted from 127.0.0.1:52434 #39
+Tue Jul 10 10:51:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:51:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:06 [conn38] end connection 127.0.0.1:52428
+Tue Jul 10 10:52:06 [initandlisten] connection accepted from 127.0.0.1:52448 #40
+Tue Jul 10 10:52:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:15 [conn39] end connection 127.0.0.1:52434
+Tue Jul 10 10:52:15 [initandlisten] connection accepted from 127.0.0.1:52454 #41
+Tue Jul 10 10:52:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:27 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 10:52:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:52:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:36 [conn40] end connection 127.0.0.1:52448
+Tue Jul 10 10:52:36 [initandlisten] connection accepted from 127.0.0.1:52465 #42
+Tue Jul 10 10:52:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:45 [conn41] end connection 127.0.0.1:52454
+Tue Jul 10 10:52:45 [initandlisten] connection accepted from 127.0.0.1:52471 #43
+Tue Jul 10 10:52:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:52:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:06 [conn42] end connection 127.0.0.1:52465
+Tue Jul 10 10:53:06 [initandlisten] connection accepted from 127.0.0.1:52481 #44
+Tue Jul 10 10:53:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:15 [conn43] end connection 127.0.0.1:52471
+Tue Jul 10 10:53:15 [initandlisten] connection accepted from 127.0.0.1:52487 #45
+Tue Jul 10 10:53:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 10:53:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:53:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:36 [conn44] end connection 127.0.0.1:52481
+Tue Jul 10 10:53:36 [initandlisten] connection accepted from 127.0.0.1:52497 #46
+Tue Jul 10 10:53:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:45 [conn45] end connection 127.0.0.1:52487
+Tue Jul 10 10:53:45 [initandlisten] connection accepted from 127.0.0.1:52504 #47
+Tue Jul 10 10:53:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:53:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:06 [conn46] end connection 127.0.0.1:52497
+Tue Jul 10 10:54:06 [initandlisten] connection accepted from 127.0.0.1:52516 #48
+Tue Jul 10 10:54:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:15 [conn47] end connection 127.0.0.1:52504
+Tue Jul 10 10:54:15 [initandlisten] connection accepted from 127.0.0.1:52535 #49
+Tue Jul 10 10:54:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:54:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:36 [conn48] end connection 127.0.0.1:52516
+Tue Jul 10 10:54:36 [initandlisten] connection accepted from 127.0.0.1:52546 #50
+Tue Jul 10 10:54:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:45 [conn49] end connection 127.0.0.1:52535
+Tue Jul 10 10:54:45 [initandlisten] connection accepted from 127.0.0.1:52551 #51
+Tue Jul 10 10:54:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:54:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:06 [conn50] end connection 127.0.0.1:52546
+Tue Jul 10 10:55:06 [initandlisten] connection accepted from 127.0.0.1:52669 #52
+Tue Jul 10 10:55:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:15 [conn51] end connection 127.0.0.1:52551
+Tue Jul 10 10:55:15 [initandlisten] connection accepted from 127.0.0.1:52679 #53
+Tue Jul 10 10:55:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:55:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:36 [conn52] end connection 127.0.0.1:52669
+Tue Jul 10 10:55:36 [initandlisten] connection accepted from 127.0.0.1:52690 #54
+Tue Jul 10 10:55:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:45 [conn53] end connection 127.0.0.1:52679
+Tue Jul 10 10:55:45 [initandlisten] connection accepted from 127.0.0.1:52696 #55
+Tue Jul 10 10:55:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:55:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:06 [conn54] end connection 127.0.0.1:52690
+Tue Jul 10 10:56:06 [initandlisten] connection accepted from 127.0.0.1:52706 #56
+Tue Jul 10 10:56:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:15 [conn55] end connection 127.0.0.1:52696
+Tue Jul 10 10:56:15 [initandlisten] connection accepted from 127.0.0.1:52712 #57
+Tue Jul 10 10:56:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:56:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:36 [conn56] end connection 127.0.0.1:52706
+Tue Jul 10 10:56:36 [initandlisten] connection accepted from 127.0.0.1:52723 #58
+Tue Jul 10 10:56:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:45 [conn57] end connection 127.0.0.1:52712
+Tue Jul 10 10:56:45 [initandlisten] connection accepted from 127.0.0.1:52727 #59
+Tue Jul 10 10:56:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:56:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:06 [conn58] end connection 127.0.0.1:52723
+Tue Jul 10 10:57:06 [initandlisten] connection accepted from 127.0.0.1:52738 #60
+Tue Jul 10 10:57:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:15 [conn59] end connection 127.0.0.1:52727
+Tue Jul 10 10:57:15 [initandlisten] connection accepted from 127.0.0.1:52743 #61
+Tue Jul 10 10:57:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:26 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 10:57:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:57:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:36 [conn60] end connection 127.0.0.1:52738
+Tue Jul 10 10:57:36 [initandlisten] connection accepted from 127.0.0.1:52756 #62
+Tue Jul 10 10:57:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:45 [conn61] end connection 127.0.0.1:52743
+Tue Jul 10 10:57:45 [initandlisten] connection accepted from 127.0.0.1:52761 #63
+Tue Jul 10 10:57:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:57:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:06 [conn62] end connection 127.0.0.1:52756
+Tue Jul 10 10:58:06 [initandlisten] connection accepted from 127.0.0.1:52774 #64
+Tue Jul 10 10:58:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:15 [conn63] end connection 127.0.0.1:52761
+Tue Jul 10 10:58:15 [initandlisten] connection accepted from 127.0.0.1:52779 #65
+Tue Jul 10 10:58:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 10:58:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:58:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:36 [conn64] end connection 127.0.0.1:52774
+Tue Jul 10 10:58:36 [initandlisten] connection accepted from 127.0.0.1:52795 #66
+Tue Jul 10 10:58:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:45 [conn65] end connection 127.0.0.1:52779
+Tue Jul 10 10:58:45 [initandlisten] connection accepted from 127.0.0.1:52814 #67
+Tue Jul 10 10:58:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:58:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:06 [conn66] end connection 127.0.0.1:52795
+Tue Jul 10 10:59:06 [initandlisten] connection accepted from 127.0.0.1:52890 #68
+Tue Jul 10 10:59:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:15 [conn67] end connection 127.0.0.1:52814
+Tue Jul 10 10:59:15 [initandlisten] connection accepted from 127.0.0.1:52972 #69
+Tue Jul 10 10:59:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:25 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:28 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:31 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 10:59:31 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:34 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:37 [conn68] end connection 127.0.0.1:52890
+Tue Jul 10 10:59:37 [initandlisten] connection accepted from 127.0.0.1:53033 #70
+Tue Jul 10 10:59:37 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:40 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:43 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:45 [conn69] end connection 127.0.0.1:52972
+Tue Jul 10 10:59:45 [initandlisten] connection accepted from 127.0.0.1:53039 #71
+Tue Jul 10 10:59:46 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:49 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:52 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:55 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 10:59:58 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:01 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:04 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:07 [conn70] end connection 127.0.0.1:53033
+Tue Jul 10 11:00:07 [initandlisten] connection accepted from 127.0.0.1:53050 #72
+Tue Jul 10 11:00:07 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:10 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:13 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:15 [conn71] end connection 127.0.0.1:53039
+Tue Jul 10 11:00:15 [initandlisten] connection accepted from 127.0.0.1:53055 #73
+Tue Jul 10 11:00:16 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:19 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:22 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:00:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:37 [conn72] end connection 127.0.0.1:53050
+Tue Jul 10 11:00:37 [initandlisten] connection accepted from 127.0.0.1:53068 #74
+Tue Jul 10 11:00:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:45 [conn73] end connection 127.0.0.1:53055
+Tue Jul 10 11:00:45 [initandlisten] connection accepted from 127.0.0.1:53076 #75
+Tue Jul 10 11:00:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:00:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:07 [conn74] end connection 127.0.0.1:53068
+Tue Jul 10 11:01:07 [initandlisten] connection accepted from 127.0.0.1:53097 #76
+Tue Jul 10 11:01:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:15 [conn75] end connection 127.0.0.1:53076
+Tue Jul 10 11:01:15 [initandlisten] connection accepted from 127.0.0.1:53102 #77
+Tue Jul 10 11:01:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:01:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:37 [conn76] end connection 127.0.0.1:53097
+Tue Jul 10 11:01:37 [initandlisten] connection accepted from 127.0.0.1:53114 #78
+Tue Jul 10 11:01:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:45 [conn77] end connection 127.0.0.1:53102
+Tue Jul 10 11:01:45 [initandlisten] connection accepted from 127.0.0.1:53118 #79
+Tue Jul 10 11:01:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:01:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:07 [conn78] end connection 127.0.0.1:53114
+Tue Jul 10 11:02:07 [initandlisten] connection accepted from 127.0.0.1:53130 #80
+Tue Jul 10 11:02:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:15 [conn79] end connection 127.0.0.1:53118
+Tue Jul 10 11:02:15 [initandlisten] connection accepted from 127.0.0.1:53134 #81
+Tue Jul 10 11:02:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:26 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 11:02:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:02:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:37 [conn80] end connection 127.0.0.1:53130
+Tue Jul 10 11:02:37 [initandlisten] connection accepted from 127.0.0.1:53146 #82
+Tue Jul 10 11:02:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:45 [conn81] end connection 127.0.0.1:53134
+Tue Jul 10 11:02:45 [initandlisten] connection accepted from 127.0.0.1:53151 #83
+Tue Jul 10 11:02:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:02:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:07 [initandlisten] connection accepted from 127.0.0.1:53163 #84
+Tue Jul 10 11:03:07 [conn82] end connection 127.0.0.1:53146
+Tue Jul 10 11:03:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:15 [conn83] end connection 127.0.0.1:53151
+Tue Jul 10 11:03:15 [initandlisten] connection accepted from 127.0.0.1:53167 #85
+Tue Jul 10 11:03:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 11:03:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:03:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:37 [conn84] end connection 127.0.0.1:53163
+Tue Jul 10 11:03:37 [initandlisten] connection accepted from 127.0.0.1:53187 #86
+Tue Jul 10 11:03:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:45 [conn85] end connection 127.0.0.1:53167
+Tue Jul 10 11:03:45 [initandlisten] connection accepted from 127.0.0.1:53191 #87
+Tue Jul 10 11:03:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:03:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:07 [conn86] end connection 127.0.0.1:53187
+Tue Jul 10 11:04:07 [initandlisten] connection accepted from 127.0.0.1:53218 #88
+Tue Jul 10 11:04:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:15 [conn87] end connection 127.0.0.1:53191
+Tue Jul 10 11:04:15 [initandlisten] connection accepted from 127.0.0.1:53223 #89
+Tue Jul 10 11:04:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:04:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:37 [conn88] end connection 127.0.0.1:53218
+Tue Jul 10 11:04:37 [initandlisten] connection accepted from 127.0.0.1:53242 #90
+Tue Jul 10 11:04:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:45 [conn89] end connection 127.0.0.1:53223
+Tue Jul 10 11:04:45 [initandlisten] connection accepted from 127.0.0.1:53247 #91
+Tue Jul 10 11:04:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:04:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:07 [conn90] end connection 127.0.0.1:53242
+Tue Jul 10 11:05:07 [initandlisten] connection accepted from 127.0.0.1:53271 #92
+Tue Jul 10 11:05:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:15 [conn91] end connection 127.0.0.1:53247
+Tue Jul 10 11:05:15 [initandlisten] connection accepted from 127.0.0.1:53290 #93
+Tue Jul 10 11:05:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:05:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:37 [conn92] end connection 127.0.0.1:53271
+Tue Jul 10 11:05:37 [initandlisten] connection accepted from 127.0.0.1:53360 #94
+Tue Jul 10 11:05:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:45 [conn93] end connection 127.0.0.1:53290
+Tue Jul 10 11:05:45 [initandlisten] connection accepted from 127.0.0.1:53374 #95
+Tue Jul 10 11:05:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:05:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:07 [conn94] end connection 127.0.0.1:53360
+Tue Jul 10 11:06:07 [initandlisten] connection accepted from 127.0.0.1:53391 #96
+Tue Jul 10 11:06:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:15 [conn95] end connection 127.0.0.1:53374
+Tue Jul 10 11:06:15 [initandlisten] connection accepted from 127.0.0.1:53398 #97
+Tue Jul 10 11:06:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:06:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:37 [conn96] end connection 127.0.0.1:53391
+Tue Jul 10 11:06:37 [initandlisten] connection accepted from 127.0.0.1:53416 #98
+Tue Jul 10 11:06:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:45 [conn97] end connection 127.0.0.1:53398
+Tue Jul 10 11:06:45 [initandlisten] connection accepted from 127.0.0.1:53421 #99
+Tue Jul 10 11:06:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:06:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:07 [conn98] end connection 127.0.0.1:53416
+Tue Jul 10 11:07:07 [initandlisten] connection accepted from 127.0.0.1:53436 #100
+Tue Jul 10 11:07:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:15 [conn99] end connection 127.0.0.1:53421
+Tue Jul 10 11:07:15 [initandlisten] connection accepted from 127.0.0.1:53440 #101
+Tue Jul 10 11:07:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:26 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 11:07:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:07:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:37 [conn100] end connection 127.0.0.1:53436
+Tue Jul 10 11:07:37 [initandlisten] connection accepted from 127.0.0.1:53455 #102
+Tue Jul 10 11:07:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:45 [conn101] end connection 127.0.0.1:53440
+Tue Jul 10 11:07:45 [initandlisten] connection accepted from 127.0.0.1:53459 #103
+Tue Jul 10 11:07:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:07:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:07 [conn102] end connection 127.0.0.1:53455
+Tue Jul 10 11:08:07 [initandlisten] connection accepted from 127.0.0.1:53471 #104
+Tue Jul 10 11:08:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:15 [conn103] end connection 127.0.0.1:53459
+Tue Jul 10 11:08:15 [initandlisten] connection accepted from 127.0.0.1:53478 #105
+Tue Jul 10 11:08:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 11:08:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:08:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:37 [conn104] end connection 127.0.0.1:53471
+Tue Jul 10 11:08:37 [initandlisten] connection accepted from 127.0.0.1:53492 #106
+Tue Jul 10 11:08:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:45 [conn105] end connection 127.0.0.1:53478
+Tue Jul 10 11:08:45 [initandlisten] connection accepted from 127.0.0.1:53499 #107
+Tue Jul 10 11:08:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:08:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:07 [conn106] end connection 127.0.0.1:53492
+Tue Jul 10 11:09:07 [initandlisten] connection accepted from 127.0.0.1:53510 #108
+Tue Jul 10 11:09:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:15 [conn107] end connection 127.0.0.1:53499
+Tue Jul 10 11:09:15 [initandlisten] connection accepted from 127.0.0.1:53515 #109
+Tue Jul 10 11:09:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:09:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:37 [conn108] end connection 127.0.0.1:53510
+Tue Jul 10 11:09:37 [initandlisten] connection accepted from 127.0.0.1:53529 #110
+Tue Jul 10 11:09:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:45 [conn109] end connection 127.0.0.1:53515
+Tue Jul 10 11:09:45 [initandlisten] connection accepted from 127.0.0.1:53534 #111
+Tue Jul 10 11:09:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:09:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:07 [conn110] end connection 127.0.0.1:53529
+Tue Jul 10 11:10:07 [initandlisten] connection accepted from 127.0.0.1:53569 #112
+Tue Jul 10 11:10:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:15 [conn111] end connection 127.0.0.1:53534
+Tue Jul 10 11:10:15 [initandlisten] connection accepted from 127.0.0.1:53573 #113
+Tue Jul 10 11:10:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:10:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:37 [conn112] end connection 127.0.0.1:53569
+Tue Jul 10 11:10:37 [initandlisten] connection accepted from 127.0.0.1:53585 #114
+Tue Jul 10 11:10:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:45 [conn113] end connection 127.0.0.1:53573
+Tue Jul 10 11:10:45 [initandlisten] connection accepted from 127.0.0.1:53592 #115
+Tue Jul 10 11:10:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:10:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:07 [conn114] end connection 127.0.0.1:53585
+Tue Jul 10 11:11:07 [initandlisten] connection accepted from 127.0.0.1:53604 #116
+Tue Jul 10 11:11:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:15 [conn115] end connection 127.0.0.1:53592
+Tue Jul 10 11:11:15 [initandlisten] connection accepted from 127.0.0.1:53608 #117
+Tue Jul 10 11:11:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:11:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:37 [conn116] end connection 127.0.0.1:53604
+Tue Jul 10 11:11:37 [initandlisten] connection accepted from 127.0.0.1:53619 #118
+Tue Jul 10 11:11:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:45 [conn117] end connection 127.0.0.1:53608
+Tue Jul 10 11:11:45 [initandlisten] connection accepted from 127.0.0.1:53624 #119
+Tue Jul 10 11:11:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:11:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:07 [conn118] end connection 127.0.0.1:53619
+Tue Jul 10 11:12:07 [initandlisten] connection accepted from 127.0.0.1:53638 #120
+Tue Jul 10 11:12:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:16 [conn119] end connection 127.0.0.1:53624
+Tue Jul 10 11:12:16 [initandlisten] connection accepted from 127.0.0.1:53643 #121
+Tue Jul 10 11:12:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:26 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 11:12:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:12:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:37 [conn120] end connection 127.0.0.1:53638
+Tue Jul 10 11:12:37 [initandlisten] connection accepted from 127.0.0.1:53658 #122
+Tue Jul 10 11:12:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:46 [conn121] end connection 127.0.0.1:53643
+Tue Jul 10 11:12:46 [initandlisten] connection accepted from 127.0.0.1:53663 #123
+Tue Jul 10 11:12:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:12:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:05 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:07 [conn122] end connection 127.0.0.1:53658
+Tue Jul 10 11:13:07 [initandlisten] connection accepted from 127.0.0.1:53674 #124
+Tue Jul 10 11:13:08 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:11 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:14 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:16 [conn123] end connection 127.0.0.1:53663
+Tue Jul 10 11:13:16 [initandlisten] connection accepted from 127.0.0.1:53679 #125
+Tue Jul 10 11:13:17 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:20 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:23 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 11:13:26 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:29 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:32 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:13:32 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:35 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:37 [conn124] end connection 127.0.0.1:53674
+Tue Jul 10 11:13:37 [initandlisten] connection accepted from 127.0.0.1:53690 #126
+Tue Jul 10 11:13:38 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:41 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:44 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:46 [conn125] end connection 127.0.0.1:53679
+Tue Jul 10 11:13:46 [initandlisten] connection accepted from 127.0.0.1:53695 #127
+Tue Jul 10 11:13:47 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:50 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:53 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:56 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:13:59 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:02 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:07 [conn126] end connection 127.0.0.1:53690
+Tue Jul 10 11:14:07 [initandlisten] connection accepted from 127.0.0.1:53707 #128
+Tue Jul 10 11:14:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:16 [conn127] end connection 127.0.0.1:53695
+Tue Jul 10 11:14:16 [initandlisten] connection accepted from 127.0.0.1:53711 #129
+Tue Jul 10 11:14:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:14:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:37 [conn128] end connection 127.0.0.1:53707
+Tue Jul 10 11:14:37 [initandlisten] connection accepted from 127.0.0.1:53727 #130
+Tue Jul 10 11:14:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:46 [conn129] end connection 127.0.0.1:53711
+Tue Jul 10 11:14:46 [initandlisten] connection accepted from 127.0.0.1:53734 #131
+Tue Jul 10 11:14:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:14:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:07 [conn130] end connection 127.0.0.1:53727
+Tue Jul 10 11:15:07 [initandlisten] connection accepted from 127.0.0.1:53746 #132
+Tue Jul 10 11:15:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:16 [conn131] end connection 127.0.0.1:53734
+Tue Jul 10 11:15:16 [initandlisten] connection accepted from 127.0.0.1:53751 #133
+Tue Jul 10 11:15:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:15:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:37 [conn132] end connection 127.0.0.1:53746
+Tue Jul 10 11:15:37 [initandlisten] connection accepted from 127.0.0.1:53762 #134
+Tue Jul 10 11:15:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:46 [conn133] end connection 127.0.0.1:53751
+Tue Jul 10 11:15:46 [initandlisten] connection accepted from 127.0.0.1:53767 #135
+Tue Jul 10 11:15:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:15:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:07 [conn134] end connection 127.0.0.1:53762
+Tue Jul 10 11:16:07 [initandlisten] connection accepted from 127.0.0.1:53779 #136
+Tue Jul 10 11:16:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:16 [conn135] end connection 127.0.0.1:53767
+Tue Jul 10 11:16:16 [initandlisten] connection accepted from 127.0.0.1:53783 #137
+Tue Jul 10 11:16:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:16:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:37 [conn136] end connection 127.0.0.1:53779
+Tue Jul 10 11:16:37 [initandlisten] connection accepted from 127.0.0.1:53794 #138
+Tue Jul 10 11:16:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:46 [conn137] end connection 127.0.0.1:53783
+Tue Jul 10 11:16:46 [initandlisten] connection accepted from 127.0.0.1:53799 #139
+Tue Jul 10 11:16:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:16:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:07 [conn138] end connection 127.0.0.1:53794
+Tue Jul 10 11:17:07 [initandlisten] connection accepted from 127.0.0.1:53829 #140
+Tue Jul 10 11:17:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:16 [conn139] end connection 127.0.0.1:53799
+Tue Jul 10 11:17:16 [initandlisten] connection accepted from 127.0.0.1:53834 #141
+Tue Jul 10 11:17:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:26 [conn11] command admin.$cmd command: { writebacklisten: ObjectId('4ffc40465aed26d38727c643') } ntoreturn:1 reslen:44 299993ms
+Tue Jul 10 11:17:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:17:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:37 [conn140] end connection 127.0.0.1:53829
+Tue Jul 10 11:17:37 [initandlisten] connection accepted from 127.0.0.1:53845 #142
+Tue Jul 10 11:17:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:46 [conn141] end connection 127.0.0.1:53834
+Tue Jul 10 11:17:46 [initandlisten] connection accepted from 127.0.0.1:53850 #143
+Tue Jul 10 11:17:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:17:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:07 [conn142] end connection 127.0.0.1:53845
+Tue Jul 10 11:18:07 [initandlisten] connection accepted from 127.0.0.1:53861 #144
+Tue Jul 10 11:18:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:16 [conn143] end connection 127.0.0.1:53850
+Tue Jul 10 11:18:16 [initandlisten] connection accepted from 127.0.0.1:53866 #145
+Tue Jul 10 11:18:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:25 [clientcursormon] mem (MB) res:21 virt:3144 mapped:336
+Tue Jul 10 11:18:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:18:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:37 [conn144] end connection 127.0.0.1:53861
+Tue Jul 10 11:18:37 [initandlisten] connection accepted from 127.0.0.1:53879 #146
+Tue Jul 10 11:18:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:46 [conn145] end connection 127.0.0.1:53866
+Tue Jul 10 11:18:46 [initandlisten] connection accepted from 127.0.0.1:53883 #147
+Tue Jul 10 11:18:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:18:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:07 [conn146] end connection 127.0.0.1:53879
+Tue Jul 10 11:19:07 [initandlisten] connection accepted from 127.0.0.1:53895 #148
+Tue Jul 10 11:19:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:16 [conn147] end connection 127.0.0.1:53883
+Tue Jul 10 11:19:16 [initandlisten] connection accepted from 127.0.0.1:53900 #149
+Tue Jul 10 11:19:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:19:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:37 [conn148] end connection 127.0.0.1:53895
+Tue Jul 10 11:19:37 [initandlisten] connection accepted from 127.0.0.1:53912 #150
+Tue Jul 10 11:19:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:46 [conn149] end connection 127.0.0.1:53900
+Tue Jul 10 11:19:46 [initandlisten] connection accepted from 127.0.0.1:53945 #151
+Tue Jul 10 11:19:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:19:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:07 [conn150] end connection 127.0.0.1:53912
+Tue Jul 10 11:20:07 [initandlisten] connection accepted from 127.0.0.1:53961 #152
+Tue Jul 10 11:20:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:16 [conn151] end connection 127.0.0.1:53945
+Tue Jul 10 11:20:16 [initandlisten] connection accepted from 127.0.0.1:53965 #153
+Tue Jul 10 11:20:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:20:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:37 [conn152] end connection 127.0.0.1:53961
+Tue Jul 10 11:20:37 [initandlisten] connection accepted from 127.0.0.1:53977 #154
+Tue Jul 10 11:20:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:46 [conn153] end connection 127.0.0.1:53965
+Tue Jul 10 11:20:46 [initandlisten] connection accepted from 127.0.0.1:53981 #155
+Tue Jul 10 11:20:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:20:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:07 [conn154] end connection 127.0.0.1:53977
+Tue Jul 10 11:21:07 [initandlisten] connection accepted from 127.0.0.1:53993 #156
+Tue Jul 10 11:21:09 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:12 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:15 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:16 [conn155] end connection 127.0.0.1:53981
+Tue Jul 10 11:21:16 [initandlisten] connection accepted from 127.0.0.1:53997 #157
+Tue Jul 10 11:21:18 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:21 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:24 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:27 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:30 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:33 [rsSync] replSet syncing to: localhost:27118
+Tue Jul 10 11:21:33 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:36 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:37 [conn156] end connection 127.0.0.1:53993
+Tue Jul 10 11:21:37 [initandlisten] connection accepted from 127.0.0.1:54012 #158
+Tue Jul 10 11:21:39 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:42 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:45 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:46 [conn157] end connection 127.0.0.1:53997
+Tue Jul 10 11:21:46 [initandlisten] connection accepted from 127.0.0.1:54016 #159
+Tue Jul 10 11:21:48 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:51 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:54 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:21:57 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:22:00 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:22:03 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:22:06 [rsSync] replSet error empty query result from localhost:27118 oplog
+Tue Jul 10 11:22:07 [conn158] end connection 127.0.0.1:54012
+Tue Jul 10 11:22:07 [initandlisten] connection accepted from 127.0.0.1:54029 #160
+Tue Jul 10 11:22:09 [rsSync] replSet error empty query result from localhost:27118 oplog
