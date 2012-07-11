@@ -74,7 +74,9 @@ class OplogThread(Thread):
                             doc['ns'] = entry['ns']
                             print 'in main run method, inserting doc'
                             self.doc_manager.upsert(doc) 
-                    #there's an issue here
+                    #sometimes you see the document, but don't follow
+                    #through and insert, and the timestamp gets written
+                    #anyways
                 last_ts = entry['ts']
             except:
                 time.sleep(2)

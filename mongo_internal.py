@@ -41,7 +41,8 @@ class Daemon(Thread):
                 shard_conn = Connection(shard_doc['host'])
                 oplog_coll = shard_conn['local']['oplog.rs']
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
-                 True, doc_manager, self.oplog_checkpoint, {'test.test', 'test.best'})
+                 True, doc_manager, self.oplog_checkpoint, {'test.test', 'test.best'
+                 , 'alpha.foo'})
                 self.shard_set[shard_id] = oplog
                 oplog.start()
           

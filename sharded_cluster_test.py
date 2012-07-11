@@ -6,19 +6,12 @@ from pymongo import Connection
 MONGOS_PORT = 27217
 MONGOD_PORTS = [27117, 27317]
 
-rsm = ReplSetManager()
-rsm.start_cluster()
-
-from test_oplog_manager import ReplSetManager
-from mongo_internal import Daemon
-from pysolr import Solr
-from pymongo import Connection
-
-MONGOS_PORT = 27217
-MONGOD_PORTS = [27117, 27317]
 
 solr = Solr('http://localhost:8080/solr')
 solr.delete(q='*:*')
+
+rsm = ReplSetManager()
+rsm.start_cluster()
 
 mongos = Connection('localhost' , MONGOS_PORT)
 """
@@ -29,17 +22,17 @@ primary_one['alpha']['foo'].insert({})      #create those namespaces
 primary_two['beta']['foo'].insert({})
 """
 
-mongos['test']['test'].remove({})
+mongos['alpha']['foo'].remove({})
 
 d = Daemon('localhost:27217', 'config.txt')
 d.start()
 
 #general tests to verify that the Daemon is working properly.
 
-n = 10
-while n > 0:
-    mongos['test']['test'].insert({'name':'paulie'})
-    n = n - 1
+counter = 0
+while counter < 18000:                  #enough for two shards`
+    mongos['alpha']['foo'].insert({'_id':counter, 'name':'paulie'})
+    counter = counter + 1
 
 
 results = solr.search('*')
