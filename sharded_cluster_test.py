@@ -6,8 +6,16 @@ from pymongo import Connection
 MONGOS_PORT = 27217
 MONGOD_PORTS = [27117, 27317]
 
-#rsm = ReplSetManager()
-#rsm.start_cluster()
+rsm = ReplSetManager()
+rsm.start_cluster()
+
+from test_oplog_manager import ReplSetManager
+from mongo_internal import Daemon
+from pysolr import Solr
+from pymongo import Connection
+
+MONGOS_PORT = 27217
+MONGOD_PORTS = [27117, 27317]
 
 solr = Solr('http://localhost:8080/solr')
 solr.delete(q='*:*')

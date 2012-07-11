@@ -299,6 +299,7 @@ class OplogThread(Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and backend are in consistent states. 
         """
+        self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
         
         if last_inserted_doc is None:
