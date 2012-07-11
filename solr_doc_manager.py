@@ -41,7 +41,7 @@ class SolrDocManager():
         """
         self.solr.delete(id=str(doc_id), commit=False)
         
-    def search(self, query):
+    def search(self, start_ts, end_ts):
         """Called by oplog_manager to query Solr
         """
         if query == "":

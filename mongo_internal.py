@@ -36,6 +36,7 @@ class Daemon(Thread):
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
                 if self.shard_set.has_key(shard_id):
+                    time.sleep(2)
                     continue
                     
                 shard_conn = Connection(shard_doc['host'])

@@ -18,7 +18,7 @@ mongos = Connection('localhost' , MONGOS_PORT)
 primary_one = Connection('localhost', MONGOD_PORTS[0])
 primary_two = Connection('localhost', MONGOD_PORTS[1])
 
-primary_one['alpha']['foo'].insert({})      #create those namespaces
+primary_one['alpha' ]['foo'].insert({})      #create those namespaces
 primary_two['beta']['foo'].insert({})
 """
 
