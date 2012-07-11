@@ -20,7 +20,7 @@ class SolrDocManager():
     """
     
     def __init__(self, url, auto_commit = True):
-        """Just create a dict
+        """Verify Solr URL and establish a connection.
         """
 	if verify_url(url) is False:
 		print 'Invalid Solr URL'
@@ -31,10 +31,10 @@ class SolrDocManager():
         	self.solr_commit()          
 
 
-    def upsert(self, docs):
-        """Update or insert documents into Solr
+    def upsert(self, doc):
+        """Update or insert a document into Solr
         """
-        self.solr.add(docs, commit=False)
+        self.solr.add([doc], commit=False)
         
     def remove(self, doc_id):
         """Removes documents from Solr

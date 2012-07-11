@@ -73,11 +73,9 @@ class OplogThread(Thread):
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
                             print 'in main run method, inserting doc'
-                            self.doc_manager.upsert([doc])
-                        else:
-                            
-                    
-                    last_ts = entry['ts']
+                            self.doc_manager.upsert(doc) 
+                    #there's an issue here
+                last_ts = entry['ts']
             except:
                 time.sleep(2)
                 continue
@@ -193,7 +191,7 @@ class OplogThread(Thread):
                 print doc
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
-                self.doc_manager.upsert([doc])
+                self.doc_manager.upsert(doc)
             
     
     def init_cursor(self):
@@ -362,7 +360,7 @@ class OplogThread(Thread):
             for doc in to_index:
                 doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
-                self.doc_manager.upsert([doc])
+                self.doc_manager.upsert(doc)
          
         return rollback_cutoff_ts
                        
