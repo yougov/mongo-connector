@@ -11,7 +11,7 @@ from pysolr import Solr
 from threading import Timer
 from util import verify_url, retry_until_ok
 
-class SolrDocManager():
+class DocManager():
     """The DocManager class contains a dictionary that stores id/doc pairs. 
 
     The reason for storing id/doc pairs as opposed to doc's is so that multiple 
@@ -22,12 +22,12 @@ class SolrDocManager():
     def __init__(self, url, auto_commit = True):
         """Verify Solr URL and establish a connection.
         """
-	if verify_url(url) is False:
-		print 'Invalid Solr URL'
-		return None	
+        if verify_url(url) is False:
+		    print 'Invalid Solr URL'
+		    return None	
 
-        self.solr = Solr(url)   
-	if auto_commit:
+        self.solr = Solr(url)
+        if auto_commit:
         	self.solr_commit()          
 
 

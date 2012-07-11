@@ -1,7 +1,7 @@
 """Discovers the mongo cluster and starts the daemon. 
 """
 
-from solr_doc_manager import SolrDocManager
+from solr_doc_manager import DocManager
 import time
 from threading import Thread
 from pymongo import Connection
@@ -16,7 +16,7 @@ class Daemon(Thread):
         self.canRun = True
         self.oplog_checkpoint = oplog_checkpoint
         self.address = address
-        self.setDaemon(True)
+        #self.setDaemon(True)
         self.shard_set = {}
         
     def stop(self):
@@ -29,7 +29,7 @@ class Daemon(Thread):
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        doc_manager = SolrDocManager('http://127.0.0.1:8080/solr/')
+        doc_manager = DocManager('http://127.0.0.1:8080/solr/')
         
         while self.canRun is True: 
             
