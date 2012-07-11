@@ -11,7 +11,6 @@ from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from threading import Thread, Timer
 from checkpoint import Checkpoint
-from solr_doc_manager import SolrDocManager
 from util import (bson_ts_to_long,
                   long_to_bson_ts,
 		          retry_until_ok)
