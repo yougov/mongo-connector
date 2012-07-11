@@ -597,11 +597,14 @@ class ReplSetManager():
         last_ts = test_oplog.get_last_oplog_timestamp()    
         second_doc = {'name':'paul', '_ts':bson_ts_to_long(last_ts), 'ns':'test.test', '_id': obj2}
         
-        test_oplog.doc_manager.upsert([first_doc, second_doc])
+        test_oplog.doc_manager.upsert(first_doc)
+        test_oplog.doc_manager.upsert(second_doc)
         test_oplog.doc_manager.commit()
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')
+        
+        print len(results)
         
         assert (len(results) == 1)
 

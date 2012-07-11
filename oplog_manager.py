@@ -62,8 +62,9 @@ class OplogThread(Thread):
                     operation = entry['op']
     
                     if operation == 'd':
-                        doc_id = entry['o']['_id']
-                        self.doc_manager.remove(doc_id)
+                      #  doc_id = entry['o']['_id']
+                        entry['_id'] = entry['o']['_id']
+                        self.doc_manager.remove(entry)
                     
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
@@ -72,8 +73,11 @@ class OplogThread(Thread):
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
-                            #print 'in main run method, inserting doc'
+                            print 'in main run method, inserting doc'
+                            print doc
                             self.doc_manager.upsert(doc) 
+                            
+                            
                     #sometimes you see the document, but don't follow
                     #through and insert, and the timestamp gets written
                     #anyways
@@ -318,7 +322,6 @@ class OplogThread(Thread):
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']    
         
-        query = '_ts: [%s TO %s]' % (start_ts, end_ts)
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)   
         
         rollback_set = {}
@@ -326,37 +329,40 @@ class OplogThread(Thread):
             ns = doc['ns']
             
             if rollback_set.has_key(ns):
-                rollback_set[ns].append(doc['_id'])
+                rollback_set[ns].append(doc)
             else:
-                rollback_set[ns] = [doc['_id']]
+                rollback_set[ns] = [doc]
                 
-        for namespace, id_list in rollback_set.items():
+        for namespace, doc_list in rollback_set.items():
             db, coll = namespace.split('.', 1)
-            bson_obj_id_list = [ObjectId(x) for x in id_list]
+            bson_obj_id_list = [ObjectId(doc['_id']) for doc in doc_list]
             
             while True:
                 try:
                     to_update = self.mongos_connection[db][coll].find({'_id': 
                         {'$in': bson_obj_id_list}})
-                    to_update.count()
                     break
                 except:
                     pass
-            id_list_set = set(id_list)
+                    
+            doc_hash = {}
+            for doc in doc_list:
+                doc_hash[ObjectId(doc['_id'])] = doc
+                
             to_index = []
-
 
             try:
                 for doc in to_update:
-                    id_list_set.remove(str(doc['_id']))
+                    del doc_hash[doc['_id']]
                     to_index.append(doc)
             except:
                 pass
                     
+            print doc_hash
             #delete the inconsistent documents
             try:
-                for id in id_list_set:
-                    self.doc_manager.remove(id)
+                for doc in doc_hash.values():
+                    self.doc_manager.remove(doc)
             except:
                 pass
                         

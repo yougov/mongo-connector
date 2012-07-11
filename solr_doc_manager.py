@@ -34,18 +34,18 @@ class SolrDocManager():
     def upsert(self, doc):
         """Update or insert a document into Solr
         """
+
         self.solr.add([doc], commit=False)
         
-    def remove(self, doc_id):
+    def remove(self, doc):
         """Removes documents from Solr
         """
-        self.solr.delete(id=str(doc_id), commit=False)
+        self.solr.delete(id=str(doc['_id']), commit=False)
         
     def search(self, start_ts, end_ts):
         """Called by oplog_manager to query Solr
         """
-        if query == "":
-            query = "*"
+        query = '_ts: [%s TO %s]' % (start_ts, end_ts)
         
         return self.solr.search(query)
     
