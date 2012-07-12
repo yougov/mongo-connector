@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 import simplejson as json
 from util import bson_ts_to_long
 
-class ElasticSearchDocManager():
+class DocManager():
 
     def __init__ (self, url):
         if verify_url(url) is False:
