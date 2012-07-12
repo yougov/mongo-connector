@@ -599,7 +599,6 @@ class ReplSetManager():
         
         test_oplog.doc_manager.upsert(first_doc)
         test_oplog.doc_manager.upsert(second_doc)
-        test_oplog.doc_manager.commit()
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')

@@ -54,7 +54,9 @@ class DocManager():
         It is used only in the beginning of rollbacks and in test cases, and is     
         not meant to be called in other circumstances. The body should commit 
         all documents to the backend engine (like auto_commit), but not have any
-        timers or run itself again (unlike auto_commit).
+        timers or run itself again (unlike auto_commit). In the event of too 
+        many Solr searchers, the commit is wrapped in a retry_until_ok to keep 
+        trying until the commit goes through.  
         """
         retry_until_ok(self.solr.commit)
 
@@ -73,6 +75,8 @@ class DocManager():
         
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.
+        
+        This method is used 
         """
         #search everything, sort by descending timestamp, return 1 row
         result = self.solr.search('*:*', sort='_ts desc', rows=1)
