@@ -135,11 +135,11 @@ class OplogThread(Thread):
         """Handles special cases when oplog is stale/rollback/etc
         """
         
-        entry = retry_until_ok(self.oplog.find_one, '{\'ts\':timestamp}')
+        entry = retry_until_ok(self.oplog.find_one, {'ts':timestamp})
         print 'in manage_oplog_cursor_failure, entry is' 
         print entry
         if entry is None:
-            less_doc = retry_until_ok(self.oplog.find_one,'{\'ts\':{\'$lt\':timestamp}}')
+            less_doc = retry_until_ok(self.oplog.find_one, {'ts':{'$lt':timestamp}})
             print 'after less than doc search'
             print less_doc
             if less_doc:
