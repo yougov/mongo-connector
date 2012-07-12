@@ -7,6 +7,7 @@ from threading import Thread
 from pymongo import Connection
 from oplog_manager import OplogThread
         
+
 class Daemon(Thread):
     """Checks the cluster for shards to tail. 
     """
