@@ -276,7 +276,7 @@ class ReplSetManager():
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
-        return (oplog, primary_conn, oplog_coll)
+        return (oplog, primary_conn, oplog.mongos_connection, oplog_coll)
 
             
     def test_retrieve_doc(self):
@@ -541,14 +541,15 @@ class ReplSetManager():
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
         """
         
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
+        test_oplog, primary_conn, mongos_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
         solr = Solr('http://localhost:8080/solr')
         solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
-        primary_conn['test']['test'].remove({})
-        primary_conn['test']['test'].insert( {'_id':obj1,'name':'paulie'},w=2 )
+        
+        mongos_conn['alpha']['foo'].remove({})
+        mongos_conn['alpha']['foo'].insert( {'_id':obj1,'name':'paulie'} )
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
@@ -572,7 +573,7 @@ class ReplSetManager():
         #try kill one, try restarting
         killMongoProc(primary_conn.host, secondary_port)
                 
-        primary_conn['test']['test'].insert ( {'_id': obj2, 'name':'paul'})
+        mongos_conn['alpha']['foo'].insert ( {'_id': obj2, 'name':'paul'})
 
         killMongoProc(primary_conn.host, primary_port)  
        	

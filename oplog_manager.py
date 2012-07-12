@@ -114,12 +114,14 @@ class OplogThread(Thread):
         doc_id = entry[doc_field]['_id']
         print 'in retrieve doc'
         print doc_id 
+	print entry
         db_name, coll_name = namespace.split('.',1)
 
         while True:
             try :
                 coll = self.mongos_connection[db_name][coll_name]
-                doc = coll.find_one({'_id': doc_id})
+               	print coll
+               	doc = coll.find_one({'_id': doc_id})
                 print 'found doc'
                 print doc
                 break
@@ -128,7 +130,24 @@ class OplogThread(Thread):
                 continue
 
         return doc
-    
+        
+    def manage_oplog_cursor_failure(self, timestamp):
+        """Handles special cases when oplog is stale/rollback/etc
+        """
+        
+        entry = retry_until_ok(self.oplog.find_one, '{\'ts\':timestamp}')
+        print 'in manage_oplog_cursor_failure, entry is' 
+        print entry
+        if entry is None:
+            less_doc = retry_until_ok(self.oplog.find_one,'{\'ts\':{\'$lt\':timestamp}}')
+            print 'after less than doc search'
+            print less_doc
+            if less_doc:
+                print 'triggering a rollback'
+                timestamp = self.rollback()
+                
+        return timestamp
+        
     
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
@@ -140,25 +159,25 @@ class OplogThread(Thread):
               
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
         await_data=True).sort('$natural', pymongo.ASCENDING) 
-    
+        
+        print timestamp
+        print 'past cursor'
         try: 
             # we should re-read the last committed document
             doc = cursor.next() 
             print doc
             if timestamp == doc['ts']: 
-                'print returning up to date cursor'
-                time.sleep(1)  
+                'print returning up to date cursor' 
                 ret = cursor 
             else:
                 return None
         except:
-            entry = self.oplog.find_one, '{\'ts\':timestamp}'
-            if entry is None:
-                less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
-                if less_than_doc:
-                    ret = self.get_oplog_cursor(self.rollback())
-            else:
+            print 'going to manage oplog failure'
+            new_ts = self.manage_oplog_cursor_failure(timestamp)
+            if timestamp == new_ts:
                 ret = cursor
+            else:
+                ret = self.get_oplog_cursor(new_ts)
         
         return ret
         
@@ -166,8 +185,9 @@ class OplogThread(Thread):
         """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
-        if curr.count(with_limit_and_skip= True) == 0 :
-            return None
+      #  if curr.count(with_limit_and_skip= True) == 0 :
+      #      print 'returning none for last timestamp'
+      #      return None
         return curr[0]['ts']
         
     #used here for testing, eventually we will use last_oplog_ts() + full_dump()
@@ -186,9 +206,13 @@ class OplogThread(Thread):
         """
         if timestamp == None:
             return None
+            
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
-            cursor = self.mongos_connection[db][coll].find()
+            print 'getting target coll'
+            target_coll = retry_until_ok(self.mongos_connection[db][coll], no_func=True)
+            cursor = retry_until_ok(target_coll.find)
+            print 'found docs'
             long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
@@ -197,7 +221,6 @@ class OplogThread(Thread):
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
-            
     
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -206,14 +229,21 @@ class OplogThread(Thread):
         last left off. 
         """
         timestamp = self.read_config()
+        print 'in init cursor, finished reading config'
         
         if timestamp is None:
-            timestamp = self.get_last_oplog_timestamp()
-            self.dump_collection(timestamp)
+            print 'going to try getting last timestamp'
+            timestamp = retry_until_ok(self.get_last_oplog_timestamp)
+            print 'timestamp is '
+            print timestamp
+            retry_until_ok(self.dump_collection, args=timestamp)
+            print 'finished dumping collection'
             
         self.checkpoint.commit_ts = timestamp
         self.write_config()
-        cursor = self.get_oplog_cursor(timestamp)
+        print 'going to get cursor from init cursor'
+        cursor = retry_until_ok(self.get_oplog_cursor, timestamp)
+        print 'done getting cursor, returning from init cursor'
         
         return cursor
             
@@ -226,10 +256,13 @@ class OplogThread(Thread):
 
         if self.checkpoint is None:
             self.checkpoint = Checkpoint()
+            print 'going to init cursor'
             cursor = self.init_cursor()
+            print 'done with init cursor'
         else:
             last_commit = self.checkpoint.commit_ts
             print 'getting oplog cursor'
+            print 'last commit is %s' % last_commit
             cursor = self.get_oplog_cursor(last_commit)
             
             if cursor is None:
@@ -248,9 +281,14 @@ class OplogThread(Thread):
         if self.oplog_file is None:
             return None
 
-        os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
-        dest = open(self.oplog_file, 'w')
-        source = open(self.oplog_file + '~', 'r')
+        try:
+            os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
+            dest = open(self.oplog_file, 'w')
+            source = open(self.oplog_file + '~', 'r')
+        except:
+            print 'could not open config file!'
+            return None
+            
         oplog_str = str(self.oplog.database.connection)
         
         timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
@@ -357,7 +395,6 @@ class OplogThread(Thread):
             except:
                 pass
                     
-            print doc_hash
             #delete the inconsistent documents
             try:
                 for doc in doc_hash.values():

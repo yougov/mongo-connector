@@ -35,18 +35,28 @@ def long_to_bson_ts(val):
     
     return Timestamp(seconds, increment)
 
-def retry_until_ok(func, args = None):
+def retry_until_ok(func, args = None, no_func = False):
     """Retry code block until it succeeds.
     """
     
+    result = True
+    
     while True:
         try:
-            if args is None:
-                func()
+            if no_func == True:         #just a statement, not a function
+                result = func
+                break
+            elif args is None:
+                result = func()
                 break
             else:
-                func(args)
+                result = func(args)
                 break
         except:
+            print 'messed up for func'
+            print str(func)
+            print str(args)
+            print str(no_func)
             time.sleep(1)
-    return True
+            
+    return result 
