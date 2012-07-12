@@ -86,7 +86,7 @@ class DocManager():
         handled, as timers may not be necessary in all instances. 
         """ 
         self.solr.commit()
-        Timer(1, self.solr_commit).start() 
+        Timer(1, self.auto_commit).start() 
         
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.

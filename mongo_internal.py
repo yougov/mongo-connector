@@ -11,11 +11,14 @@ class Daemon(Thread):
     """Checks the cluster for shards to tail. 
     """
     
-    def __init__(self, address, oplog_checkpoint):
+    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key):
         super(Daemon, self).__init__()
         self.canRun = True
         self.oplog_checkpoint = oplog_checkpoint
         self.address = address
+        self.backend_url = backend_url
+        self.ns_set = ns_set
+        self.u_key = u_key
         #self.setDaemon(True)
         self.shard_set = {}
         
@@ -29,7 +32,10 @@ class Daemon(Thread):
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        doc_manager = DocManager('http://127.0.0.1:8080/solr/')
+        doc_manager = DocManager(self.backend_url, unique_key=self.u_key)
+        if doc_manager is None:
+            print 'Bad backend URL!'
+            return
         
         while self.canRun is True: 
             
@@ -42,8 +48,7 @@ class Daemon(Thread):
                 shard_conn = Connection(shard_doc['host'])
                 oplog_coll = shard_conn['local']['oplog.rs']
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
-                 True, doc_manager, self.oplog_checkpoint, {'test.test', 'test.best'
-                 , 'alpha.foo'})
+                 True, doc_manager, self.oplog_checkpoint, self.ns_set)
                 self.shard_set[shard_id] = oplog
                 oplog.start()
           

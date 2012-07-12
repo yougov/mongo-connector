@@ -80,7 +80,7 @@ class OplogThread(Thread):
                     #sometimes you see the document, but don't follow
                     #through and insert, and the timestamp gets written
                     #anyways
-                last_ts = entry['ts']
+                    last_ts = entry['ts']
             except:
                 time.sleep(2)
                 continue
@@ -152,7 +152,7 @@ class OplogThread(Thread):
             else:
                 return None
         except:
-            entry = retry_until_ok(self.oplog.find_one, '{\'ts\':timestamp}')
+            entry = self.oplog.find_one, '{\'ts\':timestamp}'
             if entry is None:
                 less_than_doc = self.oplog.find_one({'ts': {'$lt':timestamp}})
                 if less_than_doc:

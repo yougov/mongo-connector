@@ -16,7 +16,7 @@ from os import path
 from mongo_internal import Daemon
 from threading import Timer
 from oplog_manager import OplogThread
-from solr_doc_manager import SolrDocManager
+from solr_doc_manager import DocManager
 from pysolr import Solr
 from util import (long_to_bson_ts, 
                   bson_ts_to_long)
@@ -252,7 +252,7 @@ class ReplSetManager():
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
-        doc_manager = SolrDocManager('http://localhost:8080/solr', False)
+        doc_manager = DocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
@@ -272,7 +272,7 @@ class ReplSetManager():
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test']
-        doc_manager = SolrDocManager('http://localhost:8080/solr', False)
+        doc_manager = DocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
