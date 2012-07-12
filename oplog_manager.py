@@ -43,21 +43,21 @@ class OplogThread(Thread):
         self.running = True  
         
         if self.is_sharded is False:
-            #print 'handle later'
+            print 'handle later'
             return
               
         while self.running is True:    
             
-            #print 'in oplog thread for connection'
-            #print self.primary_connection   
+            print 'in oplog thread for connection'
+            print self.primary_connection   
             cursor = self.prepare_for_sync()
             last_ts = None
             
-            #print 'cursor count is ' + str(cursor.count())
+            print 'cursor count is ' + str(cursor.count())
             try:
                 for entry in cursor:  
-                    #print 'cursor entry is'
-                    #print entry
+                    print 'cursor entry is'
+                    print entry
                     operation = entry['op']
     
                     if operation == 'd':
@@ -67,7 +67,7 @@ class OplogThread(Thread):
                     
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
-                        #print 'in insert area'
+                        print 'in insert area'
                         
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
@@ -112,16 +112,16 @@ class OplogThread(Thread):
             doc_field = 'o'
         
         doc_id = entry[doc_field]['_id']
-        #print 'in retrieve doc'
-        #print doc_id 
+        print 'in retrieve doc'
+        print doc_id 
         db_name, coll_name = namespace.split('.',1)
 
         while True:
             try :
                 coll = self.mongos_connection[db_name][coll_name]
                 doc = coll.find_one({'_id': doc_id})
-                #print 'found doc'
-                #print doc
+                print 'found doc'
+                print doc
                 break
             except :
                 time.sleep(1)
@@ -144,9 +144,9 @@ class OplogThread(Thread):
         try: 
             # we should re-read the last committed document
             doc = cursor.next() 
-            #print doc
+            print doc
             if timestamp == doc['ts']: 
-                '#print returning up to date cursor'
+                'print returning up to date cursor'
                 time.sleep(1)  
                 ret = cursor 
             else:
@@ -188,12 +188,12 @@ class OplogThread(Thread):
             return None
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
-            cursor = self.primary_connection[db][coll].find()
+            cursor = self.mongos_connection[db][coll].find()
             long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
-                #print 'in dump collection'
-                #print doc
+                print 'in dump collection'
+                print doc
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
@@ -229,7 +229,7 @@ class OplogThread(Thread):
             cursor = self.init_cursor()
         else:
             last_commit = self.checkpoint.commit_ts
-            #print 'getting oplog cursor'
+            print 'getting oplog cursor'
             cursor = self.get_oplog_cursor(last_commit)
             
             if cursor is None:
@@ -274,7 +274,7 @@ class OplogThread(Thread):
         """      
         config_file = self.oplog_file
         if config_file is None:
-            #print 'Need a config file!'
+            print 'Need a config file!'
             return None
         
         source = open(self.oplog_file, 'r')
