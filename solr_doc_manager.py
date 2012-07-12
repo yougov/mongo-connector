@@ -17,31 +17,49 @@ class DocManager():
     multiple, slightly different versions of a doc.                                                                           
     """
     
-    def __init__(self, url, auto_commit = True):
+    def __init__(self, url, auto_commit = True, unique_key = '_id'):
         """Verify Solr URL and establish a connection.
+        
+        This method may vary from implementation to implementation, but it must
+        verify the url to the backend and return None if that fails. It must    
+        also create the connection to the backend, and start a periodic 
+        committer if necessary. The Solr uniqueKey is set to '_id' in the sample 
+        schema, but this may be overridden by user defined configuration. 
         """
         if verify_url(url) is False:
 		    print 'Invalid Solr URL'
 		    return None	
 
         self.solr = Solr(url)
+        self.unique_key = unique_key
         if auto_commit:
         	self.auto_commit()          
 
 
     def upsert(self, doc):
         """Update or insert a document into Solr
+        
+        This method should call whatever add/insert/update method exists for the 
+        backend engine and add the document in there. The input will always be 
+        one mongo document, represented as a Python dictionary.
         """
 
         self.solr.add([doc], commit=False)
         
     def remove(self, doc):
         """Removes documents from Solr
+        
+        The input is a python dictionary that represents a mongo document.  
         """
-        self.solr.delete(id=str(doc['_id']), commit=False)
+        self.solr.delete(id=str(doc[self.unique_key]), commit=False)
         
     def search(self, start_ts, end_ts):
-        """Called by oplog_manager to query Solr
+        """Called to query Solr for documents in a time range. 
+        
+        This method is only used by rollbacks to query all the documents in Solr 
+        within a certain timestamp window. The input will be two longs 
+        (converted from Bson timestamp) which specify the time range. The output 
+        should be an iterable set of documents. 
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
         
@@ -67,8 +85,7 @@ class DocManager():
         timer that calls this function again in one second. The reason for this 
         function is to prevent overloading Solr from other searchers. This 
         function may be modified based on the backend engine and how commits are     
-        handled, as timers may not be necessary in all    
-        instances. 
+        handled, as timers may not be necessary in all instances. 
         """ 
         self.solr.commit()
         Timer(1, self.solr_commit).start() 
@@ -76,7 +93,9 @@ class DocManager():
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.
         
-        This method is used 
+        This method is used for rollbacks to establish the rollback window,
+        which is the gap between the last document on a mongo shard and the last 
+        document in Solr. 
         """
         #search everything, sort by descending timestamp, return 1 row
         result = self.solr.search('*:*', sort='_ts desc', rows=1)
