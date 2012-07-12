@@ -1,6 +1,6 @@
 """Receives documents from the oplog worker threads and indexes them into the backend. 
 
-This file is a document manager for the Solr search engine, but the intent is that this file can be used as an example to add on different backends. 
+This file is a document manager for the Solr search engine, but the intent is that this file can be used as an example to add on different backends. To extend this to other systems, simply implement the exact same class and replace the method definitions with API calls for the desired backend. Each method is detailed to describe the desired behavior. 
 """
 #!/usr/env/python
 import sys
@@ -43,7 +43,6 @@ class DocManager():
         backend engine and add the document in there. The input will always be 
         one mongo document, represented as a Python dictionary.
         """
-
         self.solr.add([doc], commit=False)
         
     def remove(self, doc):
@@ -58,11 +57,10 @@ class DocManager():
         
         This method is only used by rollbacks to query all the documents in Solr 
         within a certain timestamp window. The input will be two longs 
-        (converted from Bson timestamp) which specify the time range. The output 
-        should be an iterable set of documents. 
+        (converted from Bson timestamp) which specify the time range. The return
+        value should be an iterable set of documents. 
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        
         return self.solr.search(query)
     
     
@@ -95,7 +93,8 @@ class DocManager():
         
         This method is used for rollbacks to establish the rollback window,
         which is the gap between the last document on a mongo shard and the last 
-        document in Solr. 
+        document in Solr. If there are no documents, this functions returns
+        None. Otherwise, it returns the first document. 
         """
         #search everything, sort by descending timestamp, return 1 row
         result = self.solr.search('*:*', sort='_ts desc', rows=1)
