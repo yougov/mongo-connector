@@ -135,16 +135,16 @@ class OplogThread(Thread):
         """Handles special cases when oplog is stale/rollback/etc
         """
         
-        entry = retry_until_ok(self.oplog.find_one, {'ts':timestamp})
-        print 'in manage_oplog_cursor_failure, entry is' 
-        print entry
-        if entry is None:
-            less_doc = retry_until_ok(self.oplog.find_one, {'ts':{'$lt':timestamp}})
-            print 'after less than doc search'
-            print less_doc
-            if less_doc:
-                print 'triggering a rollback'
-                timestamp = self.rollback()
+        #entry = retry_until_ok(self.oplog.find_one, {'ts':timestamp})
+        #print 'in manage_oplog_cursor_failure, entry is' 
+        #print entry
+        #if entry is None:
+        less_doc = retry_until_ok(self.oplog.find_one, {'ts':{'$lt':timestamp}})
+        print 'after less than doc search'
+        print less_doc
+        if less_doc:
+            print 'triggering a rollback'
+            timestamp = self.rollback()
                 
         return timestamp
         
@@ -173,12 +173,16 @@ class OplogThread(Thread):
             	print str(self.oplog) + 'timestamp is ' + str(timestamp) 
                 return None
         except:
-            print str(self.oplog) + '  going to manage oplog failure'
-            new_ts = self.manage_oplog_cursor_failure(timestamp)
-            if timestamp == new_ts:
-                ret = cursor
-            else:
-                ret = self.get_oplog_cursor(new_ts)
+            print str(self.oplog) + '  going to manage oplog failure'            
+            entry = retry_until_ok(self.oplog.find_one, {'ts':timestamp})
+            if entry is not None:
+          	ret = cursor
+            else:   
+            	new_ts = self.manage_oplog_cursor_failure(timestamp)
+            	if timestamp == new_ts:
+                    ret = cursor
+            	else:
+                    ret = self.get_oplog_cursor(new_ts)
         
         return ret
         
