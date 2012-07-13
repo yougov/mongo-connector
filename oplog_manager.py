@@ -53,7 +53,7 @@ class OplogThread(Thread):
             cursor = self.prepare_for_sync()
             last_ts = None
             
-            print 'cursor count is ' + str(cursor.count())
+            #print 'cursor count is ' + str(cursor.count())
             try:
                 for entry in cursor:  
                     print 'cursor entry is'
@@ -160,19 +160,20 @@ class OplogThread(Thread):
         cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
         await_data=True).sort('$natural', pymongo.ASCENDING) 
         
-        print timestamp
-        print 'past cursor'
+        print str(self.oplog) + str(timestamp)
+        print str(self.oplog) + 'past cursor'
         try: 
             # we should re-read the last committed document
             doc = cursor.next() 
-            print doc
+            print str(self.oplog) + doc
             if timestamp == doc['ts']: 
-                'print returning up to date cursor' 
+                print 'returning up to date cursor' 
                 ret = cursor 
             else:
+            	print str(self.oplog) + 'timestamp is ' + str(timestamp) 
                 return None
         except:
-            print 'going to manage oplog failure'
+            print str(self.oplog) + '  going to manage oplog failure'
             new_ts = self.manage_oplog_cursor_failure(timestamp)
             if timestamp == new_ts:
                 ret = cursor

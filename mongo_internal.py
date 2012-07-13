@@ -1,7 +1,7 @@
 """Discovers the mongo cluster and starts the daemon. 
 """
 
-from solr_doc_manager import DocManager
+from doc_manager import DocManager
 import time
 from threading import Thread
 from pymongo import Connection
@@ -33,7 +33,7 @@ class Daemon(Thread):
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        doc_manager = DocManager(self.backend_url, unique_key=self.u_key)
+        doc_manager = DocManager(self.backend_url)
         if doc_manager is None:
             print 'Bad backend URL!'
             return
