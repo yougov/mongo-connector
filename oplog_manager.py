@@ -53,7 +53,7 @@ class OplogThread(Thread):
             cursor = self.prepare_for_sync()
             last_ts = None
             
-            #print 'cursor count is ' + str(cursor.count())
+            print 'cursor count is ' + str(cursor.count())
             try:
                 for entry in cursor:  
                     print 'cursor entry is'
@@ -243,7 +243,7 @@ class OplogThread(Thread):
         self.checkpoint.commit_ts = timestamp
         self.write_config()
         print 'going to get cursor from init cursor'
-        cursor = retry_until_ok(self.get_oplog_cursor, timestamp)
+        cursor = self.get_oplog_cursor(timestamp)
         print 'done getting cursor, returning from init cursor'
         
         return cursor
@@ -362,10 +362,13 @@ class OplogThread(Thread):
         
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)   
         
+        print 'start_ts is ' + str(start_ts)
+        print 'end_ts is ' + str(end_ts)
+        
         rollback_set = {}
         for doc in docs_to_rollback:
-            ns = doc['ns']
-            
+            print doc
+       	    ns = doc['ns']
             if rollback_set.has_key(ns):
                 rollback_set[ns].append(doc)
             else:

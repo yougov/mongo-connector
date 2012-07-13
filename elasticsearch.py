@@ -18,12 +18,13 @@ class DocManager():
             self.auto_commit()
 
     def upsert(self, doc):
+	print doc
         index = doc['ns']
         doc_type = 'string'
+        doc['_id'] = str(doc['_id'])
         doc_id = doc['_id']
-        del doc['ns']
-        del doc['_id']
         self.elastic.index(doc, index, doc_type, doc_id)
+	print 'upserted successfully!'
 
     def remove(self, doc):
         
