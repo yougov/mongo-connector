@@ -198,7 +198,7 @@ class OplogThread(Thread):
         try: 
             # we should re-read the last committed document
             doc = cursor.next() 
-            print str(self.oplog) + doc
+           # print str(self.oplog) + doc
             if timestamp == doc['ts']: 
                 print 'returning up to date cursor' 
                 ret = cursor 
@@ -223,9 +223,10 @@ class OplogThread(Thread):
         """Return the timestamp of the latest entry in the oplog.
         """
         curr = self.oplog.find().sort('$natural',pymongo.DESCENDING).limit(1)
-      #  if curr.count(with_limit_and_skip= True) == 0 :
-      #      print 'returning none for last timestamp'
-      #      return None
+        if curr.count(with_limit_and_skip= True) == 0 :
+            print 'returning none for last timestamp'
+            return None
+            
         return curr[0]['ts']
         
     #used here for testing, eventually we will use last_oplog_ts() + full_dump()
@@ -274,7 +275,7 @@ class OplogThread(Thread):
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
             print 'timestamp is '
             print timestamp
-            retry_until_ok(self.dump_collection, args=timestamp)
+            self.dump_collection(timestamp)
             print 'finished dumping collection'
             
         self.checkpoint.commit_ts = timestamp
