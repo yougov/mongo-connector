@@ -51,6 +51,9 @@ class OplogThread(Thread):
             print 'in oplog thread for connection'
             print self.primary_connection   
             cursor = self.prepare_for_sync()
+            if cursor == None:
+                time.sleep(1)
+                continue
             last_ts = None
             
             print 'cursor count is ' + str(cursor.count())
@@ -152,7 +155,37 @@ class OplogThread(Thread):
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog. 
         """
-        ret = None
+
+        if timestamp == None:
+            return None
+
+
+        while (True):
+            try:
+                cursor = self.oplog.find({'ts': {'$gte': timestamp}}, tailable=True,
+                                         await_data=True).sort('$natural', pymongo.ASCENDING)
+                cursor_len = cursor.count()
+                break
+            except:
+                pass
+
+
+
+        if cursor_len == 1:     #means we are the end of the oplog
+            return None
+        elif cursor_len > 1:
+            doc = cursor.next()
+            if timestamp == doc['ts']:
+                return cursor
+            else:               #error condition
+                print 'Bad timstamp. Recheck config file!'
+                return None
+        else:                    #rollback, we are past the last element in the oplog
+            timestamp = self.rollback()
+            print 'finished rollback'
+            return self.get_oplog_cursor(timestamp)
+        """ 
+       ret = None
         
         if timestamp is None:
             return None
@@ -183,8 +216,8 @@ class OplogThread(Thread):
                     ret = cursor
             	else:
                     ret = self.get_oplog_cursor(new_ts)
-        
         return ret
+        """
         
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.

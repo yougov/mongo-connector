@@ -154,9 +154,9 @@ class ReplSetManager():
         create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
         
-        create_dir(DEMO_SERVER_DATA + "/replset2a/journal")
-        create_dir(DEMO_SERVER_DATA + "/replset2b/journal")
-        create_dir(DEMO_SERVER_DATA + "/replset2c/journal")
+        #create_dir(DEMO_SERVER_DATA + "/replset2a/journal")
+        #create_dir(DEMO_SERVER_DATA + "/replset2b/journal")
+        #create_dir(DEMO_SERVER_DATA + "/replset2c/journal")
         
         create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
         create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
@@ -168,9 +168,9 @@ class ReplSetManager():
         startMongoProc(PORTS_ONE["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
         startMongoProc(PORTS_ONE["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
         
-        startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log")
-        startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log")
-        startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log")
+        #startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log")
+        #startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log")
+        #startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log")
         
         # Setup config server
         CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " +                 PORTS_ONE["CONFIG"] + " --dbpath " + DEMO_SERVER_DATA + "/config1 --rest --logpath "
@@ -188,7 +188,7 @@ class ReplSetManager():
             
         # Configure the shards and begin load simulation
         cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSetSharded1.js"
-        cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR +         "/setup/configReplSetSharded2.js"
+        #cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR +         "/setup/configReplSetSharded2.js"
         cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongosSharded.js"
          
         subprocess.call(cmd1, shell=True)
@@ -201,15 +201,15 @@ class ReplSetManager():
         while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
              
-        subprocess.call(cmd2, shell=True)
-        conn = Connection('localhost:' + PORTS_TWO["PRIMARY"])
-        sec_conn = Connection('localhost:' + PORTS_TWO["SECONDARY"])
+        #subprocess.call(cmd2, shell=True)
+        #conn = Connection('localhost:' + PORTS_TWO["PRIMARY"])
+        #sec_conn = Connection('localhost:' + PORTS_TWO["SECONDARY"])
                  
-        while conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
+        #while conn['admin'].command("isMaster")['ismaster'] is False:
+        #    time.sleep(1)
                  
-        while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
-            time.sleep(1)
+        #while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+        #    time.sleep(1)
              
         subprocess.call(cmd3, shell=True)
 
@@ -224,17 +224,42 @@ class ReplSetManager():
         """
         t = Timer(60, self.abort_test)
         t.start()
-        d = Daemon('localhost:' + PORTS_ONE["MONGOS"], None)
+        d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
         d.start()
         while len(d.shard_set) == 0:
             pass
         t.cancel()
                     
-        d.stop()
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
+
+        #establish solr and mongo
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        s = Solr('http://localhost:8080/solr')
+        s.delete(q = '*:*')
+        #test search + initial clear
+        assert (primary_conn['test']['test'].find().count() == 0)
+        assert (len(s.search('*:*')) == 0)
+        print 'PASSED INITIAL TEST'
+        #test insert
+        time.sleep(20)
+        primary_conn['test']['test'].insert ( {'name':'paulie'} )
+        time.sleep(10)
+        primary_conn['test']['test'].insert({'name': 'paul'})
+        time.sleep(2)
+        a = s.search('paul')
+        print len(a)
+        assert (len(a) == 1)
+        b = primary_conn['test']['test'].find()
+        for it in a:
+            print it
+            assert (a['_id'] == str(b['_id']))
+            a['name'] == b['name']
         
-    
+
+        print 'PASSED ALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'
+        d.stop()
+
     def get_oplog_thread(self):
         """ Set up connection with mongo. Returns oplog, the connection and oplog collection
             
