@@ -560,7 +560,7 @@ class ReplSetManager():
         solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
         
-        mongos_conn['alpha']['foo'].remove({})
+        mongos_conn['alpha']['foo'].remove({}, safe=True)
         mongos_conn['alpha']['foo'].insert( {'_id':obj1,'name':'paulie'}, safe=True )
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
@@ -616,7 +616,11 @@ class ReplSetManager():
         test_oplog.doc_manager.commit()
         results = solr.search('*')
         
-        print len(results)
+        counter = 10
+        while counter > 0:
+            print 'results len is '  + str(len(results))
+            counter = counter - 1
+            time.sleep(1)   
         
         assert (len(results) == 1)
 
