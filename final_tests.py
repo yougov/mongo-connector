@@ -6,7 +6,7 @@ import time
 
 print 'Preparing cluster'
 rsm = ReplSetManager()
-rsm.start_cluster()
+#rsm.start_cluster()
 print 'finished startCluster'
 rsm.test_retrieve_doc()
 print 'passed test_retrieve_doc'
@@ -33,7 +33,7 @@ time.sleep(5)
 print 'restarted cluster'
 rsm.test_rollback()
 print 'passed rollback'
-rsm.test_retrieve_doc()
+#rsm.test_retrieve_doc()
 print 'passed test_retrieve_doc'
 rsm.test_get_oplog_cursor()
 print 'passed test_get_oplog_cursor'
