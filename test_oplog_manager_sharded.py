@@ -366,8 +366,8 @@ class ReplSetManager():
         """
         
         #test empty oplog
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        mongos_conn = test_oplog.mongos_connection
+        test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
+        
         assert (test_oplog.get_last_oplog_timestamp() == None)
         
         #test non-empty oplog
