@@ -274,12 +274,12 @@ class ReplSetManager():
         mongos_conn = "localhost:" + PORTS_ONE["MONGOS"]
         oplog_coll = primary_conn['local']['oplog.rs']
         
-        namespace_set = ['test.test']
+        namespace_set = ['test.test', 'alpha.foo']
         doc_manager = DocManager('http://localhost:8080/solr', False)
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
-        return (oplog, primary_conn, oplog.mongos_connection, oplog_coll)
+        return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
 
             
     def test_retrieve_doc(self):
@@ -295,29 +295,21 @@ class ReplSetManager():
         
         assert (oplog_cursor.count() == 0)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'})
-        
-        while oplog_cursor.count() != 1:
-            time.sleep(1)                              #block until write gets propagated to the oplog
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True)
         last_oplog_entry = oplog_cursor.next()
         target_entry = mongos_conn['alpha']['foo'].find_one()
         
         #testing for search after inserting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
-        mongos_conn['alpha']['foo'].update({'name':'paulie'}, {"$set": {'name':'paul'}} )
-        
-        while oplog_cursor.count() != 2:
-            time.sleep(1)
+        mongos_conn['alpha']['foo'].update({'name':'paulie'}, {"$set": {'name':'paul'}} , safe=True)
         last_oplog_entry = oplog_cursor.next()
         target_entry = mongos_conn['alpha']['foo'].find_one()        
         
         #testing for search after updating a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
-        mongos_conn['alpha']['foo'].remove( {'name':'paul'} )
-        while oplog_cursor.count() != 3:
-            time.sleep(1)
+        mongos_conn['alpha']['foo'].remove( {'name':'paul'}, safe=True )
         last_oplog_entry = oplog_cursor.next()
         
         #testing for search after deleting a document
@@ -339,16 +331,17 @@ class ReplSetManager():
         assert (test_oplog.get_oplog_cursor(None) == None)
         
         #test with one document
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
         ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 1)
         
         #test with two documents, one after the ts
-        mongos_conn['alpha']['foo'].insert ( {'name':'paul'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paul'}, safe=True )
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 2)
         
+        """ add test for when we're too behind the oplog
         #test case where timestamp is not in oplog which implies we're too behind 
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -359,7 +352,7 @@ class ReplSetManager():
         test_oplog.stop()
             
         #need to add tests for 'except' part of get_oplog_cursor
-            
+            """
 
     def test_get_last_oplog_timestamp(self):
         """Test get_last_oplog_timestamp in oplog_manager. Assertion failure if it doesn't pass
@@ -372,7 +365,7 @@ class ReplSetManager():
         
         #test non-empty oplog
         oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
         last_oplog_entry = oplog_cursor.next()
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
         
@@ -393,7 +386,7 @@ class ReplSetManager():
         assert (len(solr.search('*')) == 0)
         
         #with documents
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection(search_ts)
 
@@ -418,12 +411,19 @@ class ReplSetManager():
         assert (test_oplog.init_cursor() == None)
         
         #no config, single oplog entry
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
         search_ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.init_cursor()
         
         
         assert (cursor.count() == 1)
+        
+        if test_oplog.checkpoint.commit_ts != search_ts:
+            print 'test_oplog checkpoint ts is '
+            print test_oplog.checkpoint.commit_ts
+            print 'search ts is '
+            print search_ts
+                   
         assert (test_oplog.checkpoint.commit_ts == search_ts)
         
         #with config file, assert that size != 0
@@ -451,7 +451,7 @@ class ReplSetManager():
         assert (test_oplog.checkpoint.commit_ts == None)
         assert (cursor == None)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
         cursor = test_oplog.prepare_for_sync()
         search_ts = test_oplog.get_last_oplog_timestamp()
 
@@ -460,7 +460,7 @@ class ReplSetManager():
         assert (cursor != None)
         assert (cursor.count() == 1)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulter'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulter'} , safe=True)
         cursor = test_oplog.prepare_for_sync()
         new_search_ts = test_oplog.get_last_oplog_timestamp()
         
@@ -489,7 +489,7 @@ class ReplSetManager():
         config_file_path = os.getcwd() + '/temp_config.txt'
         test_oplog.oplog_file = config_file_path
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.checkpoint.commit_ts = search_ts
         
@@ -522,7 +522,7 @@ class ReplSetManager():
         """Test read_config in oplog_manager. Assertion failure if it doesn't pass
         """
         
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
         
         #testing with no file
@@ -553,7 +553,7 @@ class ReplSetManager():
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
         """
         
-        test_oplog, primary_conn, mongos_conn, oplog_coll = self.get_oplog_thread_new()
+        test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread_new()
         #test_oplog.start()
         
         solr = Solr('http://localhost:8080/solr')
@@ -561,7 +561,7 @@ class ReplSetManager():
         obj1 = ObjectId('4ff74db3f646462b38000001')
         
         mongos_conn['alpha']['foo'].remove({})
-        mongos_conn['alpha']['foo'].insert( {'_id':obj1,'name':'paulie'} )
+        mongos_conn['alpha']['foo'].insert( {'_id':obj1,'name':'paulie'}, safe=True )
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
@@ -585,7 +585,7 @@ class ReplSetManager():
         #try kill one, try restarting
         killMongoProc(primary_conn.host, secondary_port)
                 
-        mongos_conn['alpha']['foo'].insert ( {'_id': obj2, 'name':'paul'})
+        mongos_conn['alpha']['foo'].insert ( {'_id': obj2, 'name':'paul'}, safe=True)
 
         killMongoProc(primary_conn.host, primary_port)  
        	

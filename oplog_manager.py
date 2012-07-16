@@ -51,12 +51,12 @@ class OplogThread(Thread):
             print 'in oplog thread for connection'
             print self.primary_connection   
             cursor = self.prepare_for_sync()
-            if cursor == None:
+            if cursor == None or cursor.count() == 1:
                 time.sleep(1)
                 continue
             last_ts = None
             
-            print 'cursor count is ' + str(cursor.count())
+            #print 'cursor count is ' + str(cursor.count())
             try:
                 for entry in cursor:  
                     print 'cursor entry is'
@@ -169,10 +169,8 @@ class OplogThread(Thread):
             except:
                 pass
 
-
-
         if cursor_len == 1:     #means we are the end of the oplog
-            return None
+            return cursor
         elif cursor_len > 1:
             doc = cursor.next()
             if timestamp == doc['ts']:
