@@ -50,8 +50,6 @@ def retry_until_ok(func, args = None, no_func = False):
                 result = func()
                 break
             else:
-                if args == "None":      #case where we use None as an argument
-                    args = None
                 result = func(args)
                 break
         except:
