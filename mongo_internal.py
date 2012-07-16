@@ -51,7 +51,7 @@ class Daemon(Thread):
                 oplog = OplogThread(shard_conn, self.address, oplog_coll,
                  True, doc_manager, self.oplog_checkpoint, self.ns_set)
                 self.shard_set[shard_id] = oplog
-                oplog.start()
+                oplog.run()
           
         #time to stop running
         for thread in self.shard_set.values():

@@ -187,9 +187,9 @@ class ReplSetManager():
         checkStarted(int(PORTS_ONE["MONGOS"]))
             
         # Configure the shards and begin load simulation
-        cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSetSharded1.js"
+        cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
         #cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR +         "/setup/configReplSetSharded2.js"
-        cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongosSharded.js"
+        cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
          
         subprocess.call(cmd1, shell=True)
         conn = Connection('localhost:' + PORTS_ONE["PRIMARY"])
@@ -222,6 +222,8 @@ class ReplSetManager():
     def test_mongo_internal(self):
         """Test mongo_internal
         """
+        
+
         t = Timer(60, self.abort_test)
         t.start()
         d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
@@ -242,10 +244,8 @@ class ReplSetManager():
         assert (len(s.search('*:*')) == 0)
         print 'PASSED INITIAL TEST'
         #test insert
-        time.sleep(20)
-        primary_conn['test']['test'].insert ( {'name':'paulie'} )
-        time.sleep(10)
-        primary_conn['test']['test'].insert({'name': 'paul'})
+        primary_conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
+        primary_conn['test']['test'].insert({'name': 'paul'}, safe=True)
         time.sleep(2)
         a = s.search('paul')
         print len(a)
