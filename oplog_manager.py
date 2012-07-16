@@ -242,7 +242,7 @@ class OplogThread(Thread):
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
             print 'timestamp is '
             print timestamp
-            retry_until_ok(self.dump_collection, args=timestamp)
+            self.dump_collection(timestamp)
             print 'finished dumping collection'
             
         self.checkpoint.commit_ts = timestamp

@@ -411,8 +411,7 @@ class ReplSetManager():
         """Test init_cursor in oplog_manager. Assertion failure if it doesn't pass
         """
         
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        mongos_conn = test_oplog.mongos_connection
+        test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()            #needed for these tests
         
         #initial tests with no config file and empty oplog
