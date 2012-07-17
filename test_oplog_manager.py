@@ -236,7 +236,7 @@ class ReplSetManager():
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
 
-<<<<<<< HEAD
+
 
         #test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
         conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
@@ -246,9 +246,9 @@ class ReplSetManager():
                 break
             except:
                 continue
-=======
+
         #establish solr and mongo
->>>>>>> 12faab6bf3384db0113cb81500da25a2c8bedc94
+
         s = Solr('http://localhost:8080/solr')
         s.delete(q = '*:*')
         #test search + initial clear
