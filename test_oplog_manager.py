@@ -236,7 +236,6 @@ class ReplSetManager():
         assert len(d.shard_set) == 1
 
         #establish solr and mongo
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         s = Solr('http://localhost:8080/solr')
         s.delete(q = '*:*')
         #test search + initial clear
