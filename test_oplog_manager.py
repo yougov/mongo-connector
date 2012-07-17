@@ -224,7 +224,6 @@ class ReplSetManager():
         """Test mongo_internal
         """
         
-
         t = Timer(60, self.abort_test)
         t.start()
         d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
@@ -257,7 +256,8 @@ class ReplSetManager():
         print 'PASSED INITIAL TEST'
         #test insert
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
-        time.sleep(2)
+        while (len(s.search('*:*')) == 0):
+            time.sleep(1)
         a = s.search('paulie')
         assert (len(a) == 1)
         b = conn['test']['test'].find_one()
@@ -268,7 +268,8 @@ class ReplSetManager():
 
         #test remove
         conn['test']['test'].remove({'name':'paulie'}, safe=True)
-        time.sleep(2)
+        while (len(s.search('*:*')) == 1):
+            time.sleep(1)
         a = s.search('paulie')
         assert (len(a) == 0)
         print 'PASSED REMOVE TEST'
@@ -283,7 +284,7 @@ class ReplSetManager():
     
         while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
-        time.sleep(10)
+        time.sleep(5)
         while True:
             try:
                 a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
@@ -312,7 +313,7 @@ class ReplSetManager():
         
         startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
 
-        time.sleep(20)
+        time.sleep(2)
         a = s.search('pauline')
         assert (len(a) == 0)
         a = s.search('paul')
@@ -322,6 +323,8 @@ class ReplSetManager():
         #stress test
 
         #test stressed rollback
+        
+
         print 'PASSED ALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'
         d.stop()
 
