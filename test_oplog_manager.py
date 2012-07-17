@@ -19,7 +19,8 @@ from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
 from pysolr import Solr
 from util import (long_to_bson_ts, 
-                  bson_ts_to_long)
+                  bson_ts_to_long,
+                  retry_until_ok)
 from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
@@ -235,28 +236,88 @@ class ReplSetManager():
         #the Daemon should recognize a single running shard
         assert len(d.shard_set) == 1
 
-        #establish solr and mongo
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+
+        #test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
+        conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+        while (True):
+            try:
+                conn['test']['test'].remove(safe = True)
+                break
+            except:
+                continue
         s = Solr('http://localhost:8080/solr')
         s.delete(q = '*:*')
         #test search + initial clear
-        assert (primary_conn['test']['test'].find().count() == 0)
+        assert (conn['test']['test'].find().count() == 0)
         assert (len(s.search('*:*')) == 0)
         print 'PASSED INITIAL TEST'
         #test insert
-        primary_conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
-        primary_conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
         time.sleep(2)
-        a = s.search('paul')
-        print len(a)
+        a = s.search('paulie')
         assert (len(a) == 1)
-        b = primary_conn['test']['test'].find()
+        b = conn['test']['test'].find_one()
+        for it in a:
+            assert (it['_id'] == str(b['_id']))
+            assert (it['name'] == b['name'])
+        print 'PASSED INSERT TEST'
+
+        #test remove
+        conn['test']['test'].remove({'name':'paulie'}, safe=True)
+        time.sleep(2)
+        a = s.search('paulie')
+        assert (len(a) == 0)
+        print 'PASSED REMOVE TEST'
+
+        #test rollback
+        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+
+        conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+
+        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+    
+        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        time.sleep(10)
+        while True:
+            try:
+                a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
+                print 'I JUST INSERTEDDDDD'
+                break
+            except: 
+                time.sleep(1)
+                continue
+        while (len(s.search('*:*')) != 2):
+            time.sleep(1)
+        a = s.search('pauline')
+        b = conn['test']['test'].find_one({'name':'pauline'})
+        print len(a)
+        print 'THE DOCUMENTS ARE'
         for it in a:
             print it
-            assert (a['_id'] == str(b['_id']))
-            a['name'] == b['name']
-        
+        assert (len(a) == 1)
+        for it in a:
+            assert (it['_id'] == str(b['_id']))
+        print 'passed first assert'
+        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 
+        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        
+        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+
+        time.sleep(20)
+        a = s.search('pauline')
+        assert (len(a) == 0)
+        a = s.search('paul')
+        assert (len(a) == 1)
+        
+        print 'FINISHED PERFORMING ROLLBACK'
+        #stress test
+
+        #test stressed rollback
         print 'PASSED ALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'
         d.stop()
 
@@ -304,7 +365,6 @@ class ReplSetManager():
         return (oplog, primary_conn, oplog.mongos_connection, oplog_coll)
 
             
-    def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't pass
         """
         

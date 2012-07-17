@@ -7,6 +7,7 @@ import json
 import pymongo
 
 from pymongo import Connection
+from pymongo.errors import AutoReconnect
 from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from threading import Thread, Timer
@@ -51,45 +52,48 @@ class OplogThread(Thread):
             print 'in oplog thread for connection'
             print self.primary_connection   
             cursor = self.prepare_for_sync()
-            if cursor == None or cursor.count() == 1:
+            if cursor == None or retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
             last_ts = None
-            
+            cursor_size = retry_until_ok(cursor.count)
+            counter = 0
             #print 'cursor count is ' + str(cursor.count())
             try:
-                for entry in cursor:  
+                for entry in cursor:
                     print 'cursor entry is'
                     print entry
                     operation = entry['op']
-    
+                
                     if operation == 'd':
-                      #  doc_id = entry['o']['_id']
+                        #  doc_id = entry['o']['_id']
                         entry['_id'] = entry['o']['_id']
                         self.doc_manager.remove(entry)
                     
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
                         print 'in insert area'
-                        
+                    
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
                             print 'in main run method, inserting doc'
                             print doc
                             self.doc_manager.upsert(doc) 
-                            
+                            print 'finished inserting document'
                             
                     #sometimes you see the document, but don't follow
                     #through and insert, and the timestamp gets written
                     #anyways
                     last_ts = entry['ts']
-            except:
-                time.sleep(2)
-                continue
-                
+                    # counter = counter + 1
+            except AutoReconnect:
+                pass
+
+            print 'finished try/except loop, might update timestamp'
             if last_ts is not None:                 #we actually processed docs
                 self.checkpoint.commit_ts = last_ts
+                print 'going to write config'
                 self.write_config()
                 
             time.sleep(2)   #for testing purposes
@@ -327,22 +331,25 @@ class OplogThread(Thread):
             return None
             
         oplog_str = str(self.oplog.database.connection)
-        
+        print oplog_str
+
         timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
         json_str = json.dumps([oplog_str, timestamp])
         dest.write(json_str) 
-            
+        print 'written json_str'
         for line in source:
+            print 'line in source is ' 
+            print str(line)
             if oplog_str in line:
                 continue                        # we've already updated
             else:
                 dest.write(line)
   
-        
+        print 'finished all writing'
         source.close()
         dest.close()
         os.remove(self.oplog_file+'~')
-        
+        print 'exiting write_config'
 
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
