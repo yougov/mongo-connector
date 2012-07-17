@@ -52,6 +52,7 @@ class OplogThread(Thread):
             print 'in oplog thread for connection'
             print self.primary_connection   
             cursor = self.prepare_for_sync()
+
             if cursor == None or retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
@@ -281,7 +282,8 @@ class OplogThread(Thread):
             print 'finished dumping collection'
             
         self.checkpoint.commit_ts = timestamp
-        self.write_config()
+        if timestamp is not None:
+            self.write_config()
         print 'going to get cursor from init cursor'
         cursor = self.get_oplog_cursor(timestamp)
         print 'done getting cursor, returning from init cursor'
@@ -420,20 +422,17 @@ class OplogThread(Thread):
         for namespace, doc_list in rollback_set.items():
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(doc['_id']) for doc in doc_list]
-            
-            while True:
-                try:
-                    to_update = self.mongos_connection[db][coll].find({'_id': 
-                        {'$in': bson_obj_id_list}})
-                    break
-                except:
-                    pass
+                
+            to_update = retry_until_ok(self.mongos_connection[db][coll].find, {'_id': 
+                {'$in': bson_obj_id_list}})
                     
             doc_hash = {}
             for doc in doc_list:
                 doc_hash[ObjectId(doc['_id'])] = doc
                 
             to_index = []
+            print 'to_update count is '
+            print to_update.count()
 
             try:
                 for doc in to_update:

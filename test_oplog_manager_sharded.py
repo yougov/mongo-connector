@@ -11,7 +11,7 @@ import os
 import json
 
 from pymongo import Connection
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
 from mongo_internal import Daemon
 from threading import Timer
@@ -36,6 +36,18 @@ DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["CONFIG"]
 
+
+def safe_mongo_op(func, arg1, arg2=None):
+    
+    while True:
+        try:
+            if arg2:
+                func(arg1, arg2, safe=True)
+            else:
+                func(arg1, safe=True)
+            break
+        except OperationFailure:
+            pass
 
 def remove_dir(path):
     """Remove supplied directory
@@ -295,21 +307,21 @@ class ReplSetManager():
         
         assert (oplog_cursor.count() == 0)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'})
         last_oplog_entry = oplog_cursor.next()
         target_entry = mongos_conn['alpha']['foo'].find_one()
         
         #testing for search after inserting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
-        mongos_conn['alpha']['foo'].update({'name':'paulie'}, {"$set": {'name':'paul'}} , safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].update, {'name':'paulie'}, {"$set": {'name':'paul'}})
         last_oplog_entry = oplog_cursor.next()
         target_entry = mongos_conn['alpha']['foo'].find_one()        
         
         #testing for search after updating a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
         
-        mongos_conn['alpha']['foo'].remove( {'name':'paul'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].remove,{'name':'paul'})
         last_oplog_entry = oplog_cursor.next()
         
         #testing for search after deleting a document
@@ -331,13 +343,13 @@ class ReplSetManager():
         assert (test_oplog.get_oplog_cursor(None) == None)
         
         #test with one document
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'})
         ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 1)
         
         #test with two documents, one after the ts
-        mongos_conn['alpha']['foo'].insert ( {'name':'paul'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paul'} )
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 2)
         
@@ -365,7 +377,7 @@ class ReplSetManager():
         
         #test non-empty oplog
         oplog_cursor = oplog_coll.find({},tailable=True, await_data=True)
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'})
         last_oplog_entry = oplog_cursor.next()
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
         
@@ -386,7 +398,7 @@ class ReplSetManager():
         assert (len(solr.search('*')) == 0)
         
         #with documents
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'} )
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection(search_ts)
 
@@ -411,7 +423,7 @@ class ReplSetManager():
         assert (test_oplog.init_cursor() == None)
         
         #no config, single oplog entry
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.init_cursor()
         
@@ -451,7 +463,7 @@ class ReplSetManager():
         assert (test_oplog.checkpoint.commit_ts == None)
         assert (cursor == None)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'} )
         cursor = test_oplog.prepare_for_sync()
         search_ts = test_oplog.get_last_oplog_timestamp()
 
@@ -460,7 +472,7 @@ class ReplSetManager():
         assert (cursor != None)
         assert (cursor.count() == 1)
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulter'} , safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulter'} )
         cursor = test_oplog.prepare_for_sync()
         new_search_ts = test_oplog.get_last_oplog_timestamp()
         
@@ -489,7 +501,7 @@ class ReplSetManager():
         config_file_path = os.getcwd() + '/temp_config.txt'
         test_oplog.oplog_file = config_file_path
         
-        mongos_conn['alpha']['foo'].insert ( {'name':'paulie'} , safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'} )
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.checkpoint.commit_ts = search_ts
         
@@ -560,8 +572,9 @@ class ReplSetManager():
         solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
         
-        mongos_conn['alpha']['foo'].remove({}, safe=True)
-        mongos_conn['alpha']['foo'].insert( {'_id':obj1,'name':'paulie'}, safe=True )
+        safe_mongo_op(mongos_conn['alpha']['foo'].remove, {})
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'_id':obj1,'name':'paulie'})
+                
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
@@ -585,8 +598,11 @@ class ReplSetManager():
         #try kill one, try restarting
         killMongoProc(primary_conn.host, secondary_port)
                 
-        mongos_conn['alpha']['foo'].insert ( {'_id': obj2, 'name':'paul'}, safe=True)
+        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'_id': obj2, 'name':'paul'})
 
+        for item in mongos_conn['alpha']['foo'].find():
+            print item
+            
         killMongoProc(primary_conn.host, primary_port)  
        	
         startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + 
@@ -595,7 +611,9 @@ class ReplSetManager():
     
         #wait for master to be established
         while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            print 'secondary port ' + str(secondary_port) + ' not yet primary'
             time.sleep(1)
+            
         startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + 
             ".log")
         new_secondary_conn = Connection(primary_conn.host, primary_port)
@@ -604,6 +622,10 @@ class ReplSetManager():
         while new_secondary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
         
+        while retry_until_ok(mongos_conn['alpha']['foo'].find().count) != 1:
+            time.sleep(1)
+            
+            
         assert (new_primary_conn.port == secondary_port)
         assert (new_secondary_conn.port == primary_port)
        
@@ -615,13 +637,7 @@ class ReplSetManager():
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')
-        
-        counter = 10
-        while counter > 0:
-            print 'results len is '  + str(len(results))
-            counter = counter - 1
-            time.sleep(1)   
-        
+
         assert (len(results) == 1)
 
         results_doc = results.docs[0]
