@@ -267,8 +267,6 @@ class OplogThread(Thread):
         """
         timestamp = self.read_config()
         print 'in init cursor, finished reading config'
-        print 'timestamp is'
-        print timestamp
         
         if timestamp is None:
             print 'going to try getting last timestamp'
@@ -279,7 +277,8 @@ class OplogThread(Thread):
             print 'finished dumping collection'
             
         self.checkpoint.commit_ts = timestamp
-        self.write_config()
+        if timestamp is not None:
+            self.write_config()
         print 'going to get cursor from init cursor'
         cursor = self.get_oplog_cursor(timestamp)
         print 'done getting cursor, returning from init cursor'
