@@ -18,6 +18,7 @@ from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
 from pysolr import Solr
+from solr_simulator import SolrSimulator
 from util import (long_to_bson_ts, 
                   bson_ts_to_long,
                   retry_until_ok)
@@ -220,7 +221,8 @@ class ReplSetManager():
                  
         while conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
-                 
+            
+        #need to look a bit more carefully here     
         while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
              
@@ -267,7 +269,7 @@ class ReplSetManager():
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = DocManager('http://localhost:8080/solr', False)
+        doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
@@ -287,7 +289,7 @@ class ReplSetManager():
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = DocManager('http://localhost:8080/solr', False)
+        doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
                             namespace_set)
         
@@ -389,13 +391,12 @@ class ReplSetManager():
         """
         
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
-        solr_url = "http://localhost:8080/solr"
-        solr = Solr(solr_url)
-        solr.delete(q='*:*')
+        solr = SolrSimulator()
+        test_oplog.doc_manager = solr
         
         #for empty oplog, no documents added
         assert (test_oplog.dump_collection(None) == None)
-        assert (len(solr.search('*')) == 0)
+        assert (len(solr.test_search()) == 0)
         
         #with documents
         safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'name':'paulie'} )
@@ -403,9 +404,10 @@ class ReplSetManager():
         test_oplog.dump_collection(search_ts)
 
         test_oplog.doc_manager.commit()
-        solr_results = solr.search('*')
+        solr_results = solr.test_search()
+        print solr_results
         assert (len(solr_results) == 1)
-        solr_doc = solr_results.docs[0]
+        solr_doc = solr_results[0]
         assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'alpha.foo')
@@ -568,8 +570,9 @@ class ReplSetManager():
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread_new()
         #test_oplog.start()
         
-        solr = Solr('http://localhost:8080/solr')
-        solr.delete(q='*:*')
+        solr = SolrSimulator()
+        test_oplog.doc_manager = solr
+        solr.test_delete()          #equivalent to solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
         
         safe_mongo_op(mongos_conn['alpha']['foo'].remove, {})
@@ -636,10 +639,11 @@ class ReplSetManager():
         test_oplog.doc_manager.upsert(second_doc)
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
-        results = solr.search('*')
-
+        results = solr.test_search()
+    
+        print results
         assert (len(results) == 1)
 
-        results_doc = results.docs[0]
+        results_doc = results[0]
         assert(results_doc['name'] == 'paulie')
         assert(results_doc['_ts'] == bson_ts_to_long(cutoff_ts))
