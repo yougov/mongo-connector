@@ -73,7 +73,7 @@ class OplogThread(Thread):
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
-            except AutoReconnect, OperationFailure:
+            except (AutoReconnect, OperationFailure):
                 pass
 
             if last_ts is not None:
@@ -119,7 +119,10 @@ class OplogThread(Thread):
 
         if timestamp is None:
             return None
-
+        cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
+        if retry_until_ok (cursor.count) == 0:
+            return None
+        #if less than to to see if cursor is too stale
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
@@ -346,10 +349,15 @@ class OplogThread(Thread):
 
             to_index = []
 
-            for doc in to_update:
-                if doc['_id'] in doc_hash:
-                    del doc_hash[doc['_id']]
-                    to_index.append(doc)
+            while True:
+                try:
+                    for doc in to_update:
+                        if doc['_id'] in doc_hash:
+                            del doc_hash[doc['_id']]
+                            to_index.append(doc)
+                    break
+                except (OperationFailure, AutoReconnect):
+                    pass
 
             #delete the inconsistent documents
             for doc in doc_hash.values():
