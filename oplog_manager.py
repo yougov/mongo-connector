@@ -3,6 +3,7 @@
 
 import os
 import time
+import fcntl
 import json
 import logging
 import pymongo
@@ -228,6 +229,9 @@ class OplogThread(Thread):
         """
         if self.oplog_file is None:
             return None
+            
+        ofile = file(self.oplog_file, 'w')
+        fcntl.lockf(ofile.fileno(), fcntl.LOCK_EX)
 
         try:
             os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
@@ -247,10 +251,13 @@ class OplogThread(Thread):
                 continue                        # we've already updated
             else:
                 dest.write(line)
-
+        
         source.close()
         dest.close()
         os.remove(self.oplog_file + '~')
+        
+        fcntl.lockf(ofile.fileno(), fcntl.LOCK_UN)
+        
 
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
