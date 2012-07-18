@@ -12,7 +12,7 @@ from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from checkpoint import Checkpoint
 from pymongo import Connection
-from pymongo.errors import AutoReconnect
+from pymongo.errors import AutoReconnect, OperationFailure
 from threading import Thread, Timer
 from util import (bson_ts_to_long,
                   long_to_bson_ts,
@@ -107,7 +107,7 @@ class OplogThread(Thread):
                 coll = self.mongos_connection[db_name][coll_name]
                 doc = coll.find_one({'_id': doc_id})
                 break
-            except AutoReconnect:
+            except AutoReconnect, OperationFailure:
                 time.sleep(1)
                 continue
 
