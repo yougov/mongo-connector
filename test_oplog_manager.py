@@ -325,7 +325,7 @@ class ReplSetManager():
         print 'FINISHED PERFORMING ROLLBACK'
         
         #stress test
-        NUMBER_OF_DOCS = 10
+        NUMBER_OF_DOCS = 1000
         for i in range(0, NUMBER_OF_DOCS):
             conn['test']['test'].insert({'name': 'Paul '+str(i)})
         print 'inserted'
@@ -438,10 +438,9 @@ class ReplSetManager():
         
         return (oplog, primary_conn, oplog.mongos_connection, oplog_coll)
 
-            
+    def test_retrieve_doc(self): 
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't pass
         """
-        
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         #testing for entry as none type
         entry = None

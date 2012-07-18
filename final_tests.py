@@ -8,7 +8,7 @@ import time
 
 print 'Preparing cluster'
 rsm = ReplSetManager()
-#rsm.start_cluster()
+rsm.start_cluster()
 print 'finished startCluster'
 rsm.test_retrieve_doc()
 print 'passed test_retrieve_doc'
