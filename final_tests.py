@@ -33,9 +33,9 @@ rsm.start_cluster()
 time.sleep(5)
 
 print 'restarted cluster'
-rsm.test_rollback()
+#rsm.test_rollback()
 print 'passed rollback'
-#rsm.test_retrieve_doc()
+rsm.test_retrieve_doc()
 print 'passed test_retrieve_doc'
 rsm.test_get_oplog_cursor()
 print 'passed test_get_oplog_cursor'
