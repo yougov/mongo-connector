@@ -10,9 +10,8 @@ Quick start instructions:
 5. Delete docs to confirm deletion. 
 """
 
-import sys
-
 from mongo_internal import Daemon
+from sys import exit
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -43,7 +42,7 @@ try:
     ns_set = options.ns_set.split(',')
 except:
     print 'Namespaces must be separated by commas!'
-    sys.exit(1)
+    exit(1)
 
 dt = Daemon(options.mongos_addr, options.oplog_config, options.url, ns_set, options.u_key)
 dt.start()

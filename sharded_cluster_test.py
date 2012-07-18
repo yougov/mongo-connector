@@ -38,7 +38,6 @@ while counter < 18000:                  #enough for two shards`
 results = solr.search('*')
         
 assert (len(results) == 2)
-
 results_doc_one = results.docs[0]
 results_doc_two = results.docs[1]
 assert(results_doc_one['name'] == 'paulie')

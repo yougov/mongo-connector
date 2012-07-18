@@ -1,11 +1,14 @@
 """Discovers the mongo cluster and starts the daemon. 
 """
 
-from doc_manager import DocManager
 import time
+
+from doc_manager import DocManager
 from threading import Thread
 from pymongo import Connection
 from oplog_manager import OplogThread
+from sys import exit
+from optparse import OptionParser
         
 
 class Daemon(Thread):
@@ -14,7 +17,7 @@ class Daemon(Thread):
     
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key):
         super(Daemon, self).__init__()
-        self.canRun = True
+        self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
         self.address = address
         self.backend_url = backend_url
@@ -24,7 +27,7 @@ class Daemon(Thread):
         self.shard_set = {}
         
     def stop(self):
-        self.canRun = False
+        self.can_run = False
 
 
   
@@ -38,7 +41,7 @@ class Daemon(Thread):
             print 'Bad backend URL!'
             return
         
-        while self.canRun is True: 
+        while self.can_run is True: 
             
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
@@ -57,4 +60,40 @@ class Daemon(Thread):
         for thread in self.shard_set.values():
             thread.stop()      
             
+
+if __name__ == '__main__':
+
+    parser = OptionParser()
+
+    #-m is for the mongos address, which is a host:port pair. 
+    parser.add_option("-m", "--mongos", action="store", type="string", dest="mongos_addr", 
+        default="localhost:27217")
+        
+    #-o is to specify the oplog-config file. This file is used by the system to store the last timestamp
+    #read on a specific oplog. This allows for quick recovery from failure. 
+    parser.add_option("-o", "--oplog-config", action="store", type="string", dest="oplog_config",
+        default="config.txt")
+    
+    #-b is to specify the URL to the backend engine being used. 
+    parser.add_option("-b", "--backend-url", action="store", type="string", dest="url", default="")
+    
+    #-n is to specify the URL of the namespaces we want to consider. The default considers 
+    #'test.test' and 'alpha.foo'
+    parser.add_option("-n", "--namespace-set", action="store", type="string", dest="ns_set",
+        default="test.test,alpha.foo")
+    
+    #-u is to specify the uniqueKey used by the backend, 
+    parser.add_option("-u", "--unique-key", action="store", type="string", dest="u_key", default="_id")
+        
+    (options, args) = parser.parse_args()
+    
+    try:
+        ns_set = options.ns_set.split(',')
+    except:
+        print 'Namespaces must be separated by commas!'
+        exit(1)
+    
+    dt = Daemon(options.mongos_addr, options.oplog_config, options.url, ns_set, options.u_key)
+    dt.start()
+
        

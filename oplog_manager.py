@@ -110,7 +110,7 @@ class OplogThread(Thread):
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
         """
-        if (entry is None):
+        if not entry:
             return None
 
         namespace = entry['ns']
@@ -123,7 +123,7 @@ class OplogThread(Thread):
         print 'in retrieve doc'
         print doc_id 
 	print entry
-        db_name, coll_name = namespace.split('.',1)
+        db_name, coll_name = namespace.split('.', 1)
 
         while True:
             try :
@@ -133,7 +133,7 @@ class OplogThread(Thread):
                 print 'found doc'
                 print doc
                 break
-            except :
+            except AutoReconnect:
                 time.sleep(1)
                 continue
 
@@ -395,8 +395,8 @@ class OplogThread(Thread):
             return None
 
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({ 'ts': { '$lt':backend_ts} }, 
-        sort= [('$natural',pymongo.DESCENDING)])
+        last_oplog_entry = self.oplog.find_one({ 'ts': { '$lt': backend_ts} }, 
+        sort= [('$natural', pymongo.DESCENDING)])
         
         if last_oplog_entry is None:
             return None
@@ -419,7 +419,7 @@ class OplogThread(Thread):
             else:
                 rollback_set[ns] = [doc]
                 
-        for namespace, doc_list in rollback_set.items():
+        for namespace, doc_list in rollback_set.iteritems():
             db, coll = namespace.split('.', 1)
             bson_obj_id_list = [ObjectId(doc['_id']) for doc in doc_list]
                 
@@ -434,19 +434,14 @@ class OplogThread(Thread):
             print 'to_update count is '
             print to_update.count()
 
-            try:
-                for doc in to_update:
+            for doc in to_update:
+                if doc_hash.has_key(doc['_id']):
                     del doc_hash[doc['_id']]
                     to_index.append(doc)
-            except:
-                pass
                     
             #delete the inconsistent documents
-            try:
-                for doc in doc_hash.values():
-                    self.doc_manager.remove(doc)
-            except:
-                pass
+            for doc in doc_hash.values():
+                self.doc_manager.remove(doc)
                         
             for doc in to_index:
                 doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
