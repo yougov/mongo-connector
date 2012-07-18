@@ -273,11 +273,14 @@ class ReplSetManager():
         a = s.search('paulie')
         assert (len(a) == 0)
         print 'PASSED REMOVE TEST'
-
+        
         #test rollback
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
         conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        while conn['test']['test'].find({'name': 'paul'}).count() != 1:
+            time.sleep(1)
+                 
         killMongoProc('localhost', PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
@@ -318,14 +321,78 @@ class ReplSetManager():
         assert (len(a) == 0)
         a = s.search('paul')
         assert (len(a) == 1)
-        
+        conn['test']['test'].remove()
         print 'FINISHED PERFORMING ROLLBACK'
-        #stress test
-
-        #test stressed rollback
         
+        #stress test
+        NUMBER_OF_DOCS = 10
+        for i in range(0, NUMBER_OF_DOCS):
+            conn['test']['test'].insert({'name': 'Paul '+str(i)})
+        print 'inserted'
+        time.sleep(5)
+        print conn['test']['test'].find().count()
+        while len(s.search('*:*', rows=NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
+            time.sleep(5)
+            print len(s.search('*:*', rows=NUMBER_OF_DOCS))
+       # conn['test']['test'].create_index('name')
+        count = 0
+        for i in range(0, NUMBER_OF_DOCS):
+            a = s.search('Paul ' + str(i))
+            b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
+            for it in a:
+                assert (it['_id'] == it['_id']) 
+            count = count + 1
+            if count % 1000 == 0:
+                print count
+                   
+        print 'finished stress test'
 
-        print 'PASSED ALLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'
+        #test stressed rollback         
+        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+         
+        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        
+        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        time.sleep(5)
+        for i in range(0, NUMBER_OF_DOCS):
+            try:
+                conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=True)
+            except: 
+                time.sleep(1)
+                i -= 1
+                continue
+        while (len(s.search('*:*', rows = NUMBER_OF_DOCS*2)) != NUMBER_OF_DOCS*2):
+            time.sleep(1)
+        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2, sort='_id asc')
+        assert (len(a) == NUMBER_OF_DOCS)
+        i = 0
+        for it in a:
+            b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
+            i += 1
+            assert (it['_id'] == str(b['_id']))
+        print 'passed first assert'
+    
+        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
+         
+        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+            
+        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+        
+        print 'done with rollback, doing asserts'
+        while (len( s.search('Pauline', rows = NUMBER_OF_DOCS*2)) != 0):
+            time.sleep(15)
+        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2)
+        assert (len(a) == 0)
+        a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
+        assert (len(a) == NUMBER_OF_DOCS)
+        
+        print 'FINISHED PERFORMING STRESSED ROLLBACK'
+         
+        print 'PASSED ALLL'
         d.stop()
 
     def get_oplog_thread(self):
