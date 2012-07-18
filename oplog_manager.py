@@ -437,7 +437,7 @@ class OplogThread(Thread):
             for doc in to_update:
                 if doc_hash.has_key(doc['_id']):
                     del doc_hash[doc['_id']]
-                    to_index.append(doc)
+                    to_index.append (doc)
                     
             #delete the inconsistent documents
             for doc in doc_hash.values():
