@@ -46,8 +46,9 @@ class Daemon(Thread):
                 if shard_id in self.shard_set:
                     time.sleep(2)
                     continue
-
-                shard_conn = Connection(shard_doc['host'])
+                    
+                repl_set, hosts = shard_doc['host'].split('/')
+                shard_conn = Connection(hosts, replicaset=repl_set)
                 oplog_coll = shard_conn['local']['oplog.rs']
                 oplog = OplogThread(shard_conn, self.address, oplog_coll, True,
                                     doc_manager, self.oplog_checkpoint,
