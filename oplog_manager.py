@@ -4,6 +4,7 @@
 import os
 import time
 import json
+import logging
 import pymongo
 
 from bson.objectid import ObjectId
@@ -42,54 +43,40 @@ class OplogThread(Thread):
         """
         self.running = True
 
-        if self.is_sharded is False:
-            print 'handle later'
-            return
-
         while self.running is True:
 
-            print 'in oplog thread for connection'
-            print self.primary_connection
             cursor = self.prepare_for_sync()
 
             if cursor is None or retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
+
             last_ts = None
             cursor_size = retry_until_ok(cursor.count)
             counter = 0
-            #print 'cursor count is ' + str(cursor.count())
+
             try:
                 for entry in cursor:
-                    print 'cursor entry is'
-                    print entry
                     operation = entry['op']
 
                     if operation == 'd':
-                        #  doc_id = entry['o']['_id']
                         entry['_id'] = entry['o']['_id']
                         self.doc_manager.remove(entry)
 
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
-                        print 'in insert area'
 
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
-                            print 'in main run method, inserting doc'
-                            print doc
                             self.doc_manager.upsert(doc)
-                            print 'finished inserting document'
 
                     last_ts = entry['ts']
             except AutoReconnect:
                 pass
 
-            print 'finished try/except loop, might update timestamp'
             if last_ts is not None:
                 self.checkpoint.commit_ts = last_ts
-                print 'going to write config'
                 self.write_config()
 
             time.sleep(2)
@@ -112,15 +99,11 @@ class OplogThread(Thread):
             doc_field = 'o'
 
         doc_id = entry[doc_field]['_id']
-        print 'in retrieve doc'
-        print doc_id
-        print entry
         db_name, coll_name = namespace.split('.', 1)
 
         while True:
             try:
                 coll = self.mongos_connection[db_name][coll_name]
-                print coll
                 doc = coll.find_one({'_id': doc_id})
                 break
             except AutoReconnect:
@@ -128,20 +111,6 @@ class OplogThread(Thread):
                 continue
 
         return doc
-
-    def manage_oplog_cursor_failure(self, timestamp):
-        """Handles special cases when oplog is stale/rollback/etc
-        """
-
-        less_doc = retry_until_ok(self.oplog.find_one,
-                                  {'ts': {'$lt': timestamp}})
-        print 'after less than doc search'
-        print less_doc
-        if less_doc:
-            print 'triggering a rollback'
-            timestamp = self.rollback()
-
-        return timestamp
 
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog.
@@ -167,12 +136,12 @@ class OplogThread(Thread):
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
-                print 'Bad timstamp. Recheck config file!'
+                logging.error('Bad timestamp in config file')
                 return None
         else:
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
-            print 'finished rollback'
+            logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
 
     def get_last_oplog_timestamp(self):
@@ -180,7 +149,6 @@ class OplogThread(Thread):
         """
         curr = self.oplog.find().sort('$natural', pymongo.DESCENDING).limit(1)
         if curr.count(with_limit_and_skip=True) == 0:
-            print 'returning none for last timestamp'
             return None
 
         return curr[0]['ts']
@@ -203,16 +171,12 @@ class OplogThread(Thread):
 
         for namespace in self.namespace_set:
             db, coll = namespace.split('.', 1)
-            print 'getting target coll'
             target_coll = retry_until_ok(self.mongos_connection[db][coll],
                                          no_func=True)
             cursor = retry_until_ok(target_coll.find)
-            print 'found docs'
             long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
-                print 'in dump collection'
-                print doc
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
@@ -224,22 +188,16 @@ class OplogThread(Thread):
         wherever it was last left off.
         """
         timestamp = self.read_config()
-        print 'in init cursor, finished reading config'
 
         if timestamp is None:
-            print 'going to try getting last timestamp'
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
-            print 'timestamp is '
-            print timestamp
             self.dump_collection(timestamp)
-            print 'finished dumping collection'
+            logging.info('OplogManager: Dumped collection into backend')
 
         self.checkpoint.commit_ts = timestamp
         if timestamp is not None:
             self.write_config()
-        print 'going to get cursor from init cursor'
         cursor = self.get_oplog_cursor(timestamp)
-        print 'done getting cursor, returning from init cursor'
 
         return cursor
 
@@ -251,13 +209,9 @@ class OplogThread(Thread):
 
         if self.checkpoint is None:
             self.checkpoint = Checkpoint()
-            print 'going to init cursor'
             cursor = self.init_cursor()
-            print 'done with init cursor'
         else:
             last_commit = self.checkpoint.commit_ts
-            print 'getting oplog cursor'
-            print 'last commit is %s' % last_commit
             cursor = self.get_oplog_cursor(last_commit)
 
             if cursor is None:
@@ -280,25 +234,20 @@ class OplogThread(Thread):
             dest = open(self.oplog_file, 'w')
             source = open(self.oplog_file + '~', 'r')
         except:
-            print 'could not open config file!'
+            logging.error('OplogManager: Could not open config file!')
             return None
 
         oplog_str = str(self.oplog.database.connection)
-        print oplog_str
-
         timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
         json_str = json.dumps([oplog_str, timestamp])
         dest.write(json_str)
-        print 'written json_str'
+
         for line in source:
-            print 'line in source is '
-            print str(line)
             if oplog_str in line:
                 continue                        # we've already updated
             else:
                 dest.write(line)
 
-        print 'finished all writing'
         source.close()
         dest.close()
         os.remove(self.oplog_file + '~')
@@ -308,7 +257,6 @@ class OplogThread(Thread):
         """
         config_file = self.oplog_file
         if config_file is None:
-            print 'Need a config file!'
             return None
 
         source = open(self.oplog_file, 'r')
@@ -357,12 +305,8 @@ class OplogThread(Thread):
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
 
-        print 'start_ts is ' + str(start_ts)
-        print 'end_ts is ' + str(end_ts)
-
         rollback_set = {}
         for doc in docs_to_rollback:
-            print doc
             ns = doc['ns']
             if ns in rollback_set:
                 rollback_set[ns].append(doc)
@@ -381,8 +325,6 @@ class OplogThread(Thread):
                 doc_hash[ObjectId(doc['_id'])] = doc
 
             to_index = []
-            print 'to_update count is '
-            print to_update.count()
 
             for doc in to_update:
                 if doc['_id'] in doc_hash:

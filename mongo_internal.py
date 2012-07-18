@@ -2,6 +2,7 @@
 """
 
 import time
+import logging
 
 from doc_manager import DocManager
 from pymongo import Connection
@@ -23,7 +24,6 @@ class Daemon(Thread):
         self.backend_url = backend_url
         self.ns_set = ns_set
         self.u_key = u_key
-        #self.setDaemon(True)
         self.shard_set = {}
 
     def stop(self):
@@ -36,7 +36,7 @@ class Daemon(Thread):
         shard_coll = mongos_conn['config']['shards']
         doc_manager = DocManager(self.backend_url)
         if doc_manager is None:
-            print 'Bad backend URL!'
+            logging.critical('Bad backend URL!')
             return
 
         while self.can_run is True:
@@ -53,7 +53,9 @@ class Daemon(Thread):
                                     doc_manager, self.oplog_checkpoint,
                                     self.ns_set)
                 self.shard_set[shard_id] = oplog
-                oplog.run()
+                logging.info('MongoInternal: Starting connection thread %s' %
+                             shard_conn)
+                oplog.start()
 
         #time to stop running
         for thread in self.shard_set.values():
@@ -61,6 +63,23 @@ class Daemon(Thread):
 
 
 if __name__ == '__main__':
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    fh = logging.FileHandler('mongo_connector_log.txt')
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    logger.info('Beginning Mongo Connector')
 
     parser = OptionParser()
 
@@ -92,7 +111,7 @@ if __name__ == '__main__':
     try:
         ns_set = options.ns_set.split(',')
     except:
-        print 'Namespaces must be separated by commas!'
+        logger.error('Namespaces must be separated by commas!')
         exit(1)
 
     dt = Daemon(options.mongos_addr, options.oplog_config, options.url,
