@@ -1,4 +1,6 @@
-""" Runs all the testing methods in testoplogmanager.py. Re-runs all of them after rollbacking.
+""" Runs all the testing methods in testoplogmanager.py
+
+Re-runs all of them after rollbacking.
 """
 
 from test_oplog_manager import ReplSetManager
