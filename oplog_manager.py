@@ -12,7 +12,7 @@ from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
 from checkpoint import Checkpoint
 from pymongo import Connection
-from pymongo.errors import AutoReconnect
+from pymongo.errors import AutoReconnect, OperationFailure
 from threading import Thread, Timer
 from util import (bson_ts_to_long,
                   long_to_bson_ts,
@@ -73,7 +73,7 @@ class OplogThread(Thread):
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
-            except AutoReconnect:
+            except AutoReconnect, OperationFailure:
                 pass
 
             if last_ts is not None:
@@ -107,7 +107,7 @@ class OplogThread(Thread):
                 coll = self.mongos_connection[db_name][coll_name]
                 doc = coll.find_one({'_id': doc_id})
                 break
-            except AutoReconnect:
+            except AutoReconnect, OperationFailure:
                 time.sleep(1)
                 continue
 
@@ -137,7 +137,7 @@ class OplogThread(Thread):
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
-                logging.error('Bad timestamp in config file')
+                logging.error('%s Bad timestamp in config file' % self.oplog)
                 return None
         else:
             #rollback, we are past the last element in the oplog
@@ -181,6 +181,10 @@ class OplogThread(Thread):
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
+        
+        print self.oplog
+        print 'exiting dump collection, had timestamp: '
+        print timestamp
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -192,8 +196,11 @@ class OplogThread(Thread):
 
         if timestamp is None:
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
+            print self.oplog
+            print 'timestamp after get last ts is '
+            print timestamp
             self.dump_collection(timestamp)
-            logging.info('OplogManager: Dumped collection into backend')
+            logging.info('OplogManager: %s Dumped collection into backend' % self.oplog)
 
         self.checkpoint.commit_ts = timestamp
         if timestamp is not None:
@@ -214,7 +221,10 @@ class OplogThread(Thread):
         else:
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
-
+            
+            print self.oplog
+            print cursor
+            
             if cursor is None:
                 cursor = self.init_cursor()
 
@@ -229,8 +239,8 @@ class OplogThread(Thread):
         """
         if self.oplog_file is None:
             return None
-            
-        ofile = file(self.oplog_file, 'w')
+
+        ofile = file(self.oplog_file, 'r+')
         fcntl.lockf(ofile.fileno(), fcntl.LOCK_EX)
 
         try:
@@ -238,13 +248,13 @@ class OplogThread(Thread):
             dest = open(self.oplog_file, 'w')
             source = open(self.oplog_file + '~', 'r')
         except:
-            logging.error('OplogManager: Could not open config file!')
+            logging.error('OplogManager: %s could not open config file!', self.oplog)
             return None
 
         oplog_str = str(self.oplog.database.connection)
         timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
         json_str = json.dumps([oplog_str, timestamp])
-        dest.write(json_str)
+        dest.write(json_str) 
 
         for line in source:
             if oplog_str in line:
@@ -255,7 +265,6 @@ class OplogThread(Thread):
         source.close()
         dest.close()
         os.remove(self.oplog_file + '~')
-        
         fcntl.lockf(ofile.fileno(), fcntl.LOCK_UN)
         
 
@@ -282,6 +291,10 @@ class OplogThread(Thread):
                 break
             count = count + 2                        # skip to next set
 
+        print self.oplog
+        print 'in read config, returning timestamp'
+        print self.checkpoint.commit_ts
+        
         return self.checkpoint.commit_ts
 
     def rollback(self):

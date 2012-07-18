@@ -91,7 +91,7 @@ if __name__ == '__main__':
     #to store the last timestamp read on a specific oplog. This allows for
     #quick recovery from failure.
     parser.add_option("-o", "--oplog-config", action="store", type="string",
-                      dest="oplog_config", default="config.txt")
+                      dest="oplog_config", default="./config.txt")
 
     #-b is to specify the URL to the backend engine being used.
     parser.add_option("-b", "--backend-url", action="store", type="string",
