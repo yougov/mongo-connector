@@ -13,14 +13,13 @@ from setup_cluster import killMongoProc, startMongoProc
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
-from mongo_internal import Daemon
-from threading import Timer
+#from mongo_internal import Daemon
+#from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
 from pysolr import Solr
 from util import (long_to_bson_ts, 
-                  bson_ts_to_long,
-                  retry_until_ok)
+                  bson_ts_to_long)
 from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
@@ -32,184 +31,7 @@ PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119",
 class ReplSetManager():
     """Defines all the testing methods, as well as a method that sets up the cluster
     """
-    def abort_test(self):
-        print 'test failed'
-        sys.exit(1)
-    
-    def test_mongo_internal(self):
-        """Test mongo_internal
-        """
-        
-        t = Timer(60, self.abort_test)
-        t.start()
-        d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
-        d.start()
-        while len(d.shard_set) == 0:
-            pass
-        t.cancel()
-                    
-        #the Daemon should recognize a single running shard
-        assert len(d.shard_set) == 1
 
-
-
-        #test_oplog, primary_conn, oplog_coll = self.get_oplog_thread_new()
-        conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-        while (True):
-            try:
-                conn['test']['test'].remove(safe = True)
-                break
-            except:
-                continue
-
-        #establish solr and mongo
-
-        s = Solr('http://localhost:8080/solr')
-        s.delete(q = '*:*')
-        #test search + initial clear
-        assert (conn['test']['test'].find().count() == 0)
-        assert (len(s.search('*:*')) == 0)
-        print 'PASSED INITIAL TEST'
-        #test insert
-        conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
-        while (len(s.search('*:*')) == 0):
-            time.sleep(1)
-        a = s.search('paulie')
-        assert (len(a) == 1)
-        b = conn['test']['test'].find_one()
-        for it in a:
-            assert (it['_id'] == str(b['_id']))
-            assert (it['name'] == b['name'])
-        print 'PASSED INSERT TEST'
-
-        #test remove
-        conn['test']['test'].remove({'name':'paulie'}, safe=True)
-        while (len(s.search('*:*')) == 1):
-            time.sleep(1)
-        a = s.search('paulie')
-        assert (len(a) == 0)
-        print 'PASSED REMOVE TEST'
-        
-        #test rollback
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-
-        conn['test']['test'].insert({'name': 'paul'}, safe=True)
-        while conn['test']['test'].find({'name': 'paul'}).count() != 1:
-            time.sleep(1)
-                 
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
-
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
-    
-        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        while True:
-            try:
-                a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
-                print 'I JUST INSERTEDDDDD'
-                break
-            except: 
-                time.sleep(1)
-                continue
-        while (len(s.search('*:*')) != 2):
-            time.sleep(1)
-        a = s.search('pauline')
-        b = conn['test']['test'].find_one({'name':'pauline'})
-        print len(a)
-        print 'THE DOCUMENTS ARE'
-        for it in a:
-            print it
-        assert (len(a) == 1)
-        for it in a:
-            assert (it['_id'] == str(b['_id']))
-        print 'passed first assert'
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
-
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
-
-        time.sleep(2)
-        a = s.search('pauline')
-        assert (len(a) == 0)
-        a = s.search('paul')
-        assert (len(a) == 1)
-        conn['test']['test'].remove()
-        print 'FINISHED PERFORMING ROLLBACK'
-        
-        #stress test
-        NUMBER_OF_DOCS = 100000
-        for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul '+str(i)})
-        print 'inserted'
-        time.sleep(5)
-        print conn['test']['test'].find().count()
-        while len(s.search('*:*', rows=NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
-            time.sleep(5)
-            print len(s.search('*:*', rows=NUMBER_OF_DOCS))
-       # conn['test']['test'].create_index('name')
-        count = 0
-        for i in range(0, NUMBER_OF_DOCS):
-            a = s.search('Paul ' + str(i))
-            b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
-            for it in a:
-                assert (it['_id'] == it['_id']) 
-            count = count + 1
-            if count % 1000 == 0:
-                print count
-                   
-        print 'finished stress test'
-
-        #test stressed rollback         
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
-         
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
-        
-        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        for i in range(0, NUMBER_OF_DOCS):
-            try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=True)
-            except: 
-                time.sleep(1)
-                i -= 1
-                continue
-        while (len(s.search('*:*', rows = NUMBER_OF_DOCS*2)) != NUMBER_OF_DOCS*2):
-            time.sleep(1)
-        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2, sort='_id asc')
-        assert (len(a) == NUMBER_OF_DOCS)
-        i = 0
-        for it in a:
-            b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
-            i += 1
-            assert (it['_id'] == str(b['_id']))
-        print 'passed first assert'
-    
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
-         
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-            
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
-        
-        print 'done with rollback, doing asserts'
-        while (len( s.search('Pauline', rows = NUMBER_OF_DOCS*2)) != 0):
-            time.sleep(15)
-        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2)
-        assert (len(a) == 0)
-        a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
-        assert (len(a) == NUMBER_OF_DOCS)
-        
-        print 'FINISHED PERFORMING STRESSED ROLLBACK'
-         
-        print 'PASSED ALLL'
-        d.stop()
 
     def get_oplog_thread(self):
         """ Set up connection with mongo. Returns oplog, the connection and oplog collection
