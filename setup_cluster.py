@@ -219,4 +219,3 @@ def start_cluster(sharded=False):
                 time.sleep(1)
 		 
 	subprocess.call(cmd3, shell=True)
-

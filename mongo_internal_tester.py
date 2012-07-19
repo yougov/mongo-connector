@@ -20,4 +20,3 @@ class MongoInternalTester(unittest.TestCase):
         self.assertFalse(d.canRun)
         for thread in d.shard_set.values():
             self.assertFalse(thread.running)
-        
