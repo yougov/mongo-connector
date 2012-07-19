@@ -8,13 +8,13 @@ import sys
 import time
 import os
 import json
+import unittest
 
-from setup_cluster import killMongoProc, startMongoProc 
+
+from setup_cluster import killMongoProc, startMongoProc, start_cluster 
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
-#from mongo_internal import Daemon
-#from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
 from pysolr import Solr
@@ -28,11 +28,12 @@ from bson.objectid import ObjectId
 PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
 
-class ReplSetManager():
+class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the cluster
     """
-
-
+    def runTest(self):
+        unittest.TestCase.__init__(self)
+    
     def get_oplog_thread(self):
         """ Set up connection with mongo. Returns oplog, the connection and oplog collection
             
@@ -113,7 +114,7 @@ class ReplSetManager():
         assert (test_oplog.retrieve_doc(last_oplog_entry) == None)
         
         test_oplog.stop()
-        
+        print 'PASSED TEST RETRIEVE DOC'
                 
     def test_get_oplog_cursor(self):
         """Test get_oplog_cursor in oplog_manager. Assertion failure if it doesn't pass
@@ -142,7 +143,7 @@ class ReplSetManager():
         primary_conn['test']['test'].insert ( {'name':'pauline'} )
         assert (test_oplog.get_oplog_cursor(ts) == None)
         test_oplog.stop()
-            
+        print 'PASSED TEST GET OPLOG CURSOR'
         #need to add tests for 'except' part of get_oplog_cursor
             
 
@@ -161,7 +162,7 @@ class ReplSetManager():
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
         
         test_oplog.stop()
-        
+        print 'PASSED TEST GET LAST OPLOG TIMESTAMP'
             
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager. Assertion failure if it doesn't pass
@@ -190,7 +191,8 @@ class ReplSetManager():
         assert (solr_doc['ns'] == 'test.test')
         
         test_oplog.stop()
-        
+        print 'PASSED TEST DUMP COLLECTION'
+    
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it doesn't pass
         """
@@ -223,6 +225,7 @@ class ReplSetManager():
         
         os.system('rm temp_config.txt')
         test_oplog.stop()
+        print 'PASSED TEST INIT CURSOR'
     
     def test_prepare_for_sync(self):
         """Test prepare_for_sync in oplog_manager. Assertion failure if it doesn't pass
@@ -255,7 +258,7 @@ class ReplSetManager():
         assert (next_doc['ts'] == new_search_ts)
 
         test_oplog.stop()
-        
+        print 'PASSED TEST PREPARE FOR SYNC'
     
     def test_write_config(self):
         """Test write_config in oplog_manager. Assertion failure if it doesn't pass
@@ -300,7 +303,7 @@ class ReplSetManager():
         
         test_oplog.stop()
         os.system('rm ' + config_file_path)
-        
+        print 'PASSED TEST WRITE CONFIG'
     
     def test_read_config(self):
         """Test read_config in oplog_manager. Assertion failure if it doesn't pass
@@ -331,12 +334,13 @@ class ReplSetManager():
         test_oplog.write_config()
         assert (test_oplog.read_config() == search_ts)
         os.system('rm ' + config_file_path)   
-        
+        print 'PASSED TEST READ CONFIG'
     
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
         """
-        
+        os.system('rm config.txt; touch config.txt')
+        start_cluster()
         test_oplog, primary_conn, mongos_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
@@ -399,11 +403,18 @@ class ReplSetManager():
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
         results = solr.search('*')
-        
-        print len(results)
-        
+                
         assert (len(results) == 1)
 
         results_doc = results.docs[0]
         assert(results_doc['name'] == 'paulie')
         assert(results_doc['_ts'] == bson_ts_to_long(cutoff_ts))
+        print 'PASSED TEST ROLLBACK'
+
+if __name__ == '__main__':
+    os.system('rm config.txt; touch config.txt')
+    start_cluster()
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    unittest.main()
+
+

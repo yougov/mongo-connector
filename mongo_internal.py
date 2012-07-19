@@ -61,7 +61,7 @@ class Daemon(Thread):
         #time to stop running
         for thread in self.shard_set.values():
             thread.stop()
-
+        exit(0)
 
 if __name__ == '__main__':
 
