@@ -4,13 +4,14 @@ Re-runs all of them after rollbacking.
 """
 
 from test_oplog_manager import ReplSetManager
+from setup_cluster import start_cluster
 import time
 import os
 
 print 'Preparing cluster'
 rsm = ReplSetManager()
 os.system('rm config.txt; touch config.txt')
-rsm.start_cluster()
+start_cluster()
 print 'finished startCluster'
 rsm.test_retrieve_doc()
 print 'passed test_retrieve_doc'
@@ -32,7 +33,7 @@ print 'passed test_read_config'
 print 'passed first round of tests...'
 print 'restarting cluster for rollback'
 os.system('rm config.txt; touch config.txt')
-rsm.start_cluster()
+start_cluster()
 time.sleep(5)
 
 print 'restarted cluster'

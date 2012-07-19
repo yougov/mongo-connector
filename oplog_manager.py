@@ -185,9 +185,9 @@ class OplogThread(Thread):
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
         
-        print self.oplog
-        print 'exiting dump collection, had timestamp: '
-        print timestamp
+        #print self.oplog
+        #print 'exiting dump collection, had timestamp: '
+        #print timestamp
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -199,9 +199,9 @@ class OplogThread(Thread):
 
         if timestamp is None:
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
-            print self.oplog
-            print 'timestamp after get last ts is '
-            print timestamp
+            #print self.oplog
+            #print 'timestamp after get last ts is '
+            #print timestamp
             self.dump_collection(timestamp)
             logging.info('OplogManager: %s Dumped collection into backend' % self.oplog)
 
@@ -225,8 +225,8 @@ class OplogThread(Thread):
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
             
-            print self.oplog
-            print cursor
+            #print self.oplog
+            #print cursor
             
             if cursor is None:
                 cursor = self.init_cursor()
@@ -294,9 +294,9 @@ class OplogThread(Thread):
                 break
             count = count + 2                        # skip to next set
 
-        print self.oplog
-        print 'in read config, returning timestamp'
-        print self.checkpoint.commit_ts
+        #print self.oplog
+        #print 'in read config, returning timestamp'
+        #print self.checkpoint.commit_ts
         
         return self.checkpoint.commit_ts
 
