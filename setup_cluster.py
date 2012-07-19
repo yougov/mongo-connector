@@ -132,7 +132,7 @@ def checkStarted(port):
 #========================================= #
 
 
-def start_cluster():
+def start_cluster(sharded=False):
 	"""Sets up cluster with 1 shard, replica set with 3 members
 	"""
 	# Kill all spawned mongods
@@ -151,6 +151,11 @@ def start_cluster():
 	create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
 	create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
 	
+	if sharded is True:
+	    create_dir(DEMO_SERVER_DATA + "/replset2a/journal")
+            create_dir(DEMO_SERVER_DATA + "/replset2b/journal")
+            create_dir(DEMO_SERVER_DATA + "/replset2c/journal")
+	
 	create_dir(DEMO_SERVER_DATA + "/shard1a/journal")
 	create_dir(DEMO_SERVER_DATA + "/shard1b/journal")
 	create_dir(DEMO_SERVER_DATA + "/config1/journal")
@@ -161,8 +166,14 @@ def start_cluster():
 	startMongoProc(PORTS_ONE["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
 	startMongoProc(PORTS_ONE["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
 	
+	if sharded:
+	    startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log")
+            startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log")
+            startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log")
+        
+	
 	# Setup config server
-	CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " +                 PORTS_ONE["CONFIG"] + " --dbpath " + DEMO_SERVER_DATA + "/config1 --rest --logpath "
+	CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS_ONE["CONFIG"] + " --dbpath " + DEMO_SERVER_DATA + "/config1 --rest --logpath "
    + DEMO_SERVER_LOG + "/config1.log --logappend &"]
 	executeCommand(CMD)
 	checkStarted(int(PORTS_ONE["CONFIG"]))
@@ -176,9 +187,14 @@ def start_cluster():
 	checkStarted(int(PORTS_ONE["MONGOS"]))
 		
 	# Configure the shards and begin load simulation
-	cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
-	#cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR +         "/setup/configReplSetSharded2.js"
-	cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
+	if sharded:
+	    cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSetSharded1.js"
+	    cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongosSharded.js"
+	else:
+	    cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSet.js"
+	    cmd3 = "mongo --port  "+ PORTS_ONE["MONGOS"] + " " + SETUP_DIR + "/setup/configMongos.js"
+	    
+	cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " " + SETUP_DIR + "/setup/configReplSetSharded2.js"
 	 
 	subprocess.call(cmd1, shell=True)
 	conn = Connection('localhost:' + PORTS_ONE["PRIMARY"])
@@ -189,6 +205,18 @@ def start_cluster():
 			 
 	while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
 		time.sleep(1)
+		
+	if sharded:
+	    subprocess.call(cmd2, shell=True)
+            conn = Connection('localhost:' + PORTS_TWO["PRIMARY"])
+            sec_conn = Connection('localhost:' + PORTS_TWO["SECONDARY"])
+                 
+            while conn['admin'].command("isMaster")['ismaster'] is False:
+                time.sleep(1)
+            
+            #need to look a bit more carefully here     
+            while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+                time.sleep(1)
 		 
 	subprocess.call(cmd3, shell=True)
 
