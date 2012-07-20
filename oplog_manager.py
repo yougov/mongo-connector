@@ -66,7 +66,7 @@ class OplogThread(Thread):
                 for entry in cursor:
                     operation = entry['op']
                     ns = entry['ns']
-                    
+
                     if ns not in self.namespace_set:
                         continue
 
@@ -101,6 +101,7 @@ class OplogThread(Thread):
         """Stop this thread from managing the oplog.
         """
         self.running = False
+#        Thread.join(self)
 
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
