@@ -34,7 +34,7 @@ SETUP_DIR = path.expanduser("~/mongo-connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS_ONE["CONFIG"]
+MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 
 
 def remove_dir(path):
@@ -76,13 +76,17 @@ def killAllMongoProc(host, ports):
         killMongoProc(host, port)
 
 
-def startMongoProc(port, replSetName, data, log):
+def startMongoProc(port, replSetName, data, log, key_file):
     """Create the replica set
     """
     CMD = ["mongod --fork --replSet " + replSetName + " --noprealloc --port " + port + " --dbpath "
     + DEMO_SERVER_DATA + data + " --shardsvr --rest --logpath "
-    + DEMO_SERVER_LOG + log + " --logappend &"]
+    + DEMO_SERVER_LOG + log + " --logappend"]
     
+    if key_file is not None:
+    	CMD[0] += " --keyFile " + key_file
+    
+    CMD[0] += " &"
     executeCommand(CMD)
     checkStarted(int(port))
 
@@ -132,7 +136,7 @@ def checkStarted(port):
 #========================================= #
 
 
-def start_cluster(sharded=False):
+def start_cluster(sharded=False, key_file=None):
 	"""Sets up cluster with 1 shard, replica set with 3 members
 	"""
 	# Kill all spawned mongods
@@ -162,27 +166,36 @@ def start_cluster(sharded=False):
 	create_dir(DEMO_SERVER_LOG)
 		
 	# Create the replica set
-	startMongoProc(PORTS_ONE["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log")
-	startMongoProc(PORTS_ONE["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log")
-	startMongoProc(PORTS_ONE["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log")
+	startMongoProc(PORTS_ONE["PRIMARY"], "demo-repl", "/replset1a", "/replset1a.log", key_file)
+	startMongoProc(PORTS_ONE["SECONDARY"], "demo-repl", "/replset1b", "/replset1b.log", key_file)
+	startMongoProc(PORTS_ONE["ARBITER"], "demo-repl", "/replset1c", "/replset1c.log", key_file)
 	
 	if sharded:
-	    startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log")
-            startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log")
-            startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log")
+	    startMongoProc(PORTS_TWO["PRIMARY"], "demo-repl-2", "/replset2a", "/replset2a.log", key_file)
+            startMongoProc(PORTS_TWO["SECONDARY"], "demo-repl-2", "/replset2b", "/replset2b.log", key_file)
+            startMongoProc(PORTS_TWO["ARBITER"], "demo-repl-2", "/replset2c", "/replset2c.log", key_file)
         
 	
 	# Setup config server
 	CMD = ["mongod --oplogSize 500 --fork --configsvr --noprealloc --port " + PORTS_ONE["CONFIG"] + " --dbpath " + DEMO_SERVER_DATA + "/config1 --rest --logpath "
-   + DEMO_SERVER_LOG + "/config1.log --logappend &"]
+   + DEMO_SERVER_LOG + "/config1.log --logappend"]
+   
+   	if key_file is not None:
+            CMD[0] += " --keyFile " + key_file
+    
+        CMD[0] += " &"
 	executeCommand(CMD)
 	checkStarted(int(PORTS_ONE["CONFIG"]))
 
 	# Setup the mongos, same mongos for both shards
 	CMD = ["mongos --port " + PORTS_ONE["MONGOS"] + " --fork --configdb localhost:" +
 	PORTS_ONE["CONFIG"] + " --chunkSize 1  --logpath "  + DEMO_SERVER_LOG + 
-	"/mongos1.log --logappend &"]
-
+	"/mongos1.log --logappend"]
+	
+	if key_file is not None:
+   	     CMD[0] += " --keyFile " + key_file
+    
+    	CMD[0] += " &"
 	executeCommand(CMD)    
 	checkStarted(int(PORTS_ONE["MONGOS"]))
 		

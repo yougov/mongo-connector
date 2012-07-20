@@ -1,22 +1,27 @@
 """Discovers the mongo cluster and starts the daemon.
 """
 
-import time
 import logging
+import os
+import re
+import simplejson as json
+import time
 
 from doc_manager import DocManager
 from pymongo import Connection
 from oplog_manager import OplogThread
 from optparse import OptionParser
+from simplejson import JSONDecodeError
 from sys import exit
 from threading import Thread
+from util import bson_ts_to_long
 
 
 class Daemon(Thread):
     """Checks the cluster for shards to tail.
     """
 
-    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key):
+    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key, auth_key):
         super(Daemon, self).__init__()
         self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
@@ -24,10 +29,55 @@ class Daemon(Thread):
         self.backend_url = backend_url
         self.ns_set = ns_set
         self.u_key = u_key
+        self.auth_key = auth_key
         self.shard_set = {}
+        self.oplog_progress_dict = {}
 
     def stop(self):
         self.can_run = False
+        
+    def write_oplog_progress(self):
+    
+        if self.oplog_checkpoint is None:
+                return None
+    
+        ofile = file(self.oplog_checkpoint, 'r+')
+        #fcntl.lockf(ofile.fileno(), fcntl.LOCK_EX)
+    
+        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')  # temp file
+        dest = open(self.oplog_checkpoint, 'w')
+        source = open(self.oplog_checkpoint + '~', 'r')
+    
+        for oplog, ts in self.oplog_progress_dict.items():
+            oplog_str = str(oplog.database.connection)
+            timestamp = bson_ts_to_long(ts)
+            json_str = json.dumps([oplog_str, timestamp])
+            dest.write(json_str) 
+    
+        dest.close()
+        source.close()
+        os.remove(self.oplog_checkpoint + '~')
+        
+    def read_oplog_progress(self):
+        
+        if self.oplog_checkpoint is None:
+            return None
+
+        source = open(self.oplog_checkpoint, 'r')
+        try:
+            data = json.load(source)
+        except JSONDecodeError:                 # empty file              
+            return None
+        
+        count = 0
+        while count < len(data):
+            oplog_str = data[count]
+            ts = data[count+1]
+            self.oplog_progress_dict[oplog_str] = ts
+            count = count + 2                        # skip to next set
+        
+        return self.checkpoint.commit_ts
+        
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
@@ -39,20 +89,22 @@ class Daemon(Thread):
             logging.critical('Bad backend URL!')
             return
 
+        self.read_oplog_progress()
         while self.can_run is True:
 
             for shard_doc in shard_coll.find():
                 shard_id = shard_doc['_id']
                 if shard_id in self.shard_set:
-                    time.sleep(2)
+                    self.write_oplog_progress()
+                    time.sleep(1)
                     continue
                     
                 repl_set, hosts = shard_doc['host'].split('/')
                 shard_conn = Connection(hosts, replicaset=repl_set)
                 oplog_coll = shard_conn['local']['oplog.rs']
                 oplog = OplogThread(shard_conn, self.address, oplog_coll, True,
-                                    doc_manager, self.oplog_checkpoint,
-                                    self.ns_set)
+                                    doc_manager, self.oplog_progress_dict,
+                                    self.ns_set, self.auth_key)
                 self.shard_set[shard_id] = oplog
                 logging.info('MongoInternal: Starting connection thread %s' %
                              shard_conn)
@@ -91,8 +143,8 @@ if __name__ == '__main__':
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
     #quick recovery from failure.
-    parser.add_option("-o", "--oplog-config", action="store", type="string",
-                      dest="oplog_config", default="./config.txt")
+    parser.add_option("-o", "--oplog-ts", action="store", type="string",
+                      dest="oplog_config", default="config.txt")
 
     #-b is to specify the URL to the backend engine being used.
     parser.add_option("-b", "--backend-url", action="store", type="string",
@@ -106,6 +158,12 @@ if __name__ == '__main__':
     #-u is to specify the uniqueKey used by the backend,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id")
+                      
+    #-a is to specify the authentication key file. This file is used by mongos
+    #to authenticate connections to the shards, and we'll use it in the oplog
+    #threads. 
+    parser.add_option("-a", "--auth-file", action="store", type="string",
+                      dest="auth_file", default=None)
 
     (options, args) = parser.parse_args()
 
@@ -114,7 +172,17 @@ if __name__ == '__main__':
     except:
         logger.error('Namespaces must be separated by commas!')
         exit(1)
+        
+    key = None
+    if options.auth_file is not None:
+        try:
+            file = open(options.auth_file)
+            key = file.read()
+            re.sub(r'\s', '', key)
+        except:
+            logger.error('Could not parse authentication file!')
+            exit(1)
 
     dt = Daemon(options.mongos_addr, options.oplog_config, options.url,
-                ns_set, options.u_key)
+                ns_set, options.u_key, key)
     dt.start()

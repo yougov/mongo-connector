@@ -35,7 +35,7 @@ SETUP_DIR = path.expanduser("~/mongo-connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS_ONE["CONFIG"]
+MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 
 
 def safe_mongo_op(func, arg1, arg2=None):
@@ -271,7 +271,7 @@ class ReplSetManager():
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, None, 
-                            namespace_set)
+                            namespace_set, None)
         
         return (oplog, primary_conn, oplog_coll, mongos_conn)
 
@@ -291,7 +291,7 @@ class ReplSetManager():
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
-                            namespace_set)
+                            namespace_set, None)
         
         return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
 

@@ -24,7 +24,7 @@ class OplogThread(Thread):
     """
 
     def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
-                 doc_manager, oplog_file, namespace_set):
+                 doc_manager, oplog_progress_dict, namespace_set, auth_key):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -35,9 +35,14 @@ class OplogThread(Thread):
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
-        self.oplog_file = oplog_file
+        self.oplog_progress_dict = oplog_progress_dict
         self.namespace_set = namespace_set
+        self.auth_key = auth_key
         self.mongos_connection = Connection(mongos_address)
+        
+        if auth_key is not None:
+            #Authenticate for the whole system
+            primary_conn['local'].authenticate('__system', auth_key)
 
     def run(self):
         """Start the oplog worker.
@@ -55,10 +60,15 @@ class OplogThread(Thread):
             last_ts = None
             cursor_size = retry_until_ok(cursor.count)
             counter = 0
+            err = False
 
             try:
                 for entry in cursor:
                     operation = entry['op']
+                    ns = entry['ns']
+                    
+                    if ns not in self.namespace_set:
+                        continue
 
                     if operation == 'd':
                         entry['_id'] = entry['o']['_id']
@@ -69,12 +79,17 @@ class OplogThread(Thread):
 
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
-                            doc['ns'] = entry['ns']
+                            doc['ns'] = ns
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
             except (AutoReconnect, OperationFailure):
+                err = True
                 pass
+                
+            if err is True and self.auth_key is not None:
+                primary_conn['local'].authenticate('__system', auth_key)
+                err = False
 
             if last_ts is not None:
                 self.checkpoint.commit_ts = last_ts
@@ -170,6 +185,8 @@ class OplogThread(Thread):
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
+        print 'thread is %s, timestamp is %s' %  (self.oplog, timestamp)
+        
         if timestamp is None:
             return None
 
@@ -178,16 +195,27 @@ class OplogThread(Thread):
             target_coll = retry_until_ok(self.mongos_connection[db][coll],
                                          no_func=True)
             cursor = retry_until_ok(target_coll.find)
+            
+            for doc in cursor:
+                print doc
+            
+            print 'finished printing cursor'
+            cursor.rewind()
+            print 'timestamp is %s' % timestamp
+            print 'c_len is %d' % cursor.count()
+            
+            print '%s in dump coll, have target and cursor, going to convert TS' % self.oplog
             long_ts = bson_ts_to_long(timestamp)
 
+            print 'about to enter for loop in d_c'
             for doc in cursor:
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
+                print 'doc in cursor here'
                 self.doc_manager.upsert(doc)
         
-        #print self.oplog
-        #print 'exiting dump collection, had timestamp: '
-        #print timestamp
+        print '%s exiting dump collection, had timestamp: %s' % (self.oplog, timestamp)
+
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -240,65 +268,19 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file.
         """
-        if self.oplog_file is None:
-            return None
-
-        ofile = file(self.oplog_file, 'r+')
-        fcntl.lockf(ofile.fileno(), fcntl.LOCK_EX)
-
-        try:
-            os.rename(self.oplog_file, self.oplog_file + '~')  # temp file
-            dest = open(self.oplog_file, 'w')
-            source = open(self.oplog_file + '~', 'r')
-        except:
-            logging.error('OplogManager: %s could not open config file!', self.oplog)
-            return None
-
-        oplog_str = str(self.oplog.database.connection)
-        timestamp = bson_ts_to_long(self.checkpoint.commit_ts)
-        json_str = json.dumps([oplog_str, timestamp])
-        dest.write(json_str) 
-
-        for line in source:
-            if oplog_str in line:
-                continue                        # we've already updated
-            else:
-                dest.write(line)
         
-        source.close()
-        dest.close()
-        os.remove(self.oplog_file + '~')
-        fcntl.lockf(ofile.fileno(), fcntl.LOCK_UN)
+        self.oplog_progress_dict[self.oplog] = self.checkpoint.commit_ts
         
-
+        
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
         """
-        config_file = self.oplog_file
-        if config_file is None:
-            return None
-
-        source = open(self.oplog_file, 'r')
-        try:
-            data = json.load(source)
-        except:                                             # empty file
-            return None
-
         oplog_str = str(self.oplog.database.connection)
-
-        count = 0
-        while (count < len(data)):
-            if oplog_str in data[count]:             # next line has time
-                count = count + 1
-                self.checkpoint.commit_ts = long_to_bson_ts(data[count])
-                break
-            count = count + 2                        # skip to next set
-
-        #print self.oplog
-        #print 'in read config, returning timestamp'
-        #print self.checkpoint.commit_ts
         
-        return self.checkpoint.commit_ts
+        if oplog_str in self.oplog_progress_dict:
+            return self.oplog_progress_dict[oplog_str]
+        else:
+            return None
 
     def rollback(self):
         """Rollback backend engine to consistent state.
@@ -315,7 +297,7 @@ class OplogThread(Thread):
             return None
 
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lt': backend_ts}},
+        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
                                                sort=[('$natural',
                                                pymongo.DESCENDING)])
 
