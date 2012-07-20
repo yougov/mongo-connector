@@ -18,7 +18,7 @@ s = Solr('http://localhost:8080/solr')
 d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
 			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
 conn = None
-NUMBER_OF_DOCS = 1000
+NUMBER_OF_DOCS = 10
 
 class TestSynchronizer(unittest.TestCase):
 
@@ -112,6 +112,7 @@ class TestSynchronizer(unittest.TestCase):
 		
 	def test_stress(self):
 		#stress test
+		#os.system('rm config.txt; touch config.txt')
 		for i in range(0, NUMBER_OF_DOCS):
 			conn['test']['test'].insert({'name': 'Paul '+str(i)})
 		time.sleep(5)
@@ -128,10 +129,14 @@ class TestSynchronizer(unittest.TestCase):
 	
 	def test_stressed_rollback(self):
 		#test stressed rollback
-        conn['test']['test'].remove()
-        for i in range(0, NUMBER_OF_DOCS):
-        conn['test']['test'].insert({'name': 'Paul '+str(i)})
-        
+		conn['test']['test'].remove()
+		while len(s.search('*:*', rows = NUMBER_OF_DOCS)) != 0:
+			time.sleep(1)
+		for i in range(0, NUMBER_OF_DOCS):
+			conn['test']['test'].insert({'name': 'Paul '+str(i)})
+    
+		while len(s.search('*:*', rows = NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
+			time.sleep(1)
 		primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 		killMongoProc('localhost', PORTS_ONE['PRIMARY'])
 		 

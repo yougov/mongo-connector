@@ -394,8 +394,8 @@ class TestOplogManager(unittest.TestCase):
         
         print new_primary_conn.port
         print primary_conn.port
-        assert (str(new_primary_conn.port) == PORTS_ONE['SECONDARY'])
-        assert (str(primary_conn.port) == PORTS_ONE['PRIMARY'])
+        self.assertEqual (str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
+        self.assertEqual (str(primary_conn.port), PORTS_ONE['PRIMARY'])
        
         last_ts = test_oplog.get_last_oplog_timestamp()    
         second_doc = {'name':'paul', '_ts':bson_ts_to_long(last_ts), 'ns':'test.test', '_id': obj2}
@@ -410,7 +410,7 @@ class TestOplogManager(unittest.TestCase):
 
         results_doc = results.docs[0]
         self.assertEqual(results_doc['name'], 'paulie')
-        self.assertEqual(results_doc['_ts'], bson_ts_to_long(cutoff_ts))
+        self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
         print 'PASSED TEST ROLLBACK'
 
 if __name__ == '__main__':

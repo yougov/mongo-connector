@@ -319,7 +319,7 @@ class OplogThread(Thread):
             return None
 
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
+        last_oplog_entry = self.oplog.find_one({'ts': {'$lt': backend_ts}},
                                                sort=[('$natural',
                                                pymongo.DESCENDING)])
 
