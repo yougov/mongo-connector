@@ -18,7 +18,7 @@ s = Solr('http://localhost:8080/solr')
 d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
 			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
 conn = None
-NUMBER_OF_DOCS = 100
+NUMBER_OF_DOCS = 1000
 
 class TestSynchronizer(unittest.TestCase):
 
@@ -127,7 +127,11 @@ class TestSynchronizer(unittest.TestCase):
 				   
 	
 	def test_stressed_rollback(self):
-		#test stressed rollback         
+		#test stressed rollback
+        conn['test']['test'].remove()
+        for i in range(0, NUMBER_OF_DOCS):
+        conn['test']['test'].insert({'name': 'Paul '+str(i)})
+        
 		primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 		killMongoProc('localhost', PORTS_ONE['PRIMARY'])
 		 
@@ -184,7 +188,5 @@ if __name__ == '__main__':
 	while len(d.shard_set) == 0:
 		pass
 	t.cancel()
-	#the Daemon should recognize a single running shard
 	unittest.main()
-	print 'la'
 	d.join()

@@ -35,6 +35,7 @@ class DocManager():
         """
         if verify_url(url) is False:
             print 'Invalid Solr URL'
+            self.solr = None
             return None
 
         self.solr = Solr(url)
@@ -67,6 +68,9 @@ class DocManager():
         return value should be an iterable set of documents.
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
+        return self.solr.search(query)
+
+    def _search(self, query):
         return self.solr.search(query)
 
     def commit(self):

@@ -106,23 +106,6 @@ class TestOplogManagerSharded(unittest.TestCase):
                             namespace_set)
         
         return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
-
-    def test_mongo_internal(self):
-        """Test mongo_internal
-            """
-        t = Timer(120, self.abort_test)
-        t.start()
-        d = Daemon('localhost:' + PORTS_ONE["MONGOS"], None, 'http://localhost:8080/solr', ['alpha.foo'],
-                   '_id')
-        d.start()
-        while len(d.shard_set) == 0:
-            pass
-        t.cancel()
-        
-        d.stop()
-        #the Daemon should recognize a single running shard
-        assert len(d.shard_set) == 2
-        print 'PASSED TEST MONGO INTERNAL'
         
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't pass
@@ -398,6 +381,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         os.system('rm ' + config_file_path)   
         
         print 'TEST READ CONFIG'
+            
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -416,57 +400,51 @@ class TestOplogManagerSharded(unittest.TestCase):
         
         safe_mongo_op(mongos_conn['alpha']['foo'].remove, {})
         safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'_id':obj1,'name':'paulie'})
-                
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
         first_doc = {'name':'paulie', '_ts':bson_ts_to_long(cutoff_ts), 'ns':'alpha.foo', 
             '_id': obj1}
         
-        primary_port = primary_conn.port
-        char = None
-        altchar = None
-        
-        #make it more general so we can call it several times in a row
-        if primary_port == int(PORTS_ONE["PRIMARY"]):
-            secondary_port = int(PORTS_ONE["SECONDARY"])
-            altchar = "b"
-            char = "a"
-        else:
-            secondary_port = int(PORTS_ONE["PRIMARY"])
-            altchar = "a"
-            char = "b"
-        
         #try kill one, try restarting
-        killMongoProc(primary_conn.host, secondary_port)
-                
-        safe_mongo_op(mongos_conn['alpha']['foo'].insert, {'_id': obj2, 'name':'paul'})
-
-            
-        killMongoProc(primary_conn.host, primary_port)  
-       	
-        startMongoProc(str(secondary_port), "demo-repl", "/replset1" + altchar, "/replset1" + 
-                       altchar + ".log")
-        new_primary_conn = Connection(primary_conn.host, secondary_port)
-    
-        #wait for master to be established
+        killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
+        
+        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        
         while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
-            
-        startMongoProc(str(primary_port), "demo-repl", "/replset1" + char, "/replset1" + char + 
-            ".log")
-        new_secondary_conn = Connection(primary_conn.host, primary_port)
+        time.sleep(5)
+        while True:
+            try:
+                mongos_conn['alpha']['foo'].insert, {'_id': obj2, 'name':'paul'}         
+                break
+            except: 
+                time.sleep(1)
+                continue
+                
+    
+        killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])  
+                
+        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+
+    
+        #wait for master to be established
+        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+
+        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+
                 
         #wait for secondary to be established
-        while new_secondary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
+        while new_primary_conn['admin'].command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
         
         while retry_until_ok(mongos_conn['alpha']['foo'].find().count) != 1:
             time.sleep(1)
             
             
-        assert (new_primary_conn.port == secondary_port)
-        assert (new_secondary_conn.port == primary_port)
+        self.assertEqual (str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
+        self.assertEqual (str(primary_conn.port), PORTS_ONE['PRIMARY'])
        
         last_ts = test_oplog.get_last_oplog_timestamp()    
         second_doc = {'name':'paul', '_ts':bson_ts_to_long(last_ts), 'ns':'alpha.foo', '_id': obj2}
@@ -477,11 +455,11 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog.doc_manager.commit()
         results = solr.test_search()
     
-        assert (len(results) == 1)
+        self.assertEqual (len(results), 1)
 
         results_doc = results[0]
-        assert(results_doc['name'] == 'paulie')
-        assert(results_doc['_ts'] == bson_ts_to_long(cutoff_ts))
+        self.assertEqual(results_doc['name'], 'paulie')
+        self.assertEqual(results_doc['_ts'], bson_ts_to_long(cutoff_ts))
         
         print 'PASSED TEST ROLLBACK'
 

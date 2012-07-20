@@ -34,7 +34,7 @@ SETUP_DIR = path.expanduser("~/mongo-connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS_ONE["CONFIG"]
+MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 
 
 def remove_dir(path):
