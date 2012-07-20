@@ -459,7 +459,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         results_doc = results[0]
         self.assertEqual(results_doc['name'], 'paulie')
-        self.assertEqual(results_doc['_ts'], bson_ts_to_long(cutoff_ts))
+        self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
         
         print 'PASSED TEST ROLLBACK'
 
