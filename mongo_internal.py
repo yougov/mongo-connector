@@ -33,6 +33,16 @@ class Daemon(Thread):
         self.auth_key = auth_key
         self.shard_set = {}
         self.oplog_progress_dict = {}
+        
+        if self.backend_url is None:
+            self.doc_manager = BackendSimulator()
+        else:
+            self.doc_manager = DocManager(self.backend_url)
+            
+        if self.doc_manager is None:
+            logging.critical('Bad backend URL!')
+            return
+
 
     def stop(self):
         self.can_run = False
@@ -86,14 +96,6 @@ class Daemon(Thread):
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
         
-        if self.backend_url is None:
-            doc_manager = BackendSimulator()
-        else:
-            doc_manager = DocManager(self.backend_url)
-        if doc_manager is None:
-            logging.critical('Bad backend URL!')
-            return
-
         self.read_oplog_progress()
         while self.can_run is True:
 
@@ -108,7 +110,7 @@ class Daemon(Thread):
                 shard_conn = Connection(hosts, replicaset=repl_set)
                 oplog_coll = shard_conn['local']['oplog.rs']
                 oplog = OplogThread(shard_conn, self.address, oplog_coll, True,
-                                    doc_manager, self.oplog_progress_dict,
+                                    self.doc_manager, self.oplog_progress_dict,
                                     self.ns_set, self.auth_key)
                 self.shard_set[shard_id] = oplog
                 logging.info('MongoInternal: Starting connection thread %s' %
