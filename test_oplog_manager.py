@@ -16,7 +16,6 @@ from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
 from oplog_manager import OplogThread
-from solr_doc_manager import DocManager
 from backend_simulator import BackendSimulator
 from pysolr import Solr
 from util import (long_to_bson_ts, 
