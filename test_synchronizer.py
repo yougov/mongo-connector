@@ -30,23 +30,19 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST SHARD LENGTH'
 
     def setUp(self):
-        s.test_delete()
+        conn['test']['test'].remove(safe = True)
+        while (len(s.test_search()) != 0):
+            print len(s.test_search())
+            time.sleep(1)      
     
     def test_initial (self):
         #test search + initial clear
-        while (True):
-            try:
-                conn['test']['test'].remove(safe = True)
-                break
-            except:
-                continue
-            
-    def test_initial(self):  
+        conn['test']['test'].remove(safe = True) 
         s.test_delete()
         self.assertEqual (conn['test']['test'].find().count(), 0)
         self.assertEqual (len(s.test_search()), 0)
         print 'PASSED TEST INITIAL'
-        
+      
     def test_insert(self):
         #test insert
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
@@ -56,13 +52,15 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), 1)
         b = conn['test']['test'].find_one()
         for it in a:
-            self.assertEqual (it['_id'], str(b['_id']))
+            self.assertEqual (it['_id'], b['_id'])
             self.assertEqual (it['name'], b['name'])
         print 'PASSED TEST INSERT'
 
     def test_remove (self):
         #test remove
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
+        while (len(s.test_search()) != 1):
+            time.sleep(1)        
         conn['test']['test'].remove({'name':'paulie'}, safe=True)
         while (len(s.test_search()) == 1):
             time.sleep(1)
@@ -70,7 +68,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), 0)
         print 'PASSED TEST REMOVE'
 
-    '''
+    
     def test_rollback(self):
         #test rollback
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
@@ -100,7 +98,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), 2)
         for it in a:
             if it['name'] == 'pauline':
-                self.assertEqual (it['_id'], str(b['_id']))
+                self.assertEqual (it['_id'], b['_id'])
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 
         startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
@@ -110,13 +108,12 @@ class TestSynchronizer(unittest.TestCase):
         startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log", None)
 
         time.sleep(2)
-        a = s.search()
+        a = s.test_search()
         self.assertEqual (len(a), 1)
         for it in a:
-            self.assertEqual(it['name'], 'paul'
-        conn['test']['test'].remove()
+            self.assertEqual(it['name'], 'paul')
         print 'PASSED TEST ROLLBACK'
-    
+        '''  
     def test_stress(self):
         #stress test
         #os.system('rm config.txt; touch config.txt')
@@ -194,8 +191,8 @@ def abort_test(self):
 		sys.exit(1)
 				
 if __name__ == '__main__':
-	#os.system('rm config.txt; touch config.txt')
-	#start_cluster()
+	os.system('rm config.txt; touch config.txt')
+	start_cluster()
 	conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
 	t = Timer(60, abort_test)
 	t.start()
