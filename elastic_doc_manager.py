@@ -12,19 +12,18 @@ class DocManager():
     def __init__ (self, url, auto_commit = True):
         if verify_url(url) is False:
             print 'Invalid ElasticSearch URL'
+            self.elastic = None
             return None
         self.elastic = ES(server=url)
         if auto_commit:
             self.auto_commit()
 
     def upsert(self, doc):
-	print doc
         index = doc['ns']
         doc_type = 'string'
         doc['_id'] = str(doc['_id'])
         doc_id = doc['_id']
         self.elastic.index(doc, index, doc_type, doc_id)
-	print 'upserted successfully!'
 
     def remove(self, doc):
         
@@ -33,14 +32,11 @@ class DocManager():
     def search(self, start_ts, end_ts):
        res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
        q = RangeQuery(res)
-       for it in self.elastic.search(q):
-           print it
        results = self.elastic.search(q)
        return results
     
     def _search(self):
         results = self.elastic.search(MatchAllQuery())
-        for it in results: print it
         return results
 
     def commit(self):

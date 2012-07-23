@@ -16,7 +16,7 @@ class SolrDocManagerTester(unittest.TestCase):
     def setUp(self):
         solr.delete(q = '*:*')
     
-    def test_a_invalid_URL(self):
+    def test_invalid_URL(self):
 
         #Invalid URL
         s = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
@@ -71,7 +71,7 @@ class SolrDocManagerTester(unittest.TestCase):
         SolrDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866}
         SolrDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', '_ts': 5767301236327972870}
+        docc = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870}
         SolrDoc.upsert(docc)
         solr.commit()
         search = SolrDoc.search(5767301236327972865, 5767301236327972866)
