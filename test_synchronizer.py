@@ -60,16 +60,11 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_remove (self):
         #test remove
-<<<<<<< HEAD
-        conn['test']['test'].insert ( {'name':'paulie'}, safe=1 )
-        time.sleep(3)
-        conn['test']['test'].remove({'name':'paulie'}, safe=1)
-=======
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
         while (len(s.test_search()) != 1):
             time.sleep(1)        
         conn['test']['test'].remove({'name':'paulie'}, safe=True)
->>>>>>> 4d4a28c26f37fec38f4eef5d5df0b531ffc16277
+
         while (len(s.test_search()) == 1):
             time.sleep(1)
         a = s.test_search()
