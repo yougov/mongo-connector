@@ -2,6 +2,7 @@ import unittest
 import time
 from mongo_internal import Daemon
 import os
+from setup_cluster import start_cluster
 
 class MongoInternalTester(unittest.TestCase):
     
@@ -14,7 +15,7 @@ class MongoInternalTester(unittest.TestCase):
        
         d.start()
         
-        while len(d.shard_set) != 2:
+        while len(d.shard_set) != 1:
             time.sleep(2)
         d.stop()
         
@@ -24,5 +25,6 @@ class MongoInternalTester(unittest.TestCase):
             self.assertFalse(thread.running)
 
 if __name__ == '__main__':
+    start_cluster()
     os.system('rm config.txt; touch config.txt')
     unittest.main()
