@@ -16,7 +16,7 @@ PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119",
     "CONFIG":"27220", "MONGOS":"27217"}
 s = Solr('http://localhost:8080/solr')
 d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
-			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
+			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
 conn = None
 NUMBER_OF_DOCS = 10
 
@@ -96,11 +96,11 @@ class TestSynchronizer(unittest.TestCase):
 			self.assertEqual (it['_id'], str(b['_id']))
 		killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 
-		startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+		startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
 		while primary_conn['admin'].command("isMaster")['ismaster'] is False:
 			time.sleep(1)
 		
-		startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+		startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log", None)
 
 		time.sleep(2)
 		a = s.search('pauline')
