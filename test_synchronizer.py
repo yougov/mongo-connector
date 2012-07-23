@@ -177,7 +177,7 @@ class TestSynchronizer(unittest.TestCase):
 		a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
 		self.assertEqual (len(a), NUMBER_OF_DOCS)
 		print 'PASSED TEST STRESSED ROLBACK'
-		
+
 		
 def abort_test(self):
 		print 'test failed'
