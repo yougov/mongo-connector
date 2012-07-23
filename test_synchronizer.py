@@ -184,8 +184,8 @@ def abort_test(self):
 		sys.exit(1)
 				
 if __name__ == '__main__':
-	os.system('rm config.txt; touch config.txt')
-	start_cluster()
+	#os.system('rm config.txt; touch config.txt')
+	#start_cluster()
 	conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
 	t = Timer(60, abort_test)
 	t.start()

@@ -1,6 +1,8 @@
 """A class to serve as proxy for the Solr engine for testing.
 """
 
+from bson.objectid import ObjectId
+
 class BackendSimulator():
     """BackendSimulator emulates both a Solr DocManager and a Solr server.
     """

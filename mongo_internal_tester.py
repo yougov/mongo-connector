@@ -1,5 +1,6 @@
 import unittest
 import time
+import json
 from mongo_internal import Daemon
 import os
 from setup_cluster import start_cluster
@@ -25,11 +26,36 @@ class MongoInternalTester(unittest.TestCase):
             
     def test_write_oplog_progress(self):
         
-        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)  
-        
+        os.system('touch temp_config.txt')
+        config_file_path = os.getcwd() + '/temp_config.txt'
+        d = Daemon('localhost:27217', config_file_path, 'http://localhost:8080/solr', ['test.test'], '_id', None)  
         
         #test that None is returned if there is no config file specified.
         self.assertEqual(d.write_oplog_progress(), None)
+        
+        d.oplog_progress_dict[1] = '1234'           #pretend to insert a thread/timestamp pair
+        d.write_oplog_progress()
+        
+        data = json.load(open(config_file_path, 'r'))
+        self.assertEqual(1, int(data[0]))
+        self.assertEqual('1234', data[1])
+        
+        #ensure the temp file was deleted
+        self.assertFalse(os.path.exists(config_file_path + '~'))
+        
+        #ensure that updates work properly
+        d.oplog_progress_dict[1] = '44'
+        d.write_oplog_progress()
+        
+        data = json.load(open(config_file_path, 'r'))
+        self.assertEqual(1, int(data[0]))
+        self.assertEqual('44', data[1])
+        
+        print 'PASSED TEST WRITE OPLOG PROGRESS'
+        
+    def test_read_oplog_progress(self):
+        
+        print 'PASSED TEST READ OPLOG PROGRESS'      
 
 if __name__ == '__main__':
     start_cluster()
