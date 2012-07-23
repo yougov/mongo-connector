@@ -20,7 +20,7 @@ from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
 from pysolr import Solr
-from solr_simulator import SolrSimulator
+from backend_simulator import BackendSimulator
 from util import (long_to_bson_ts, 
                   bson_ts_to_long,
                   retry_until_ok)
@@ -81,7 +81,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = SolrSimulator()
+        doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -101,7 +101,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = SolrSimulator()
+        doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -205,7 +205,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
         
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
-        solr = SolrSimulator()
+        solr = BackendSimulator()
         test_oplog.doc_manager = solr
         
         #for empty oplog, no documents added
@@ -395,7 +395,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread_new()
         #test_oplog.start()
         
-        solr = SolrSimulator()
+        solr = BackendSimulator()
         test_oplog.doc_manager = solr
         solr.test_delete()          #equivalent to solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')

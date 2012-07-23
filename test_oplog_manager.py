@@ -17,7 +17,7 @@ from pymongo.errors import ConnectionFailure
 from os import path
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
-from solr_simulator import SolrSimulator
+from backend_simulator import BackendSimulator
 from pysolr import Solr
 from util import (long_to_bson_ts, 
                   bson_ts_to_long,
@@ -53,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
-        doc_manager = SolrSimulator()
+        doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -73,7 +73,7 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test']
-        doc_manager = SolrSimulator()
+        doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -171,7 +171,7 @@ class TestOplogManager(unittest.TestCase):
         """
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        solr = SolrSimulator()
+        solr = BackendSimulator()
         test_oplog.doc_manager = solr
         
         #for empty oplog, no documents added
@@ -349,7 +349,7 @@ class TestOplogManager(unittest.TestCase):
         test_oplog, primary_conn, mongos_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
-        solr = SolrSimulator()
+        solr = BackendSimulator()
         test_oplog.doc_manager = solr
         solr.test_delete()          #equivalent to solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
