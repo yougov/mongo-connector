@@ -16,6 +16,7 @@ class BackendSimulator():
     def upsert(self, doc):
         """Adds a document to the doc dict.
         """
+
         self.doc_dict[doc['_id']] = doc
         
         

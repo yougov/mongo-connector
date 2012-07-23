@@ -62,8 +62,9 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_remove (self):
         #test remove
-        conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
-        conn['test']['test'].remove({'name':'paulie'}, safe=True)
+        conn['test']['test'].insert ( {'name':'paulie'}, safe=1 )
+        time.sleep(3)
+        conn['test']['test'].remove({'name':'paulie'}, safe=1)
         while (len(s.test_search()) == 1):
             time.sleep(1)
         a = s.test_search()
@@ -194,8 +195,8 @@ def abort_test(self):
 		sys.exit(1)
 				
 if __name__ == '__main__':
-	#os.system('rm config.txt; touch config.txt')
-	#start_cluster()
+	os.system('rm config.txt; touch config.txt')
+	start_cluster()
 	conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
 	t = Timer(60, abort_test)
 	t.start()
