@@ -49,7 +49,7 @@ class Daemon(Thread):
         source = open(self.oplog_checkpoint + '~', 'r')
     
         for oplog, ts in self.oplog_progress_dict.items():
-            oplog_str = str(oplog.database.connection)
+            oplog_str = str(self.oplog.database.connection)
             timestamp = bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
             dest.write(json_str) 
