@@ -159,10 +159,13 @@ class OplogThread(Thread):
                 pass
 
         if cursor_len == 1:     # means we are the end of the oplog
+       #     print 'returning cursor here again, ts is %s' % timestamp
+            self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
             return cursor
         elif cursor_len > 1:
             doc = cursor.next()
             if timestamp == doc['ts']:
+                print 'moving past to next doc, ts arg was %s' % timestamp
                 return cursor
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
@@ -170,6 +173,8 @@ class OplogThread(Thread):
         else:
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
+            print 'timestamp returned after rollback is %s' % timestamp
+            
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
 
@@ -244,10 +249,11 @@ class OplogThread(Thread):
             logging.info('OplogManager: %s Dumped collection into backend' % self.oplog)
 
         self.checkpoint.commit_ts = timestamp
-        if timestamp is not None:
-            self.write_config()
         cursor = self.get_oplog_cursor(timestamp)
-
+        print 'in init cursor after getting oplog ts'
+        if cursor is not None:
+            self.write_config()
+        
         return cursor
 
     def prepare_for_sync(self):
@@ -268,6 +274,8 @@ class OplogThread(Thread):
             
             if cursor is None:
                 cursor = self.init_cursor()
+            else:
+                self.write_config()
 
         return cursor
 
@@ -278,8 +286,7 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file.
         """
-        print self.checkpoint.commit_ts
-        print 'ts an instance of ts? %s ' % isinstance(self.checkpoint.commit_ts, Timestamp)
+       # print 'in write config, %s' % self.checkpoint.commit_ts
         self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
         
         
@@ -288,7 +295,7 @@ class OplogThread(Thread):
         """
         oplog_str = str(self.oplog)
         
-        if oplog_str in self.oplog_progress_dict:
+        if oplog_str in self.oplog_progress_dict.keys():
             return self.oplog_progress_dict[oplog_str]
         else:
             return None
@@ -301,6 +308,8 @@ class OplogThread(Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and backend are in consistent states.
         """
+        
+        print 'going to do a rollback'
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
 

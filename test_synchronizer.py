@@ -32,11 +32,13 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         conn['test']['test'].remove(safe = True)
         while (len(s.test_search()) != 0):
-            print len(s.test_search())
-            for it in s.test_search():
-                print it
-            time.sleep(1)      
-    
+       #     print len(s.test_search())
+      #      for it in s.test_search():
+       #         print it
+            time.sleep(1)    
+            
+        print 'all finished with setup'  
+     
     def test_initial (self):
         #test search + initial clear
         conn['test']['test'].remove(safe = True) 
@@ -70,7 +72,7 @@ class TestSynchronizer(unittest.TestCase):
         a = s.test_search()
         self.assertEqual (len(a), 0)
         print 'PASSED TEST REMOVE'
-
+    
     
     def test_rollback(self):
         #test rollback
@@ -119,7 +121,7 @@ class TestSynchronizer(unittest.TestCase):
             print it
         self.assertEqual(conn['test']['test'].find().count(), 1)
         print 'PASSED TEST ROLLBACK'
-        '''  
+    '''    
     def test_stress(self):
         #stress test
         #os.system('rm config.txt; touch config.txt')
@@ -188,8 +190,8 @@ class TestSynchronizer(unittest.TestCase):
 		a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
 		self.assertEqual (len(a), NUMBER_OF_DOCS)
 
-		print 'PASSED TEST STRESSED ROLBACK'''
-		
+		print 'PASSED TEST STRESSED ROLBACK'
+		'''
 
 		
 def abort_test(self):
