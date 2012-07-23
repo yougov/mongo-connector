@@ -15,7 +15,7 @@ from optparse import OptionParser
 from simplejson import JSONDecodeError
 from sys import exit
 from threading import Thread
-from util import bson_ts_to_long
+from util import bson_ts_to_long, long_to_bson_ts
 
 
 class Daemon(Thread):
@@ -50,8 +50,6 @@ class Daemon(Thread):
         source = open(self.oplog_checkpoint + '~', 'r')
     
         for oplog, ts in self.oplog_progress_dict.items():
-            print oplog
-            print ts
             oplog_str = str(oplog)
             timestamp = bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
