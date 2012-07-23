@@ -7,6 +7,7 @@ import re
 import simplejson as json
 import time
 
+from backend_simulator import BackendSimulator
 from doc_manager import DocManager
 from pymongo import Connection
 from oplog_manager import OplogThread
@@ -84,7 +85,11 @@ class Daemon(Thread):
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        doc_manager = DocManager(self.backend_url)
+        
+        if self.backend_url is None:
+            doc_manager = BackendSimulator()
+        else:
+            doc_manager = DocManager(self.backend_url)
         if doc_manager is None:
             logging.critical('Bad backend URL!')
             return
