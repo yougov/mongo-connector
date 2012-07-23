@@ -50,7 +50,9 @@ class Daemon(Thread):
         source = open(self.oplog_checkpoint + '~', 'r')
     
         for oplog, ts in self.oplog_progress_dict.items():
-            oplog_str = str(self.oplog.database.connection)
+            print oplog
+            print ts
+            oplog_str = str(oplog)
             timestamp = bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
             dest.write(json_str) 
@@ -74,7 +76,7 @@ class Daemon(Thread):
         while count < len(data):
             oplog_str = data[count]
             ts = data[count+1]
-            self.oplog_progress_dict[oplog_str] = ts
+            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
             count = count + 2                        # skip to next set
         
        # return self.checkpoint.commit_ts

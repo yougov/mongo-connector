@@ -270,13 +270,13 @@ class OplogThread(Thread):
         timestamp, and then copying the new config onto the old file.
         """
         
-        self.oplog_progress_dict[self.oplog] = self.checkpoint.commit_ts
+        self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
         
         
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
         """
-        oplog_str = str(self.oplog.database.connection)
+        oplog_str = str(self.oplog)
         
         if oplog_str in self.oplog_progress_dict:
             return self.oplog_progress_dict[oplog_str]
