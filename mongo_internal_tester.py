@@ -11,7 +11,7 @@ class MongoInternalTester(unittest.TestCase):
     
 
     def test_daemon(self):
-        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id')
+        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
        
         d.start()
         
