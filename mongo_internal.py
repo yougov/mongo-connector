@@ -76,7 +76,7 @@ class Daemon(Thread):
             self.oplog_progress_dict[oplog_str] = ts
             count = count + 2                        # skip to next set
         
-        return self.checkpoint.commit_ts
+       # return self.checkpoint.commit_ts
         
 
     def run(self):
