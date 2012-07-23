@@ -71,11 +71,17 @@ class OplogThread(Thread):
                         continue
 
                     if operation == 'd':
+                        print 'delete'
+                        print entry
+                        print doc
                         entry['_id'] = entry['o']['_id']
                         self.doc_manager.remove(entry)
 
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
+                        print 'oplog'
+                        print entry
+                        print doc
 
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])

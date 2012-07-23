@@ -33,6 +33,8 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe = True)
         while (len(s.test_search()) != 0):
             print len(s.test_search())
+            for it in s.test_search():
+                print it
             time.sleep(1)      
     
     def test_initial (self):
@@ -112,6 +114,9 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), 1)
         for it in a:
             self.assertEqual(it['name'], 'paul')
+        for it in conn['test']['test'].find():
+            print it
+        self.assertEqual(conn['test']['test'].find().count(), 1)
         print 'PASSED TEST ROLLBACK'
         '''  
     def test_stress(self):
