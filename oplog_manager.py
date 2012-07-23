@@ -64,6 +64,7 @@ class OplogThread(Thread):
 
             try:
                 for entry in cursor:
+
                     operation = entry['op']
                     ns = entry['ns']
 
@@ -106,6 +107,7 @@ class OplogThread(Thread):
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
         """
+
         if not entry:
             return None
 
@@ -121,6 +123,7 @@ class OplogThread(Thread):
         while True:
             try:
                 coll = self.mongos_connection[db_name][coll_name]
+                
                 doc = coll.find_one({'_id': doc_id})
                 break
             except AutoReconnect, OperationFailure:
@@ -269,7 +272,8 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file.
         """
-        
+        print self.checkpoint.commit_ts
+        print 'ts an instance of ts? %s ' % isinstance(self.checkpoint.commit_ts, Timestamp)
         self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
         
         

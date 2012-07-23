@@ -16,6 +16,7 @@ from simplejson import JSONDecodeError
 from sys import exit
 from threading import Thread
 from util import bson_ts_to_long, long_to_bson_ts
+from bson.timestamp import Timestamp
 
 
 class Daemon(Thread):
@@ -84,7 +85,7 @@ class Daemon(Thread):
         while count < len(data):
             oplog_str = data[count]
             ts = data[count+1]
-            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
+            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)    #stored as bson_ts
             count = count + 2                        # skip to next set
         
        # return self.checkpoint.commit_ts
