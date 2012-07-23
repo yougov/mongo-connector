@@ -82,7 +82,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = SolrSimulator()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, None, 
+        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
         return (oplog, primary_conn, oplog_coll, mongos_conn)
@@ -102,7 +102,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = SolrSimulator()
-        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, None, 
+        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
         return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
@@ -258,17 +258,19 @@ class TestOplogManagerSharded(unittest.TestCase):
         #with config file, assert that size != 0
         os.system('touch temp_config.txt')
         
-        config_file_path = os.getcwd() + '/'+ 'temp_config.txt'
-        test_oplog.oplog_file = config_file_path
+        #config_file_path = os.getcwd() + '/'+ 'temp_config.txt'
+        #test_oplog.oplog_file = config_file_path
         cursor = test_oplog.init_cursor()
-        config_file_size = os.stat(config_file_path)[6]
+        #config_file_size = os.stat(config_file_path)[6]
+        oplog_dict = test_oplog.oplog_progress_dict
+
         
         assert (cursor.count() == 1)
-        assert (config_file_size != 0)
+        self.assertTrue (test_oplog.oplog in oplog_dict)
+        self.assertTrue (oplog_dict[test_oplog.oplog] == test_oplog.checkpoint.commit_ts)
         
         os.system('rm temp_config.txt')
         test_oplog.stop()
-
         print 'PASSED TEST INIT CURSOR'
     
     def test_prepare_for_sync(self):
@@ -304,9 +306,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog.stop()
         print 'PASSED TEST PREPARE FOR SYNC'
     
-    def test_write_config(self):
-        """Test write_config in oplog_manager. Assertion failure if it doesn't pass
-        """
+    """def test_write_config(self):
+        #Test write_config in oplog_manager. Assertion failure if it doesn't pass
+        
         
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
@@ -351,8 +353,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         print 'PASSED TEST WRITE CONFIG'
             
     def test_read_config(self):
-        """Test read_config in oplog_manager. Assertion failure if it doesn't pass
-        """
+        #Test read_config in oplog_manager. Assertion failure if it doesn't pass
+        
         
         test_oplog, primary_conn, oplog_coll, mongos_conn = self.get_oplog_thread()
         test_oplog.checkpoint = Checkpoint()
@@ -381,7 +383,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         os.system('rm ' + config_file_path)   
         
         print 'TEST READ CONFIG'
-            
+    """     
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -425,14 +427,14 @@ class TestOplogManagerSharded(unittest.TestCase):
     
         killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])  
                 
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
 
     
         #wait for master to be established
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log", None)
 
                 
         #wait for secondary to be established

@@ -45,7 +45,7 @@ class TestOplogManager(unittest.TestCase):
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
         
         primary_conn['test']['test'].drop()
-        mongos_conn = "localhost:" + PORTS_ONE["MONGOS"]
+        mongos_addr = "localhost:" + PORTS_ONE["MONGOS"]
         
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -53,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
         doc_manager = DocManager('http://localhost:8080/solr', False)
-        oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
+        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
         return (oplog, primary_conn, oplog_coll)
