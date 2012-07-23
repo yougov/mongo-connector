@@ -17,6 +17,7 @@ from pymongo.errors import ConnectionFailure
 from os import path
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager
+from solr_simulator import SolrSimulator
 from pysolr import Solr
 from util import (long_to_bson_ts, 
                   bson_ts_to_long,
@@ -52,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
         
         primary_conn['local'].create_collection('oplog.rs', capped=True, size=1000000)
         namespace_set = ['test.test']
-        doc_manager = DocManager('http://localhost:8080/solr', False)
+        doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -72,7 +73,7 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
         
         namespace_set = ['test.test']
-        doc_manager = DocManager('http://localhost:8080/solr', False)
+        doc_manager = SolrSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
                             namespace_set, None)
         
@@ -170,13 +171,12 @@ class TestOplogManager(unittest.TestCase):
         """
         
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        solr_url = "http://localhost:8080/solr"
-        solr = Solr(solr_url)
-        solr.delete(q='*:*')
+        solr = SolrSimulator()
+        test_oplog.doc_manager = solr
         
         #for empty oplog, no documents added
         self.assertEqual (test_oplog.dump_collection(None), None)
-        self.assertEqual (len(solr.search('*')), 0)
+        self.assertEqual (len(solr.test_search()), 0)
         
         #with documents
         primary_conn['test']['test'].insert ( {'name':'paulie'} )
@@ -184,9 +184,9 @@ class TestOplogManager(unittest.TestCase):
         test_oplog.dump_collection(search_ts)
 
         test_oplog.doc_manager.commit()
-        solr_results = solr.search('*')
+        solr_results = solr.test_search()
         self.assertEqual (len(solr_results), 1)
-        solr_doc = solr_results.docs[0]
+        solr_doc = solr_results[0]
         self.assertEqual (long_to_bson_ts(solr_doc['_ts']), search_ts)
         self.assertEqual (solr_doc['name'], 'paulie')
         self.assertEqual (solr_doc['ns'], 'test.test')
@@ -349,12 +349,13 @@ class TestOplogManager(unittest.TestCase):
         test_oplog, primary_conn, mongos_conn, oplog_coll = self.get_oplog_thread_new()
         #test_oplog.start()
         
-        solr = Solr('http://localhost:8080/solr')
-        solr.delete(q='*:*')
+        solr = SolrSimulator()
+        test_oplog.doc_manager = solr
+        solr.test_delete()          #equivalent to solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
         
         mongos_conn['test']['test'].remove({})
-        mongos_conn['test']['test'].insert( {'_id':obj1,'name':'paulie'} )
+        mongos_conn['test']['test'].insert( {'_id':obj1,'name':'paulie'}, safe=1 )
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
        
         obj2 = ObjectId('4ff74db3f646462b38000002')
@@ -372,7 +373,7 @@ class TestOplogManager(unittest.TestCase):
         time.sleep(5)
         while True:
             try:
-                mongos_conn['test']['test'].insert ( {'_id': obj2, 'name':'paul'})
+                mongos_conn['test']['test'].insert ( {'_id': obj2, 'name':'paul'}, safe=1)
                 break
             except: 
                 time.sleep(1)
@@ -405,13 +406,14 @@ class TestOplogManager(unittest.TestCase):
         
         test_oplog.doc_manager.upsert(first_doc)
         test_oplog.doc_manager.upsert(second_doc)
+
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
-        results = solr.search('*')
+        results = solr.test_search()
                 
         assert (len(results) == 1)
 
-        results_doc = results.docs[0]
+        results_doc = results[0]
         self.assertEqual(results_doc['name'], 'paulie')
         self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
         print 'PASSED TEST ROLLBACK'

@@ -11,8 +11,7 @@ class MongoInternalTester(unittest.TestCase):
     
 
     def test_daemon(self):
-        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
-       
+        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)  
         d.start()
         
         while len(d.shard_set) != 1:
@@ -23,6 +22,14 @@ class MongoInternalTester(unittest.TestCase):
         time.sleep(5)
         for thread in d.shard_set.values():
             self.assertFalse(thread.running)
+            
+    def test_write_oplog_progress(self):
+        
+        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)  
+        
+        
+        #test that None is returned if there is no config file specified.
+        self.assertEqual(d.write_oplog_progress(), None)
 
 if __name__ == '__main__':
     start_cluster()
