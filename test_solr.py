@@ -33,7 +33,7 @@ class TestSynchronizer(unittest.TestCase):
     def test_shard_length (self):
         self.assertEqual(len(d.shard_set), 1)
         print 'PASSED TEST SHARD LENGTH'
-
+    '''
     def test_initial (self):
         #test search + initial clear
         while (True):
@@ -130,7 +130,7 @@ class TestSynchronizer(unittest.TestCase):
             for it in a:
                 self.assertEqual (it['_id'], it['_id']) 
         print 'PASSED TEST STRESS'
-                   
+    '''
     
     def test_stressed_rollback(self):
         #test stressed rollback

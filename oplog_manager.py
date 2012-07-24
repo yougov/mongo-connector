@@ -22,7 +22,6 @@ from util import (bson_ts_to_long,
 class OplogThread(Thread):
     """OplogThread gathers the updates for a single oplog.
     """
-
     def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key):
         """Initialize the oplog thread.
@@ -291,14 +290,17 @@ class OplogThread(Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and backend are in consistent states.
         """
-
+        '''print 'IN ROLLBACK'
+        for it in self.doc_manager._search('*:*'):
+            print it'''
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
-
+        #print 'last inserted doc is %s' % last_inserted_doc
+        
         if last_inserted_doc is None:
             return None
 
-
+        
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
                                                sort=[('$natural',
@@ -307,13 +309,18 @@ class OplogThread(Thread):
         if last_oplog_entry is None:
             return None
         
+        #print 'last oplog entry is %s' % last_oplog_entry
+                
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
 
-
+        #print 'start ts is %s' % start_ts
+        #    print 'end ts is %s' % end_ts
+        #for it in docs_to_rollback:
+        #   print it
         rollback_set = {}
         for doc in docs_to_rollback:
             ns = doc['ns']
