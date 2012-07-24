@@ -23,8 +23,6 @@ class BackendSimulator():
     def remove(self, doc):
         """Removes the document from the doc dict. 
         """
-        print 'removing'
-        print doc
         del self.doc_dict[doc['_id']]
         
         
