@@ -14,12 +14,12 @@ class MongoInternalTester(unittest.TestCase):
     
 
     def test_daemon(self):
-        d = Daemon('localhost:27217', 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)  
+        d = Daemon('localhost:27217', 'config.txt', None, ['test.test'], '_id', None)  
         d.start()
         
         while len(d.shard_set) != 1:
             time.sleep(2)
-        d.stop()
+        d.join()
         
         self.assertFalse(d.can_run)
         time.sleep(5)
@@ -30,7 +30,7 @@ class MongoInternalTester(unittest.TestCase):
         
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
-        d = Daemon('localhost:27217', config_file_path, 'http://localhost:8080/solr', ['test.test'], '_id', None)  
+        d = Daemon('localhost:27217', config_file_path, None, ['test.test'], '_id', None)  
         
         #test that None is returned if there is no config file specified.
         self.assertEqual(d.write_oplog_progress(), None)
@@ -58,7 +58,7 @@ class MongoInternalTester(unittest.TestCase):
         
     def test_read_oplog_progress(self):
         
-        d = Daemon('localhost:27217', None, 'http://localhost:8080/solr', ['test.test'], '_id', None) 
+        d = Daemon('localhost:27217', None, None, ['test.test'], '_id', None) 
         
         #testing with no file 
         self.assertEqual(d.read_oplog_progress(), None)
@@ -92,6 +92,6 @@ class MongoInternalTester(unittest.TestCase):
         print 'PASSED TEST READ OPLOG PROGRESS'      
 
 if __name__ == '__main__':
-  #  start_cluster()
-   # os.system('rm config.txt; touch config.txt')
+    start_cluster()
+    os.system('rm config.txt; touch config.txt')
     unittest.main()
