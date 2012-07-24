@@ -69,7 +69,10 @@ class DocManager():
         return value should be an iterable set of documents.
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self.solr.search(query)
+        return self.solr.search(query, rows = 100000000)
+
+    def _search(self, query):
+        return self.solr.search(query, rows = 200)
 
     def commit(self):
         """This function is used to force a commit.
@@ -104,7 +107,8 @@ class DocManager():
         returns None. Otherwise, it returns the first document.
         """
         #search everything, sort by descending timestamp, return 1 row
-        result = self.solr.search('*:*', sort='_ts desc', rows=1)
+        result = self.solr.search('*:*', sort='_ts desc', rows=1
+                                  )
 
         if len(result) == 0:
             return None

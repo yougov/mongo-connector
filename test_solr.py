@@ -167,32 +167,7 @@ class TestSynchronizer(unittest.TestCase):
             b = conn['test']['test'].find_one({'name': it['name']})
             self.assertEqual (it['_id'], str(b['_id']))
     
-	while len(s.search('*:*', rows = NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
-    	    time.sleep(1)
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
-         
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
-        
-        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        for i in range(0, NUMBER_OF_DOCS):
-            try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=True)
-            except: 
-                time.sleep(1)
-                i -= 1
-                continue
-        while (len(s.search('*:*', rows = NUMBER_OF_DOCS*2)) != NUMBER_OF_DOCS*2):
-            time.sleep(1)
-        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2, sort='_id asc')
-        self.assertEqual (len(a), NUMBER_OF_DOCS)
-        i = 0
-        for it in a:
-            b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
-            i += 1
-            self.assertEqual (it['_id'], str(b['_id']))
+
         
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
          
