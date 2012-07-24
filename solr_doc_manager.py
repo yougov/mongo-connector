@@ -59,6 +59,7 @@ class DocManager():
         """
         self.solr.delete(id=str(doc[self.unique_key]), commit=False)
 
+
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range.
 
@@ -68,9 +69,6 @@ class DocManager():
         return value should be an iterable set of documents.
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self.solr.search(query)
-
-    def _search(self, query):
         return self.solr.search(query)
 
     def commit(self):

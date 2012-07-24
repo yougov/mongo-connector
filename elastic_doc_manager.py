@@ -11,8 +11,8 @@ class DocManager():
 
     def __init__ (self, url, auto_commit = True):
         if verify_url(url) is False:
-            print 'Invalid ElasticSearch URL'
             self.elastic = None
+            print 'Invalid ElasticSearch URL'
             return None
         self.elastic = ES(server=url)
         if auto_commit:
@@ -25,13 +25,18 @@ class DocManager():
         doc_id = doc['_id']
         self.elastic.index(doc, index, doc_type, doc_id)
 
-    def remove(self, doc):
-        
-        self.elastic.delete(doc['ns'], 'string', str(doc['_id']))
+    def remove(self, doc):        
+        try:
+            self.elastic.delete(doc['ns'], 'string', str(doc['_id']))
+        except:
+            pass
 
     def _remove(self):
-        self.elastic.delete('test.test', 'string', '')
-    
+        try:
+            self.elastic.delete('test.test', 'string', '')
+        except:
+            pass
+
     def search(self, start_ts, end_ts):
        res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
        q = RangeQuery(res)
@@ -53,5 +58,7 @@ class DocManager():
         it = None
         q = MatchAllQuery()
         result = self.elastic.search(q, size=1, sort={'_ts:desc'})
-        for it in result: pass
-        return it
+        for it in result:
+            r = it
+            break
+        return r

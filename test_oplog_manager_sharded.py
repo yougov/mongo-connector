@@ -149,7 +149,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         #testing for bad doc id as input
         assert (test_oplog.retrieve_doc(last_oplog_entry) == None)
         
-        test_oplog.stop()
+        #test_oplog.stop()
         print 'PASSED TEST RETRIEVE DOC'
         
                 
@@ -179,7 +179,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         
         mongos_conn['alpha']['foo'].insert ( {'name':'pauline'} )
         assert (test_oplog.get_oplog_cursor(ts) == None)
-        test_oplog.stop()
+        #test_oplog.stop()
             
         #need to add tests for 'except' part of get_oplog_cursor
             """
@@ -200,7 +200,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         last_oplog_entry = oplog_cursor.next()
         assert (test_oplog.get_last_oplog_timestamp() == last_oplog_entry['ts'])
         
-        test_oplog.stop()
+        #test_oplog.stop()
         
         print 'PASSED TEST GET OPLOG TIMESTAMP'
             
@@ -229,7 +229,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'alpha.foo')
         
-        test_oplog.stop()
+        #test_oplog.stop()
                 
         print 'PASSED TEST DUMP COLLECTION'
         
@@ -275,7 +275,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertTrue (oplog_dict[str(test_oplog.oplog)] == test_oplog.checkpoint.commit_ts)
         
         os.system('rm temp_config.txt')
-        test_oplog.stop()
+        #test_oplog.stop()
         print 'PASSED TEST INIT CURSOR'
     
     def test_prepare_for_sync(self):
@@ -308,7 +308,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (next_doc['o']['name'] == 'paulter')
         assert (next_doc['ts'] == new_search_ts)
 
-        test_oplog.stop()
+        #test_oplog.stop()
         print 'PASSED TEST PREPARE FOR SYNC'
     
     """def test_write_config(self):
@@ -352,7 +352,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (oplog_str in data[0])
         assert (search_ts == long_to_bson_ts(data[1]))
         
-        test_oplog.stop()
+        #test_oplog.stop()
         os.system('rm ' + config_file_path)
         
         print 'PASSED TEST WRITE CONFIG'

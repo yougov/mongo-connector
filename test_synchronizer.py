@@ -135,7 +135,6 @@ class TestSynchronizer(unittest.TestCase):
     
     def test_stressed_rollback(self):
         #test stressed rollback
-        conn['test']['test'].remove()
         while len(s.test_search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):
@@ -166,10 +165,9 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), NUMBER_OF_DOCS + count)
         i = 0
         for it in a:
-            if 'pauline' in it['name']:
-                b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
-                i += 1
-                self.assertEqual (it['_id'], str(b['_id']))
+            if 'Pauline' in it['name']:
+                b = conn['test']['test'].find_one({'name': it['name']})
+                self.assertEqual (it['_id'], b['_id'])
     
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
          
