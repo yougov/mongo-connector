@@ -1,7 +1,7 @@
 import unittest
 import time
 import sys
-from solr_doc_manager import DocManager
+from doc_manager import DocManager
 from pysolr import Solr
 
 SolrDoc = DocManager("http://localhost:8080/solr/")

@@ -18,7 +18,7 @@ s = Solr('http://localhost:8080/solr')
 d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
 			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
 conn = None
-NUMBER_OF_DOCS = 10
+NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
 
