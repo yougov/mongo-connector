@@ -5,7 +5,7 @@ from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
 from threading import Timer
-from elastic_doc_manager import DocManager
+from doc_manager import DocManager
 from pysolr import Solr
 from mongo_internal import Daemon
 
@@ -18,7 +18,7 @@ d = Daemon('localhost:' + PORTS_ONE["MONGOS"],
 			'config.txt', 'http://localhost:9200', ['test.test'], '_id', None)
 s = DocManager('http://localhost:9200')
 conn = None
-NUMBER_OF_DOCS = 1
+NUMBER_OF_DOCS = 1000
 
 class TestSynchronizer(unittest.TestCase):
 
@@ -162,11 +162,9 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         a = s._search()
         self.assertEqual (len(a), NUMBER_OF_DOCS + count)
-        i = 0
         for it in a:
-            if 'pauline' in it['name']:
-                b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
-                i += 1
+            if 'Pauline' in it['name']:
+                b = conn['test']['test'].find_one({'name': it['name']})
                 self.assertEqual (it['_id'], str(b['_id']))
     
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
