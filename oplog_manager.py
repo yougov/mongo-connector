@@ -291,12 +291,13 @@ class OplogThread(Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and backend are in consistent states.
         """
-        
+
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
 
         if last_inserted_doc is None:
             return None
+
 
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
@@ -305,12 +306,13 @@ class OplogThread(Thread):
 
         if last_oplog_entry is None:
             return None
-
+        
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
+
 
         rollback_set = {}
         for doc in docs_to_rollback:
