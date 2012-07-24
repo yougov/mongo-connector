@@ -45,8 +45,9 @@ class Daemon(Thread):
             return
 
 
-    def stop(self):
+    def join(self):
         self.can_run = False
+        Thread.join(self)
         
     def write_oplog_progress(self):
     
@@ -120,8 +121,7 @@ class Daemon(Thread):
 
         #time to stop running
         for thread in self.shard_set.values():
-            thread.stop()
-        exit(0)
+            thread.join()
 
 if __name__ == '__main__':
 

@@ -164,11 +164,11 @@ class TestSynchronizer(unittest.TestCase):
 	
 		killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 		 
-		startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
+		startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
 		while primary_conn['admin'].command("isMaster")['ismaster'] is False:
 			time.sleep(1)
 			
-		startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
+		startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log", None)
 		
 		while (len( s.search('Pauline', rows = NUMBER_OF_DOCS*2)) != 0):
 			time.sleep(15)

@@ -10,8 +10,10 @@ import time
 import os
 import json
 import unittest
+import re
 
-from setup_cluster import killMongoProc, startMongoProc, start_cluster 
+from setup_cluster import killMongoProc, startMongoProc, start_cluster
+from optparse import OptionParser 
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
@@ -38,6 +40,8 @@ DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
+
+AUTH_KEY = None
 
 def safe_mongo_op(func, arg1, arg2=None):
     while True:
@@ -83,7 +87,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
-                            namespace_set, None)
+                            namespace_set, AUTH_KEY)
         
         return (oplog, primary_conn, oplog_coll, mongos_conn)
 
@@ -103,7 +107,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
-                            namespace_set, None)
+                            namespace_set, AUTH_KEY)
         
         return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
         
@@ -468,9 +472,44 @@ class TestOplogManagerSharded(unittest.TestCase):
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
-   # start_cluster(sharded = True)
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-    unittest.main()
+        
+    parser = OptionParser()
 
-    print 'RERUNNING'
-    unittest.main()
+    #-m is for the mongos address, which is a host:port pair.
+    parser.add_option("-a", "--auth", action="store", type="string",
+                      dest="auth_file", default="")
+                      
+    (options, args) = parser.parse_args()
+    
+    if options.auth_file != "":
+        print 'options auth file is %s' % options.auth_file
+        start_cluster(sharded = True, key_file = options.auth_file)   
+        try:
+            file = open(options.auth_file)
+            print 'opened file'
+            key = file.read()
+            print 'read file'
+            re.sub(r'\s', '', key)
+            AUTH_KEY = key
+        except:
+           # logger.error('Could not parse authentication file!')
+            exit(1)
+    else: 
+        start_cluster(sharded = True)
+        
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    unittest.main(argv=[sys.argv[0]])
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

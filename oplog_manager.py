@@ -98,11 +98,11 @@ class OplogThread(Thread):
 
             time.sleep(2)
 
-    def stop(self):
+    def join(self):
         """Stop this thread from managing the oplog.
         """
         self.running = False
-#        Thread.join(self)
+        Thread.join(self)
 
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
