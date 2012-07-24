@@ -40,8 +40,11 @@ class DocManager():
 
         self.solr = Solr(url)
         self.unique_key = unique_key
+        self.auto_commit = auto_commit
+        
         if auto_commit:
-            self.auto_commit()
+            self.run_auto_commit()
+            
 
     def upsert(self, doc):
         """Update or insert a document into Solr
@@ -86,7 +89,7 @@ class DocManager():
         """
         retry_until_ok(self.solr.commit)
 
-    def auto_commit(self):
+    def run_auto_commit(self):
         """Periodically commits to the Solr server.
 
         This function commits all changes to the Solr engine, and then starts a
@@ -96,7 +99,8 @@ class DocManager():
         are handled, as timers may not be necessary in all instances.
         """
         self.solr.commit()
-        Timer(1, self.auto_commit).start()
+        if self.auto_commit:
+            Timer(1, self.run_auto_commit).start()
 
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.

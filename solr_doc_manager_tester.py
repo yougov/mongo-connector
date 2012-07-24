@@ -93,6 +93,7 @@ class SolrDocManagerTester(unittest.TestCase):
         res = SolrDoc._search('Waldo')
         assert(len(res) != 0)
         print 'PASSED COMMIT'
+        SolrDoc.auto_commit = False
 
     def test_get_last_doc(self):
         #test get last doc
@@ -112,6 +113,7 @@ class SolrDocManagerTester(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+    print 'ok'
 
         
 
