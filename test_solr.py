@@ -15,8 +15,7 @@ from mongo_internal import Daemon
 PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
 s = Solr('http://localhost:8080/solr')
-d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
-			'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
+d = None 
 conn = None
 NUMBER_OF_DOCS = 100
 
@@ -134,6 +133,7 @@ class TestSynchronizer(unittest.TestCase):
     
     def test_stressed_rollback(self):
         #test stressed rollback
+        
         conn['test']['test'].remove()
         while len(s.search('*:*', rows = NUMBER_OF_DOCS)) != 0:
             time.sleep(1)
@@ -167,6 +167,33 @@ class TestSynchronizer(unittest.TestCase):
             b = conn['test']['test'].find_one({'name': it['name']})
             self.assertEqual (it['_id'], str(b['_id']))
     
+	while len(s.search('*:*', rows = NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
+    	    time.sleep(1)
+        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+         
+        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        
+        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        time.sleep(5)
+        for i in range(0, NUMBER_OF_DOCS):
+            try:
+                conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=True)
+            except: 
+                time.sleep(1)
+                i -= 1
+                continue
+        while (len(s.search('*:*', rows = NUMBER_OF_DOCS*2)) != NUMBER_OF_DOCS*2):
+            time.sleep(1)
+        a = s.search('Pauline', rows = NUMBER_OF_DOCS*2, sort='_id asc')
+        self.assertEqual (len(a), NUMBER_OF_DOCS)
+        i = 0
+        for it in a:
+            b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
+            i += 1
+            self.assertEqual (it['_id'], str(b['_id']))
+        
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
          
         startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
@@ -182,8 +209,7 @@ class TestSynchronizer(unittest.TestCase):
         a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
         self.assertEqual (len(a), NUMBER_OF_DOCS)
         print 'PASSED TEST STRESSED ROLBACK'
-        
-        
+		
 def abort_test(self):
         print 'test failed'
         sys.exit(1)
@@ -193,11 +219,12 @@ if __name__ == '__main__':
     s.delete(q = '*:*')
     start_cluster()
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
     t = Timer(60, abort_test)
     t.start()
     d.start()
     while len(d.shard_set) == 0:
         pass
-	t.cancel()
-	unittest.main()
-	d.join()
+    t.cancel()
+    unittest.main()
+    d.join()

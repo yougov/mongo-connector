@@ -8,6 +8,7 @@ import sys
 import time
 import os
 import json
+import re
 import unittest
 
 from setup_cluster import killMongoProc, startMongoProc, start_cluster 
@@ -15,6 +16,7 @@ from mongo_internal import Daemon
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
+from optparse import OptionParser
 from oplog_manager import OplogThread
 from backend_simulator import BackendSimulator
 from pysolr import Solr
@@ -28,6 +30,8 @@ from bson.objectid import ObjectId
 """    
 PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
+    
+AUTH_KEY = None
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the cluster
@@ -54,7 +58,7 @@ class TestOplogManager(unittest.TestCase):
         namespace_set = ['test.test']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True, doc_manager, {}, 
-                            namespace_set, None)
+                            namespace_set, AUTH_KEY)
         
         return (oplog, primary_conn, oplog_coll)
 
@@ -74,7 +78,7 @@ class TestOplogManager(unittest.TestCase):
         namespace_set = ['test.test']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_conn, oplog_coll, True, doc_manager, {}, 
-                            namespace_set, None)
+                            namespace_set, AUTH_KEY)
         
         return (oplog, primary_conn, oplog.mongos_connection, oplog_coll)
     
@@ -114,7 +118,7 @@ class TestOplogManager(unittest.TestCase):
         #testing for bad doc id as input
         self.assertEqual (test_oplog.retrieve_doc(last_oplog_entry), None)
         
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST RETRIEVE DOC'
                 
     def test_get_oplog_cursor(self):
@@ -143,7 +147,7 @@ class TestOplogManager(unittest.TestCase):
         
         primary_conn['test']['test'].insert ( {'name':'pauline'} )
         self.assertEqual (test_oplog.get_oplog_cursor(ts), None)
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST GET OPLOG CURSOR'
         #need to add tests for 'except' part of get_oplog_cursor
             
@@ -162,7 +166,7 @@ class TestOplogManager(unittest.TestCase):
         last_oplog_entry = oplog_cursor.next()
         self.assertEqual (test_oplog.get_last_oplog_timestamp(), last_oplog_entry['ts'])
         
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST GET LAST OPLOG TIMESTAMP'
             
     def test_dump_collection(self):
@@ -190,7 +194,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual (solr_doc['name'], 'paulie')
         self.assertEqual (solr_doc['ns'], 'test.test')
         
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST DUMP COLLECTION'
     
     def test_init_cursor(self):
@@ -226,7 +230,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertTrue (oplog_dict[str(test_oplog.oplog)] == test_oplog.checkpoint.commit_ts)
         
         os.system('rm temp_config.txt')
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST INIT CURSOR'
     
     def test_prepare_for_sync(self):
@@ -259,86 +263,9 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual (next_doc['o']['name'], 'paulter')
         self.assertEqual (next_doc['ts'], new_search_ts)
 
-        test_oplog.stop()
+        #test_oplog.join()
         print 'PASSED TEST PREPARE FOR SYNC'
     
-    """
-    def test_write_config(self):
-        """#Test write_config in oplog_manager. Assertion failure if it doesn't pass
-    """
-        
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        test_oplog.checkpoint = Checkpoint()
-        
-        
-        #test that None is returned if there is no config file specified.
-        self.assertEqual (test_oplog.write_config(), None)
-        
-        #create config file
-        os.system('touch temp_config.txt')
-        config_file_path = os.getcwd() + '/temp_config.txt'
-        test_oplog.oplog_file = config_file_path
-        
-        primary_conn['test']['test'].insert ( {'name':'paulie'} )
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.checkpoint.commit_ts = search_ts
-        
-        test_oplog.write_config()
-        
-        data = json.load(open(config_file_path, 'r'))
-        oplog_str = str(oplog_coll.database.connection)
-        
-        self.assertTrue (oplog_str in data[0])
-        self.assertEqual (search_ts, long_to_bson_ts(data[1]))
-        
-        #ensure that the temporary file is deleted
-        self.assertTrue (os.path.exists(config_file_path + '~') is False)
-        
-        search_ts = long_to_bson_ts(111111111111111)
-        test_oplog.checkpoint.commit_ts = search_ts
-        
-        test_oplog.write_config()
-        data = json.load(open(config_file_path, 'r'))
-        oplog_str = str(oplog_coll.database.connection)
-        
-        self.assertTrue(oplog_str in data[0])
-        self.assertEqual(search_ts, long_to_bson_ts(data[1]))
-        
-        test_oplog.stop()
-        os.system('rm ' + config_file_path)
-        print 'PASSED TEST WRITE CONFIG'
-    
-    def test_read_config(self):
-    """#Test read_config in oplog_manager. Assertion failure if it doesn't pass
-    """
-        
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        test_oplog.checkpoint = Checkpoint()
-        
-        #testing with no file
-        self.assertTrue(test_oplog.read_config() is None)
-        #create config file
-        os.system('touch temp_config.txt')
-        config_file_path = os.getcwd() + '/temp_config.txt'
-        test_oplog.oplog_file = config_file_path
-        
-        #testing with empty file
-        self.assertTrue(test_oplog.read_config() is None)
-        
-        #testing with a non-empty file
-        search_ts = long_to_bson_ts(111111111111111)
-        test_oplog.checkpoint.commit_ts = search_ts
-        test_oplog.write_config()
-        self.assertEqual (test_oplog.read_config(), search_ts)
-
-        #testing update
-        search_ts = long_to_bson_ts(999999999999999)
-        test_oplog.checkpoint.commit_ts = search_ts
-        test_oplog.write_config()
-        self.assertEqual (test_oplog.read_config(), search_ts)
-        os.system('rm ' + config_file_path)   
-        print 'PASSED TEST READ CONFIG'
-    """
     
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -415,12 +342,38 @@ class TestOplogManager(unittest.TestCase):
         results_doc = results[0]
         self.assertEqual(results_doc['name'], 'paulie')
         self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
+        
+        #test_oplog.join()
         print 'PASSED TEST ROLLBACK'
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
-    start_cluster()
+    
+    parser = OptionParser()
+
+    #-m is for the mongos address, which is a host:port pair.
+    parser.add_option("-a", "--auth", action="store", type="string",
+                      dest="auth_file", default="")
+                      
+    (options, args) = parser.parse_args()
+    
+    if options.auth_file != "":
+        print 'options auth file is %s' % options.auth_file
+        start_cluster(key_file = options.auth_file)   
+        try:
+            file = open(options.auth_file)
+            print 'opened file'
+            key = file.read()
+            print 'read file'
+            re.sub(r'\s', '', key)
+            AUTH_KEY = key
+        except:
+           # logger.error('Could not parse authentication file!')
+            exit(1)
+    else: 
+        start_cluster()
+    
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-    unittest.main()
+    unittest.main(argv=[sys.argv[0]])   
 
 
