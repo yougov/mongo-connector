@@ -29,6 +29,9 @@ class DocManager():
         
         self.elastic.delete(doc['ns'], 'string', str(doc['_id']))
 
+    def _remove(self):
+        self.elastic.delete('test.test', 'string', '')
+    
     def search(self, start_ts, end_ts):
        res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
        q = RangeQuery(res)

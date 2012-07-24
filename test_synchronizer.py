@@ -32,13 +32,8 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         conn['test']['test'].remove(safe = True)
         while (len(s.test_search()) != 0):
-       #     print len(s.test_search())
-      #      for it in s.test_search():
-       #         print it
             time.sleep(1)    
-            
-        print 'all finished with setup'  
-     
+              
     def test_initial (self):
         #test search + initial clear
         conn['test']['test'].remove(safe = True) 
@@ -117,14 +112,11 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual (len(a), 1)
         for it in a:
             self.assertEqual(it['name'], 'paul')
-        for it in conn['test']['test'].find():
-            print it
         self.assertEqual(conn['test']['test'].find().count(), 1)
         print 'PASSED TEST ROLLBACK'
-    '''    
+        
     def test_stress(self):
         #stress test
-        #os.system('rm config.txt; touch config.txt')
         for i in range(0, NUMBER_OF_DOCS):
             conn['test']['test'].insert({'name': 'Paul '+str(i)})
         time.sleep(5)
@@ -132,68 +124,75 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(5)
        # conn['test']['test'].create_index('name')
         for i in range(0, NUMBER_OF_DOCS):
-            a = s.search('Paul ' + str(i))
+            #a = s.search('Paul ' + str(i))
+            a = s.test_search()
             b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
             for it in a:
                 if (it['name'] == 'Paul' + str(i)):
                              self.assertEqual (it['_id'], it['_id']) 
         print 'PASSED TEST STRESS'
-				   
-	
-	def test_stressed_rollback(self):
-		#test stressed rollback
-		conn['test']['test'].remove()
-		while len(s.test_search()) != 0:
-			time.sleep(1)
-		for i in range(0, NUMBER_OF_DOCS):
-			conn['test']['test'].insert({'name': 'Paul '+str(i)})
+        		   
     
-		while len(s.test_search()) != NUMBER_OF_DOCS:
-			time.sleep(1)
-		primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-		killMongoProc('localhost', PORTS_ONE['PRIMARY'])
-		 
-		new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
-		
-		while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
-			time.sleep(1)
-		time.sleep(5)
-		for i in range(0, NUMBER_OF_DOCS):
-			try:
-				conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=True)
-			except: 
-				time.sleep(1)
-				i -= 1
-				continue
-		while (len(s.test_search()) != NUMBER_OF_DOCS*2):
-			time.sleep(1)
-		a = s.search('Pauline', rows = NUMBER_OF_DOCS*2, sort='_id asc')
-		self.assertEqual (len(a), NUMBER_OF_DOCS)
-		i = 0
-		for it in a:
-			b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
-			i += 1
-			self.assertEqual (it['_id'], str(b['_id']))
-	
-		killMongoProc('localhost', PORTS_ONE['SECONDARY'])
-		 
-		startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log")
-		while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-			time.sleep(1)
-			
-		startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log")
-		
-		while (len( s.search('Pauline', rows = NUMBER_OF_DOCS*2)) != 0):
-			time.sleep(15)
-		a = s.search('Pauline', rows = NUMBER_OF_DOCS*2)
-		self.assertEqual (len(a), 0)
-		a = s.search('Paul', rows = NUMBER_OF_DOCS*2)
-		self.assertEqual (len(a), NUMBER_OF_DOCS)
+    def test_stressed_rollback(self):
+        #test stressed rollback
+        conn['test']['test'].remove()
+        while len(s.test_search()) != 0:
+            time.sleep(1)
+        for i in range(0, NUMBER_OF_DOCS):
+            conn['test']['test'].insert({'name': 'Paul '+str(i)})
+    
+        while len(s.test_search()) != NUMBER_OF_DOCS:
+            time.sleep(1)
+        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+         
+        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        
+        while new_primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        time.sleep(5)
+        count = 0
+        for i in range(0, NUMBER_OF_DOCS):
+            try:
+                conn['test']['test'].insert({'name': 'Pauline ' + str(i)}, safe=1)
+                count += 1
+            except: 
+                time.sleep(1)
+                i -= 1
+                continue
+        while (len(s.test_search()) != NUMBER_OF_DOCS + count):
+            time.sleep(1)
+        a = s.test_search()
+        self.assertEqual (len(a), NUMBER_OF_DOCS + count)
+        i = 0
+        for it in a:
+            if 'pauline' in it['name']:
+                b = conn['test']['test'].find_one({'name': 'Pauline ' + str(i)})
+                i += 1
+                self.assertEqual (it['_id'], str(b['_id']))
+    
+        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
+         
+        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a", "/replset1a.log", None)
+        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+            
+        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b", "/replset1b.log", None)
+        
+        while (len( s.test_search()) != NUMBER_OF_DOCS):
+            time.sleep(5)
+            
+        a = s.test_search()
+        self.assertEqual (len(a), NUMBER_OF_DOCS)
+        for it in a:
+            self.assertTrue('Paul' in it['name'])
+        self.assertEqual(conn['test']['test'].find().count(), NUMBER_OF_DOCS)
+                
 
-		print 'PASSED TEST STRESSED ROLBACK'
-		'''
+        print 'PASSED TEST STRESSED ROLBACK'
+        
 
-		
+        
 def abort_test(self):
 		print 'test failed'
 		sys.exit(1)

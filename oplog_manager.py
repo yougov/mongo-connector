@@ -72,17 +72,11 @@ class OplogThread(Thread):
                         continue
 
                     if operation == 'd':
-                        print 'delete'
-                        print entry
-                        print doc
                         entry['_id'] = entry['o']['_id']
                         self.doc_manager.remove(entry)
 
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
-                        print 'oplog'
-                        print entry
-                        print doc
 
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
@@ -159,13 +153,11 @@ class OplogThread(Thread):
                 pass
 
         if cursor_len == 1:     # means we are the end of the oplog
-       #     print 'returning cursor here again, ts is %s' % timestamp
             self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
             return cursor
         elif cursor_len > 1:
             doc = cursor.next()
             if timestamp == doc['ts']:
-                print 'moving past to next doc, ts arg was %s' % timestamp
                 return cursor
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
@@ -173,7 +165,6 @@ class OplogThread(Thread):
         else:
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
-            print 'timestamp returned after rollback is %s' % timestamp
             
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
@@ -200,7 +191,6 @@ class OplogThread(Thread):
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
-        print 'thread is %s, timestamp is %s' %  (self.oplog, timestamp)
         
         if timestamp is None:
             return None
@@ -211,25 +201,16 @@ class OplogThread(Thread):
                                          no_func=True)
             cursor = retry_until_ok(target_coll.find)
             
-            for doc in cursor:
-                print doc
             
-            print 'finished printing cursor'
-            cursor.rewind()
-            print 'timestamp is %s' % timestamp
-            print 'c_len is %d' % cursor.count()
             
-            print '%s in dump coll, have target and cursor, going to convert TS' % self.oplog
+            
             long_ts = bson_ts_to_long(timestamp)
 
-            print 'about to enter for loop in d_c'
             for doc in cursor:
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
-                print 'doc in cursor here'
                 self.doc_manager.upsert(doc)
         
-        print '%s exiting dump collection, had timestamp: %s' % (self.oplog, timestamp)
 
 
     def init_cursor(self):
@@ -250,7 +231,6 @@ class OplogThread(Thread):
 
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)
-        print 'in init cursor after getting oplog ts'
         if cursor is not None:
             self.write_config()
         
@@ -309,7 +289,6 @@ class OplogThread(Thread):
         back until the oplog and backend are in consistent states.
         """
         
-        print 'going to do a rollback'
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
 
