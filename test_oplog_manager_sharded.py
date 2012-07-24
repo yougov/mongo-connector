@@ -266,8 +266,9 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         
         assert (cursor.count() == 1)
-        self.assertTrue (test_oplog.oplog in oplog_dict)
-        self.assertTrue (oplog_dict[test_oplog.oplog] == test_oplog.checkpoint.commit_ts)
+        print oplog_dict
+        self.assertTrue (str(test_oplog.oplog) in oplog_dict)
+        self.assertTrue (oplog_dict[str(test_oplog.oplog)] == test_oplog.checkpoint.commit_ts)
         
         os.system('rm temp_config.txt')
         test_oplog.stop()
@@ -467,6 +468,9 @@ class TestOplogManagerSharded(unittest.TestCase):
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
-    start_cluster(sharded = True)
+   # start_cluster(sharded = True)
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    unittest.main()
+
+    print 'RERUNNING'
     unittest.main()

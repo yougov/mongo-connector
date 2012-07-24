@@ -160,7 +160,8 @@ class OplogThread(Thread):
 
         if cursor_len == 1:     # means we are the end of the oplog
        #     print 'returning cursor here again, ts is %s' % timestamp
-            self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
+            if self.checkpoint is not None:
+                self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
             return cursor
         elif cursor_len > 1:
             doc = cursor.next()

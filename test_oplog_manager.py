@@ -222,8 +222,8 @@ class TestOplogManager(unittest.TestCase):
         oplog_dict = test_oplog.oplog_progress_dict
         
         self.assertEqual (cursor.count(), 1)
-        self.assertTrue (test_oplog.oplog in oplog_dict)
-        self.assertTrue (oplog_dict[test_oplog.oplog] == test_oplog.checkpoint.commit_ts)
+        self.assertTrue (str(test_oplog.oplog) in oplog_dict)
+        self.assertTrue (oplog_dict[str(test_oplog.oplog)] == test_oplog.checkpoint.commit_ts)
         
         os.system('rm temp_config.txt')
         test_oplog.stop()
