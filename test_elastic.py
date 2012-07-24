@@ -18,7 +18,7 @@ d = Daemon('localhost:' + PORTS_ONE["MONGOS"],
 			'config.txt', 'http://localhost:9200', ['test.test'], '_id', None)
 s = DocManager('http://localhost:9200')
 conn = None
-NUMBER_OF_DOCS = 6
+NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
 
@@ -33,7 +33,7 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe = True)
         while (len(s._search()) != 0):
             time.sleep(1)    
-    '''
+    
     def test_initial (self):
         #test search + initial clear
         conn['test']['test'].remove(safe = True)
@@ -130,7 +130,7 @@ class TestSynchronizer(unittest.TestCase):
                 if (it['name'] == 'Paul' + str(i)):
                              self.assertEqual (it['_id'], it['_id']) 
         print 'PASSED TEST STRESS'
-    '''   		   
+       		   
     
     def test_stressed_rollback(self):
         #test stressed rollback
