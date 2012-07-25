@@ -34,8 +34,8 @@ class DocManager():
         This method may vary from implementation to implementation, but it must
         verify the url to the backend and return None if that fails. It must
         also create the connection to the backend, and start a periodic
-        committer if necessary. The Solr uniqueKey is '_id' in the sample
-        schema, but this may be overridden by user defined configuration.
+        committer if necessary. The Elastic uniqueKey is '_id', but this may be overridden 
+        by user defined configuration.
         """
 
         if verify_url(url) is False:
@@ -82,7 +82,7 @@ class DocManager():
         """Called to query Elastic for documents in a time range.
         
         This method is only used by rollbacks to query all the documents in
-        Solr within a certain timestamp window. The input will be two longs
+        Elastic within a certain timestamp window. The input will be two longs
         (converted from Bson timestamp) which specify the time range. The
         return value should be an iterable set of documents.
         """
@@ -113,9 +113,9 @@ class DocManager():
     def run_auto_commit(self):
         """Periodically commits to the Elastic server.
             
-        This function commits all changes to the Solr engine, and then starts a
+        This function commits all changes to the Elastic engine, and then starts a
         timer that calls this function again in one second. The reason for this
-        function is to prevent overloading Solr from other searchers. This
+        function is to prevent overloading Elastic from other searchers. This
         function may be modified based on the backend engine and how commits
         are handled, as timers may not be necessary in all instances.
         """
@@ -129,7 +129,7 @@ class DocManager():
         
         This method is used for rollbacks to establish the rollback window,
         which is the gap between the last document on a mongo shard and the
-        last document in Solr. If there are no documents, this functions
+        last document in Elastic. If there are no documents, this functions
         returns None. Otherwise, it returns the first document.
         """
 
