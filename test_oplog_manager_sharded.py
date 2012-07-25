@@ -252,10 +252,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (cursor.count() == 1)
         
         if test_oplog.checkpoint.commit_ts != search_ts:
-            print 'test_oplog checkpoint ts is '
-            print test_oplog.checkpoint.commit_ts
-            print 'search ts is '
-            print search_ts
                    
         assert (test_oplog.checkpoint.commit_ts == search_ts)
         
@@ -270,7 +266,6 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         
         assert (cursor.count() == 1)
-        print oplog_dict
         self.assertTrue (str(test_oplog.oplog) in oplog_dict)
         self.assertTrue (oplog_dict[str(test_oplog.oplog)] == test_oplog.checkpoint.commit_ts)
         
@@ -482,13 +477,10 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     
     if options.auth_file != "":
-        print 'options auth file is %s' % options.auth_file
         start_cluster(sharded = True, key_file = options.auth_file)   
         try:
             file = open(options.auth_file)
-            print 'opened file'
             key = file.read()
-            print 'read file'
             re.sub(r'\s', '', key)
             AUTH_KEY = key
         except:

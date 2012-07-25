@@ -152,7 +152,6 @@ class OplogThread(Thread):
                 pass
 
         if cursor_len == 1:     # means we are the end of the oplog
-       #     print 'returning cursor here again, ts is %s' % timestamp
             if self.checkpoint is not None:
                 self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
 
@@ -225,9 +224,6 @@ class OplogThread(Thread):
 
         if timestamp is None:
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
-            #print self.oplog
-            #print 'timestamp after get last ts is '
-            #print timestamp
             self.dump_collection(timestamp)
             logging.info('OplogManager: %s Dumped collection into backend' % self.oplog)
 
@@ -251,9 +247,6 @@ class OplogThread(Thread):
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
             
-            #print self.oplog
-            #print cursor
-            
             if cursor is None:
                 cursor = self.init_cursor()
             else:
@@ -268,7 +261,6 @@ class OplogThread(Thread):
         This is done by duplicating the old config file, editing the relevant
         timestamp, and then copying the new config onto the old file.
         """
-       # print 'in write config, %s' % self.checkpoint.commit_ts
         self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
         
         
@@ -290,12 +282,8 @@ class OplogThread(Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and backend are in consistent states.
         """
-        '''print 'IN ROLLBACK'
-        for it in self.doc_manager._search('*:*'):
-            print it'''
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
-        #print 'last inserted doc is %s' % last_inserted_doc
         
         if last_inserted_doc is None:
             return None
@@ -309,7 +297,6 @@ class OplogThread(Thread):
         if last_oplog_entry is None:
             return None
         
-        #print 'last oplog entry is %s' % last_oplog_entry
                 
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
@@ -317,10 +304,6 @@ class OplogThread(Thread):
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
 
-        #print 'start ts is %s' % start_ts
-        #    print 'end ts is %s' % end_ts
-        #for it in docs_to_rollback:
-        #   print it
         rollback_set = {}
         for doc in docs_to_rollback:
             ns = doc['ns']

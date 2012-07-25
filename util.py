@@ -55,10 +55,6 @@ def retry_until_ok(func, args=None, no_func=False):
                 result = func(args)
                 break
         except:
-            #print 'messed up for func'
-            #print str(func)
-            #print str(args)
-            #print str(no_func)
             time.sleep(1)
 
     return result
