@@ -34,8 +34,8 @@ class DocManager():
         This method may vary from implementation to implementation, but it must
         verify the url to the backend and return None if that fails. It must
         also create the connection to the backend, and start a periodic
-        committer if necessary. The Solr uniqueKey is '_id' in the sample
-        schema, but this may be overridden by user defined configuration.
+        committer if necessary. The Elastic uniqueKey is '_id', but this may be overridden 
+        by user defined configuration.
         """
 
         if verify_url(url) is False:
