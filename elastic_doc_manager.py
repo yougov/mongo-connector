@@ -86,10 +86,10 @@ class DocManager():
         (converted from Bson timestamp) which specify the time range. The
         return value should be an iterable set of documents.
         """
-       res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
-       q = RangeQuery(res)
-       results = self.elastic.search(q)
-       return results
+        res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
+        q = RangeQuery(res)
+        results = self.elastic.search(q)
+        return results
     
     def _search(self):
         """For test purposes only. Performs search on Elastic with empty query.
