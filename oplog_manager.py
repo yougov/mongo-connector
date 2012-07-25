@@ -38,7 +38,7 @@ class OplogThread(Thread):
         self.namespace_set = namespace_set
         self.auth_key = auth_key
         self.mongos_connection = Connection(mongos_address)
-        
+
         if auth_key is not None:
             #Authenticate for the whole system
             primary_conn['local'].authenticate('__system', auth_key)
@@ -86,7 +86,7 @@ class OplogThread(Thread):
             except (AutoReconnect, OperationFailure):
                 err = True
                 pass
-                
+
             if err is True and self.auth_key is not None:
                 primary_conn['local'].authenticate('__system', auth_key)
                 err = False
@@ -122,7 +122,7 @@ class OplogThread(Thread):
         while True:
             try:
                 coll = self.mongos_connection[db_name][coll_name]
-                
+
                 doc = coll.find_one({'_id': doc_id})
                 break
             except AutoReconnect, OperationFailure:
@@ -138,7 +138,7 @@ class OplogThread(Thread):
         if timestamp is None:
             return None
         cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
-        if retry_until_ok (cursor.count) == 0:
+        if retry_until_ok(cursor.count) == 0:
             return None
         #if less than to to see if cursor is too stale
         while (True):
@@ -153,7 +153,8 @@ class OplogThread(Thread):
 
         if cursor_len == 1:     # means we are the end of the oplog
             if self.checkpoint is not None:
-                self.checkpoint.commit_ts = timestamp       #to commit new TS after rollbacks
+                self.checkpoint.commit_ts = timestamp
+            #to commit new TS after rollbacks
 
             return cursor
         elif cursor_len > 1:
@@ -166,7 +167,7 @@ class OplogThread(Thread):
         else:
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
-            
+
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
 
@@ -192,7 +193,7 @@ class OplogThread(Thread):
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
-        
+
         if timestamp is None:
             return None
 
@@ -201,18 +202,12 @@ class OplogThread(Thread):
             target_coll = retry_until_ok(self.mongos_connection[db][coll],
                                          no_func=True)
             cursor = retry_until_ok(target_coll.find)
-            
-            
-            
-            
             long_ts = bson_ts_to_long(timestamp)
 
             for doc in cursor:
                 doc['ns'] = namespace
                 doc['_ts'] = long_ts
                 self.doc_manager.upsert(doc)
-        
-
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -225,13 +220,14 @@ class OplogThread(Thread):
         if timestamp is None:
             timestamp = retry_until_ok(self.get_last_oplog_timestamp)
             self.dump_collection(timestamp)
-            logging.info('OplogManager: %s Dumped collection into backend' % self.oplog)
+            logging.info('OplogManager: %s Dumped collection into backend'
+                         % self.oplog)
 
         self.checkpoint.commit_ts = timestamp
         cursor = self.get_oplog_cursor(timestamp)
         if cursor is not None:
             self.write_config()
-        
+
         return cursor
 
     def prepare_for_sync(self):
@@ -246,7 +242,7 @@ class OplogThread(Thread):
         else:
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
-            
+
             if cursor is None:
                 cursor = self.init_cursor()
             else:
@@ -262,13 +258,12 @@ class OplogThread(Thread):
         timestamp, and then copying the new config onto the old file.
         """
         self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
-        
-        
+
     def read_config(self):
         """Read the config file for the relevant timestamp, if possible.
         """
         oplog_str = str(self.oplog)
-        
+
         if oplog_str in self.oplog_progress_dict.keys():
             return self.oplog_progress_dict[oplog_str]
         else:
@@ -284,20 +279,17 @@ class OplogThread(Thread):
         """
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
-        
+
         if last_inserted_doc is None:
             return None
 
-        
         backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
                                                sort=[('$natural',
                                                pymongo.DESCENDING)])
-
         if last_oplog_entry is None:
             return None
-        
-                
+
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']

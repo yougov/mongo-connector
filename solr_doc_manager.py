@@ -41,10 +41,9 @@ class DocManager():
         self.solr = Solr(url)
         self.unique_key = unique_key
         self.auto_commit = auto_commit
-        
+
         if auto_commit:
             self.run_auto_commit()
-            
 
     def upsert(self, doc):
         """Update or insert a document into Solr
@@ -62,7 +61,6 @@ class DocManager():
         """
         self.solr.delete(id=str(doc[self.unique_key]), commit=False)
 
-
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range.
 
@@ -72,13 +70,13 @@ class DocManager():
         return value should be an iterable set of documents.
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self.solr.search(query, rows = 100000000)
+        return self.solr.search(query, rows=100000000)
 
     def _search(self, query):
         """For test purposes only. Performs search on Solr with given query
             Does not have to be implemented.
         """
-        return self.solr.search(query, rows = 200)
+        return self.solr.search(query, rows=200)
 
     def commit(self):
         """This function is used to force a commit.

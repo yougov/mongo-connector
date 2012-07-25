@@ -23,7 +23,8 @@ class Daemon(Thread):
     """Checks the cluster for shards to tail.
     """
 
-    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key, auth_key):
+    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key,
+                 auth_key):
         super(Daemon, self).__init__()
         self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
@@ -34,78 +35,75 @@ class Daemon(Thread):
         self.auth_key = auth_key
         self.shard_set = {}
         self.oplog_progress_dict = {}
-        
+
         if self.backend_url is None:
             self.doc_manager = BackendSimulator()
         else:
             self.doc_manager = DocManager(self.backend_url)
-            
+
         if self.doc_manager is None:
             logging.critical('Bad backend URL!')
             return
 
-
     def join(self):
         """ Joins thread, stops it from running
         """
-        
+
         self.can_run = False
         Thread.join(self)
-      
-    
+
     def write_oplog_progress(self):
         """ Writes oplog progress to file provided by user
         """
-        
+
         if self.oplog_checkpoint is None:
                 return None
-    
+
         ofile = file(self.oplog_checkpoint, 'r+')
-    
-        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')  # temp file
+
+        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')
         dest = open(self.oplog_checkpoint, 'w')
         source = open(self.oplog_checkpoint + '~', 'r')
-    
+
         for oplog, ts in self.oplog_progress_dict.items():
             oplog_str = str(oplog)
             timestamp = bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
-            dest.write(json_str) 
-    
+            dest.write(json_str)
+
         dest.close()
         source.close()
         os.remove(self.oplog_checkpoint + '~')
-     
-            
+
     def read_oplog_progress(self):
         """Reads oplog progress from file provided by user
         """
-        
+
         if self.oplog_checkpoint is None:
             return None
 
         source = open(self.oplog_checkpoint, 'r')
         try:
             data = json.load(source)
-        except JSONDecodeError:                 # empty file              
+        except JSONDecodeError:                 # empty file
             return None
-        
+
         count = 0
         while count < len(data):
             oplog_str = data[count]
-            ts = data[count+1]
-            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)    #stored as bson_ts
+            ts = data[count + 1]
+            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
+            #stored as bson_ts
             count = count + 2                        # skip to next set
-        
+
        # return self.checkpoint.commit_ts
-        
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         mongos_conn = Connection(self.address)
         shard_coll = mongos_conn['config']['shards']
-        
+
         self.read_oplog_progress()
         while self.can_run is True:
 
@@ -115,7 +113,7 @@ class Daemon(Thread):
                     self.write_oplog_progress()
                     time.sleep(1)
                     continue
-                    
+
                 repl_set, hosts = shard_doc['host'].split('/')
                 shard_conn = Connection(hosts, replicaset=repl_set)
                 oplog_coll = shard_conn['local']['oplog.rs']
@@ -176,10 +174,10 @@ if __name__ == '__main__':
     #-u is to specify the uniqueKey used by the backend,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id")
-                      
+
     #-a is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
-    #threads. 
+    #threads.
     parser.add_option("-a", "--auth-file", action="store", type="string",
                       dest="auth_file", default=None)
 
@@ -190,7 +188,7 @@ if __name__ == '__main__':
     except:
         logger.error('Namespaces must be separated by commas!')
         exit(1)
-        
+
     key = None
     if options.auth_file is not None:
         try:
