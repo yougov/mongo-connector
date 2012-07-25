@@ -75,6 +75,9 @@ class DocManager():
         return self.solr.search(query, rows = 100000000)
 
     def _search(self, query):
+        """For test purposes only. Performs search on Solr with given query
+            Does not have to be implemented.
+        """
         return self.solr.search(query, rows = 200)
 
     def commit(self):
