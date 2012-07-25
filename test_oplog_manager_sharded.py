@@ -44,6 +44,9 @@ MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 AUTH_KEY = None
 
 def safe_mongo_op(func, arg1, arg2=None):
+    """Performs the given operation with the safe argument
+    """
+
     while True:
         try:
             if arg2:

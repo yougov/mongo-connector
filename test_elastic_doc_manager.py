@@ -1,3 +1,6 @@
+"""Tests each of the functions in elastic_doc_manager
+"""
+
 import unittest
 import time
 import sys
@@ -12,12 +15,14 @@ class ElasticDocManagerTester(unittest.TestCase):
 	def runTest(self):
 		unittest.TestCase.__init__(self)
 		
+    
 	def setUp(self):
 		try:
 			elastic.delete('test.test', 'string', '')
 		except:
 			pass
         
+
 	def test_invalid_URL(self):
     
        	#Invalid URL
@@ -25,6 +30,7 @@ class ElasticDocManagerTester(unittest.TestCase):
 		self.assertTrue(e.elastic is None)
 		print ('PASSED INVALID URL')
 		
+
 	def test_upsert(self):
 		#test upsert
 		docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
@@ -42,6 +48,7 @@ class ElasticDocManagerTester(unittest.TestCase):
 			self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
 		print 'PASSED UPSERT'
 
+            
 	def test__search(self):
 	    #test _search
 		docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
@@ -57,6 +64,7 @@ class ElasticDocManagerTester(unittest.TestCase):
 			self.assertTrue(list(search)[i] == list(search2)[i])
 		print 'PASSED _SEARCH'
 	
+            
 	def test_search(self):
 	    #test search
 		docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865, 'ns':'test.test'}
@@ -72,6 +80,7 @@ class ElasticDocManagerTester(unittest.TestCase):
 		self.assertTrue (list(search)[1]['name']=='John Paul')
 		print 'PASSED SEARCH' 
 	
+
 	def test_elastic_commit(self):
 	    #test elastic commit
 		docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
@@ -85,6 +94,7 @@ class ElasticDocManagerTester(unittest.TestCase):
 			assert(it['name'] == 'Waldo')
 		print 'PASSED COMMIT'
 
+            
 	def test_get_last_doc(self):
 		#test get last doc
 		docc = {'_id': '4', 'name': 'Hare', '_ts': 3, 'ns': 'test.test'}
@@ -95,15 +105,14 @@ class ElasticDocManagerTester(unittest.TestCase):
 		ElasticDoc.upsert(docc)
 		elastic.refresh()
 		doc = ElasticDoc.get_last_doc()
-		print doc['_id']
 		self.assertTrue(doc['_id'] == '4')
-
 		docc = {'_id': '6', 'name': 'HareTwin', '_ts':4, 'ns': 'test.test'}
 		ElasticDoc.upsert(docc)
 		elastic.refresh()
 		doc = ElasticDoc.get_last_doc()
 		self.assertTrue(doc['_id'] == '6');
 		print 'PASSED GET LAST DOC'
+
 
 if __name__ == '__main__':
     unittest.main()

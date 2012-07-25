@@ -46,16 +46,21 @@ class Daemon(Thread):
 
 
     def join(self):
+        """ Joins thread, stops it from running
+        """
+        
         self.can_run = False
         Thread.join(self)
-        
-    def write_oplog_progress(self):
+      
     
+    def write_oplog_progress(self):
+        """ Writes oplog progress to file provided by user
+        """
+        
         if self.oplog_checkpoint is None:
                 return None
     
         ofile = file(self.oplog_checkpoint, 'r+')
-        #fcntl.lockf(ofile.fileno(), fcntl.LOCK_EX)
     
         os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')  # temp file
         dest = open(self.oplog_checkpoint, 'w')
@@ -70,8 +75,11 @@ class Daemon(Thread):
         dest.close()
         source.close()
         os.remove(self.oplog_checkpoint + '~')
-        
+     
+            
     def read_oplog_progress(self):
+        """Reads oplog progress from file provided by user
+        """
         
         if self.oplog_checkpoint is None:
             return None
@@ -124,6 +132,8 @@ class Daemon(Thread):
             thread.join()
 
 if __name__ == '__main__':
+    """Runs mongo connector
+    """
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)

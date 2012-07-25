@@ -1,7 +1,5 @@
-
-#================================= #
-#       Run Mongo* processes       #
-#================================= #
+"""Test oplog manager methods
+"""
 
 import subprocess
 import sys

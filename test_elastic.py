@@ -1,3 +1,6 @@
+"""Test elastic search using the synchronizer, i.e. as it would be used by an user
+"""
+
 import time
 import unittest
 import os
@@ -16,11 +19,11 @@ PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119",
     "CONFIG":"27220", "MONGOS":"27217"}
 s = DocManager('http://localhost:9200', auto_commit = False)
 conn = None
-NUMBER_OF_DOCS = 100
+NUMBER_OF_DOCS = 1000
 
 class TestSynchronizer(unittest.TestCase):
     
-    d = None
+    d = None #used for as the daemon
     
     def runTest(self):
         unittest.TestCase.__init__(self)
@@ -29,10 +32,6 @@ class TestSynchronizer(unittest.TestCase):
         self.d.doc_manager.auto_commit = False
         time.sleep(2)
         self.d.join()
-        
-    def test_shard_length (self):
-        self.assertEqual(len(self.d.shard_set), 1)
-        print 'PASSED TEST SHARD LENGTH'
 
     def setUp(self):
         self.d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
@@ -43,16 +42,27 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe = True)
         while (len(s._search()) != 0):
             time.sleep(1)    
+
+    def test_shard_length (self):
+        """Tests the shard_length to see if the shard set was recognized properly
+        """
+        
+        self.assertEqual(len(self.d.shard_set), 1)
+        print 'PASSED TEST SHARD LENGTH'
     
     def test_initial (self):
-        #test search + initial clear
+        """Tests search and assures that the databases are clear.
+        """
+        
         conn['test']['test'].remove(safe = True)
         self.assertEqual (conn['test']['test'].find().count(), 0)
         self.assertEqual (len(s._search()), 0)
         print 'PASSED TEST INITIAL'
       
     def test_insert(self):
-        #test insert
+        """Tests insert
+        """
+        
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
         while (len(s._search()) == 0):
             time.sleep(1)
@@ -65,7 +75,9 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST INSERT'
 
     def test_remove (self):
-        #test remove
+        """Tests remove
+        """
+        
         conn['test']['test'].insert ( {'name':'paulie'}, safe=True )
         while (len(s._search()) != 1):
             time.sleep(1)        
@@ -79,7 +91,9 @@ class TestSynchronizer(unittest.TestCase):
     
     
     def test_rollback(self):
-        #test rollback
+        """Tests rollback
+        """
+        
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
         conn['test']['test'].insert({'name': 'paul'}, safe=True)
@@ -125,15 +139,16 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST ROLLBACK'
         
     def test_stress(self):
-        #stress test
+        """Test stress by inserting and removing the number of documents specified in global
+            variable
+        """
+        
         for i in range(0, NUMBER_OF_DOCS):
             conn['test']['test'].insert({'name': 'Paul '+str(i)})
         time.sleep(5)
         while len(s._search()) != NUMBER_OF_DOCS:
             time.sleep(5)
-       # conn['test']['test'].create_index('name')
         for i in range(0, NUMBER_OF_DOCS):
-            #a = s.search('Paul ' + str(i))
             a = s._search()
             b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
             for it in a:
@@ -143,7 +158,10 @@ class TestSynchronizer(unittest.TestCase):
        		   
     
     def test_stressed_rollback(self):
-        #test stressed rollback
+        """Test stressed rollback with number of documents equal to specified 
+            in global variable.
+        """
+        
         while len(s._search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):

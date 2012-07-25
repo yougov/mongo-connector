@@ -1,3 +1,6 @@
+"""Tests methods from mongo_internal
+"""
+
 import unittest
 import time
 import json
@@ -12,8 +15,10 @@ class MongoInternalTester(unittest.TestCase):
     def runTest(self):
         unittest.TestCase.__init__(self)    
     
-
     def test_daemon(self):
+        """Test whether the daemon initiates properly
+        """
+        
         d = Daemon('localhost:27217', 'config.txt', None, ['test.test'], '_id', None)  
         d.start()
         
@@ -26,8 +31,10 @@ class MongoInternalTester(unittest.TestCase):
         for thread in d.shard_set.values():
             self.assertFalse(thread.running)
             
+
     def test_write_oplog_progress(self):
-        
+        """Test write_oplog_progress under several circumstances
+        """
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
         d = Daemon('localhost:27217', config_file_path, None, ['test.test'], '_id', None)  
@@ -57,6 +64,8 @@ class MongoInternalTester(unittest.TestCase):
         print 'PASSED TEST WRITE OPLOG PROGRESS'
         
     def test_read_oplog_progress(self):
+        """Test read_oplog_progress
+        """
         
         d = Daemon('localhost:27217', None, None, ['test.test'], '_id', None) 
         

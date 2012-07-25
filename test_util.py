@@ -1,3 +1,6 @@
+"""Tests methods in util.py
+"""
+
 import unittest
 from bson import timestamp
 from util import (verify_url, 
@@ -7,6 +10,9 @@ from util import (verify_url,
               
                   
 def err_func():
+    """Helper function for retry_until_ok test
+    """
+    
     err_func.counter += 1
     if err_func.counter == 3:
         return True
@@ -23,8 +29,9 @@ class UtilTester(unittest.TestCase):
         
             
     def test_verify_url(self):
+        """Test verify_url with good and bad urls
+        """
         
-        #Testing verify_url
         bad_url = "weofkej"
         good_url = "http://www.google.com"
         no_http_url = "www.google.com"
@@ -37,16 +44,22 @@ class UtilTester(unittest.TestCase):
         self.assertFalse(verify_url(good_host_bad_path))
         print 'PASSED TEST VERIFY URL'
         
+    
     def test_bson_ts_to_long(self):
-        #Testing bson_ts_to_long and long_to_bson_ts
+        """Test bson_ts_to_long and long_to_bson_ts
+        """
+        
         ts = timestamp.Timestamp(0x12345678, 0x90abcdef)
         
         self.assertEqual(0x1234567890abcdef, bson_ts_to_long(ts))
         self.assertEqual(long_to_bson_ts(0x1234567890abcdef), ts)
         print 'PASSED BSON TS TO LONG'
         
+    
     def test_retry_until_ok(self):
-        #Testing retry_until_ok
+        """Test retry_until_ok
+        """
+        
         self.assertTrue(retry_until_ok(err_func))
         self.assertEqual(err_func.counter, 3)
         print 'PASSED RETRY UNTIL OK'
