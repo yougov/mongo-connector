@@ -9,21 +9,29 @@ solr = Solr("http://localhost:8080/solr/")
 
 
 class SolrDocManagerTester(unittest.TestCase):
+    """Test class for SolrDocManager
+    """
 
     def runTest(self):
 		unittest.TestCase.__init__(self)
 
     def setUp(self):
+        """Empty Solr at the start of every test
+        """
+        
         solr.delete(q = '*:*')
     
     def test_invalid_URL(self):
-
+        """Ensure DocManager fails for a bad Solr url.
+        """
         #Invalid URL
         s = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
         self.assertTrue(s.solr is None)
         print 'PASSED INVALID URL'
 
     def test_upsert(self):
+        """Ensure we can properly insert into Solr via DocManager. 
+        """
         #test upsert
         docc = {'_id': '1', 'name': 'John'}
         SolrDoc.upsert(docc)
@@ -41,8 +49,15 @@ class SolrDocManagerTester(unittest.TestCase):
         print 'PASSED UPSERT'
 
     def test_remove(self):
+        """Ensure we can properly delete from Solr via DocManager. 
+        """
         #test remove
         docc = {'_id': '1', 'name': 'John'}
+        SolrDoc.upsert(docc)
+        solr.commit()
+        res = solr.search('*:*')
+        self.assertTrue(len(res) == 1)
+        
         SolrDoc.remove(docc)
         solr.commit()
         res = solr.search('*:*')
@@ -50,7 +65,9 @@ class SolrDocManagerTester(unittest.TestCase):
         print 'PASSED REMOVE'
 
         
-    def test__search(self):
+    def test_full_search(self):
+        """Query Solr for all docs via API and via DocManager's _search(), compare results. 
+        """
         #test _search
         docc = {'_id': '1', 'name': 'John'}
         SolrDoc.upsert(docc)
@@ -66,6 +83,10 @@ class SolrDocManagerTester(unittest.TestCase):
         print 'PASSED _SEARCH'
     
     def test_search(self):
+        """Query Solr for docs in a timestamp range.
+        
+        We use API and DocManager's search(start_ts,end_ts), and then compare. 
+        """
         #test search
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865}
         SolrDoc.upsert(docc)
@@ -84,6 +105,8 @@ class SolrDocManagerTester(unittest.TestCase):
 
          
     def test_solr_commit(self):
+        """Test that documents get properly added to Solr.
+        """
         #test solr commit
         docc = {'_id': '3', 'name': 'Waldo'}
         SolrDoc.upsert(docc)
@@ -96,6 +119,8 @@ class SolrDocManagerTester(unittest.TestCase):
         SolrDoc.auto_commit = False
 
     def test_get_last_doc(self):
+        """Insert documents, verify that get_last_doc() returns the one with the latest timestamp.
+        """
         #test get last doc
         docc = {'_id': '4', 'name': 'Hare', '_ts': '2'}
         SolrDoc.upsert(docc)
