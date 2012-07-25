@@ -250,9 +250,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         
         
         assert (cursor.count() == 1)
-        
-        if test_oplog.checkpoint.commit_ts != search_ts:
-                   
         assert (test_oplog.checkpoint.commit_ts == search_ts)
         
         #with config file, assert that size != 0
