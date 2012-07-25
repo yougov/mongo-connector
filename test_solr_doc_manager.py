@@ -13,14 +13,14 @@ class SolrDocManagerTester(unittest.TestCase):
     """
 
     def runTest(self):
-		unittest.TestCase.__init__(self)
+        unittest.TestCase.__init__(self)
 
     def setUp(self):
         """Empty Solr at the start of every test
         """
-        
-        solr.delete(q = '*:*')
-    
+
+        solr.delete(q='*:*')
+
     def test_invalid_URL(self):
         """Ensure DocManager fails for a bad Solr url.
         """
@@ -30,7 +30,7 @@ class SolrDocManagerTester(unittest.TestCase):
         print 'PASSED INVALID URL'
 
     def test_upsert(self):
-        """Ensure we can properly insert into Solr via DocManager. 
+        """Ensure we can properly insert into Solr via DocManager.
         """
         #test upsert
         docc = {'_id': '1', 'name': 'John'}
@@ -39,7 +39,7 @@ class SolrDocManagerTester(unittest.TestCase):
         res = solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
-        
+
         docc = {'_id': '1', 'name': 'Paul'}
         SolrDoc.upsert(docc)
         solr.commit()
@@ -49,7 +49,7 @@ class SolrDocManagerTester(unittest.TestCase):
         print 'PASSED UPSERT'
 
     def test_remove(self):
-        """Ensure we can properly delete from Solr via DocManager. 
+        """Ensure we can properly delete from Solr via DocManager.
         """
         #test remove
         docc = {'_id': '1', 'name': 'John'}
@@ -57,16 +57,15 @@ class SolrDocManagerTester(unittest.TestCase):
         solr.commit()
         res = solr.search('*:*')
         self.assertTrue(len(res) == 1)
-        
+
         SolrDoc.remove(docc)
         solr.commit()
         res = solr.search('*:*')
         self.assertTrue(len(res) == 0)
         print 'PASSED REMOVE'
 
-        
     def test_full_search(self):
-        """Query Solr for all docs via API and via DocManager's _search(), compare results. 
+        """Query Solr for all docs via API and via DocManager's _search()
         """
         #test _search
         docc = {'_id': '1', 'name': 'John'}
@@ -78,14 +77,14 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = solr.search('*:*')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0,len(search)):
+        for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
         print 'PASSED _SEARCH'
-    
+
     def test_search(self):
         """Query Solr for docs in a timestamp range.
-        
-        We use API and DocManager's search(start_ts,end_ts), and then compare. 
+
+        We use API and DocManager's search(start_ts,end_ts), and then compare.
         """
         #test search
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865}
@@ -99,11 +98,10 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = solr.search('John')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0,len(search)):
+        for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
-        print 'PASSED SEARCH'    
+        print 'PASSED SEARCH'
 
-         
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.
         """
@@ -119,7 +117,7 @@ class SolrDocManagerTester(unittest.TestCase):
         SolrDoc.auto_commit = False
 
     def test_get_last_doc(self):
-        """Insert documents, verify that get_last_doc() returns the one with the latest timestamp.
+        """Insert documents, Verify the doc with the latest timestamp.
         """
         #test get last doc
         docc = {'_id': '4', 'name': 'Hare', '_ts': '2'}
@@ -130,15 +128,11 @@ class SolrDocManagerTester(unittest.TestCase):
         doc = SolrDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4')
 
-        docc = {'_id': '6', 'name': 'HareTwin', 'ts':'2'}
+        docc = {'_id': '6', 'name': 'HareTwin', 'ts': '2'}
         solr.commit()
         doc = SolrDoc.get_last_doc()
-        self.assertTrue(doc['_id'] == '4' or doc['_id'] == '6');
+        self.assertTrue(doc['_id'] == '4' or doc['_id'] == '6')
         print 'PASSED GET LAST DOC'
 
 if __name__ == '__main__':
     unittest.main()
-
-        
-
-        
