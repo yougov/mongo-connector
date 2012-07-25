@@ -197,7 +197,7 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST STRESSED ROLBACK'
 		
 def abort_test(self):
-        print 'test failed'
+        print 'TEST FAILED'
         sys.exit(1)
                 
 if __name__ == '__main__':

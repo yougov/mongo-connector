@@ -319,11 +319,8 @@ class TestOplogManager(unittest.TestCase):
             time.sleep(1)
         
         while retry_until_ok(mongos_conn['test']['test'].find().count) != 1:
-            print mongos_conn['test']['test'].find().count()
             time.sleep(1)
         
-        print new_primary_conn.port
-        print primary_conn.port
         self.assertEqual (str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
         self.assertEqual (str(primary_conn.port), PORTS_ONE['PRIMARY'])
        
@@ -358,13 +355,10 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     
     if options.auth_file != "":
-        print 'options auth file is %s' % options.auth_file
         start_cluster(key_file = options.auth_file)   
         try:
             file = open(options.auth_file)
-            print 'opened file'
             key = file.read()
-            print 'read file'
             re.sub(r'\s', '', key)
             AUTH_KEY = key
         except:
