@@ -19,7 +19,7 @@ PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119",
     "CONFIG":"27220", "MONGOS":"27217"}
 s = Solr('http://localhost:8080/solr')
 conn = None
-NUMBER_OF_DOCS = 1000
+NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
     

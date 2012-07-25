@@ -21,7 +21,7 @@ d = Daemon('localhost:' + PORTS_ONE["MONGOS"],
 			'config.txt', None, ['test.test'], '_id', None)
 s = d.doc_manager
 conn = None
-NUMBER_OF_DOCS = 1000
+NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
 
