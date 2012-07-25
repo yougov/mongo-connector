@@ -8,24 +8,31 @@ ElasticDoc = DocManager("http://localhost:9200", auto_commit = False)
 elastic = ES(server = "http://localhost:9200")
 
 class ElasticDocManagerTester(unittest.TestCase):
+    """Test class for ElasticDocManager
+    """
 	
 	def runTest(self):
 		unittest.TestCase.__init__(self)
 		
 	def setUp(self):
+	"""Empty ElasticSearch at the start of every test
+    """
 		try:
 			elastic.delete('test.test', 'string', '')
 		except:
 			pass
         
 	def test_invalid_URL(self):
-    
+        """Ensure DocManager fails for a bad Solr url.
+        """
        	#Invalid URL
 		e = DocManager("http://doesntexistqwertasg.com")
 		self.assertTrue(e.elastic is None)
 		print ('PASSED INVALID URL')
 		
 	def test_upsert(self):
+	    """Ensure we can properly insert into ElasticSearch via DocManager. 
+        """
 		#test upsert
 		docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
 		ElasticDoc.upsert(docc)
@@ -42,7 +49,25 @@ class ElasticDocManagerTester(unittest.TestCase):
 			self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
 		print 'PASSED UPSERT'
 
-	def test__search(self):
+    def test_remove(self):
+        """Ensure we can properly delete from ElasticSearch via DocManager. 
+        """
+        #test remove
+        docc = {'_id': '1', 'name': 'John'}
+        ElasticDoc.upsert(docc)
+        ElasticDoc.commit()
+        res = elastic.search(MatchAllQuery())
+        self.assertTrue(len(res) == 1)
+                
+        ElasticDoc.remove(docc)
+        ElasticDoc.commit()
+        res = elastic.search(MatchAllQuery())
+        self.assertTrue(len(res) == 0)
+        print 'PASSED REMOVE'
+
+	def test_full_search(self):
+        """Query ElasticSearch for all docs via API and via DocManager's _search(), compare. 
+        """
 	    #test _search
 		docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
 		ElasticDoc.upsert(docc)
@@ -58,6 +83,10 @@ class ElasticDocManagerTester(unittest.TestCase):
 		print 'PASSED _SEARCH'
 	
 	def test_search(self):
+	    """Query ElasticSearch for docs in a timestamp range.
+        
+        We use API and DocManager's search(start_ts,end_ts), and then compare. 
+        """
 	    #test search
 		docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865, 'ns':'test.test'}
 		ElasticDoc.upsert(docc)
@@ -73,6 +102,8 @@ class ElasticDocManagerTester(unittest.TestCase):
 		print 'PASSED SEARCH' 
 	
 	def test_elastic_commit(self):
+	    """Test that documents get properly added to ElasticSearch.
+        """
 	    #test elastic commit
 		docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
 		ElasticDoc.upsert(docc)
@@ -86,6 +117,8 @@ class ElasticDocManagerTester(unittest.TestCase):
 		print 'PASSED COMMIT'
 
 	def test_get_last_doc(self):
+	    """Insert documents, verify that get_last_doc() returns the one with the latest timestamp.
+        """
 		#test get last doc
 		docc = {'_id': '4', 'name': 'Hare', '_ts': 3, 'ns': 'test.test'}
 		ElasticDoc.upsert(docc)
