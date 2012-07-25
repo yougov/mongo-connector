@@ -14,22 +14,32 @@ from mongo_internal import Daemon
 """    
 PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
-d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
-			'config.txt', 'http://localhost:9200', ['test.test'], '_id', None)
-s = DocManager('http://localhost:9200')
+s = DocManager('http://localhost:9200', auto_commit = False)
 conn = None
 NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
-
+    
+    d = None
+    
     def runTest(self):
         unittest.TestCase.__init__(self)
     
+    def tearDown(self):
+        self.d.doc_manager.auto_commit = False
+        time.sleep(2)
+        self.d.join()
+        
     def test_shard_length (self):
-        self.assertEqual(len(d.shard_set), 1)
+        self.assertEqual(len(self.d.shard_set), 1)
         print 'PASSED TEST SHARD LENGTH'
 
     def setUp(self):
+        self.d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 
+                   'config.txt', 'http://localhost:9200', ['test.test'], '_id', None)
+        self.d.start()
+        while len(self.d.shard_set) == 0:
+            pass
         conn['test']['test'].remove(safe = True)
         while (len(s._search()) != 0):
             time.sleep(1)    
@@ -184,7 +194,6 @@ class TestSynchronizer(unittest.TestCase):
             self.assertTrue('Paul' in it['name'])
         self.assertEqual(conn['test']['test'].find().count(), NUMBER_OF_DOCS)
                 
-
         print 'PASSED TEST STRESSED ROLBACK'
         
 
@@ -198,12 +207,4 @@ if __name__ == '__main__':
     s._remove()
     start_cluster()
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-    t = Timer(60, abort_test)
-    t.start()
-    d.start()
-    while len(d.shard_set) == 0:
-        pass
-    t.cancel()
-    print 'starting'
     unittest.main()
-    d.join()

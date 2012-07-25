@@ -15,24 +15,35 @@ from mongo_internal import Daemon
 PORTS_ONE = {"PRIMARY":"27117", "SECONDARY":"27118", "ARBITER":"27119", 
     "CONFIG":"27220", "MONGOS":"27217"}
 s = Solr('http://localhost:8080/solr')
-d = None 
 conn = None
 NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
-
+    
+    d = None 
+    
     def runTest(self):
         unittest.TestCase.__init__(self)
     
     def setUp(self):
+        self.d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
+        self.d.start()
+        while len(self.d.shard_set) == 0:
+            time.sleep(1)
+        
         conn['test']['test'].remove(safe = True)
         while (len(s.search('*:*')) != 0):
             time.sleep(1) 
     
+    def tearDown(self):
+        self.d.doc_manager.auto_commit = False
+        time.sleep(2)
+        self.d.join()
+                
     def test_shard_length (self):
-        self.assertEqual(len(d.shard_set), 1)
+        self.assertEqual(len(self.d.shard_set), 1)
         print 'PASSED TEST SHARD LENGTH'
-    '''
+    
     def test_initial (self):
         #test search + initial clear
         while (True):
@@ -129,7 +140,7 @@ class TestSynchronizer(unittest.TestCase):
             for it in a:
                 self.assertEqual (it['_id'], it['_id']) 
         print 'PASSED TEST STRESS'
-    '''
+    
     
     def test_stressed_rollback(self):
         #test stressed rollback
@@ -194,12 +205,6 @@ if __name__ == '__main__':
     s.delete(q = '*:*')
     start_cluster()
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-    d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', 'http://localhost:8080/solr', ['test.test'], '_id', None)
-    t = Timer(60, abort_test)
-    t.start()
-    d.start()
-    while len(d.shard_set) == 0:
-        pass
-    t.cancel()
+  
     unittest.main()
-    d.join()
+    

@@ -15,8 +15,9 @@ class DocManager():
             print 'Invalid ElasticSearch URL'
             return None
         self.elastic = ES(server=url)
+	self.auto_commit = auto_commit
         if auto_commit:
-            self.auto_commit()
+            self.run_auto_commit()
 
     def upsert(self, doc):
         index = doc['ns']
@@ -50,9 +51,11 @@ class DocManager():
     def commit(self):
         retry_until_ok(self.elastic.refresh)
 
-    def auto_commit(self):
+    def run_auto_commit(self):
         self.elastic.refresh()
-        Timer(1, self.auto_commit).start()
+	
+	if self.auto_commit:
+            Timer(1, self.run_auto_commit).start()
 
     def get_last_doc(self):
         it = None
