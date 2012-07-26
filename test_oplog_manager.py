@@ -288,8 +288,6 @@ class TestOplogManager(unittest.TestCase):
         os.system('rm config.txt; touch config.txt')
         start_cluster()
         test_oplog, primary_conn, mongos, oplog_coll = self.get_new_oplog()
-        #test_oplog.start()
-
         solr = BackendSimulator()
         test_oplog.doc_manager = solr
         solr.test_delete()          # equivalent to solr.delete(q='*: *')
@@ -304,7 +302,7 @@ class TestOplogManager(unittest.TestCase):
         first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
                      'ns': 'test.test',
                      '_id':  obj1}
-
+        self.assertTrue(mongos['test']['test'].find({'name': 'paulie'}).count() == 1)
         #try kill one, try restarting
         killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
 

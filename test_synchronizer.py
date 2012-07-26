@@ -1,6 +1,5 @@
 """Test synchronizer using mock Solr (i.e. backend_engine)
 """
-
 import time
 import unittest
 import os
