@@ -262,7 +262,6 @@ def start_cluster(sharded=False, key_file=None):
             admin_db.command("enableSharding", "alpha")
             admin_db.command("shardCollection", "alpha.foo", key={"_id": 1})
 
-
         primary = Connection('localhost:27117')
         admin = primary['admin']
         while admin.command("isMaster")['ismaster'] is False:

@@ -302,7 +302,7 @@ class TestOplogManager(unittest.TestCase):
         first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
                      'ns': 'test.test',
                      '_id':  obj1}
-        self.assertTrue(mongos['test']['test'].find({'name': 'paulie'}).count() == 1)
+
         #try kill one, try restarting
         killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
