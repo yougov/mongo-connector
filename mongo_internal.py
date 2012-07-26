@@ -12,7 +12,6 @@ from doc_manager import DocManager
 from pymongo import Connection
 from oplog_manager import OplogThread
 from optparse import OptionParser
-from simplejson import JSONDecodeError
 from sys import exit
 from threading import Thread
 from util import bson_ts_to_long, long_to_bson_ts
@@ -85,7 +84,7 @@ class Connector(Thread):
         source = open(self.oplog_checkpoint, 'r')
         try:
             data = json.load(source)
-        except JSONDecodeError:                 # empty file
+        except json.decoder.JSONDecodeError:       # empty file
             return None
 
         count = 0
@@ -101,14 +100,16 @@ class Connector(Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        mongos_conn = Connection(self.address)
-        shard_coll = mongos_conn['config']['shards']
+        main_conn = Connection(self.address)
+        shard_coll = main_conn['config']['shards']
 
         self.read_oplog_progress()
         #can_run is set to false when we join the thread
         while self.can_run is True:
 
-            for shard_doc in shard_coll.find():
+            shard_cursor = shard_coll.find()
+
+            for shard_doc in shard_cursor:
                 shard_id = shard_doc['_id']
                 if shard_id in self.shard_set:
                     self.write_oplog_progress()
@@ -125,6 +126,9 @@ class Connector(Thread):
                 logging.info('MongoInternal: Starting connection thread %s' %
                              shard_conn)
                 oplog.start()
+
+            if shard_cursor.count() == 0:       # No shards
+                pass
 
         #time to stop running
         for thread in self.shard_set.values():
@@ -153,9 +157,10 @@ if __name__ == '__main__':
 
     parser = OptionParser()
 
-    #-m is for the mongos address, which is a host:port pair.
-    parser.add_option("-m", "--mongos", action="store", type="string",
-                      dest="mongos_addr", default="localhost:27217")
+    #-m is for the main address, which is a host:port pair, ideally of the
+    #mongos. For non sharded clusters, it can be the primary.
+    parser.add_option("-m", "--main", action="store", type="string",
+                      dest="main_addr", default="localhost:27217")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
@@ -200,6 +205,6 @@ if __name__ == '__main__':
             logger.error('Could not parse authentication file!')
             exit(1)
 
-    ct = Connector(options.mongos_addr, options.oplog_config, options.url,
+    ct = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key)
     ct.start()
