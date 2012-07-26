@@ -49,6 +49,7 @@ class DocManager():
             return None
         self.elastic = ES(server=url)
         self.auto_commit = auto_commit
+        self.doc_type = 'string'  # default type is string, change if needed
         if auto_commit:
             self.run_auto_commit()
 
@@ -58,9 +59,12 @@ class DocManager():
         This method should call whatever add/insert/update method exists for
         the backend engine and add the document in there. The input will
         always be one mongo document, represented as a Python dictionary.
+        If you'd like to have different types of document in your database,
+        you can store the doc type as a field in Mongo and set doc_type to
+        that field. (e.g. doc_type = doc['_type'])
         """
+        doc_type = self.doc_type
         index = doc['ns']
-        doc_type = 'string'
         doc['_id'] = str(doc['_id'])
         doc_id = doc['_id']
         self.elastic.index(doc, index, doc_type, doc_id)
