@@ -227,9 +227,12 @@ def start_cluster(sharded=False, key_file=None):
                 mongos.admin.command("addShard", "demo-repl/localhost:27117")
                 break
             except OperationFailure:            # replSet not ready yet
-                print 'Could not configure demo-repl in start cluster'
                 counter -= 1
                 time.sleep(1)
+
+        if counter == 0:
+            print 'Could not add shard to mongos'
+            sys.exit(1)
 
         if sharded:
             primary2 = Connection('localhost:27317')
@@ -247,9 +250,12 @@ def start_cluster(sharded=False, key_file=None):
                                      "demo-repl-2/localhost:27317", maxSize=1)
                     break
                 except OperationFailure:            # replSet not ready yet
-                    print 'Could not configure demo-repl2 in start cluster'
                     counter -= 1
                     time.sleep(1)
+
+            if counter == 0:
+                print 'Could not add shard to mongos'
+                sys.exit(1)
 
             # shard on the alpha.foo collection
             admin_db = mongos.admin
