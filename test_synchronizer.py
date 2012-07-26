@@ -18,7 +18,7 @@ from mongo_internal import Connector
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
 c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
-           ['test.test'], '_id', None)
+              ['test.test'], '_id', None)
 s = c.doc_manager
 conn = None
 NUMBER_OF_DOCS = 100
@@ -79,7 +79,9 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST REMOVE'
 
     def test_rollback(self):
-        """Tests rollback
+        """Tests rollback. Rollback is performed by inserting one document,
+            killing primary, inserting another doc, killing secondary,
+            and then restarting both.
         """
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
@@ -152,7 +154,8 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
-        in global variable.
+        in global variable. Rollback is performed like before, but with more
+            documents.
         """
         while len(s.test_search()) != 0:
             time.sleep(1)

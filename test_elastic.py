@@ -37,8 +37,9 @@ class TestSynchronizer(unittest.TestCase):
 
     def setUp(self):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
-                        'config.txt', 'http://localhost:9200', ['test.test'],
-                        '_id', None)
+                           'config.txt', 'http://localhost:9200',
+                           ['test.test'],
+                           '_id', None)
         self.c.start()
         while len(self.c.shard_set) == 0:
             pass
@@ -51,7 +52,7 @@ class TestSynchronizer(unittest.TestCase):
             properly
         """
 
-        self.assertEqual(len(self.d.shard_set), 1)
+        self.assertEqual(len(self.c.shard_set), 1)
         print 'PASSED TEST SHARD LENGTH'
 
     def test_initial(self):
@@ -94,7 +95,9 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST REMOVE'
 
     def test_rollback(self):
-        """Tests rollback
+        """Tests rollback. We force a rollback by adding a doc, killing the
+            primary, adding another doc, killing the new primary, and then
+            restarting both.
         """
 
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
@@ -127,6 +130,7 @@ class TestSynchronizer(unittest.TestCase):
         a = s._search()
         b = conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(a), 2)
+                #make sure pauling is there
         for it in a:
             if it['name'] == 'pauline':
                 self.assertEqual(it['_id'], str(b['_id']))
@@ -169,7 +173,7 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
-            in global variable.
+            in global variable. Strategy for rollback is the same as before.
         """
 
         while len(s._search()) != 0:
