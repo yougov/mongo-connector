@@ -311,12 +311,16 @@ class TestOplogManager(unittest.TestCase):
         while admin.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
+        count = 0
         while True:
             try:
                 current_conn = mongos['test']['test']
                 current_conn.insert({'_id':  obj2, 'name':  'paul'}, safe=1)
                 break
             except:
+                count += 1
+                if count > 60:
+                    sys.exit(1)
                 time.sleep(1)
                 continue
 

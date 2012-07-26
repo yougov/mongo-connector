@@ -201,7 +201,7 @@ def start_cluster(sharded=False, key_file=None):
         if sharded:
             cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " "
             cmd1 = cmd1 + SETUP_DIR + "/setup/configReplSetSharded1.js"
-            cmd3 = "mongo --port  " + PORTS_ONE["MONGOS"] + " " 
+            cmd3 = "mongo --port  " + PORTS_ONE["MONGOS"] + " "
             cmd3 = cmd3 + SETUP_DIR + "/setup/configMongosSharded.js"
         else:
             cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " "

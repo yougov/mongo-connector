@@ -46,8 +46,12 @@ AUTH_KEY = None
 def safe_mongo_op(func, arg1, arg2=None):
     """Performs the given operation with the safe argument
     """
-
+    count = 0
     while True:
+        time.sleep(1)
+        count += 1
+        if (count > 60):
+            sys.exit(1)
         try:
             if arg2:
                 func(arg1, arg2, safe=True)
@@ -335,12 +339,16 @@ class TestOplogManagerSharded(unittest.TestCase):
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
+        count = 0
         while True:
             try:
                 mongos['alpha']['foo'].insert, {'_id': obj2, 'name': 'paul'}
                 break
             except:
                 time.sleep(1)
+                count += 1
+                if count > 60:
+                    sys.exit(1)
                 continue
 
         killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])

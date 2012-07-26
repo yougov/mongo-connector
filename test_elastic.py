@@ -5,6 +5,7 @@
 import time
 import unittest
 import os
+import sys
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
@@ -110,12 +111,16 @@ class TestSynchronizer(unittest.TestCase):
         while admin.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
+        count = 0
         while True:
             try:
                 a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
                 break
             except:
                 time.sleep(1)
+                count += 1
+                if count >= 60:
+                    sys.exit(1)
                 continue
         while(len(s._search()) != 2):
             time.sleep(1)
