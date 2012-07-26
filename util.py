@@ -42,7 +42,7 @@ def retry_until_ok(func, args=None, no_func=False):
     """
 
     result = True
-
+    count = 0
     while True:
         try:
             if no_func is True:         # just a statement, not a function
@@ -55,6 +55,9 @@ def retry_until_ok(func, args=None, no_func=False):
                 result = func(args)
                 break
         except:
+            count += 1
+            if count > 60:
+                sys.exit(1)
             time.sleep(1)
 
     return result
