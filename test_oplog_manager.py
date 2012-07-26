@@ -10,7 +10,6 @@ import re
 import unittest
 
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
-from mongo_internal import Daemon
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path

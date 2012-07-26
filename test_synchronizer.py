@@ -10,15 +10,15 @@ from os import path
 from threading import Timer
 from backend_simulator import BackendSimulator
 from pysolr import Solr
-from mongo_internal import Daemon
+from mongo_internal import Connector
 
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
-d = Daemon('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
+c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
            ['test.test'], '_id', None)
-s = d.doc_manager
+s = c.doc_manager
 conn = None
 NUMBER_OF_DOCS = 100
 
@@ -36,7 +36,7 @@ class TestSynchronizer(unittest.TestCase):
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
         """
-        self.assertEqual(len(d.shard_set), 1)
+        self.assertEqual(len(c.shard_set), 1)
         print 'PASSED TEST SHARD LENGTH'
 
     def test_initial(self):
@@ -217,9 +217,9 @@ if __name__ == '__main__':
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
     t = Timer(60, abort_test)
     t.start()
-    d.start()
-    while len(d.shard_set) == 0:
+    c.start()
+    while len(c.shard_set) == 0:
         pass
     t.cancel()
     unittest.main()
-    d.join()
+    c.join()

@@ -18,7 +18,6 @@ from optparse import OptionParser
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
-from mongo_internal import Daemon
 from threading import Timer
 from oplog_manager import OplogThread
 from solr_doc_manager import DocManager

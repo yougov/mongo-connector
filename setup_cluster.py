@@ -14,17 +14,7 @@ import json
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
 from os import path
-"""from mongo_internal import Daemon
-from threading import Timer
-from oplog_manager import OplogThread
-from solr_doc_manager import DocManager
-from pysolr import Solr
-from util import (long_to_bson_ts,
-                          bson_ts_to_long,
-                          retry_until_ok)
-from checkpoint import Checkpoint
-from bson.objectid import ObjectId
-"""
+
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",

@@ -1,4 +1,4 @@
-"""Discovers the mongo cluster and starts the daemon.
+"""Discovers the mongo cluster and starts the connector.
 """
 
 import logging
@@ -19,13 +19,13 @@ from util import bson_ts_to_long, long_to_bson_ts
 from bson.timestamp import Timestamp
 
 
-class Daemon(Thread):
+class Connector(Thread):
     """Checks the cluster for shards to tail.
     """
 
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key,
                  auth_key):
-        super(Daemon, self).__init__()
+        super(Connector, self).__init__()
         self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
         self.address = address
@@ -199,6 +199,6 @@ if __name__ == '__main__':
             logger.error('Could not parse authentication file!')
             exit(1)
 
-    dt = Daemon(options.mongos_addr, options.oplog_config, options.url,
+    ct = Connector(options.mongos_addr, options.oplog_config, options.url,
                 ns_set, options.u_key, key)
-    dt.start()
+    ct.start()

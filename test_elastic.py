@@ -11,8 +11,7 @@ from os import path
 from threading import Timer
 from doc_manager import DocManager
 from pysolr import Solr
-from mongo_internal import Daemon
-
+from mongo_internal import Connector
 
 """ Global path variables
 """
@@ -25,22 +24,22 @@ NUMBER_OF_DOCS = 100
 
 class TestSynchronizer(unittest.TestCase):
 
-    d = None  # used for as the daemon
+    c = None  # used for the connector
 
     def runTest(self):
         unittest.TestCase.__init__(self)
 
     def tearDown(self):
-        self.d.doc_manager.auto_commit = False
+        self.c.doc_manager.auto_commit = False
         time.sleep(2)
-        self.d.join()
+        self.c.join()
 
     def setUp(self):
-        self.d = Daemon('localhost:' + PORTS_ONE["MONGOS"],
+        self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
                         'config.txt', 'http://localhost:9200', ['test.test'],
                         '_id', None)
-        self.d.start()
-        while len(self.d.shard_set) == 0:
+        self.c.start()
+        while len(self.c.shard_set) == 0:
             pass
         conn['test']['test'].remove(safe=True)
         while(len(s._search()) != 0):
