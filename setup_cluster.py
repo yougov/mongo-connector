@@ -12,8 +12,9 @@ import os
 import json
 
 from pymongo import Connection
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
+from util import retry_until_ok
 
 """ Global path variables
 """
@@ -136,16 +137,16 @@ def start_cluster(sharded=False, key_file=None):
         # Kill all spawned mongos
         killMongosProc()
 
+        # reset data dirs
         remove_dir(DEMO_SERVER_LOG)
         remove_dir(DEMO_SERVER_DATA)
 
         create_dir(DEMO_SERVER_DATA + "/standalone/journal")
-
         create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1b/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1c/journal")
 
-        if sharded is True:
+        if sharded:
             create_dir(DEMO_SERVER_DATA + "/replset2a/journal")
             create_dir(DEMO_SERVER_DATA + "/replset2b/journal")
             create_dir(DEMO_SERVER_DATA + "/replset2c/journal")
@@ -197,42 +198,60 @@ def start_cluster(sharded=False, key_file=None):
         executeCommand(CMD)
         checkStarted(int(PORTS_ONE["MONGOS"]))
 
-        # Configure the shards and begin load simulation
+        # configuration for replSet 1
+        config = {'_id': "demo-repl", 'members': [
+                  {'_id': 0, 'host': "localhost:27117"},
+                  {'_id': 1, 'host': "localhost:27118"},
+                  {'_id': 2, 'host': "localhost:27119",
+                   'arbiterOnly': 'true'}]}
+
+        # configuration for replSet 2, not always used
+        config2 = {'_id': "demo-repl-2", 'members': [
+                   {'_id': 0, 'host': "localhost:27317"},
+                   {'_id': 1, 'host': "localhost:27318"},
+                   {'_id': 2, 'host': "localhost:27319",
+                    'arbiterOnly': 'true'}]}
+
+        primary = Connection('localhost:27117')
+        mongos = Connection('localhost:27217')
+        primary.admin.command("replSetInitiate", config)
+
+        # ensure that the replSet is properly configured
+        while retry_until_ok(primary.admin.command,
+                             "replSetGetStatus")['myState'] == 0:
+            time.sleep(1)
+
+        counter = 100
+        while counter > 0:
+            try:
+                mongos.admin.command("addShard", "demo-repl/localhost:27117")
+                break
+            except OperationFailure:            # replSet not ready yet
+                print 'Could not configure demo-repl in start cluster'
+                counter -= 1
+                time.sleep(1)
+
         if sharded:
-            cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " "
-            cmd1 = cmd1 + SETUP_DIR + "/setup/configReplSetSharded1.js"
-            cmd3 = "mongo --port  " + PORTS_ONE["MONGOS"] + " "
-            cmd3 = cmd3 + SETUP_DIR + "/setup/configMongosSharded.js"
-        else:
-            cmd1 = "mongo --port " + PORTS_ONE["PRIMARY"] + " "
-            cmd1 = cmd1 + SETUP_DIR + "/setup/configReplSet.js"
-            cmd3 = "mongo --port  " + PORTS_ONE["MONGOS"] + " "
-            cmd3 = cmd3 + SETUP_DIR + "/setup/configMongos.js"
+            primary2 = Connection('localhost:27317')
+            primary2.admin.command("replSetInitiate", config2)
 
-        cmd2 = "mongo --port " + PORTS_TWO["PRIMARY"] + " "
-        cmd2 = cmd2 + SETUP_DIR + "/setup/configReplSetSharded2.js"
-
-        subprocess.call(cmd1, shell=True)
-        conn = Connection('localhost:' + PORTS_ONE["PRIMARY"])
-        sec_conn = Connection('localhost:' + PORTS_ONE["SECONDARY"])
-
-        while conn['admin'].command("isMaster")['ismaster'] is False:
+            while retry_until_ok(primary2.admin.command,
+                                 "replSetGetStatus")['myState'] == 0:
                 time.sleep(1)
 
-        while sec_conn['admin'].command("replSetGetStatus")['myState'] != 2:
-                time.sleep(1)
+            counter = 100
+            while counter > 0:
+                try:
+                    admin_db = mongos.admin
+                    admin_db.command("addShard",
+                                     "demo-repl-2/localhost:27317", maxSize=1)
+                    break
+                except OperationFailure:            # replSet not ready yet
+                    print 'Could not configure demo-repl2 in start cluster'
+                    counter -= 1
+                    time.sleep(1)
 
-        if sharded:
-            subprocess.call(cmd2, shell=True)
-            conn = Connection('localhost:' + PORTS_TWO["PRIMARY"])
-            sec_conn = Connection('localhost:' + PORTS_TWO["SECONDARY"])
-
-            while conn['admin'].command("isMaster")['ismaster'] is False:
-                time.sleep(1)
-
-            #need to look a bit more carefully here
-            admin_db = sec_conn['admin']
-            while admin_db.command("replSetGetStatus")['myState'] != 2:
-                time.sleep(1)
-
-        subprocess.call(cmd3, shell=True)
+            # shard on the alpha.foo collection 
+            admin_db = mongos.admin
+            admin_db.command("enableSharding", "alpha")
+            admin_db.command("shardCollection", "alpha.foo", key={"_id": 1})
