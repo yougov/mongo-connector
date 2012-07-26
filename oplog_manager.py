@@ -140,6 +140,7 @@ class OplogThread(Thread):
 
         if timestamp is None:
             return None
+            
         cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
         if retry_until_ok(cursor.count) == 0:
             return None

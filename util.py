@@ -3,6 +3,7 @@
 
 import sys
 import time
+import logging
 
 from bson.timestamp import Timestamp
 from pymongo import Connection
