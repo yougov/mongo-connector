@@ -111,6 +111,9 @@ class OplogThread(Thread):
             return None
 
         namespace = entry['ns']
+        
+        # Update operations don't have an 'o' field specifying the document - instead it specifies
+        # the changes. So we use 'o2' for updates to get the doc_id later. 
         if 'o2' in entry:
             doc_field = 'o2'
         else:
@@ -140,7 +143,8 @@ class OplogThread(Thread):
         cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
         if retry_until_ok(cursor.count) == 0:
             return None
-        #if less than to to see if cursor is too stale
+            
+        # Check to see if cursor is too stale
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
