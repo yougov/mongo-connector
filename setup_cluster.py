@@ -261,3 +261,12 @@ def start_cluster(sharded=False, key_file=None):
             admin_db = mongos.admin
             admin_db.command("enableSharding", "alpha")
             admin_db.command("shardCollection", "alpha.foo", key={"_id": 1})
+
+
+        primary = Connection('localhost:27117')
+        admin = primary['admin']
+        while admin.command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        secondary = Connection('localhost:27118')
+        while secondary.admin.command("replSetGetStatus")['myState'] is not 2:
+            time.sleep(1)
