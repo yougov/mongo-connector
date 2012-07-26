@@ -32,8 +32,8 @@ class TestSynchronizer(unittest.TestCase):
 
     def setUp(self):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt',
-                        'http://localhost:8080/solr', ['test.test'], '_id',
-                        None)
+                           'http://localhost:8080/solr', ['test.test'], '_id',
+                           None)
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)
@@ -97,7 +97,9 @@ class TestSynchronizer(unittest.TestCase):
         print 'PASSED TEST REMOVE'
 
     def test_rollback(self):
-        """Tests rollback
+        """Tests rollback. We force a rollback by inserting one doc, killing
+            primary, adding another doc, killing the new primary, and
+            restarting both the servers.
         """
 
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
@@ -170,7 +172,8 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
-        in global variable.
+        in global variable. The rollback is performed the same way as before
+            but with more docs
         """
 
         conn['test']['test'].remove()

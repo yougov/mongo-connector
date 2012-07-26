@@ -7,6 +7,7 @@ import fcntl
 import json
 import logging
 import pymongo
+import sys
 
 from bson.objectid import ObjectId
 from bson.timestamp import Timestamp
@@ -63,17 +64,18 @@ class OplogThread(Thread):
 
             try:
                 for entry in cursor:
-
+                    #sync the current oplog operation
                     operation = entry['op']
                     ns = entry['ns']
 
                     if ns not in self.namespace_set:
                         continue
-
+                    #delete
                     if operation == 'd':
                         entry['_id'] = entry['o']['_id']
                         self.doc_manager.remove(entry)
-
+                    #insert/update. They are equal because of lack of support
+                    #for partial update
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
 
@@ -111,9 +113,11 @@ class OplogThread(Thread):
             return None
 
         namespace = entry['ns']
-        
-        # Update operations don't have an 'o' field specifying the document - instead it specifies
-        # the changes. So we use 'o2' for updates to get the doc_id later. 
+
+        # Update operations don't have an 'o' field specifying the document
+        #- instead it specifies
+        # the changes. So we use 'o2' for updates to get the doc_id later.
+
         if 'o2' in entry:
             doc_field = 'o2'
         else:
@@ -140,11 +144,11 @@ class OplogThread(Thread):
 
         if timestamp is None:
             return None
-            
+
         cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
         if retry_until_ok(cursor.count) == 0:
             return None
-            
+
         # Check to see if cursor is too stale
         while (True):
             try:
@@ -301,7 +305,7 @@ class OplogThread(Thread):
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
 
-        rollback_set = {}
+        rollback_set = {}   # this is a dictionary of ns:list of docs
         for doc in docs_to_rollback:
             ns = doc['ns']
             if ns in rollback_set:
@@ -315,13 +319,13 @@ class OplogThread(Thread):
 
             to_update = retry_until_ok(self.mongos_connection[db][coll].find,
                                        {'_id': {'$in': bson_obj_id_list}})
-
-            doc_hash = {}
+            #doc list are docs in backend engine, to_update are docs in mongo
+            doc_hash = {}  # hash by _id
             for doc in doc_list:
                 doc_hash[ObjectId(doc['_id'])] = doc
 
             to_index = []
-
+            count = 0
             while True:
                 try:
                     for doc in to_update:
@@ -330,12 +334,17 @@ class OplogThread(Thread):
                             to_index.append(doc)
                     break
                 except (OperationFailure, AutoReconnect):
+                    count += 1
+                    if count > 60:
+                        sys.exit(1)
+                    time.sleep(1)
                     pass
 
             #delete the inconsistent documents
             for doc in doc_hash.values():
                 self.doc_manager.remove(doc)
 
+            #insert the ones from mongo
             for doc in to_index:
                 doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace

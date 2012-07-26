@@ -61,10 +61,6 @@ def safe_mongo_op(func, arg1, arg2=None):
         except OperationFailure:
             pass
 
-# ================================= #
-#        Run Mongo* processes       #
-# ================================= #
-
 
 class TestOplogManagerSharded(unittest.TestCase):
     """Defines all the testing methods for a sharded cluster
@@ -310,6 +306,9 @@ class TestOplogManagerSharded(unittest.TestCase):
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
+            We force a rollback by inserting a doc, killing primary, inserting
+            another doc, killing the new primary, and then restarting both
+            servers.
         """
 
         os.system('rm config.txt; touch config.txt')

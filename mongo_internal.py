@@ -60,11 +60,11 @@ class Connector(Thread):
                 return None
 
         ofile = file(self.oplog_checkpoint, 'r+')
-
+                    # write to temp file
         os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')
         dest = open(self.oplog_checkpoint, 'w')
         source = open(self.oplog_checkpoint + '~', 'r')
-
+                    #for each of the threads write to file
         for oplog, ts in self.oplog_progress_dict.items():
             oplog_str = str(oplog)
             timestamp = bson_ts_to_long(ts)
@@ -94,7 +94,7 @@ class Connector(Thread):
             ts = data[count + 1]
             self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
             #stored as bson_ts
-            count = count + 2                        # skip to next set
+            count = count + 2  # skip to next set
 
        # return self.checkpoint.commit_ts
 
@@ -105,6 +105,7 @@ class Connector(Thread):
         shard_coll = mongos_conn['config']['shards']
 
         self.read_oplog_progress()
+        #can_run is set to false when we join the thread
         while self.can_run is True:
 
             for shard_doc in shard_coll.find():
@@ -200,5 +201,5 @@ if __name__ == '__main__':
             exit(1)
 
     ct = Connector(options.mongos_addr, options.oplog_config, options.url,
-                ns_set, options.u_key, key)
+                   ns_set, options.u_key, key)
     ct.start()

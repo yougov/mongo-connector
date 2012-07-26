@@ -281,6 +281,9 @@ class TestOplogManager(unittest.TestCase):
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
+            We force a rollback by inserting a doc, killing the primary,
+            inserting another doc, killing the new primary, and then restarting
+            both.
         """
         os.system('rm config.txt; touch config.txt')
         start_cluster()
