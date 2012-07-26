@@ -251,7 +251,7 @@ def start_cluster(sharded=False, key_file=None):
                     counter -= 1
                     time.sleep(1)
 
-            # shard on the alpha.foo collection 
+            # shard on the alpha.foo collection
             admin_db = mongos.admin
             admin_db.command("enableSharding", "alpha")
             admin_db.command("shardCollection", "alpha.foo", key={"_id": 1})
