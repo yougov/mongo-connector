@@ -135,7 +135,6 @@ class Connector(Thread):
 
         while self.can_run is True:
 
-            print 'main_conn is %s ' % main_conn
             shard_cursor = shard_coll.find()
 
             for shard_doc in shard_cursor:

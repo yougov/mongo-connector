@@ -48,6 +48,7 @@ class OplogThread(Thread):
             port = primary_conn.port
             self.primary_connection = Connection(host + ":"+ str(port), replicaSet=repl_set_name)
             self.mongos_connection = self.primary_connection
+            self.oplog = self.primary_connection['local']['oplog.rs']
 
         if auth_key is not None:
             #Authenticate for the whole system
@@ -68,7 +69,6 @@ class OplogThread(Thread):
             cursor_size = retry_until_ok(cursor.count)
             counter = 0
             err = False
-
             try:
                 for entry in cursor:
                     #sync the current oplog operation
@@ -149,11 +149,9 @@ class OplogThread(Thread):
 
         if timestamp is None:
             return None
-
         cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
         if retry_until_ok(cursor.count) == 0:
             return None
-
         # Check to see if cursor is too stale
         while (True):
             try:
@@ -162,9 +160,8 @@ class OplogThread(Thread):
                 cursor = cursor.sort('$natural', pymongo.ASCENDING)
                 cursor_len = cursor.count()
                 break
-            except:
+            except (AutoReconnect, OperationFailure):
                 pass
-
         if cursor_len == 1:     # means we are the end of the oplog
             if self.checkpoint is not None:
                 self.checkpoint.commit_ts = timestamp
@@ -256,7 +253,6 @@ class OplogThread(Thread):
         else:
             last_commit = self.checkpoint.commit_ts
             cursor = self.get_oplog_cursor(last_commit)
-
             if cursor is None:
                 cursor = self.init_cursor()
             else:

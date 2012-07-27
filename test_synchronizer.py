@@ -12,6 +12,7 @@ from backend_simulator import BackendSimulator
 from pysolr import Solr
 from mongo_internal import Connector
 from optparse import OptionParser
+from util import retry_until_ok
 
 
 """ Global path variables
@@ -109,7 +110,6 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
                 continue
         while (len(s.test_search()) != 2):
-            for it in s.test_search(): print it
             time.sleep(1)
         a = s.test_search()
         b = conn['test']['test'].find_one({'name': 'pauline'})
@@ -132,7 +132,9 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 1)
         for it in a:
             self.assertEqual(it['name'], 'paul')
-        self.assertEqual(conn['test']['test'].find().count(), 1)
+        find_cursor = retry_until_ok(conn['test']['test'].find)
+        self.assertEqual(retry_until_ok(find_cursor.count), 1)
+                #self.assertEqual(conn['test']['test'].find().count(), 1)
         print 'PASSED TEST ROLLBACK'
 
     def test_stress(self):
@@ -210,8 +212,8 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), NUMBER_OF_DOCS)
         for it in a:
             self.assertTrue('Paul' in it['name'])
-        self.assertEqual(conn['test']['test'].find().count(), NUMBER_OF_DOCS)
-
+        find_cursor = retry_until_ok(conn['test']['test'].find)
+        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
         print 'PASSED TEST STRESSED ROLBACK'
 
 
