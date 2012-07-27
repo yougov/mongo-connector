@@ -227,7 +227,8 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
             counter = 100
             while counter > 0:
                 try:
-                    mongos.admin.command("addShard", "demo-repl/localhost:27117")
+                    mongos.admin.command("addShard",
+                                         "demo-repl/localhost:27117")
                     break
                 except OperationFailure:            # replSet not ready yet
                     counter -= 1

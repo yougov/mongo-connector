@@ -50,7 +50,7 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe=True)
         while(len(s._search()) != 0):
             time.sleep(1)
-    '''
+
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
             properly
@@ -103,7 +103,7 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        
+
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
         conn['test']['test'].insert({'name': 'paul'}, safe=True)
@@ -177,7 +177,7 @@ class TestSynchronizer(unittest.TestCase):
                 if(it['name'] == 'Paul' + str(i)):
                     self.assertEqual(it['_id'], it['_id'])
         print 'PASSED TEST STRESS'
-    '''
+
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
             in global variable. Strategy for rollback is the same as before.
@@ -202,7 +202,8 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while count < NUMBER_OF_DOCS:
             try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(count)}, safe=True)
+                conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
+                                            safe=True)
                 count += 1
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
@@ -245,17 +246,18 @@ def abort_test(self):
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
     parser = OptionParser()
-    
+
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
-    
+
     (options, args) = parser.parse_args()
     PORTS_ONE['MONGOS'] = options.main_addr
     s = DocManager('http://localhost:9200', auto_commit=False)
     s._remove()
     start_cluster()
 
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'], replicaSet="demo-repl")
-    unittest.main(argv = [sys.argv[0]])
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+                      replicaSet="demo-repl")
+    unittest.main(argv=[sys.argv[0]])

@@ -15,8 +15,6 @@ from optparse import OptionParser
 from util import retry_until_ok
 from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
 
-
-
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
@@ -26,8 +24,8 @@ NUMBER_OF_DOCS = 100
 c = None
 s = None
 
-class TestSynchronizer(unittest.TestCase):
 
+class TestSynchronizer(unittest.TestCase):
 
     def runTest(self):
         unittest.TestCase.__init__(self)
@@ -180,7 +178,8 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while count < NUMBER_OF_DOCS:
             try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(count)}, safe=True)
+                conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
+                                            safe=True)
                 count += 1
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
@@ -224,27 +223,28 @@ def abort_test(self):
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
     parser = OptionParser()
-    
+
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
-    
+
     (options, args) = parser.parse_args()
     PORTS_ONE['MONGOS'] = options.main_addr
     c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
                   ['test.test'], '_id', None)
-    s =  c.doc_manager
+    s = c.doc_manager
     if options.main_addr != "27217":
         start_cluster(use_mongos=False)
     else:
         start_cluster()
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'], replicaSet="demo-repl")
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+                      replicaSet="demo-repl")
     t = Timer(60, abort_test)
     t.start()
     c.start()
     while len(c.shard_set) == 0:
         pass
     t.cancel()
-    unittest.main(argv = [sys.argv[0]])
+    unittest.main(argv=[sys.argv[0]])
     c.join()

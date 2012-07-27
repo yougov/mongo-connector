@@ -32,7 +32,7 @@ class OplogThread(Thread):
         self.primary_connection = primary_conn
         self.mongos_address = mongos_address
         self.oplog = oplog_coll
-        self.is_sharded = is_sharded            
+        self.is_sharded = is_sharded
         self.doc_manager = doc_manager
         self.running = False
         self.checkpoint = None
@@ -43,10 +43,12 @@ class OplogThread(Thread):
         if mongos_address is not None:
             self.mongos_connection = Connection(mongos_address)
         else:
-            repl_set_name = self.primary_connection.admin.command("replSetGetStatus")['set']
+            prim_conn = self.primary_connection.admin
+            repl_set_name = prim_conn.command("replSetGetStatus")['set']
             host = primary_conn.host
             port = primary_conn.port
-            self.primary_connection = Connection(host + ":"+ str(port), replicaSet=repl_set_name)
+            self.primary_connection = Connection(host + ":" + str(port),
+                                                 replicaSet=repl_set_name)
             self.mongos_connection = self.primary_connection
             self.oplog = self.primary_connection['local']['oplog.rs']
 

@@ -107,7 +107,7 @@ class Connector(Thread):
         self.read_oplog_progress()
         #can_run is set to false when we join the thread
 
-    	if shard_coll.find().count() == 0:
+        if shard_coll.find().count() == 0:
             #non sharded configuration
 
             oplog_coll = main_conn['local']['oplog.rs']
@@ -125,7 +125,7 @@ class Connector(Thread):
                                 self.ns_set, self.auth_key)
             self.shard_set[0] = oplog
             logging.info('MongoInternal: Starting connection thread %s' %
-                          shard_conn)
+                         shard_conn)
             oplog.start()
 
             while self.can_run:
@@ -154,7 +154,6 @@ class Connector(Thread):
                 logging.info('MongoInternal: Starting connection thread %s' %
                              shard_conn)
                 oplog.start()
-
 
         #time to stop running
         for thread in self.shard_set.values():
