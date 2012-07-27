@@ -6,6 +6,7 @@ import time
 import fcntl
 import json
 import logging
+import inspect
 import pymongo
 import sys
 
@@ -38,7 +39,11 @@ class OplogThread(Thread):
         self.oplog_progress_dict = oplog_progress_dict
         self.namespace_set = namespace_set
         self.auth_key = auth_key
-        self.mongos_connection = Connection(mongos_address)
+
+        if mongos_address is not None:
+            self.mongos_connection = Connection(mongos_address)
+        else:
+            self.mongos_connection = primary_conn
 
         if auth_key is not None:
             #Authenticate for the whole system
@@ -50,9 +55,7 @@ class OplogThread(Thread):
         self.running = True
 
         while self.running is True:
-
             cursor = self.prepare_for_sync()
-
             if cursor is None or retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
@@ -67,7 +70,6 @@ class OplogThread(Thread):
                     #sync the current oplog operation
                     operation = entry['op']
                     ns = entry['ns']
-
                     if ns not in self.namespace_set:
                         continue
                     #delete
@@ -78,7 +80,6 @@ class OplogThread(Thread):
                     #for partial update
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
-
                         if doc is not None:
                             doc['_ts'] = bson_ts_to_long(entry['ts'])
                             doc['ns'] = ns
@@ -338,7 +339,6 @@ class OplogThread(Thread):
                     if count > 60:
                         sys.exit(1)
                     time.sleep(1)
-                    pass
 
             #delete the inconsistent documents
             for doc in doc_hash.values():

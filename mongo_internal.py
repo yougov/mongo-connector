@@ -6,6 +6,8 @@ import os
 import re
 import simplejson as json
 import time
+import sys
+import inspect
 
 from backend_simulator import BackendSimulator
 from doc_manager import DocManager
@@ -38,7 +40,7 @@ class Connector(Thread):
         if self.backend_url is None:
             self.doc_manager = BackendSimulator()
         else:
-            self.doc_manager = DocManager(self.backend_url)
+            self.doc_manager = DocManager(self.backend_url, auto_commit=True)
 
         if self.doc_manager is None:
             logging.critical('Bad backend URL!')
@@ -47,7 +49,6 @@ class Connector(Thread):
     def join(self):
         """ Joins thread, stops it from running
         """
-
         self.can_run = False
         Thread.join(self)
 
@@ -127,8 +128,27 @@ class Connector(Thread):
                              shard_conn)
                 oplog.start()
 
-            if shard_cursor.count() == 0:       # No shards
-                pass
+            if shard_cursor.count() == 0 and len(self.shard_set.items()) == 0:
+                # No shards, never seen any
+                oplog_coll = main_conn['local']['oplog.rs']
+                if oplog_coll.find().count() == 0:
+                    err_msg = 'MongoInternal: No oplog for thread:'
+                    logging.info('%s %s' % (err_msg, main_conn))
+                    self.can_run = False
+                    break
+
+                shard_conn = main_conn
+                address = None
+                is_sharded = False
+
+                oplog = OplogThread(shard_conn, address, oplog_coll,
+                                    is_sharded, self.doc_manager,
+                                    self.oplog_progress_dict,
+                                    self.ns_set, self.auth_key)
+                self.shard_set[0] = oplog
+                logging.info('MongoInternal: Starting connection thread %s' %
+                             shard_conn)
+                oplog.start()
 
         #time to stop running
         for thread in self.shard_set.values():
@@ -207,4 +227,4 @@ if __name__ == '__main__':
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key)
-    ct.start()
+    ct.run()
