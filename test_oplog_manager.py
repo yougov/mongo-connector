@@ -51,6 +51,8 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['test']['test'].drop()
         mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
 
+        if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
+            mongos_addr = None
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
 
@@ -62,6 +64,7 @@ class TestOplogManager(unittest.TestCase):
                             doc_manager, {},
                             namespace_set, AUTH_KEY)
 
+        print 'oplog mongos conn is %s' % oplog.mongos_connection
         return(oplog, primary_conn, oplog_coll)
 
     def get_new_oplog(self):
@@ -74,15 +77,17 @@ class TestOplogManager(unittest.TestCase):
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
 
-        mongos = "localhost:" + PORTS_ONE["MAIN"]
+        mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+        if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
+            mongos_addr = None
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
         doc_manager = BackendSimulator()
-        oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
+        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
                             namespace_set, AUTH_KEY)
-
+        print 'oplog mongos conn is %s' % oplog.mongos_connection
         return(oplog, primary_conn, oplog.mongos_connection, oplog_coll)
 
     def test_retrieve_doc(self):
@@ -382,6 +387,8 @@ if __name__ == '__main__':
                       dest="auth_file", default="")
 
     (options, args) = parser.parse_args()
+
+    PORTS_ONE["MAIN"] = options.main_addr
 
     if options.auth_file != "":
         start_cluster(key_file=options.auth_file)

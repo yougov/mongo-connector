@@ -120,6 +120,6 @@ if __name__ == '__main__':
                       dest="main_addr", default="localhost:27217")
 
     (options, args) = parser.parse_args()
-    main_address = options.main_addr
+    main_address = 'localhost:' + options.main_addr
 
     unittest.main(argv=[sys.argv[0]])
