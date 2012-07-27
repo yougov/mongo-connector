@@ -3,12 +3,16 @@
 
 import unittest
 import time
+import sys
 import json
 from mongo_internal import Connector
+from optparse import OptionParser
 import os
 from setup_cluster import start_cluster
 from bson.timestamp import Timestamp
 from util import long_to_bson_ts
+
+main_address = 'localhost:27217'
 
 
 class MongoInternalTester(unittest.TestCase):
@@ -20,7 +24,7 @@ class MongoInternalTester(unittest.TestCase):
         """Test whether the connector initiates properly
         """
 
-        c = Connector('localhost:27217', 'config.txt', None, ['test.test'],
+        c = Connector(main_address, 'config.txt', None, ['test.test'],
                       '_id', None)
         c.start()
 
@@ -38,7 +42,7 @@ class MongoInternalTester(unittest.TestCase):
         """
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
-        c = Connector('localhost:27217', config_file_path, None, ['test.test'],
+        c = Connector(main_address, config_file_path, None, ['test.test'],
                       '_id', None)
 
         #test that None is returned if there is no config file specified.
@@ -70,7 +74,7 @@ class MongoInternalTester(unittest.TestCase):
         """Test read_oplog_progress
         """
 
-        c = Connector('localhost:27217', None, None, ['test.test'], '_id',
+        c = Connector(main_address, None, None, ['test.test'], '_id',
                       None)
 
         #testing with no file
@@ -107,4 +111,15 @@ class MongoInternalTester(unittest.TestCase):
 if __name__ == '__main__':
     start_cluster()
     os.system('rm config.txt; touch config.txt')
-    unittest.main()
+
+    parser = OptionParser()
+
+    #-m is for the main address, which is a host:port pair, ideally of the
+    #mongos. For non sharded clusters, it can be the primary.
+    parser.add_option("-m", "--main", action="store", type="string",
+                      dest="main_addr", default="localhost:27217")
+
+    (options, args) = parser.parse_args()
+    main_address = options.main_addr
+
+    unittest.main(argv=[sys.argv[0]])

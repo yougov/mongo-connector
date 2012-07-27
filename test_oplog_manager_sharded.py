@@ -396,7 +396,7 @@ if __name__ == '__main__':
 
     parser = OptionParser()
 
-    # -m is for the mongos address, which is a host:port pair.
+    # -a is to specify the auth file.
     parser.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 

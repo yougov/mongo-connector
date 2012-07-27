@@ -26,7 +26,7 @@ from bson.objectid import ObjectId
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
-             "CONFIG":  "27220", "MONGOS":  "27217"}
+             "CONFIG":  "27220", "MAIN":  "27217"}
 
 AUTH_KEY = None
 
@@ -49,7 +49,7 @@ class TestOplogManager(unittest.TestCase):
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
 
         primary_conn['test']['test'].drop()
-        mongos_addr = "localhost:" + PORTS_ONE["MONGOS"]
+        mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
 
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -74,7 +74,7 @@ class TestOplogManager(unittest.TestCase):
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
 
-        mongos = "localhost:" + PORTS_ONE["MONGOS"]
+        mongos = "localhost:" + PORTS_ONE["MAIN"]
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
@@ -372,7 +372,12 @@ if __name__ == '__main__':
 
     parser = OptionParser()
 
-    #-m is for the mongos address, which is a host: port pair.
+    #-m is for the main address, which is a host:port pair, ideally of the
+    #mongos. For non sharded clusters, it can be the primary.
+    parser.add_option("-m", "--main", action="store", type="string",
+                      dest="main_addr", default="localhost:27217")
+
+    #-a is for the auth address
     parser.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 
@@ -391,5 +396,5 @@ if __name__ == '__main__':
     else:
         start_cluster()
 
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    conn = Connection('localhost:' + PORTS_ONE['MAIN'])
     unittest.main(argv=[sys.argv[0]])
