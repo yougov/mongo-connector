@@ -13,6 +13,8 @@ from pysolr import Solr
 from mongo_internal import Connector
 from optparse import OptionParser
 from util import retry_until_ok
+from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
+
 
 
 """ Global path variables
@@ -176,15 +178,12 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         time.sleep(5)
         count = 0
-        for i in range(0, NUMBER_OF_DOCS):
+        while count < NUMBER_OF_DOCS:
             try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(i)},
-                                            safe=1)
+                conn['test']['test'].insert({'name': 'Pauline ' + str(count)}, safe=True)
                 count += 1
-            except:
+            except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-                i -= 1
-                continue
         while (len(s.test_search()) != NUMBER_OF_DOCS + count):
             time.sleep(1)
         a = s.test_search()
@@ -236,7 +235,10 @@ if __name__ == '__main__':
     c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
                   ['test.test'], '_id', None)
     s =  c.doc_manager
-    start_cluster()
+    if options.main_addr != "27217":
+        start_cluster(use_mongos=False)
+    else:
+        start_cluster()
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'], replicaSet="demo-repl")
     t = Timer(60, abort_test)
     t.start()

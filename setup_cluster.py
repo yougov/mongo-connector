@@ -127,7 +127,7 @@ def checkStarted(port):
 #========================================= #
 
 
-def start_cluster(sharded=False, key_file=None):
+def start_cluster(sharded=False, key_file=None, use_mongos=True):
         """Sets up cluster with 1 shard, replica set with 3 members
         """
         # Kill all spawned mongods
@@ -186,7 +186,7 @@ def start_cluster(sharded=False, key_file=None):
         checkStarted(int(PORTS_ONE["CONFIG"]))
 
         # Setup the mongos, same mongos for both shards
-        """CMD = ["mongos --port " + PORTS_ONE["MONGOS"] +
+        CMD = ["mongos --port " + PORTS_ONE["MONGOS"] +
                " --fork --configdb localhost:" +
                PORTS_ONE["CONFIG"] + " --chunkSize 1  --logpath " +
                DEMO_SERVER_LOG + "/mongos1.log --logappend"]
@@ -195,8 +195,9 @@ def start_cluster(sharded=False, key_file=None):
             CMD[0] += " --keyFile " + key_file
 
         CMD[0] += " &"
-        executeCommand(CMD)
-        checkStarted(int(PORTS_ONE["MONGOS"]))"""
+        if use_mongos:
+            executeCommand(CMD)
+            checkStarted(int(PORTS_ONE["MONGOS"]))
 
         # configuration for replSet 1
         config = {'_id': "demo-repl", 'members': [
@@ -213,7 +214,8 @@ def start_cluster(sharded=False, key_file=None):
                     'arbiterOnly': 'true'}]}
 
         primary = Connection('localhost:27117')
-# mongos = Connection('localhost:27217')
+        if use_mongos:
+            mongos = Connection('localhost:27217')
         primary.admin.command("replSetInitiate", config)
 
         # ensure that the replSet is properly configured
@@ -221,19 +223,20 @@ def start_cluster(sharded=False, key_file=None):
                              "replSetGetStatus")['myState'] == 0:
             time.sleep(1)
 
-        '''counter = 100
-        while counter > 0:
-            try:
-                mongos.admin.command("addShard", "demo-repl/localhost:27117")
-                break
-            except OperationFailure:            # replSet not ready yet
-                counter -= 1
-                time.sleep(1)
+        if use_mongos:
+            counter = 100
+            while counter > 0:
+                try:
+                    mongos.admin.command("addShard", "demo-repl/localhost:27117")
+                    break
+                except OperationFailure:            # replSet not ready yet
+                    counter -= 1
+                    time.sleep(1)
 
-        if counter == 0:
-            print 'Could not add shard to mongos'
-            sys.exit(1)
-        '''
+            if counter == 0:
+                print 'Could not add shard to mongos'
+                sys.exit(1)
+
         if sharded:
             primary2 = Connection('localhost:27317')
             primary2.admin.command("replSetInitiate", config2)

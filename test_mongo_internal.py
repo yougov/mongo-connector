@@ -12,7 +12,7 @@ from setup_cluster import start_cluster
 from bson.timestamp import Timestamp
 from util import long_to_bson_ts
 
-main_address = 'localhost:27217'
+main_address = '27217'
 
 
 class MongoInternalTester(unittest.TestCase):
@@ -109,7 +109,6 @@ class MongoInternalTester(unittest.TestCase):
         print 'PASSED TEST READ OPLOG PROGRESS'
 
 if __name__ == '__main__':
-    start_cluster()
     os.system('rm config.txt; touch config.txt')
 
     parser = OptionParser()
@@ -117,9 +116,13 @@ if __name__ == '__main__':
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="localhost:27217")
+                      dest="main_addr", default="27217")
 
     (options, args) = parser.parse_args()
-    main_address = 'localhost:' + options.main_addr
+    main_address = "localhost:" + options.main_addr
+    if options.main_addr != "27217":
+        start_cluster(use_mongos=False)
+    else:
+        start_cluster(use_mongos=True)
 
     unittest.main(argv=[sys.argv[0]])

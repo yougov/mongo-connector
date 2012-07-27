@@ -13,12 +13,16 @@ from threading import Timer
 from doc_manager import DocManager
 from pysolr import Solr
 from mongo_internal import Connector
+from optparse import OptionParser
+from util import retry_until_ok
+from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
+
 
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
-s = DocManager('http://localhost:9200', auto_commit=False)
+s = None
 conn = None
 NUMBER_OF_DOCS = 100
 
@@ -46,7 +50,7 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe=True)
         while(len(s._search()) != 0):
             time.sleep(1)
-
+    '''
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
             properly
@@ -99,11 +103,13 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-
+        
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
         conn['test']['test'].insert({'name': 'paul'}, safe=True)
         while conn['test']['test'].find({'name': 'paul'}).count() != 1:
+            time.sleep(1)
+        while len(s._search()) != 1:
             time.sleep(1)
 
         killMongoProc('localhost', PORTS_ONE['PRIMARY'])
@@ -149,7 +155,8 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 1)
         for it in a:
             self.assertEqual(it['name'], 'paul')
-        self.assertEqual(conn['test']['test'].find().count(), 1)
+        find_cursor = retry_until_ok(conn['test']['test'].find)
+        self.assertEqual(retry_until_ok(find_cursor.count), 1)
         print 'PASSED TEST ROLLBACK'
 
     def test_stress(self):
@@ -170,7 +177,7 @@ class TestSynchronizer(unittest.TestCase):
                 if(it['name'] == 'Paul' + str(i)):
                     self.assertEqual(it['_id'], it['_id'])
         print 'PASSED TEST STRESS'
-
+    '''
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
             in global variable. Strategy for rollback is the same as before.
@@ -193,15 +200,12 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         time.sleep(5)
         count = 0
-        for i in range(0, NUMBER_OF_DOCS):
+        while count < NUMBER_OF_DOCS:
             try:
-                conn['test']['test'].insert({'name': 'Pauline ' + str(i)},
-                                            safe=1)
+                conn['test']['test'].insert({'name': 'Pauline ' + str(count)}, safe=True)
                 count += 1
-            except:
+            except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-                i -= 1
-                continue
         while(len(s._search()) != NUMBER_OF_DOCS + count):
             time.sleep(1)
         a = s._search()
@@ -228,7 +232,8 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), NUMBER_OF_DOCS)
         for it in a:
             self.assertTrue('Paul' in it['name'])
-        self.assertEqual(conn['test']['test'].find().count(), NUMBER_OF_DOCS)
+        find_cursor = retry_until_ok(conn['test']['test'].find)
+        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
 
         print 'PASSED TEST STRESSED ROLBACK'
 
@@ -239,7 +244,18 @@ def abort_test(self):
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
+    parser = OptionParser()
+    
+    #-m is for the main address, which is a host:port pair, ideally of the
+    #mongos. For non sharded clusters, it can be the primary.
+    parser.add_option("-m", "--main", action="store", type="string",
+                      dest="main_addr", default="27217")
+    
+    (options, args) = parser.parse_args()
+    PORTS_ONE['MONGOS'] = options.main_addr
+    s = DocManager('http://localhost:9200', auto_commit=False)
     s._remove()
     start_cluster()
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
-    unittest.main()
+
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'], replicaSet="demo-repl")
+    unittest.main(argv = [sys.argv[0]])
