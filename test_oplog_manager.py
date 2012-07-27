@@ -380,7 +380,7 @@ if __name__ == '__main__':
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="localhost:27217")
+                      dest="main_addr", default="27217")
 
     #-a is for the auth address
     parser.add_option("-a", "--auth", action="store", type="string",
