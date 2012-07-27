@@ -11,19 +11,20 @@ from threading import Timer
 from backend_simulator import BackendSimulator
 from pysolr import Solr
 from mongo_internal import Connector
+from optparse import OptionParser
+
 
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
-c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
-              ['test.test'], '_id', None)
-s = c.doc_manager
+             "CONFIG": "27220", "MONGOS": "27117"}
 conn = None
 NUMBER_OF_DOCS = 100
-
+c = None
+s = None
 
 class TestSynchronizer(unittest.TestCase):
+
 
     def runTest(self):
         unittest.TestCase.__init__(self)
@@ -108,6 +109,7 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
                 continue
         while (len(s.test_search()) != 2):
+            for it in s.test_search(): print it
             time.sleep(1)
         a = s.test_search()
         b = conn['test']['test'].find_one({'name': 'pauline'})
@@ -220,13 +222,25 @@ def abort_test(self):
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
+    parser = OptionParser()
+    
+    #-m is for the main address, which is a host:port pair, ideally of the
+    #mongos. For non sharded clusters, it can be the primary.
+    parser.add_option("-m", "--main", action="store", type="string",
+                      dest="main_addr", default="27217")
+    
+    (options, args) = parser.parse_args()
+    PORTS_ONE['MONGOS'] = options.main_addr
+    c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
+                  ['test.test'], '_id', None)
+    s =  c.doc_manager
     start_cluster()
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
+    conn = Connection('localhost:' + PORTS_ONE['MONGOS'], replicaSet="demo-repl")
     t = Timer(60, abort_test)
     t.start()
     c.start()
     while len(c.shard_set) == 0:
         pass
     t.cancel()
-    unittest.main()
+    unittest.main(argv = [sys.argv[0]])
     c.join()

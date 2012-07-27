@@ -16,7 +16,7 @@ from oplog_manager import OplogThread
 from optparse import OptionParser
 from sys import exit
 from threading import Thread
-from util import bson_ts_to_long, long_to_bson_ts
+from util import bson_ts_to_long, long_to_bson_ts, retry_until_ok
 from bson.timestamp import Timestamp
 
 
@@ -106,8 +106,36 @@ class Connector(Thread):
 
         self.read_oplog_progress()
         #can_run is set to false when we join the thread
+
+    	if shard_coll.find().count() == 0:
+            #non sharded configuration
+
+            oplog_coll = main_conn['local']['oplog.rs']
+            if oplog_coll.find().count() == 0:
+                err_msg = 'MongoInternal: No oplog for thread:'
+                logging.info('%s %s' % (err_msg, main_conn))
+                self.can_run = False
+
+            shard_conn = main_conn
+            address = None
+            is_sharded = False
+            oplog = OplogThread(shard_conn, address, oplog_coll,
+                                is_sharded, self.doc_manager,
+                                self.oplog_progress_dict,
+                                self.ns_set, self.auth_key)
+            self.shard_set[0] = oplog
+            logging.info('MongoInternal: Starting connection thread %s' %
+                          shard_conn)
+            oplog.start()
+
+            while self.can_run:
+                self.write_oplog_progress()
+                time.sleep(1)
+                continue
+
         while self.can_run is True:
 
+            print 'main_conn is %s ' % main_conn
             shard_cursor = shard_coll.find()
 
             for shard_doc in shard_cursor:
@@ -128,27 +156,6 @@ class Connector(Thread):
                              shard_conn)
                 oplog.start()
 
-            if shard_cursor.count() == 0 and len(self.shard_set.items()) == 0:
-                # No shards, never seen any
-                oplog_coll = main_conn['local']['oplog.rs']
-                if oplog_coll.find().count() == 0:
-                    err_msg = 'MongoInternal: No oplog for thread:'
-                    logging.info('%s %s' % (err_msg, main_conn))
-                    self.can_run = False
-                    break
-
-                shard_conn = main_conn
-                address = None
-                is_sharded = False
-
-                oplog = OplogThread(shard_conn, address, oplog_coll,
-                                    is_sharded, self.doc_manager,
-                                    self.oplog_progress_dict,
-                                    self.ns_set, self.auth_key)
-                self.shard_set[0] = oplog
-                logging.info('MongoInternal: Starting connection thread %s' %
-                             shard_conn)
-                oplog.start()
 
         #time to stop running
         for thread in self.shard_set.values():
