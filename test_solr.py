@@ -40,8 +40,16 @@ class TestSynchronizer(unittest.TestCase):
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)
-
-        conn['test']['test'].remove(safe=True)
+        count = 0
+        while (True):
+            try:
+                conn['test']['test'].remove(safe=True)
+                break
+            except (AutoReconnect, OperationFailure):
+                time.sleep(1)
+                count += 1
+                if count > 60:
+                    sys.exit(1)
         while (len(s.search('*:*')) != 0):
             time.sleep(1)
 
