@@ -193,7 +193,7 @@ class TestSynchronizer(unittest.TestCase):
                                             safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(s.test_search()) != NUMBER_OF_DOCS + count):
+        while (len(s.test_search()) != conn['test']['test'].find().count()):
             time.sleep(1)
         a = s.test_search()
         self.assertEqual(len(a), NUMBER_OF_DOCS + count)

@@ -232,7 +232,8 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
 
         while (len(s.search('*:*', rows=NUMBER_OF_DOCS * 2)) !=
-               NUMBER_OF_DOCS + count):
+               conn['test']['test'].find().count()):
+
             time.sleep(1)
         a = s.search('Pauline', rows=NUMBER_OF_DOCS * 2, sort='_id asc')
         self.assertEqual(len(a), count)
