@@ -47,7 +47,7 @@ This is the only file that is engine specific. In the current version, we have p
 documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
 then you need to write a doc_manager.py file for that backend. The following functions must be implemented:
 
-1) init(self, url)
+__1) init(self, url)__
 
 This method may vary from implementation to implementation, but it must
 verify the url to the backend and return None if that fails. It must
@@ -55,19 +55,19 @@ also create the connection to the backend, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
 auto_commit.
 
-2) upsert(self, doc)
+__2) upsert(self, doc)__
 
 Update or insert a document into your engine.
 This method should call whatever add/insert/update method exists for
 the backend engine and add the document in there. The input will
 always be one mongo document, represented as a Python dictionary.
 
-3) remove(self, doc)
+__3) remove(self, doc)__
 
 Removes documents from engine
 The input is a python dictionary that represents a mongo document.
 
-4) search(self, start_ts, end_ts)
+__4) search(self, start_ts, end_ts)__
 
 Called to query engine for documents in a time range, including start_ts and end_ts
 This method is only used by rollbacks to query all the documents in
@@ -76,7 +76,7 @@ Solr within a certain timestamp window. The input will be two longs
 return value should be an iterable set of documents.
 
 
-5) commit(self)
+__5) commit(self)__
 
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
@@ -84,7 +84,7 @@ not meant to be called in other circumstances. The body should commit
 all documents to the backend engine (like auto_commit), but not have
 any timers or run itself again (unlike auto_commit).
 
-6) get_last_doc(self)
+__6) get_last_doc(self)__
 
 Returns the last document stored in the Elastic engine.
 This method is used for rollbacks to establish the rollback window,
