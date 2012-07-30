@@ -1,5 +1,4 @@
-./test.sh
-cp solr_doc_manager.py doc_manager.py
+./tests/test.sh
+cd doc_managers/tests
 ./test_solr.sh
-cp elastic_doc_manager.py doc_manager.py
 ./test_elastic.sh
