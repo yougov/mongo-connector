@@ -133,27 +133,29 @@ class Connector(Thread):
                 self.write_oplog_progress()
                 time.sleep(1)
 
-        while self.can_run is True:
+        else:       # sharded cluster
+            while self.can_run is True:
 
-            shard_cursor = shard_coll.find()
+                shard_cursor = shard_coll.find()
 
-            for shard_doc in shard_cursor:
-                shard_id = shard_doc['_id']
-                if shard_id in self.shard_set:
-                    self.write_oplog_progress()
-                    time.sleep(1)
-                    continue
+                for shard_doc in shard_cursor:
+                    shard_id = shard_doc['_id']
+                    if shard_id in self.shard_set:
+                        self.write_oplog_progress()
+                        time.sleep(1)
+                        continue
 
-                repl_set, hosts = shard_doc['host'].split('/')
-                shard_conn = Connection(hosts, replicaset=repl_set)
-                oplog_coll = shard_conn['local']['oplog.rs']
-                oplog = OplogThread(shard_conn, self.address, oplog_coll, True,
-                                    self.doc_manager, self.oplog_progress_dict,
-                                    self.ns_set, self.auth_key)
-                self.shard_set[shard_id] = oplog
-                logging.info('MongoInternal: Starting connection thread %s' %
-                             shard_conn)
-                oplog.start()
+                    repl_set, hosts = shard_doc['host'].split('/')
+                    shard_conn = Connection(hosts, replicaset=repl_set)
+                    oplog_coll = shard_conn['local']['oplog.rs']
+                    oplog = OplogThread(shard_conn, self.address, oplog_coll,
+                                        True, self.doc_manager,
+                                        self.oplog_progress_dict,
+                                        self.ns_set, self.auth_key)
+                    self.shard_set[shard_id] = oplog
+                    logging.info('MongoInternal: Starting connection thread %s'
+                                 % shard_conn)
+                    oplog.start()
 
         #time to stop running
         for thread in self.shard_set.values():

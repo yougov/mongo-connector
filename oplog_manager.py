@@ -40,6 +40,8 @@ class OplogThread(Thread):
         self.namespace_set = namespace_set
         self.auth_key = auth_key
 
+        logging.info('initializing oplog thread')
+
         if mongos_address is not None:
             self.mongos_connection = Connection(mongos_address)
         else:
