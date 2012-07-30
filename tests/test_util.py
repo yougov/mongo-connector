@@ -17,6 +17,7 @@ from util import (verify_url,
                   long_to_bson_ts,
                   retry_until_ok)
 
+
 def err_func():
     """Helper function for retry_until_ok test
     """
