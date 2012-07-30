@@ -40,6 +40,9 @@ def long_to_bson_ts(val):
 
 def retry_until_ok(func, args=None, no_func=False):
     """Retry code block until it succeeds.
+
+    If it does not succeed in 60 attempts, the
+    function simply exits.
     """
 
     result = True

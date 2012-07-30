@@ -76,8 +76,12 @@ class OplogThread(Thread):
                     #sync the current oplog operation
                     operation = entry['op']
                     ns = entry['ns']
-                    if ns not in self.namespace_set:
+
+                    #check if ns is excluded or not.
+                    #also ensure non-empty namespace set.
+                    if ns not in self.namespace_set and self.namespace_set:
                         continue
+
                     #delete
                     if operation == 'd':
                         entry['_id'] = entry['o']['_id']
@@ -210,7 +214,22 @@ class OplogThread(Thread):
         if timestamp is None:
             return None
 
-        for namespace in self.namespace_set:
+        dump_set = self.namespace_set
+
+        #no namespaces specified
+        if not self.namespace_set:
+            db_list = self.mongos_connection.database_names()
+            for db in db_list:
+                if db == "system" or db == "config":
+                    continue
+                coll_list = self.mongos_connection[db].collection_names()
+                for coll in coll_list:
+                    if coll == "system.indexes":
+                        continue
+                    namespace = str(db) + "." + str(coll)
+                    dump_set.append(namespace)
+
+        for namespace in dump_set:
             db, coll = namespace.split('.', 1)
             target_coll = retry_until_ok(self.mongos_connection[db][coll],
                                          no_func=True)

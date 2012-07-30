@@ -32,13 +32,13 @@ to `-n`.
 `-u` or `--unique-key` is used to specify the uniqueKey used by the backend. The default is "_id",
 which can be noted by "-u _id"
 
-`-a` or `--auth-file` is used to specify the path to the authentication key file. This file is used
+`-k` or `--keyFile` is used to specify the path to the authentication key file. This file is used
 by mongos to authenticate connections to the shards, and we'll use it in the oplog threads. If
 authentication is not used, then this field can be left empty as the default is None.
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -a auth.txt
+	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt
 
 
 ## Doc Manager:

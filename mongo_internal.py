@@ -60,11 +60,12 @@ class Connector(Thread):
                 return None
 
         ofile = file(self.oplog_checkpoint, 'r+')
-                    # write to temp file
+        # write to temp file
         os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')
         dest = open(self.oplog_checkpoint, 'w')
         source = open(self.oplog_checkpoint + '~', 'r')
-                    #for each of the threads write to file
+
+        # for each of the threads write to file
         for oplog, ts in self.oplog_progress_dict.items():
             oplog_str = str(oplog)
             timestamp = bson_ts_to_long(ts)
@@ -131,7 +132,6 @@ class Connector(Thread):
             while self.can_run:
                 self.write_oplog_progress()
                 time.sleep(1)
-                continue
 
         while self.can_run is True:
 
@@ -200,22 +200,25 @@ if __name__ == '__main__':
     #-n is to specify the namespaces we want to consider. The default
     #considers 'test.test' and 'alpha.foo'
     parser.add_option("-n", "--namespace-set", action="store", type="string",
-                      dest="ns_set", default="test.test,alpha.foo")
+                      dest="ns_set", default=None)
 
     #-u is to specify the uniqueKey used by the backend,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id")
 
-    #-a is to specify the authentication key file. This file is used by mongos
+    #-k is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
     #threads.
-    parser.add_option("-a", "--auth-file", action="store", type="string",
+    parser.add_option("-k", "--keyFile", action="store", type="string",
                       dest="auth_file", default=None)
 
     (options, args) = parser.parse_args()
 
     try:
-        ns_set = options.ns_set.split(',')
+        if options.ns_set is None:
+            ns_set = []
+        else:
+            ns_set = options.ns_set.split(',')
     except:
         logger.error('Namespaces must be separated by commas!')
         exit(1)
