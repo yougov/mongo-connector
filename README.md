@@ -5,7 +5,6 @@ documents in mongoDB to be stored in some other system, and both mongo and the b
 in sync while the connector is running.
 
 ## Usage:
----------
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations. To start the system, simply
@@ -42,64 +41,59 @@ An example of combining all of these is:
 	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -a auth.txt
 
 
-doc_manager:
+## Doc Manager:
 
 This is the only file that is engine specific. In the current version, we have provided sample
 documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
- then you need to write a doc_manager.py file. The following functions must be implemented:
+then you need to write a doc_manager.py file for that backend. The following functions must be implemented:
 
-  1) __init__ (self, url)
+1) __init__ (self, url)
 
-        This method may vary from implementation to implementation, but it must
-        verify the url to the backend and return None if that fails. It must
-        also create the connection to the backend, and start a periodic
-        committer if necessary. It can take extra optional parameters for internal use, like
-        auto_commit.
+    This method may vary from implementation to implementation, but it must
+    verify the url to the backend and return None if that fails. It must
+    also create the connection to the backend, and start a periodic
+    committer if necessary. It can take extra optional parameters for internal use, like
+    auto_commit.
 
-	2)upsert(self, doc)
+2)upsert(self, doc)
 
-        Update or insert a document into your engine.
+    Update or insert a document into your engine.
+    This method should call whatever add/insert/update method exists for
+    the backend engine and add the document in there. The input will
+    always be one mongo document, represented as a Python dictionary.
 
-        This method should call whatever add/insert/update method exists for
-        the backend engine and add the document in there. The input will
-        always be one mongo document, represented as a Python dictionary.
+3)remove(self, doc)
 
-	3)remove(self, doc)
+    Removes documents from engine
+    The input is a python dictionary that represents a mongo document.
 
-        Removes documents from engine
+4) search(self, start_ts, end_ts)
 
-        The input is a python dictionary that represents a mongo document.
-
-	4) search(self, start_ts, end_ts)
-
-        Called to query engine for documents in a time range, including start_ts and end_ts
-
-        This method is only used by rollbacks to query all the documents in
-        Solr within a certain timestamp window. The input will be two longs
-        (converted from Bson timestamp) which specify the time range. The
-        return value should be an iterable set of documents.
+    Called to query engine for documents in a time range, including start_ts and end_ts
+    This method is only used by rollbacks to query all the documents in
+    Solr within a certain timestamp window. The input will be two longs
+    (converted from Bson timestamp) which specify the time range. The
+    return value should be an iterable set of documents.
 
 
-	5)commit(self)
+5)commit(self)
 
-        This function is used to force a refresh/commit.
+    This function is used to force a refresh/commit.
+    It is used only in the beginning of rollbacks and in test cases, and is
+    not meant to be called in other circumstances. The body should commit
+    all documents to the backend engine (like auto_commit), but not have
+    any timers or run itself again (unlike auto_commit).
 
-        It is used only in the beginning of rollbacks and in test cases, and is
-        not meant to be called in other circumstances. The body should commit
-        all documents to the backend engine (like auto_commit), but not have
-        any timers or run itself again (unlike auto_commit).
+6)get_last_doc(self)
 
-	6)get_last_doc(self)
-
-        Returns the last document stored in the Elastic engine.
-
-        This method is used for rollbacks to establish the rollback window,
-        which is the gap between the last document on a mongo shard and the
-        last document in Solr. If there are no documents, this functions
-        returns None. Otherwise, it returns the first document.
+    Returns the last document stored in the Elastic engine.
+    This method is used for rollbacks to establish the rollback window,
+    which is the gap between the last document on a mongo shard and the
+    last document in Solr. If there are no documents, this functions
+    returns None. Otherwise, it returns the first document.
 
 
-System Internals:
+## System Internals:
 
 The main Connector thread connects to either a mongod or a mongos, depending on cluster setup, and
 spawns an OplogThread for every primary node in the cluster. These OplogThreads continuously poll
@@ -126,15 +120,13 @@ The above three steps essentially loop forever. For usage purposes, the only rel
 DocManager, which will always get the documents from the underlying layer and is responsible for
 adding to/removing from the backend.
 
-
-
 Mongo-Connector imports a DocManager from the file doc_manager.py. We have provided sample
 implementations for a Solr search DocManager and an ElasticSearch DocManager, but for
 Mongo-Connector to use these, it is necessary to copy the contents to the doc_manager.py file. So,
 if you wish to use the Solr manager, you could execute 'cp solr_doc_manager.py doc_manager.py' and
 then start the connector.
 
-Testing scripts
+## Testing scripts
 
 We have a test script to make sure everything is setup properly, which is 'test.sh'. We also have
 tests for the Solr and the Elastic doc managers, which assume you have Solr and Elastic setup to the
