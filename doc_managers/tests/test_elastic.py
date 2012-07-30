@@ -211,12 +211,12 @@ class TestSynchronizer(unittest.TestCase):
         while admin.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
-        count = 0
-        while count < NUMBER_OF_DOCS:
+        count = -1
+        while count + 1 < NUMBER_OF_DOCS:
             try:
+                count += 1
                 conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
                                             safe=True)
-                count += 1
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
         while(len(s._search()) != NUMBER_OF_DOCS + count):
