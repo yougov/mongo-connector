@@ -129,7 +129,7 @@ then start the connector.
 
 ## Testing scripts
 
-We have a test script to make sure everything is setup properly, which is 'test.sh'. We also have
-tests for the Solr and the Elastic doc managers, which assume you have Solr and Elastic setup to the
-standard ports (8080 for Solr and 9200 for Elastic), and that the Solr or Elastic doc manager file
-is renamed 'doc_manager.py'
+There are two sets of tests - one is for the general system, which can be found in the Tests folder, and another is for
+the DocManagers, which is found in the DocManagerTests folder inside the DocManagers folder. The DocManagerTests utilize
+the Doc Managers stored in the DocManagers folder, so if any modifications are made to a Doc Manager, ensure that the
+changes are propogated in the corresponding file in the DocManagers folder. 
