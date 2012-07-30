@@ -221,6 +221,7 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
         while (len(s._search()) != conn['test']['test'].find().count()):
             time.sleep(1)
+        a = s._search()
         for it in a:
             if 'Pauline' in it['name']:
                 b = conn['test']['test'].find_one({'name': it['name']})
