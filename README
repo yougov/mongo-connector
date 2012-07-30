@@ -1,3 +1,9 @@
+System Overview:
+
+The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the 
+documents in mongoDB to be stored in some other system, and both mongo and the backend will remain 
+in sync while the connector is running. 
+
 Usage:
 
 To start the system, simply run "python mongo_connector.py". It is likely, however, that you will 
@@ -80,12 +86,6 @@ This is the only file that is engine specific. In the current version, we have p
         which is the gap between the last document on a mongo shard and the
         last document in Solr. If there are no documents, this functions
         returns None. Otherwise, it returns the first document.	
-
-System Overview:
-
-The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the 
-documents in mongoDB to be stored in some other system, and both mongo and the backend will remain 
-in sync while the connector is running. 
 
 
 System Internals:
