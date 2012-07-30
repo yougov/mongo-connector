@@ -333,6 +333,8 @@ class TestOplogManager(unittest.TestCase):
             except:
                 count += 1
                 if count > 60:
+                    string = 'Call to insert doc failed too many times'
+                    logging.error(string)
                     sys.exit(1)
                 time.sleep(1)
                 continue

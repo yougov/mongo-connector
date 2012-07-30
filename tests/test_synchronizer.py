@@ -113,6 +113,9 @@ class TestSynchronizer(unittest.TestCase):
             except:
                 count += 1
                 if count > 60:
+                    string = 'Call to insert failed too many times'
+                    string += ' in test_rollback'
+                    logging.error(string)
                     sys.exit(1)
                 time.sleep(1)
                 continue

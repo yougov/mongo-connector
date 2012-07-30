@@ -61,6 +61,9 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
                 count += 1
                 if count > 60:
+                    string = 'Call to remove failed too many times'
+                    string += ' in setUp'
+                    logging.error(string)
                     sys.exit(1)
         while (len(s.search('*:*')) != 0):
             time.sleep(1)
@@ -147,6 +150,9 @@ class TestSynchronizer(unittest.TestCase):
             except:
                 count += 1
                 if count > 60:
+                    string = 'Call to insert failed too many times'
+                    string += ' in test_rollback'
+                    logging.error(string)
                     sys.exit(1)
                 time.sleep(1)
                 continue

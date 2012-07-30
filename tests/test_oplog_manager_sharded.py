@@ -56,6 +56,9 @@ def safe_mongo_op(func, arg1, arg2=None):
         time.sleep(1)
         count += 1
         if (count > 60):
+            string = 'Call to %s failed too many times' % func
+            string += ' in safe_mongo_op'
+            logging.error(string)
             sys.exit(1)
         try:
             if arg2:
@@ -352,6 +355,9 @@ class TestOplogManagerSharded(unittest.TestCase):
                 time.sleep(1)
                 count += 1
                 if count > 60:
+                    string = 'Insert failed too many times'
+                    string += ' in rollback'
+                    logging.error(string)
                     sys.exit(1)
                 continue
 
