@@ -25,9 +25,8 @@ for quick recovery from failure.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
-"-n test.test,alpha.foo". Presently, there is no way to indicate "all namespaces" - if you want to
-store every single namespace, you must specify them all in a comma delimited format as an argument
-to `-n`.
+`-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
+databases, and also ignoring the "system.indexes" collection in any database.
 
 `-u` or `--unique-key` is used to specify the uniqueKey used by the backend. The default is "_id",
 which can be noted by "-u _id"

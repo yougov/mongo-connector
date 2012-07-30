@@ -200,7 +200,7 @@ if __name__ == '__main__':
                       dest="url", default="")
 
     #-n is to specify the namespaces we want to consider. The default
-    #considers 'test.test' and 'alpha.foo'
+    #considers all the namespaces
     parser.add_option("-n", "--namespace-set", action="store", type="string",
                       dest="ns_set", default=None)
 
