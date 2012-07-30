@@ -10,19 +10,19 @@ Since the connector does real time syncing, it is necessary to have MongoDB runn
 both sharded and non sharded configurations. To start the system, simply run "python mongo_connector.py". It is likely, 
 however, that you will need to specify some command line options to work with your setup. They are described below:
 
-"-m" or "--mongos" is to specify the mongos address, which is a host:port pair, or for clusters with one shard, the primary's address. 
-For example, "-m localhost:27217" would be a valid argument to "-m". 
+"-m" or "--mongos" is to specify the mongos address, which is a host:port pair, or for clusters with one shard, the 
+primary's address. For example, "-m localhost:27217" would be a valid argument to "-m". 
 
-"-b" or "--backend-url" is to specify the URL to the backend engine being used. For example, if you were using Solr out of the box, 
-you could use "-b http://localhost:8080/solr" with the SolrDocManager to establish a proper connection. 
+"-b" or "--backend-url" is to specify the URL to the backend engine being used. For example, if you were using Solr out 
+of the box, you could use "-b http://localhost:8080/solr" with the SolrDocManager to establish a proper connection. 
 
-"-o" or "--oplog-ts" is to specify the name of the file that stores the oplog progress timestamps. This file is used by the system
-to store the last timestamp read on a specific oplog. This allows for quick recovery from failure. 
+"-o" or "--oplog-ts" is to specify the name of the file that stores the oplog progress timestamps. This file is used by 
+the system to store the last timestamp read on a specific oplog. This allows for quick recovery from failure. 
 
 "-n" or "--namespace-set" is used to specify the namespaces we want to consider. For example, if we
-wished to store all documents from the test.test and alpha.foo namespaces, we could use "-n test.test,alpha.foo". Presently, there
-is no way to indicate "all namespaces" - if you want to store every single namespace, you must specify them all in a comma delimited
-format as an argument to "-n". 
+wished to store all documents from the test.test and alpha.foo namespaces, we could use "-n test.test,alpha.foo". 
+Presently, there is no way to indicate "all namespaces" - if you want to store every single namespace, you must specify 
+them all in a comma delimited format as an argument to "-n". 
 
 "-u" or "--unique-key" is used to specify the uniqueKey used by the backend. The default is "_id", which can be noted by "-u _id"
 
