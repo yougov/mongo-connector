@@ -1,15 +1,26 @@
 """Test Solr search using the synchronizer, i.e. as it would be used by an user
     """
-
+import os
 import time
 import unittest
-import os
 import sys
+import inspect
+file = inspect.getfile(inspect.currentframe())
+cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
+doc_folder = cmd_folder.rsplit("/", 1)[0]
+if doc_folder not in sys.path:
+   sys.path.insert(0, doc_folder)
+
+mongo_folder = cmd_folder.rsplit("/", 2)[0]
+if mongo_folder not in sys.path:
+    sys.path.insert(0, mongo_folder)
+
+
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
 from threading import Timer
-from doc_manager import DocManager
+from solr_doc_manager import DocManager
 from pysolr import Solr
 from mongo_internal import Connector
 from optparse import OptionParser
@@ -35,8 +46,9 @@ class TestSynchronizer(unittest.TestCase):
 
     def setUp(self):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt',
-                           'http://localhost:8080/solr', ['test.test'], '_id',
+                           None, ['test.test'], '_id',
                            None)
+        self.c.doc_manager = DocManager('http://localhost:8080/solr')
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)
