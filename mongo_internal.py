@@ -131,7 +131,6 @@ class Connector(Thread):
             while self.can_run:
                 self.write_oplog_progress()
                 time.sleep(1)
-                continue
 
         while self.can_run is True:
 
