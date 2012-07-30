@@ -1,4 +1,4 @@
-"""Tests methods from mongo_internal
+"""Tests methods for mongo_connector
 """
 
 import os
@@ -13,7 +13,7 @@ if cmd_folder not in sys.path:
 import unittest
 import time
 import json
-from mongo_internal import Connector
+from mongo_connector import Connector
 from optparse import OptionParser
 from setup_cluster import start_cluster
 from bson.timestamp import Timestamp

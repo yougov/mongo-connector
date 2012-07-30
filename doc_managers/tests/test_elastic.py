@@ -23,7 +23,7 @@ from os import path
 from threading import Timer
 from elastic_doc_manager import DocManager
 from pysolr import Solr
-from mongo_internal import Connector
+from mongo_connector import Connector
 from optparse import OptionParser
 from util import retry_until_ok
 from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
