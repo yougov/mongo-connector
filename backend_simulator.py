@@ -4,12 +4,11 @@ Receives documents from the oplog worker threads and indexes them
 into the backend.
 
 The intent is that this file can be used as an example to add on different
-    backends.
-To extend this to other systems, simply implement the exact same class and
-replace the method definitions with API calls for the desired backend.
-Each method is detailed to describe the desired behavior. Please look at the
-Solr and ElasticSearch doc manager classes for a sample implementation with
-a real engine.
+backends. To extend this to other systems, simply implement the exact same
+class and replace the method definitions with API calls for the desired
+backend. Each method is detailed to describe the desired behavior. Please
+look at the Solr and ElasticSearch doc manager classes for a sample
+implementation with real systems.
 """
 
 from bson.objectid import ObjectId
@@ -28,15 +27,13 @@ class BackendSimulator():
 
     def __init__(self):
         """Creates a dictionary to hold document id keys mapped to the
-            documents as values.
+        documents as values.
 
-            This method may vary from implementation to implementation, but it
-            must
-            verify the url to the backend and return None if that fails. It
-            must
-            also create the connection to the backend, and start a periodic
-            committer if necessary. The Solr uniqueKey is '_id' in the sample
-            schema, but this may be overridden by user defined configuration.
+        This method may vary from implementation to implementation, but it
+        must verify the url return None if that fails. It must also create
+        the connection to the backend, and start a periodic committer if
+        necessary. The Solr uniqueKey is '_id' in the sample schema, but
+        this may be overridden by user defined configuration.
         """
         self.doc_dict = {}
 
@@ -53,21 +50,23 @@ class BackendSimulator():
     def remove(self, doc):
         """Removes the document from the doc dict.
 
-            The input is a python dictionary that represents a mongo document.
+        The input is a python dictionary that represents a mongo document.
         """
         del self.doc_dict[doc['_id']]
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents within the
-            range.
+        range.
 
         Since we have very few documents in the doc dict when this is called,
-            linear search is fine.
+        linear search is fine. This method is only used by rollbacks to query
+        all the documents in Solr within a certain timestamp window. The
+        input will be two longs (converted from Bson timestamp) which specify
+        the time range. The start_ts refers to the timestamp of the last
+        oplog entry after a rollback. The end_ts is the timestamp of the last
+        document committed to the backend.
 
-        This method is only used by rollbacks to query all the documents in
-        Solr within a certain timestamp window. The input will be two longs
-        (converted from Bson timestamp) which specify the time range. The
-        return value should be an iterable set of documents.
+        The return value should be an iterable set of documents.
         """
         ret_list = []
         for stored_doc in self.doc_dict.values():
@@ -81,8 +80,8 @@ class BackendSimulator():
         """Simply passes since we're not using Solr.
 
         This function exists only because the DocManager is set to Backend
-            Simulator, and the rollback
-        function calles doc_manager.commit(), so we have a dummy here.
+        Simulator, and the rollback function calles doc_manager.commit(),
+        so we have a dummy here.
 
         It is used only in the beginning of rollbacks and in test cases, and is
         not meant to be called in other circumstances. The body should commit
@@ -116,6 +115,9 @@ class BackendSimulator():
 
     def test_search(self):
         """Proxies Solr.search('*') i.e. returns all documents in the doc dict.
+
+        This function is not a part of the DocManager API, and is only used
+        to simulate searching all documents from a backend.
         """
 
         ret_list = []
@@ -126,5 +128,8 @@ class BackendSimulator():
 
     def test_delete(self):
         """Proxies Solr.delete(q='*:*') i.e. deletes all documents.
+
+        This function is not a part of the DocManager API, and is only used
+        to simulate deleting all documents from a backend.
         """
         self.doc_dict = {}
