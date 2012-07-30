@@ -233,10 +233,8 @@ class TestSynchronizer(unittest.TestCase):
 
         while (len(s.search('*:*', rows=NUMBER_OF_DOCS * 2)) !=
                conn['test']['test'].find().count()):
-
             time.sleep(1)
-        a = s.search('Pauline', rows=NUMBER_OF_DOCS * 2, sort='_id asc')
-        self.assertEqual(len(a), count)
+                    
         for it in a:
             b = conn['test']['test'].find_one({'name': it['name']})
             self.assertEqual(it['_id'], str(b['_id']))
