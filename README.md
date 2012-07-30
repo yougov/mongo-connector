@@ -1,5 +1,4 @@
-### System Overview:
----------
+## System Overview:
 
 The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the backend will remain
