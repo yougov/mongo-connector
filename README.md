@@ -45,7 +45,9 @@ An example of combining all of these is:
 
 This is the only file that is engine specific. In the current version, we have provided sample
 documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
-then you need to write a doc_manager.py file for that backend. The following functions must be implemented:
+then you need to write a doc_manager.py file for that backend. The sample_doc_manager.py file gives a
+detailed description of the functions used by the Doc Manager, and the following functions must be
+implemented:
 
 __1) init(self, url)__
 
