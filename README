@@ -6,8 +6,9 @@ in sync while the connector is running.
 
 Usage:
 
-To start the system, simply run "python mongo_connector.py". It is likely, however, that you will 
-need to specify some command line options to work with your setup. They are described below:
+Since the connector does real time syncing, it is necessary to have MongoDB running, although the connector will work with
+both sharded and non sharded configurations. To start the system, simply run "python mongo_connector.py". It is likely, 
+however, that you will need to specify some command line options to work with your setup. They are described below:
 
 "-m" or "--mongos" is to specify the mongos address, which is a host:port pair, or for clusters with one shard, the primary's address. 
 For example, "-m localhost:27217" would be a valid argument to "-m". 
