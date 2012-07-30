@@ -130,6 +130,10 @@ then start the connector.
 ## Testing scripts
 
 There are two sets of tests - one is for the general system, which can be found in the Tests folder, and another is for
-the DocManagers, which is found in the DocManagerTests folder inside the DocManagers folder. The DocManagerTests utilize
-the Doc Managers stored in the DocManagers folder, so if any modifications are made to a Doc Manager, ensure that the
-changes are propogated in the corresponding file in the DocManagers folder. 
+the Doc Managers, which is found in the tests folder inside the doc_managers folder. The doc manager tests utilize
+the Doc Managers stored in the doc_managers folder, so if any modifications are made to a Doc Manager, ensure that the
+changes are propogated in the corresponding file in the DocManagers folder. That is, while the actual running
+system will use the doc_manager.py file in the main mongo-connector folder, the tests use the files in the
+doc_managers folder.
+There are shell scripts for running all tests for each search engine (currenctly Solr and Elastic) in doc_managers/tests;
+for the general connector tests in /tests, and a script that runs all tests in the main folder.
