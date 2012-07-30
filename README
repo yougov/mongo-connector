@@ -40,7 +40,8 @@ authentication is not used, then this field can be left empty as the default is 
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -a auth.txt
+	`python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id 
+-a auth.txt`
 
 
 doc_manager:
