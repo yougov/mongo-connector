@@ -47,50 +47,50 @@ This is the only file that is engine specific. In the current version, we have p
 documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
 then you need to write a doc_manager.py file for that backend. The following functions must be implemented:
 
-1) __init__ (self, url)
+1) init(self, url)
 
-    This method may vary from implementation to implementation, but it must
-    verify the url to the backend and return None if that fails. It must
-    also create the connection to the backend, and start a periodic
-    committer if necessary. It can take extra optional parameters for internal use, like
-    auto_commit.
+This method may vary from implementation to implementation, but it must
+verify the url to the backend and return None if that fails. It must
+also create the connection to the backend, and start a periodic
+committer if necessary. It can take extra optional parameters for internal use, like
+auto_commit.
 
-2)upsert(self, doc)
+2) upsert(self, doc)
 
-    Update or insert a document into your engine.
-    This method should call whatever add/insert/update method exists for
-    the backend engine and add the document in there. The input will
-    always be one mongo document, represented as a Python dictionary.
+Update or insert a document into your engine.
+This method should call whatever add/insert/update method exists for
+the backend engine and add the document in there. The input will
+always be one mongo document, represented as a Python dictionary.
 
-3)remove(self, doc)
+3) remove(self, doc)
 
-    Removes documents from engine
-    The input is a python dictionary that represents a mongo document.
+Removes documents from engine
+The input is a python dictionary that represents a mongo document.
 
 4) search(self, start_ts, end_ts)
 
-    Called to query engine for documents in a time range, including start_ts and end_ts
-    This method is only used by rollbacks to query all the documents in
-    Solr within a certain timestamp window. The input will be two longs
-    (converted from Bson timestamp) which specify the time range. The
-    return value should be an iterable set of documents.
+Called to query engine for documents in a time range, including start_ts and end_ts
+This method is only used by rollbacks to query all the documents in
+Solr within a certain timestamp window. The input will be two longs
+(converted from Bson timestamp) which specify the time range. The
+return value should be an iterable set of documents.
 
 
-5)commit(self)
+5) commit(self)
 
-    This function is used to force a refresh/commit.
-    It is used only in the beginning of rollbacks and in test cases, and is
-    not meant to be called in other circumstances. The body should commit
-    all documents to the backend engine (like auto_commit), but not have
-    any timers or run itself again (unlike auto_commit).
+This function is used to force a refresh/commit.
+It is used only in the beginning of rollbacks and in test cases, and is
+not meant to be called in other circumstances. The body should commit
+all documents to the backend engine (like auto_commit), but not have
+any timers or run itself again (unlike auto_commit).
 
-6)get_last_doc(self)
+6) get_last_doc(self)
 
-    Returns the last document stored in the Elastic engine.
-    This method is used for rollbacks to establish the rollback window,
-    which is the gap between the last document on a mongo shard and the
-    last document in Solr. If there are no documents, this functions
-    returns None. Otherwise, it returns the first document.
+Returns the last document stored in the Elastic engine.
+This method is used for rollbacks to establish the rollback window,
+which is the gap between the last document on a mongo shard and the
+last document in Solr. If there are no documents, this functions
+returns None. Otherwise, it returns the first document.
 
 
 ## System Internals:
@@ -101,20 +101,19 @@ the Oplog for new operations, get the relevant documents, and insert and/or upda
 backend system. The general workflow of an OplogThread is:
 
 1. "Prepare for sync", which initializes a tailable cursor to the Oplog of the mongod. This cursor
-    will return all new entries, which are processed in step 2.
-    a. If this is the first time the mongo-connector is being run, then a special "dump collection"
-       occurs where all the documents from a given namespace are dumped into the backend.
-    b. On subsequent calls, the timestamp of the last oplog entry is stored in the system,
-       so the OplogThread resumes where it left off instead of rereading  the whole oplog.
+    will return all new entries, which are processed in step 2. If this is the first time the
+    mongo-connector is being run, then a special "dump collection" occurs where all the documents
+    from a given namespace are dumped into the backend. On subsequent calls, the timestamp of the
+    last oplog entry is stored in the system, so the OplogThread resumes where it left off instead
+    of rereading  the whole oplog.
 
 2. For each entry in the oplog, we see if it's an insert/update operation or a delete operation.
-    For insert/update operations, we fetch the document from either the mongos or the primary
-    (depending on cluster setup). This document is passed up to the DocManager. For deletes, we pass
-    up the unique key for the document to the DocManager.
+   For insert/update operations, we fetch the document from either the mongos or the primary
+   (depending on cluster setup). This document is passed up to the DocManager. For deletes, we pass
+   up the unique key for the document to the DocManager.
 
 3. The DocManager can either batch documents and periodically update the backend, or immediately,
    or however the user chooses to.
-
 
 The above three steps essentially loop forever. For usage purposes, the only relevant layer is the
 DocManager, which will always get the documents from the underlying layer and is responsible for
