@@ -1,4 +1,5 @@
 ### System Overview:
+---------
 
 The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the backend will remain
@@ -12,29 +13,28 @@ connector will work with both sharded and non sharded configurations. To start t
 run "python mongo_connector.py". It is likely, however, that you will need to specify some command
 line options to work with your setup. They are described below:
 
-"-m" or "--mongos" is to specify the mongos address, which is a host:port pair, or for clusters with
+`-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
  one shard, the primary's address. For example, "-m localhost:27217" would be a valid argument
  to "-m".
 
-"-b" or "--backend-url" is to specify the URL to the backend engine being used. For example, if you
+`-b` or `--backend-url` is to specify the URL to the backend engine being used. For example, if you
 were using Solr out of the box, you could use "-b http://localhost:8080/solr" with the
 SolrDocManager to establish a proper connection.
 
-"-o" or "--oplog-ts" is to specify the name of the file that stores the oplog progress timestamps.
+`-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
 for quick recovery from failure.
 
-"-n" or "--namespace-set" is used to specify the namespaces we want to consider. For example, if we
+`-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 "-n test.test,alpha.foo". Presently, there is no way to indicate "all namespaces" - if you want to
 store every single namespace, you must specify them all in a comma delimited format as an argument
-to "-n".
+to `-n`.
 
-"-u" or "--unique-key" is used to specify the uniqueKey used by the backend. The default is "_id",
+`-u` or `--unique-key` is used to specify the uniqueKey used by the backend. The default is "_id",
 which can be noted by "-u _id"
 
 `-a` or `--auth-file` is used to specify the path to the authentication key file. This file is used
-
 by mongos to authenticate connections to the shards, and we'll use it in the oplog threads. If
 authentication is not used, then this field can be left empty as the default is None.
 
