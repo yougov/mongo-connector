@@ -1,10 +1,12 @@
-System Overview:
+### System Overview:
+====================
 
 The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the backend will remain
 in sync while the connector is running.
 
-Usage:
+## Usage:
+---------
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the 
 connector will work with both sharded and non sharded configurations. To start the system, simply 
@@ -38,8 +40,7 @@ authentication is not used, then this field can be left empty as the default is 
 
 An example of combining all of these is:
 
-python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt 
--n alpha.foo,test.test -u _id -a auth.txt
+	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -a auth.txt
 
 
 doc_manager:
