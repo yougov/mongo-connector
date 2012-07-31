@@ -4,7 +4,7 @@ The mongo-connector system is designed to hook up mongoDB to any backend. This a
 documents in mongoDB to be stored in some other system, and both mongo and the backend will remain
 in sync while the connector is running.
 
-## Usage:
+## Getting Started:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations.
@@ -19,10 +19,11 @@ to specify some command line options to work with your setup. They are described
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
  one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
  to `-m`. It is not necessary to specify double-quotes aroung the argument to `-m`.
+Don't use quotes around the address.
 
 `-b` or `--backend-url` is to specify the URL to the backend engine being used. For example, if you
-were using Solr out of the box, you could use "-b http://localhost:8080/solr" with the
-SolrDocManager to establish a proper connection.
+were using Solr out of the box, you could use '-b http://localhost:8080/solr' with the
+SolrDocManager to establish a proper connection. Don't use quotes around address.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
@@ -61,8 +62,9 @@ The sample XML schema is designed to work with the tests. For a more complete gu
 ## DocManager
 
 This is the only file that is engine specific. In the current version, we have provided sample
-documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
-then you need to write a doc_manager.py file for that backend. The sample_doc_manager.py file gives a
+documents for ElasticSearch and Solr, which are in the docmanagers folder.
+If you would like to integrate MongoDB with some other engine, then you need to write a 
+doc_manager.py file for that backend. The sample_doc_manager.py file gives a
 detailed description of the functions used by the Doc Manager, and the following functions must be
 implemented:
 
@@ -154,3 +156,11 @@ system will use the doc_manager.py file in the main mongo-connector folder, the 
 doc_managers folder.
 There are shell scripts for running all tests for each search engine (currenctly Solr and Elastic) in doc_managers/tests;
 for the general connector tests in /tests, and a script that runs all tests in the main folder.
+
+## Troubleshooting
+
+The most common issue when installing is to forget to clear config.txt before restarting the mongo connector.
+This config.txt file stores an oplog timestamp, so if you restart the syncing, it will only restart after
+that point. This can be a problem if you have restarted mongo and there's no more oplog entry for that
+timestamp; this will result in an error. Additionally, If you restart mongo, the target system will
+ not have the data automatically wiped.
