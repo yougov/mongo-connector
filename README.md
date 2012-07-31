@@ -7,13 +7,18 @@ in sync while the connector is running.
 ## Usage:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations. To start the system, simply
-run "python mongo_connector.py". It is likely, however, that you will need to specify some command
-line options to work with your setup. They are described below:
+connector will work with both sharded and non sharded configurations.
+
+To start the system, first move your doc manager file, or one of the sample doc manager files provided to the main folder (mongo-connector) and rename it doc_manager.py. For example, to use the system with Solr, you can navigate to the mongo-connector subfolder and run `cp doc_managers/solr_doc_manager.py doc_manager.py`.
+
+For more information about making your own doc manager, see Doc Manager section.
+
+After that, simply run "python mongo_connector.py". It is likely, however, that you will need
+to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
- one shard, the primary's address. For example, "-m localhost:27217" would be a valid argument
- to "-m".
+ one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
+ to `-m`. It is not necessary to specify double-quotes aroung the argument to `-m`.
 
 `-b` or `--backend-url` is to specify the URL to the backend engine being used. For example, if you
 were using Solr out of the box, you could use "-b http://localhost:8080/solr" with the
@@ -21,7 +26,8 @@ SolrDocManager to establish a proper connection.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
-for quick recovery from failure. This file MUST be created before the system can be run. The default filename is 'config.txt'
+for quick recovery from failure. By default this is `config.txt`, which starts off empty. An empty
+file causes the system to go through all the mongo oplog and sync all the documents.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
@@ -39,9 +45,20 @@ An example of combining all of these is:
 
 	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt
 
-Although most of the arguments are optional, it is essential that there are mongod's running, some backend system is accessible, and that an oplog progress file exists.
+## Usage With Solr:
 
-## Doc Manager:
+We have provided an example Solr schema called `schema.xml`, which provides field definitions for the 'name', '_ts', `ns`, and `_id` fields. The schema also sets the `_id` field to be the unique key by adding this line:
+
+     <uniqueKey>_id</uniqueKey>
+
+Solr does not require all the fields to be present, unless a field's `required` attribute is `True`, but the schema must have a line defining every field that may be present in a document field. Some examples of field definitions in the schema are:
+
+    <field name="_id" type="string" indexed="true" stored="true" />
+    <field name="_ts" type="long" indexed="true" stored="true" />
+
+For a more complete guide to adding fields, review the Solr documentation.
+
+## DocManager
 
 This is the only file that is engine specific. In the current version, we have provided sample
 documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
