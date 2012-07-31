@@ -7,9 +7,12 @@ in sync while the connector is running.
 ## Usage:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations. To start the system, simply
-run "python mongo_connector.py". It is likely, however, that you will need to specify some command
-line options to work with your setup. They are described below:
+connector will work with both sharded and non sharded configurations. To start the system, first
+move your doc manager file, or one of the sample doc manager files provided to the main folder
+(mongo-connector) and rename it doc_manager.py. For more information about making your own
+doc manager, see Doc Manager section.
+After that, simply run "python mongo_connector.py". It is likely, however, that you will need 
+to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
  one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
@@ -21,7 +24,8 @@ SolrDocManager to establish a proper connection.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
-for quick recovery from failure.
+for quick recovery from failure. By default this is config.txt, which starts off empty. An empty
+file causes the system to go through all the mongo oplog and sync all the documents.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
