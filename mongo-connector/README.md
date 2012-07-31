@@ -18,7 +18,7 @@ to specify some command line options to work with your setup. They are described
 
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
  one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
- to `-m`.
+ to `-m`. It is not necessary to specify double-quotes aroung the argument to `-m`.
 
 `-b` or `--backend-url` is to specify the URL to the backend engine being used. For example, if you
 were using Solr out of the box, you could use "-b http://localhost:8080/solr" with the
@@ -26,7 +26,7 @@ SolrDocManager to establish a proper connection.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
-for quick recovery from failure. By default this is config.txt, which starts off empty. An empty
+for quick recovery from failure. By default this is `config.txt`, which starts off empty. An empty
 file causes the system to go through all the mongo oplog and sync all the documents.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
