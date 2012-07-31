@@ -51,8 +51,8 @@ We have provided an example Solr schema called `schema.xml`, which provides fiel
 
 Solr does not require all the fields to be present, unless a field's `required` attribute is `True`, but the schema must have a line defining every field that may be present in a document field. Some examples of field definitions in the schema are:
 
-   <field name="_id" type="string" indexed="true" stored="true" />
-   <field name="_ts" type="long" indexed="true" stored="true" />
+    <field name="_id" type="string" indexed="true" stored="true" />
+    <field name="_ts" type="long" indexed="true" stored="true" />
 
 For a more complete guide to adding fields, review the Solr documentation.
 
