@@ -11,7 +11,7 @@ connector will work with both sharded and non sharded configurations. To start t
 move your doc manager file, or one of the sample doc manager files provided to the main folder
 (mongo-connector) and rename it doc_manager.py. For more information about making your own
 doc manager, see Doc Manager section.
-After that, simply run "python mongo_connector.py". It is likely, however, that you will need 
+After that, simply run "python mongo_connector.py". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
