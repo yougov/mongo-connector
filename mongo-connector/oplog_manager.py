@@ -239,7 +239,7 @@ class OplogThread(Thread):
         if not self.namespace_set:
             db_list = self.mongos_connection.database_names()
             for db in db_list:
-                if db == "system" or db == "config":
+                if db == "system" or db == "config" or db == "local":
                     continue
                 coll_list = self.mongos_connection[db].collection_names()
                 for coll in coll_list:
