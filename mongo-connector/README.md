@@ -7,10 +7,12 @@ in sync while the connector is running.
 ## Usage:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations. To start the system, first
-move your doc manager file, or one of the sample doc manager files provided to the main folder
-(mongo-connector) and rename it doc_manager.py. For more information about making your own
-doc manager, see Doc Manager section.
+connector will work with both sharded and non sharded configurations.
+
+To start the system, first move your doc manager file, or one of the sample doc manager files provided to the main folder (mongo-connector) and rename it doc_manager.py. For example, to use the system with Solr, you can navigate to the mongo-connector subfolder and run `cp doc_managers/solr_doc_manager.py doc_manager.py`.
+
+For more information about making your own doc manager, see Doc Manager section.
+
 After that, simply run "python mongo_connector.py". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
