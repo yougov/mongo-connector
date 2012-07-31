@@ -9,7 +9,7 @@ in sync while the connector is running.
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations.
 
-To start the system, first move your doc manager file, or one of the sample doc manager files provided to the main folder (mongo-connector) and rename it doc_manager.py. For example, to use the system with Solr, you can navigate to the mongo-connector subfolder and run `cp doc_managers/solr_doc_manager.py doc_manager.py`.
+To start the system, first move your doc manager file, or one of the sample doc manager files provided to the main folder (mongo-connector) and rename it doc_manager.py. It is essential that there be a `doc_manager.py` file in the same directory where the `mongo_connector.py` file is run, since the Connector imports the DocManager to add/update/delete files from the desired backend. For example, to use the system with Solr, you can navigate to the mongo-connector subfolder and run `cp doc_managers/solr_doc_manager.py doc_manager.py`.
 
 For more information about making your own doc manager, see Doc Manager section.
 
@@ -27,7 +27,7 @@ SolrDocManager to establish a proper connection.
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
 for quick recovery from failure. By default this is `config.txt`, which starts off empty. An empty
-file causes the system to go through all the mongo oplog and sync all the documents.
+file causes the system to go through all the mongo oplog and sync all the documents. Whenever the cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise the connector will miss some documents and behave incorrectly.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
@@ -56,7 +56,7 @@ Solr does not require all the fields to be present, unless a field's `required` 
     <field name="_id" type="string" indexed="true" stored="true" />
     <field name="_ts" type="long" indexed="true" stored="true" />
 
-For a more complete guide to adding fields, review the Solr documentation.
+The sample XML schema is designed to work with the tests. For a more complete guide to adding fields, review the Solr documentation.
 
 ## DocManager
 
