@@ -21,7 +21,7 @@ SolrDocManager to establish a proper connection.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
-for quick recovery from failure.
+for quick recovery from failure. This file MUST be created before the system can be run. The default filename is 'config.txt'
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
@@ -39,6 +39,7 @@ An example of combining all of these is:
 
 	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt
 
+Although most of the arguments are optional, it is essential that there are mongod's running, some backend system is accessible, and that an oplog progress file exists.
 
 ## Doc Manager:
 
