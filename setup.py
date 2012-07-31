@@ -33,7 +33,7 @@ __doc__ = ""
 doclines = __doc__.split("\n")
 
 setup(name="mongo-connector",
-      version="0.5.2",
+      version="0.5.8",
       maintainer="10Gen",
       maintainer_email="leonardo.stedile@10gen.com",
       #url = "https://github.com/AayushU/mongo-connector",
@@ -43,13 +43,15 @@ setup(name="mongo-connector",
       classifiers=filter(None, classifiers.split("\n")),
       long_description="\n".join(doclines[2:]),
       #include_package_data=True,
-      packages=['doc_managers', '.'],
+      packages=['mongo-connector.doc_managers', 'mongo-connector'],
       #packages = find_packages('src'),  # include all packages under src
       #package_dir = {'':'src'},   # tell distutils packages are under src
       #      scripts=[],
       install_requires=['pymongo', 'pyes', 'pysolr'],
 
       package_data={
+          '': ['*.xml'],
+          'mongo-connector': ['README.txt']
           # If any package contains *.txt files, include them:
           # And include any *.dat files found in the 'data' subdirectory
           # of the 'mypkg' package, also:
