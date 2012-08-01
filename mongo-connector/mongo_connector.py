@@ -119,6 +119,7 @@ class Connector(Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
+        print self.address
         main_conn = Connection(self.address)
         shard_coll = main_conn['config']['shards']
 
@@ -129,10 +130,13 @@ class Connector(Thread):
             #non sharded configuration
 
             oplog_coll = main_conn['local']['oplog.rs']
+            print oplog_coll.find().count()
             if oplog_coll.find().count() == 0:
-                err_msg = 'MongoInternal: No oplog for thread:'
+                err_msg = 'MongoConnector: No oplog for thread:'
                 logging.info('%s %s' % (err_msg, main_conn))
-                self.can_run = False
+                self.oplog_thread_join()
+                self.doc_manager.auto_commit=False
+                return
 
             shard_conn = main_conn
             address = None
@@ -142,7 +146,7 @@ class Connector(Thread):
                                 self.oplog_progress_dict,
                                 self.ns_set, self.auth_key)
             self.shard_set[0] = oplog
-            logging.info('MongoInternal: Starting connection thread %s' %
+            logging.info('MongoConnector: Starting connection thread %s' %
                          shard_conn)
             oplog.start()
 
@@ -170,11 +174,16 @@ class Connector(Thread):
                                         self.oplog_progress_dict,
                                         self.ns_set, self.auth_key)
                     self.shard_set[shard_id] = oplog
-                    logging.info('MongoInternal: Starting connection thread %s'
+                    logging.info('MongoConnector: Starting connection thread %s'
                                  % shard_conn)
                     oplog.start()
+        
+        self.oplog_thread_join()
 
-        #time to stop running
+
+    def oplog_thread_join(self):
+        """Stops all the OplogThreads
+        """
         for thread in self.shard_set.values():
             thread.join()
 

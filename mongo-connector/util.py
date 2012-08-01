@@ -55,7 +55,7 @@ def long_to_bson_ts(val):
     return Timestamp(seconds, increment)
 
 
-def retry_until_ok(func, args=None, no_func=False):
+def retry_until_ok(func, args=None):
     """Retry code block until it succeeds.
 
     If it does not succeed in 60 attempts, the
@@ -66,10 +66,7 @@ def retry_until_ok(func, args=None, no_func=False):
     count = 0
     while True:
         try:
-            if no_func is True:         # just a statement, not a function
-                result = func
-                break
-            elif args is None:
+            if args is None:
                 result = func()
                 break
             else:
@@ -79,7 +76,7 @@ def retry_until_ok(func, args=None, no_func=False):
             count += 1
             if count > 60:
                 string = 'Call to %s failed too many times' % func
-                string += ' in retry until ok'
+                string += ' in retry_until_ok'
                 logging.error(string)
                 sys.exit(1)
             time.sleep(1)

@@ -26,28 +26,21 @@ import logging
 import inspect
 import pymongo
 import sys
-
-from bson.objectid import ObjectId
-from bson.timestamp import Timestamp
-from checkpoint import Checkpoint
-from pymongo import Connection
-from pymongo.errors import AutoReconnect, OperationFailure
-from threading import Thread, Timer
-from util import (bson_ts_to_long,
-                  long_to_bson_ts,
-                  retry_until_ok)
+import bson
+import util
+import threading
 
 
-class OplogThread(Thread):
+class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
-    def __init__(self, primary_conn, mongos_address, oplog_coll, is_sharded,
+    def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
         self.primary_connection = primary_conn
-        self.mongos_address = mongos_address
+        self.main_address = main_address
         self.oplog = oplog_coll
         self.is_sharded = is_sharded
         self.doc_manager = doc_manager
@@ -59,16 +52,16 @@ class OplogThread(Thread):
 
         logging.info('initializing oplog thread')
 
-        if mongos_address is not None:
-            self.mongos_connection = Connection(mongos_address)
+        if main_address is not None:
+            self.main_connection = pymongo.Connection(main_address)
         else:
             prim_conn = self.primary_connection.admin
             repl_set_name = prim_conn.command("replSetGetStatus")['set']
             host = primary_conn.host
             port = primary_conn.port
-            self.primary_connection = Connection(host + ":" + str(port),
+            self.primary_connection = pymongo.Connection(host + ":" + str(port),
                                                  replicaSet=repl_set_name)
-            self.mongos_connection = self.primary_connection
+            self.main_connection = self.primary_connection
             self.oplog = self.primary_connection['local']['oplog.rs']
 
         if auth_key is not None:
@@ -82,13 +75,11 @@ class OplogThread(Thread):
 
         while self.running is True:
             cursor = self.prepare_for_sync()
-            if cursor is None or retry_until_ok(cursor.count) == 1:
+            if cursor is None or util.retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
 
             last_ts = None
-            cursor_size = retry_until_ok(cursor.count)
-            counter = 0
             err = False
             try:
                 for entry in cursor:
@@ -110,12 +101,12 @@ class OplogThread(Thread):
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
                         if doc is not None:
-                            doc['_ts'] = bson_ts_to_long(entry['ts'])
+                            doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                             doc['ns'] = ns
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
-            except (AutoReconnect, OperationFailure):
+            except (pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure):
                 err = True
                 pass
 
@@ -124,8 +115,8 @@ class OplogThread(Thread):
                 err = False
 
             if last_ts is not None:
-                self.checkpoint.commit_ts = last_ts
-                self.write_config()
+                self.checkpoint = last_ts
+                self.update_checkpoint()
 
             time.sleep(2)
 
@@ -133,7 +124,7 @@ class OplogThread(Thread):
         """Stop this thread from managing the oplog.
         """
         self.running = False
-        Thread.join(self)
+        threading.Thread.join(self)
 
     def retrieve_doc(self, entry):
         """Given the doc ID's, retrieve those documents from the mongos.
@@ -156,15 +147,8 @@ class OplogThread(Thread):
         doc_id = entry[doc_field]['_id']
         db_name, coll_name = namespace.split('.', 1)
 
-        while True:
-            try:
-                coll = self.mongos_connection[db_name][coll_name]
-
-                doc = coll.find_one({'_id': doc_id})
-                break
-            except AutoReconnect, OperationFailure:
-                time.sleep(1)
-                continue
+        coll = self.main_connection[db_name][coll_name]
+        doc = util.retry_until_ok(coll.find_one, {'_id':doc_id})
 
         return doc
 
@@ -174,8 +158,8 @@ class OplogThread(Thread):
 
         if timestamp is None:
             return None
-        cursor = retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
-        if retry_until_ok(cursor.count) == 0:
+        cursor = util.retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
+        if util.retry_until_ok(cursor.count) == 0:
             return None
         # Check to see if cursor is too stale
         while (True):
@@ -185,11 +169,11 @@ class OplogThread(Thread):
                 cursor = cursor.sort('$natural', pymongo.ASCENDING)
                 cursor_len = cursor.count()
                 break
-            except (AutoReconnect, OperationFailure):
+            except (pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure):
                 pass
         if cursor_len == 1:     # means we are the end of the oplog
             if self.checkpoint is not None:
-                self.checkpoint.commit_ts = timestamp
+                self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
             return cursor
@@ -237,23 +221,22 @@ class OplogThread(Thread):
 
         #no namespaces specified
         if not self.namespace_set:
-            db_list = self.mongos_connection.database_names()
+            db_list = self.main_connection.database_names()
             for db in db_list:
-                if db == "system" or db == "config" or db == "local":
+                if db == "config" or db == "local":
                     continue
-                coll_list = self.mongos_connection[db].collection_names()
+                coll_list = self.main_connection[db].collection_names()
                 for coll in coll_list:
-                    if coll == "system.indexes":
+                    if coll.startswith("system"):
                         continue
                     namespace = str(db) + "." + str(coll)
                     dump_set.append(namespace)
 
         for namespace in dump_set:
             db, coll = namespace.split('.', 1)
-            target_coll = retry_until_ok(self.mongos_connection[db][coll],
-                                         no_func=True)
-            cursor = retry_until_ok(target_coll.find)
-            long_ts = bson_ts_to_long(timestamp)
+            target_coll = self.main_connection[db][coll]
+            cursor = util.retry_until_ok(target_coll.find)
+            long_ts = util.bson_ts_to_long(timestamp)
 
             for doc in cursor:
                 doc['ns'] = namespace
@@ -266,18 +249,18 @@ class OplogThread(Thread):
         The cursor is set to either the beginning of the oplog, or
         wherever it was last left off.
         """
-        timestamp = self.read_config()
+        timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            timestamp = retry_until_ok(self.get_last_oplog_timestamp)
+            timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
             self.dump_collection(timestamp)
             logging.info('OplogManager: %s Dumped collection into backend'
                          % self.oplog)
 
-        self.checkpoint.commit_ts = timestamp
+        self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
         if cursor is not None:
-            self.write_config()
+            self.update_checkpoint()
 
         return cursor
 
@@ -285,32 +268,17 @@ class OplogThread(Thread):
         """ Initializes the cursor for the sync method.
         """
         cursor = None
-        last_commit = None
-
-        if self.checkpoint is None:
-            self.checkpoint = Checkpoint()
-            cursor = self.init_cursor()
-        else:
-            last_commit = self.checkpoint.commit_ts
-            cursor = self.get_oplog_cursor(last_commit)
-            if cursor is None:
-                cursor = self.init_cursor()
-            else:
-                self.write_config()
+        cursor = self.init_cursor()
 
         return cursor
 
-    def write_config(self):
+    def update_checkpoint(self):
+        """Store the current checkpoint in the oplog progress dictionary.
         """
-        Write the updated config to the config file.
+        self.oplog_progress_dict[str(self.oplog)] = self.checkpoint
 
-        This is done by duplicating the old config file, editing the relevant
-        timestamp, and then copying the new config onto the old file.
-        """
-        self.oplog_progress_dict[str(self.oplog)] = self.checkpoint.commit_ts
-
-    def read_config(self):
-        """Read the config file for the relevant timestamp, if possible.
+    def read_last_checkpoint(self):
+        """Read the last checkpoint from the oplog progress dictionary.
         """
         oplog_str = str(self.oplog)
 
@@ -333,7 +301,7 @@ class OplogThread(Thread):
         if last_inserted_doc is None:
             return None
 
-        backend_ts = long_to_bson_ts(last_inserted_doc['_ts'])
+        backend_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
                                                sort=[('$natural',
                                                pymongo.DESCENDING)])
@@ -341,7 +309,7 @@ class OplogThread(Thread):
             return None
 
         rollback_cutoff_ts = last_oplog_entry['ts']
-        start_ts = bson_ts_to_long(rollback_cutoff_ts)
+        start_ts = util.bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']
 
         docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
@@ -356,14 +324,14 @@ class OplogThread(Thread):
 
         for namespace, doc_list in rollback_set.iteritems():
             db, coll = namespace.split('.', 1)
-            bson_obj_id_list = [ObjectId(doc['_id']) for doc in doc_list]
+            bson_obj_id_list = [bson.objectid.ObjectId(doc['_id']) for doc in doc_list]
 
-            to_update = retry_until_ok(self.mongos_connection[db][coll].find,
+            to_update = util.retry_until_ok(self.main_connection[db][coll].find,
                                        {'_id': {'$in': bson_obj_id_list}})
             #doc list are docs in backend engine, to_update are docs in mongo
             doc_hash = {}  # hash by _id
             for doc in doc_list:
-                doc_hash[ObjectId(doc['_id'])] = doc
+                doc_hash[bson.objectid.ObjectId(doc['_id'])] = doc
 
             to_index = []
             count = 0
@@ -374,7 +342,7 @@ class OplogThread(Thread):
                             del doc_hash[doc['_id']]
                             to_index.append(doc)
                     break
-                except (OperationFailure, AutoReconnect):
+                except (pymongo.errors.OperationFailure, pymongo.errors.AutoReconnect):
                     count += 1
                     if count > 60:
                         sys.exit(1)
@@ -386,7 +354,7 @@ class OplogThread(Thread):
 
             #insert the ones from mongo
             for doc in to_index:
-                doc['_ts'] = bson_ts_to_long(rollback_cutoff_ts)
+                doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
                 self.doc_manager.upsert(doc)
 

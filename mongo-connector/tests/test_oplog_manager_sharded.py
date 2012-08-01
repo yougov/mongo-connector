@@ -138,7 +138,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
                             doc_manager, {}, namespace_set, AUTH_KEY)
 
-        return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
+        return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager.
@@ -275,7 +275,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor = test_oplog.init_cursor()
 
         assert (cursor.count() == 1)
-        assert (test_oplog.checkpoint.commit_ts == search_ts)
+        assert (test_oplog.checkpoint == search_ts)
 
         # with config file, assert that size != 0
         os.system('touch temp_config.txt')
@@ -288,7 +288,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         assert(cursor.count() == 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)
-        commit_ts = test_oplog.checkpoint.commit_ts
+        commit_ts = test_oplog.checkpoint
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
 
         os.system('rm temp_config.txt')
@@ -303,8 +303,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
         cursor = test_oplog.prepare_for_sync()
 
-        assert (test_oplog.checkpoint is not None)
-        assert (test_oplog.checkpoint.commit_ts is None)
+        assert (test_oplog.checkpoint is None)
         assert (cursor is None)
 
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
@@ -312,7 +311,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         search_ts = test_oplog.get_last_oplog_timestamp()
 
         # ensure that the cursor is valid and the timestamp is updated properly
-        assert (test_oplog.checkpoint.commit_ts == search_ts)
+        assert (test_oplog.checkpoint == search_ts)
         assert (cursor is not None)
         assert (cursor.count() == 1)
 

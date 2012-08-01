@@ -25,6 +25,8 @@
     Each method is detailed to describe the desired behavior.
 """
 
+import exceptions
+
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -46,6 +48,7 @@ class DocManager():
         overridden
         by user defined configuration.
         """
+        raise exceptions.NotImplementedError
 
     def upsert(self, doc):
         """Update or insert a document into engine
@@ -54,12 +57,14 @@ class DocManager():
         the backend engine and add the document in there. The input will
         always be one mongo document, represented as a Python dictionary.
         """
+        raise exceptions.NotImplementedError
 
     def remove(self, doc):
         """Removes documents from engine
 
         The input is a python dictionary that represents a mongo document.
         """
+        raise exceptions.NotImplementedError
 
     def search(self, start_ts, end_ts):
         """Called to query engine for documents in a time range.
@@ -69,6 +74,7 @@ class DocManager():
         (converted from Bson timestamp) which specify the time range. The
         return value should be an iterable set of documents.
         """
+        raise exceptions.NotImplementedError
 
     def commit(self):
         """This function is used to force a refresh/commit.
@@ -80,6 +86,7 @@ class DocManager():
         too many engine searchers, the commit is wrapped in a retry_until_ok
         to keep trying until the commit goes through.
         """
+        raise exceptions.NotImplementedError
 
     def run_auto_commit(self):
         """Periodically commits to the engine server, if needed.
@@ -91,6 +98,7 @@ class DocManager():
         function may be modified based on the backend engine and how commits
         are handled, as timers may not be necessary in all instances.
         """
+        raise exceptions.NotImplementedError
 
     def get_last_doc(self):
         """Returns the last document stored in the engine.
@@ -100,3 +108,4 @@ class DocManager():
         last document in engine. If there are no documents, this functions
         returns None. Otherwise, it returns the first document.
         """
+        raise exceptions.NotImplementedError

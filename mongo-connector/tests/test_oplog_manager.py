@@ -88,7 +88,6 @@ class TestOplogManager(unittest.TestCase):
                             doc_manager, {},
                             namespace_set, AUTH_KEY)
 
-        print 'oplog mongos conn is %s' % oplog.mongos_connection
         return(oplog, primary_conn, oplog_coll)
 
     def get_new_oplog(self):
@@ -111,8 +110,7 @@ class TestOplogManager(unittest.TestCase):
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
                             namespace_set, AUTH_KEY)
-        print 'oplog mongos conn is %s' % oplog.mongos_connection
-        return(oplog, primary_conn, oplog.mongos_connection, oplog_coll)
+        return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't
@@ -244,7 +242,7 @@ class TestOplogManager(unittest.TestCase):
         """
 
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        test_oplog.checkpoint = Checkpoint()    # needed for these tests
+        test_oplog.checkpoint = None # needed for these tests
 
         # initial tests with no config file and empty oplog
         self.assertEqual(test_oplog.init_cursor(), None)
@@ -254,7 +252,7 @@ class TestOplogManager(unittest.TestCase):
         search_ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.init_cursor()
         self.assertEqual(cursor.count(), 1)
-        self.assertEqual(test_oplog.checkpoint.commit_ts, search_ts)
+        self.assertEqual(test_oplog.checkpoint, search_ts)
 
         # with config file, assert that size != 0
         os.system('touch temp_config.txt')
@@ -268,7 +266,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(cursor.count(), 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] ==
-                        test_oplog.checkpoint.commit_ts)
+                        test_oplog.checkpoint)
 
         os.system('rm temp_config.txt')
         print 'PASSED TEST INIT CURSOR'
@@ -281,8 +279,7 @@ class TestOplogManager(unittest.TestCase):
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
         cursor = test_oplog.prepare_for_sync()
 
-        self.assertTrue(test_oplog.checkpoint is not None)
-        self.assertEqual(test_oplog.checkpoint.commit_ts, None)
+        self.assertEqual(test_oplog.checkpoint, None)
         self.assertEqual(cursor, None)
 
         primary_conn['test']['test'].insert({'name': 'paulie'})
@@ -291,7 +288,7 @@ class TestOplogManager(unittest.TestCase):
 
         # make sure that the cursor is valid and the timestamp is
         # updated properly
-        self.assertEqual(test_oplog.checkpoint.commit_ts, search_ts)
+        self.assertEqual(test_oplog.checkpoint, search_ts)
         self.assertTrue(cursor is not None)
         self.assertEqual(cursor.count(), 1)
 
