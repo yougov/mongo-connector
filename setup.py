@@ -51,7 +51,7 @@ setup(name="mongo-connector",
 
       package_data={
           '': ['*.xml'],
-          'mongo-connector': ['README.txt', 'config.txt']
+          'mongo-connector': ['README.md', 'config.txt']
           # If any package contains *.txt files, include them:
           # And include any *.dat files found in the 'data' subdirectory
           # of the 'mypkg' package, also:
