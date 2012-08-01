@@ -36,7 +36,7 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username):
+                 auth_username, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -58,7 +58,7 @@ class OplogThread(threading.Thread):
         self.doc_manager = doc_manager
 
         #Boolean describing whether or not the thread is running.
-        self.running = False
+        self.running = True
 
         #Stores the timestamp of the last oplog operation successfully processed.
         self.checkpoint = None
@@ -81,27 +81,24 @@ class OplogThread(threading.Thread):
         if is_sharded:
             self.main_connection = pymongo.Connection(main_address)
         else:
-            prim_admin = self.primary_connection.admin
-            repl_set_name = prim_admin.command("replSetGetStatus")['set']
-            host = primary_conn.host
-            port = primary_conn.port
-            self.primary_connection = pymongo.Connection(host + ":" + str(port),
-                                                 replicaSet=repl_set_name)
-            self.main_connection = self.primary_connection
-            self.oplog = self.primary_connection['local']['oplog.rs']
+            self.main_connection = pymongo.Connection(main_address, replicaSet=repl_set)
 
         if auth_key is not None:
             #Authenticate for the whole system
             primary_conn['admin'].authenticate(auth_username, auth_key)
 
+        if oplog_coll.find().count() == 0:
+            err_msg = 'OplogThread: No oplog for thread:'
+            logging.error('%s %s' % (err_msg, self.main_connection))
+            self.running = False
+
+
     def run(self):
         """Start the oplog worker.
         """
-        self.running = True
-
         while self.running is True:
             cursor = self.init_cursor()
-            if cursor is None and self.timestamp is not None:       # we've fallen too far behind
+            if cursor is None and self.checkpoint is not None:       # we've fallen too far behind
                 logging.error('OplogManager: Last entry no longer in oplog, cannot recover! %s' % self.oplog)
                 self.running = False
                 continue

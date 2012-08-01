@@ -23,8 +23,10 @@ import os
 import re
 import simplejson as json
 import time
+import pymongo
 import sys
 import inspect
+import exceptions
 import subprocess
 
 #from doc_manager import DocManager
@@ -57,8 +59,8 @@ class Connector(Thread):
                 subprocess.Popen(CMD, shell=True)
             else:
                 CMD = ["cp " + cmd_folder +
-                   "/doc_managers/" + doc_manager + " " +
-                   cmd_folder + "/doc_manager.py"]
+                       "/doc_managers/" + doc_manager + " " +
+                       cmd_folder + "/doc_manager.py"]
                 subprocess.Popen(CMD, shell=True)
 
         time.sleep(1)
@@ -145,7 +147,9 @@ class Connector(Thread):
         try:
             data = json.load(source)
         except json.decoder.JSONDecodeError:       # empty file
-            logging.info("MongoConnector: Can't read oplog progress file. It may be empty or corrupt")
+            err_msg = "MongoConnector: Can't read oplog progress file."
+            reason = "It may be empty or corrupt."
+            logging.info("%s %s" % (err_msg, reason))
             return None
 
         count = 0
@@ -154,7 +158,6 @@ class Connector(Thread):
             ts = data[count + 1]
             self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
             #stored as bson_ts
-
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
@@ -166,27 +169,42 @@ class Connector(Thread):
 
         if shard_coll.find().count() == 0:
             #non sharded configuration
+            try:
+                main_conn.admin.command("isdbgrid")
+                logging.error('MongoConnector: mongos has no shards!')
+                self.doc_manager.auto_commit = False
+                return
+            except pymongo.errors.OperationFailure:
+                pass
 
             oplog_coll = main_conn['local']['oplog.rs']
-            print oplog_coll.find().count()
-            if oplog_coll.find().count() == 0:
-                err_msg = 'MongoConnector: No oplog for thread:'
-                logging.info('%s %s' % (err_msg, main_conn))
-                self.oplog_thread_join()
-                self.doc_manager.auto_commit=False
-                return
 
-            oplog = OplogThread(main_conn, None, oplog_coll,
+            prim_admin = main_conn.admin
+            repl_set = prim_admin.command("replSetGetStatus")['set']
+            host = main_conn.host
+            port = main_conn.port
+            address = host + ":" + str(port)
+
+            oplog = OplogThread(main_conn, address, oplog_coll,
                                 False, self.doc_manager,
                                 self.oplog_progress_dict,
                                 self.ns_set, self.auth_key,
-                                self.auth_username)
+                                self.auth_username, repl_set=repl_set)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)
             oplog.start()
 
             while self.can_run:
+                if not self.shard_set[0].running:
+                    err_msg = "MongoConnector: OplogThread"
+                    set = str(self.shard_set[0])
+                    effect = "unexpectedly stopped! Shutting down."
+                    logging.error("%s %s %s" % (err_msg, set, effect))
+                    self.oplog_thread_join()
+                    self.doc_manager.auto_commit = False
+                    return
+
                 self.write_oplog_progress()
                 time.sleep(1)
 
@@ -198,11 +216,27 @@ class Connector(Thread):
                 for shard_doc in shard_cursor:
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
+                        if not self.shard_set[shard_id].running:
+                            err_msg = "MongoConnector: OplogThread"
+                            set = str(self.shard_set[shard_id])
+                            effect = "unexpectedly stopped! Shutting down"
+                            logging.error("%s %s %s" % (err_msg, set, effect))
+                            self.oplog_thread_join()
+                            self.doc_manager.auto_commit = False
+                            return
+
                         self.write_oplog_progress()
                         time.sleep(1)
                         continue
+                    try:
+                        repl_set, hosts = shard_doc['host'].split('/')
+                    except exceptions.ValueError:
+                        cause = "The system only uses replica sets!"
+                        logging.error("MongoConnector: %s", cause)
+                        self.oplog_thread_join()
+                        self.doc_manager.auto_commit = False
+                        return
 
-                    repl_set, hosts = shard_doc['host'].split('/')
                     shard_conn = Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
                     oplog = OplogThread(shard_conn, self.address, oplog_coll,
@@ -211,12 +245,11 @@ class Connector(Thread):
                                         self.ns_set, self.auth_key,
                                         self.auth_username)
                     self.shard_set[shard_id] = oplog
-                    logging.info('MongoConnector: Starting connection thread %s'
-                                 % shard_conn)
+                    msg = "Starting connection thread"
+                    logging.info("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
         self.oplog_thread_join()
-
 
     def oplog_thread_join(self):
         """Stops all the OplogThreads
@@ -321,7 +354,6 @@ if __name__ == '__main__':
                       """ this field can be left empty as the default """
                       """ is None.""")
 
-
     #-d is to specify the doc manager file.
     parser.add_option("-d", "--docManager", action="store", type="string",
                       dest="doc_manager", default=None, help=
@@ -360,7 +392,7 @@ if __name__ == '__main__':
             exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key, option.doc_manager,
+                   ns_set, options.u_key, key, options.doc_manager,
                    auth_username=options.admin_name)
 
     ct.run()
