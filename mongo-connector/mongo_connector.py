@@ -39,7 +39,7 @@ from bson.timestamp import Timestamp
 
 class Connector(Thread):
     """Checks the cluster for shards to tail.
-    """    
+    """
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key, auth_key, doc_manager, auth_username=None):
         print 'starting'
         file = inspect.getfile(inspect.currentframe())
@@ -50,15 +50,36 @@ class Connector(Thread):
             subprocess.Popen(CMD, shell=True)
         from doc_manager import DocManager
         super(Connector, self).__init__()
+
+        #can_run is set to false when we join the thread
         self.can_run = True
+
+        #The name of the file that stores the progress of the OplogThreads
         self.oplog_checkpoint = oplog_checkpoint
+
+        #main address - either mongos for sharded setups or a primary otherwise
         self.address = address
+
+        #The URL of the target system
         self.backend_url = backend_url
+
+        "The set of relevant namespaces to consider
         self.ns_set = ns_set
+
+        #The key that is a unique document identifier for the backend system.
+        #Not necessarily the mongo unique key.
         self.u_key = u_key
+
+        #Password for authentication
         self.auth_key = auth_key
+
+        #Username for authentication
         self.auth_username = auth_username
+
+        #The set of OplogThreads created
         self.shard_set = {}
+
+        #Dict of OplogThread/timestmap pairs to record progress
         self.oplog_progress_dict = {}
 
         if backend_url is None:
@@ -83,11 +104,10 @@ class Connector(Thread):
         if self.oplog_checkpoint is None:
                 return None
 
-        ofile = file(self.oplog_checkpoint, 'r+')
         # write to temp file
-        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '~')
+        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '++')
         dest = open(self.oplog_checkpoint, 'w')
-        source = open(self.oplog_checkpoint + '~', 'r')
+        source = open(self.oplog_checkpoint + '++', 'r')
 
         # for each of the threads write to file
         for oplog, ts in self.oplog_progress_dict.items():
@@ -98,7 +118,7 @@ class Connector(Thread):
 
         dest.close()
         source.close()
-        os.remove(self.oplog_checkpoint + '~')
+        os.remove(self.oplog_checkpoint + '++')
 
     def read_oplog_progress(self):
         """Reads oplog progress from file provided by user
@@ -111,17 +131,16 @@ class Connector(Thread):
         try:
             data = json.load(source)
         except json.decoder.JSONDecodeError:       # empty file
+            logging.info('MongoConnector: Can't read oplog progress file. It may be empty or corrupt')
             return None
 
         count = 0
-        while count < len(data):
+        for count in range(0, len(data), 2):
             oplog_str = data[count]
             ts = data[count + 1]
             self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
             #stored as bson_ts
-            count = count + 2  # skip to next set
 
-       # return self.checkpoint.commit_ts
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
@@ -130,7 +149,6 @@ class Connector(Thread):
         shard_coll = main_conn['config']['shards']
 
         self.read_oplog_progress()
-        #can_run is set to false when we join the thread
 
         if shard_coll.find().count() == 0:
             #non sharded configuration
@@ -299,7 +317,7 @@ if __name__ == '__main__':
                       """folder that should be used as the doc manager."""
                       """Absolute paths also supported. By default, it will"""
                       """use the doc_manager_simulator.py file.""")
-    
+
     #-a is to specify the username for authentication.
     parser.add_option("-a", "--admin-username", action="store", type="string",
                       dest="admin_name", default="__system", help=
@@ -309,7 +327,7 @@ if __name__ == '__main__':
                       """The default username is '__system'""")
 
     (options, args) = parser.parse_args()
-    
+
     try:
         if options.ns_set is None:
             ns_set = []

@@ -49,7 +49,7 @@ class MongoInternalTester(unittest.TestCase):
         """
 
         c = Connector(main_address, 'config.txt', None, ['test.test'],
-                      '_id', None)
+                      '_id', None, None)
         c.start()
 
         while len(c.shard_set) != 1:
@@ -67,7 +67,7 @@ class MongoInternalTester(unittest.TestCase):
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
         c = Connector(main_address, config_file_path, None, ['test.test'],
-                      '_id', None)
+                      '_id', None, None)
 
         #test that None is returned if there is no config file specified.
         self.assertEqual(c.write_oplog_progress(), None)
@@ -99,7 +99,7 @@ class MongoInternalTester(unittest.TestCase):
         """
 
         c = Connector(main_address, None, None, ['test.test'], '_id',
-                      None)
+                      None, None)
 
         #testing with no file
         self.assertEqual(c.read_oplog_progress(), None)

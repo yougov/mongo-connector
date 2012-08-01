@@ -76,7 +76,7 @@ class DocManager():
 
         Since we have very few documents in the doc dict when this is called,
         linear search is fine. This method is only used by rollbacks to query
-        all the documents in the target engine within a certain timestamp 
+        all the documents in the target engine within a certain timestamp
         window. The input will be two longs (converted from Bson timestamp)
         which specify the time range. The start_ts refers to the timestamp
         of the last oplog entry after a rollback. The end_ts is the timestamp
@@ -107,7 +107,7 @@ class DocManager():
 
         This method is used for rollbacks to establish the rollback window,
         which is the gap between the last document on a mongo shard and the
-        last document in the target engine. 
+        last document in the target engine.
         If there are no documents, this functions
         returns None. Otherwise, it returns the first document.
         """
