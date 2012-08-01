@@ -59,8 +59,8 @@ class Connector(Thread):
                 subprocess.Popen(CMD, shell=True)
             else:
                 CMD = ["cp " + cmd_folder +
-                   "/doc_managers/" + doc_manager + " " +
-                   cmd_folder + "/doc_manager.py"]
+                       "/doc_managers/" + doc_manager + " " +
+                       cmd_folder + "/doc_manager.py"]
                 subprocess.Popen(CMD, shell=True)
 
         time.sleep(1)
@@ -147,7 +147,9 @@ class Connector(Thread):
         try:
             data = json.load(source)
         except json.decoder.JSONDecodeError:       # empty file
-            logging.info("MongoConnector: Can't read oplog progress file. It may be empty or corrupt")
+            err_msg = "MongoConnector: Can't read oplog progress file."
+            reason = "It may be empty or corrupt."
+            logging.info("%s %s" % (err_msg, reason))
             return None
 
         count = 0
@@ -156,7 +158,6 @@ class Connector(Thread):
             ts = data[count + 1]
             self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
             #stored as bson_ts
-
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
@@ -171,7 +172,7 @@ class Connector(Thread):
             try:
                 main_conn.admin.command("isdbgrid")
                 logging.error('MongoConnector: mongos has no shards!')
-                self.doc_manager.auto_commit=False
+                self.doc_manager.auto_commit = False
                 return
             except pymongo.errors.OperationFailure:
                 pass
@@ -180,15 +181,15 @@ class Connector(Thread):
 
             prim_admin = main_conn.admin
             repl_set = prim_admin.command("replSetGetStatus")['set']
-            host = primary_conn.host
-            port = primary_conn.port
+            host = main_conn.host
+            port = main_conn.port
             address = host + ":" + str(port)
 
             oplog = OplogThread(main_conn, address, oplog_coll,
                                 False, self.doc_manager,
                                 self.oplog_progress_dict,
                                 self.ns_set, self.auth_key,
-                                self.auth_username, replica_set=repl_set)
+                                self.auth_username, repl_set=repl_set)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)
@@ -196,9 +197,12 @@ class Connector(Thread):
 
             while self.can_run:
                 if not self.shard_set[0].running:
-                    logging.error('MongoConnector: OplogThread %s unexpectedly stopped! Shutting down' % self.shard_set[0])
+                    err_msg = "MongoConnector: OplogThread"
+                    set = str(self.shard_set[0])
+                    effect = "unexpectedly stopped! Shutting down."
+                    logging.error("%s %s %s" % (err_msg, set, effect))
                     self.oplog_thread_join()
-                    self.doc_manager.auto_commit=False
+                    self.doc_manager.auto_commit = False
                     return
 
                 self.write_oplog_progress()
@@ -213,9 +217,12 @@ class Connector(Thread):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
-                            logging.error('MongoConnector: OplogThread %s unexpectedly stopped! Shutting down' % self.shard_set[shard_id])
+                            err_msg = "MongoConnector: OplogThread"
+                            set = str(self.shard_set[shard_id])
+                            effect = "unexpectedly stopped! Shutting down"
+                            logging.error("%s %s %s" % (err_msg, set, effect))
                             self.oplog_thread_join()
-                            self.doc_manager.auto_commit=False
+                            self.doc_manager.auto_commit = False
                             return
 
                         self.write_oplog_progress()
@@ -224,9 +231,10 @@ class Connector(Thread):
                     try:
                         repl_set, hosts = shard_doc['host'].split('/')
                     except exceptions.ValueError:
-                        logging.error('MongoConnector: The system only uses replica sets!')
+                        cause = "The system only uses replica sets!"
+                        logging.error("MongoConnector: %s", cause)
                         self.oplog_thread_join()
-                        self.doc_manager.auto_commit=False
+                        self.doc_manager.auto_commit = False
                         return
 
                     shard_conn = Connection(hosts, replicaset=repl_set)
@@ -237,12 +245,11 @@ class Connector(Thread):
                                         self.ns_set, self.auth_key,
                                         self.auth_username)
                     self.shard_set[shard_id] = oplog
-                    logging.info('MongoConnector: Starting connection thread %s'
-                                 % shard_conn)
+                    msg = "Starting connection thread"
+                    logging.info("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
         self.oplog_thread_join()
-
 
     def oplog_thread_join(self):
         """Stops all the OplogThreads
@@ -346,7 +353,6 @@ if __name__ == '__main__':
                       """ oplog threads. If authentication is not used, then"""
                       """ this field can be left empty as the default """
                       """ is None.""")
-
 
     #-d is to specify the doc manager file.
     parser.add_option("-d", "--docManager", action="store", type="string",
