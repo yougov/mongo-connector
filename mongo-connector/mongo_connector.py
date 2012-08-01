@@ -25,9 +25,9 @@ import simplejson as json
 import time
 import sys
 import inspect
+import subprocess
 
-from backend_simulator import BackendSimulator
-from doc_manager import DocManager
+#from doc_manager import DocManager
 from pymongo import Connection
 from oplog_manager import OplogThread
 from optparse import OptionParser
@@ -39,10 +39,18 @@ from bson.timestamp import Timestamp
 
 class Connector(Thread):
     """Checks the cluster for shards to tail.
-    """
-
+    """    
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key,
-                 auth_key):
+                 auth_key, doc_manager):
+        print 'starting'
+        file = inspect.getfile(inspect.currentframe())
+        cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
+        if doc_manager is None:
+            CMD = ["cp " + cmd_folder + "/doc_managers/doc_manager_simulator.py "
+                   + cmd_folder + "/doc_manager.py"]
+            subprocess.Popen(CMD, shell=True)
+        
+        from doc_manager import DocManager
         super(Connector, self).__init__()
         self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
@@ -54,10 +62,10 @@ class Connector(Thread):
         self.shard_set = {}
         self.oplog_progress_dict = {}
 
-        if self.backend_url is None:
-            self.doc_manager = BackendSimulator()
+        if backend_url is None:
+            self.doc_manager = DocManager()
         else:
-            self.doc_manager = DocManager(self.backend_url, auto_commit=True)
+            self.doc_manager = DocManager(self.backend_url)
 
         if self.doc_manager is None:
             logging.critical('Bad backend URL!')
@@ -233,13 +241,14 @@ if __name__ == '__main__':
 
     #-b is to specify the URL to the backend engine being used.
     parser.add_option("-b", "--backend-url", action="store", type="string",
-                      dest="url", default="",
+                      dest="url", default=None,
                       help="""Specify the URL to the backend engine being """
                       """used. For example, if you were using Solr out of """
                       """the box, you could use '-b """
                       """ http://localhost:8080/solr' with the """
                       """ SolrDocManager to establish a proper connection."""
-                      """ Don't use quotes around address.""")
+                      """ Don't use quotes around address."""
+                      """If target system doesn't need URL, don't specify""")
 
     #-n is to specify the namespaces we want to consider. The default
     #considers all the namespaces
@@ -273,8 +282,17 @@ if __name__ == '__main__':
                       """ this field can be left empty as the default """
                       """ is None.""")
 
+    #-d is to specify the doc manager file.
+    parser.add_option("-d", "--docManager", action="store", type="string",
+                      dest="doc_manager", default=None, help=
+                      """Used to specify the file in the /doc_managers"""
+                      """folder that should be used as the doc manager."""
+                      """Absolute paths also supported. By default, it will"""
+                      """use the doc_manager_simulator.py file.""")
+    
     (options, args) = parser.parse_args()
 
+    
     try:
         if options.ns_set is None:
             ns_set = []
@@ -295,5 +313,5 @@ if __name__ == '__main__':
             exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key)
+                   ns_set, options.u_key, key, option.doc_manager)
     ct.run()

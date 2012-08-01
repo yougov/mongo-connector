@@ -7,7 +7,8 @@ in sync while the connector is running. This has been tested with python 2.7.
 ## Getting Started:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations.
+connector will work with both sharded and non sharded configurations. It requires a replica set
+setup.
 
 To start the system, first move your doc manager file, or one of the sample doc manager files
  provided to the main folder (mongo-connector) and rename it doc_manager.py. 
@@ -29,7 +30,8 @@ Don't use quotes around the address.
 
 `-b` or `--backend-url` is to specify the URL to the target system being used. For example, if you
 were using Solr out of the box, you could use '-b http://localhost:8080/solr' with the
-SolrDocManager to establish a proper connection. Don't use quotes around address.
+SolrDocManager to establish a proper connection. Don't use quotes around address. If target
+system doesn't need URL, don't specify.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
@@ -49,6 +51,10 @@ which can be noted by "-u _id"
 `-k` or `--keyFile` is used to specify the path to the authentication key file. This file is used
 by mongos to authenticate connections to the shards, and we'll use it in the oplog threads. If
 authentication is not used, then this field can be left empty as the default is None.
+
+`-d` or `--docManager` is used to specify the file in the /doc_managers folder that should be used
+as the doc manager. Absolute paths are also supported. By default, it will use 
+the doc_manager_simulator.py file.
 
 An example of combining all of these is:
 

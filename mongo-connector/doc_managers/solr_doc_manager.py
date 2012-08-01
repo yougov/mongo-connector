@@ -44,7 +44,7 @@ class DocManager():
     def __init__(self, url, auto_commit=True, unique_key='_id'):
         """Verify Solr URL and establish a connection.
 
-        This method may vary from implementation to implementation, but it must
+        This method may vary from implementation to implementation, but it should
         verify the url to the backend and return None if that fails. It must
         also create the connection to the backend, and start a periodic
         committer if necessary. The Solr uniqueKey is '_id' in the sample
