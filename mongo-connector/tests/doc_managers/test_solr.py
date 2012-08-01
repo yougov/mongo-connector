@@ -70,7 +70,7 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt',
                            'http://localhost:8080/solr', ['test.test'], '_id',
-                           None)
+                           None, 'solr_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)
