@@ -40,14 +40,28 @@ from bson.timestamp import Timestamp
 class Connector(Thread):
     """Checks the cluster for shards to tail.
     """    
-    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key, auth_key, doc_manager, auth_username=None):
-        print 'starting'
+    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, 
+                 u_key, auth_key, doc_manager=None, auth_username=None):
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
         if doc_manager is None:
-            CMD = ["cp " + cmd_folder + "/doc_managers/doc_manager_simulator.py "
+            CMD = ["cp " + cmd_folder + 
+                   "/doc_managers/doc_manager_simulator.py "
                    + cmd_folder + "/doc_manager.py"]
             subprocess.Popen(CMD, shell=True)
+        
+        else:
+            if doc_manager[0] is '/':
+                CMD = ["cp " + doc_manager + " " +
+                       + cmd_folder + "/doc_manager.py"]
+                subprocess.Popen(CMD, shell=True)
+            else:
+                CMD = ["cp " + cmd_folder + 
+                   "/doc_managers/" + doc_manager + " " +
+                   cmd_folder + "/doc_manager.py"]
+                subprocess.Popen(CMD, shell=True)        
+        
+        time.sleep(1)
         from doc_manager import DocManager
         super(Connector, self).__init__()
         self.can_run = True
