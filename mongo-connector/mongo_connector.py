@@ -213,32 +213,74 @@ if __name__ == '__main__':
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="localhost:27217")
+                      dest="main_addr", default="localhost:27217",
+                      help="""Specify the mongos address, which is a """
+                      """host:port pair, or for clusters with one shard,"""
+                      """the primary's adderess. For example, `-m """
+                      """localhost:27217` would be a valid argument"""
+                      """to `-m`. It is not necessary to specify """
+                      """double-quotes aroung the argument to `-m`. Don't """
+                      """ use quotes around the address.""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
     #quick recovery from failure.
     parser.add_option("-o", "--oplog-ts", action="store", type="string",
-                      dest="oplog_config", default="config.txt")
+                      dest="oplog_config", default="config.txt",
+                      help="""Specify the name of the file that stores the"""
+                      """oplog progress timestamps. """
+                      """This file is used by the system to store the last"""
+                      """timestamp read on a specific oplog. This allows"""
+                      """ for quick recovery from failure. By default this"""
+                      """ is `config.txt`, which starts off empty. An empty"""
+                      """ file causes the system to go through all the mongo"""
+                      """ oplog and sync all the documents. Whenever the """
+                      """cluster is restarted, it is essential that the """
+                      """oplog-timestamp config file be emptied - otherwise"""
+                      """ the connector will miss some documents and behave"""
+                      """incorrectly.""")
 
     #-b is to specify the URL to the backend engine being used.
     parser.add_option("-b", "--backend-url", action="store", type="string",
-                      dest="url", default="")
+                      dest="url", default="",
+                      help="""Specify the URL to the backend engine being """
+                      """used. For example, if you were using Solr out of """
+                      """the box, you could use '-b """
+                      """ http://localhost:8080/solr' with the """
+                      """ SolrDocManager to establish a proper connection."""
+                      """ Don't use quotes around address.""")
 
     #-n is to specify the namespaces we want to consider. The default
     #considers all the namespaces
     parser.add_option("-n", "--namespace-set", action="store", type="string",
-                      dest="ns_set", default=None)
+                      dest="ns_set", default=None, help=
+                      """Used to specify the namespaces we want to """
+                      """ consider. For example, if we wished to store all """
+                      """ documents from the test.test and alpha.foo """
+                      """ namespaces, we could use `-n test.test,alpha.foo`."""
+                      """ The default is to consider all the namespaces, """
+                      """ excluding the system and config databases, and """
+                      """ also ignoring the "system.indexes" collection in """
+                      """any database.""")
 
     #-u is to specify the uniqueKey used by the backend,
     parser.add_option("-u", "--unique-key", action="store", type="string",
-                      dest="u_key", default="_id")
+                      dest="u_key", default="_id", help=
+                      """Used to specify the uniqueKey used by the backend."""
+                      """The default is "_id", which can be noted by """
+                      """  '-u _id'""")
 
     #-k is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
     #threads.
     parser.add_option("-k", "--keyFile", action="store", type="string",
-                      dest="auth_file", default=None)
+                      dest="auth_file", default=None, help=
+                      """Used to specify the path to the authentication key"""
+                      """file. This file is used by mongos to authenticate"""
+                      """ connections to the shards, and we'll use it in the"""
+                      """ oplog threads. If authentication is not used, then"""
+                      """ this field can be left empty as the default """
+                      """ is None.""")
 
     (options, args) = parser.parse_args()
 

@@ -1,15 +1,21 @@
 ## System Overview:
 
-The mongo-connector system is designed to hook up mongoDB to any backend. This allows all the
-documents in mongoDB to be stored in some other system, and both mongo and the backend will remain
-in sync while the connector is running.
+The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
+documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
+in sync while the connector is running. This has been tested with python 2.7.
 
-## Usage:
+## Getting Started:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations.
 
-To start the system, first move your doc manager file, or one of the sample doc manager files provided to the main folder (mongo-connector) and rename it doc_manager.py. It is essential that there be a `doc_manager.py` file in the same directory where the `mongo_connector.py` file is run, since the Connector imports the DocManager to add/update/delete files from the desired backend. For example, to use the system with Solr, you can navigate to the mongo-connector subfolder and run `cp doc_managers/solr_doc_manager.py doc_manager.py`.
+To start the system, first move your doc manager file, or one of the sample doc manager files
+ provided to the main folder (mongo-connector) and rename it doc_manager.py. 
+ It is essential that there be a `doc_manager.py` file in the same directory where the
+  `mongo_connector.py` file is run, since the Connector imports the DocManager to
+   add/update/delete files from the desired target system. For example, to use the system with 
+   Solr, you can navigate to the mongo-connector subfolder and run 
+   `cp doc_managers/solr_doc_manager.py doc_manager.py`.
 
 For more information about making your own doc manager, see Doc Manager section.
 
@@ -19,22 +25,25 @@ to specify some command line options to work with your setup. They are described
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
  one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
  to `-m`. It is not necessary to specify double-quotes aroung the argument to `-m`.
+Don't use quotes around the address.
 
-`-b` or `--backend-url` is to specify the URL to the backend engine being used. For example, if you
-were using Solr out of the box, you could use "-b http://localhost:8080/solr" with the
-SolrDocManager to establish a proper connection.
+`-b` or `--backend-url` is to specify the URL to the target system being used. For example, if you
+were using Solr out of the box, you could use '-b http://localhost:8080/solr' with the
+SolrDocManager to establish a proper connection. Don't use quotes around address.
 
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
 for quick recovery from failure. By default this is `config.txt`, which starts off empty. An empty
-file causes the system to go through all the mongo oplog and sync all the documents. Whenever the cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise the connector will miss some documents and behave incorrectly.
+file causes the system to go through all the mongo oplog and sync all the documents. Whenever the 
+cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise 
+the connector will miss some documents and behave incorrectly.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
 databases, and also ignoring the "system.indexes" collection in any database.
 
-`-u` or `--unique-key` is used to specify the uniqueKey used by the backend. The default is "_id",
+`-u` or `--unique-key` is used to specify the uniqueKey used by the target system. The default is "_id",
 which can be noted by "-u _id"
 
 `-k` or `--keyFile` is used to specify the path to the authentication key file. This file is used
@@ -61,16 +70,17 @@ The sample XML schema is designed to work with the tests. For a more complete gu
 ## DocManager
 
 This is the only file that is engine specific. In the current version, we have provided sample
-documents for ElasticSearch and Solr. If you would like to integrate MongoDB with some other engine,
-then you need to write a doc_manager.py file for that backend. The sample_doc_manager.py file gives a
+implementations for ElasticSearch and Solr, which are in the docmanagers folder.
+If you would like to integrate MongoDB with some other engine, then you need to write a 
+doc_manager.py file for that target system. The sample_doc_manager.py file gives a
 detailed description of the functions used by the Doc Manager, and the following functions must be
 implemented:
 
 __1) init(self, url)__
 
 This method may vary from implementation to implementation, but it must
-verify the url to the backend and return None if that fails. It must
-also create the connection to the backend, and start a periodic
+verify the url to the target system and return None if that fails. It should
+also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
 auto_commit.
 
@@ -78,21 +88,31 @@ __2) upsert(self, doc)__
 
 Update or insert a document into your engine.
 This method should call whatever add/insert/update method exists for
-the backend engine and add the document in there. The input will
+the target system engine and add the document in there. The input will
 always be one mongo document, represented as a Python dictionary.
+This document will be the current mongo version of the document,
+not necessarily the version at the time the upsert was made; the
+doc manager will be responsible to track the changes if necessary.
+It is possible to get two inserts for the same document with the same
+contents if there is considerable delay in trailing the oplog.
+We have only one function for update and insert because incremental
+updates are not supported, so there is no update option.
 
 __3) remove(self, doc)__
 
-Removes documents from engine
+Removes document from engine
 The input is a python dictionary that represents a mongo document.
 
 __4) search(self, start_ts, end_ts)__
 
 Called to query engine for documents in a time range, including start_ts and end_ts
 This method is only used by rollbacks to query all the documents in
-Solr within a certain timestamp window. The input will be two longs
-(converted from Bson timestamp) which specify the time range. The
-return value should be an iterable set of documents.
+the target engine within a certain timestamp window. The input will be two longs
+(converted from Bson timestamp) which specify the time range. The 32 most significant
+bits are the Unix Epoch Time, and the other bits are the increment. For all purposes,
+the function should just do a simple search for timestamps between these values
+treating them as simple longs.
+The return value should be an iterable set of documents.
 
 
 __5) commit(self)__
@@ -100,15 +120,15 @@ __5) commit(self)__
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
 not meant to be called in other circumstances. The body should commit
-all documents to the backend engine (like auto_commit), but not have
+all documents to the target system (like auto_commit), but not have
 any timers or run itself again (unlike auto_commit).
 
 __6) get_last_doc(self)__
 
-Returns the last document stored in the Elastic engine.
+Returns the last document stored in the target engine.
 This method is used for rollbacks to establish the rollback window,
 which is the gap between the last document on a mongo shard and the
-last document in Solr. If there are no documents, this functions
+last document. If there are no documents, this functions
 returns None. Otherwise, it returns the first document.
 
 
@@ -117,12 +137,12 @@ returns None. Otherwise, it returns the first document.
 The main Connector thread connects to either a mongod or a mongos, depending on cluster setup, and
 spawns an OplogThread for every primary node in the cluster. These OplogThreads continuously poll
 the Oplog for new operations, get the relevant documents, and insert and/or update them into the
-backend system. The general workflow of an OplogThread is:
+target system. The general workflow of an OplogThread is:
 
 1. "Prepare for sync", which initializes a tailable cursor to the Oplog of the mongod. This cursor
     will return all new entries, which are processed in step 2. If this is the first time the
     mongo-connector is being run, then a special "dump collection" occurs where all the documents
-    from a given namespace are dumped into the backend. On subsequent calls, the timestamp of the
+    from a given namespace are dumped into the target system. On subsequent calls, the timestamp of the
     last oplog entry is stored in the system, so the OplogThread resumes where it left off instead
     of rereading  the whole oplog.
 
@@ -131,12 +151,12 @@ backend system. The general workflow of an OplogThread is:
    (depending on cluster setup). This document is passed up to the DocManager. For deletes, we pass
    up the unique key for the document to the DocManager.
 
-3. The DocManager can either batch documents and periodically update the backend, or immediately,
+3. The DocManager can either batch documents and periodically update the target system, or immediately,
    or however the user chooses to.
 
 The above three steps essentially loop forever. For usage purposes, the only relevant layer is the
 DocManager, which will always get the documents from the underlying layer and is responsible for
-adding to/removing from the backend.
+adding to/removing from the target system.
 
 Mongo-Connector imports a DocManager from the file doc_manager.py. We have provided sample
 implementations for a Solr search DocManager and an ElasticSearch DocManager, but for
@@ -154,3 +174,11 @@ system will use the doc_manager.py file in the main mongo-connector folder, the 
 doc_managers folder.
 There are shell scripts for running all tests for each search engine (currenctly Solr and Elastic) in doc_managers/tests;
 for the general connector tests in /tests, and a script that runs all tests in the main folder.
+
+## Troubleshooting
+
+The most common issue when installing is to forget to clear config.txt before restarting the mongo connector.
+This config.txt file stores an oplog timestamp, so if you restart the syncing, it will only restart after
+that point. This can be a problem if you have restarted mongo and there's no more oplog entry for that
+timestamp; this will result in an error. Additionally, If you restart mongo, the target system will
+ not have the data automatically wiped.
