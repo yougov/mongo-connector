@@ -63,6 +63,7 @@ DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 AUTH_KEY = None
+AUTH_USERNAME = None
 
 
 def safe_mongo_op(func, arg1, arg2=None):
@@ -116,7 +117,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY)
+                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -136,9 +137,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY)
+                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
 
-        return (oplog, primary_conn, oplog_coll, oplog.mongos_connection)
+        return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager.
@@ -275,7 +276,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor = test_oplog.init_cursor()
 
         assert (cursor.count() == 1)
-        assert (test_oplog.checkpoint.commit_ts == search_ts)
+        assert (test_oplog.checkpoint == search_ts)
 
         # with config file, assert that size != 0
         os.system('touch temp_config.txt')
@@ -288,46 +289,11 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         assert(cursor.count() == 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)
-        commit_ts = test_oplog.checkpoint.commit_ts
+        commit_ts = test_oplog.checkpoint
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
 
         os.system('rm temp_config.txt')
         print 'PASSED TEST INIT CURSOR'
-
-    def test_prepare_for_sync(self):
-        """Test prepare_for_sync in oplog_manager.
-
-        Assertion failure if it doesn't pass
-        """
-
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
-        cursor = test_oplog.prepare_for_sync()
-
-        assert (test_oplog.checkpoint is not None)
-        assert (test_oplog.checkpoint.commit_ts is None)
-        assert (cursor is None)
-
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        cursor = test_oplog.prepare_for_sync()
-        search_ts = test_oplog.get_last_oplog_timestamp()
-
-        # ensure that the cursor is valid and the timestamp is updated properly
-        assert (test_oplog.checkpoint.commit_ts == search_ts)
-        assert (cursor is not None)
-        assert (cursor.count() == 1)
-
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulter'})
-        cursor = test_oplog.prepare_for_sync()
-        new_search_ts = test_oplog.get_last_oplog_timestamp()
-
-        # make sure that the newest document is in the cursor.
-        assert (cursor.count() == 2)
-        next_doc = cursor.next()
-        assert (next_doc['o']['name'] == 'paulter')
-        assert (next_doc['ts'] == new_search_ts)
-
-        # test_oplog.stop()
-        print 'PASSED TEST PREPARE FOR SYNC'
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -428,6 +394,10 @@ if __name__ == '__main__':
     parser.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 
+    #-u is for the auth username
+    parser.add_option("-u", "--username", action="store", type="string",
+                      dest="auth_user", default="__system")
+
     (options, args) = parser.parse_args()
 
     if options.auth_file != "":
@@ -437,6 +407,7 @@ if __name__ == '__main__':
             key = file.read()
             re.sub(r'\s', '', key)
             AUTH_KEY = key
+            AUTH_USERNAME = options.auth_user
         except:
            #  logger.error('Could not parse authentication file!')
             exit(1)

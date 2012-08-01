@@ -40,8 +40,7 @@ from bson.timestamp import Timestamp
 class Connector(Thread):
     """Checks the cluster for shards to tail.
     """    
-    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key,
-                 auth_key, doc_manager):
+    def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key, auth_key, doc_manager, auth_username=None):
         print 'starting'
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
@@ -49,7 +48,6 @@ class Connector(Thread):
             CMD = ["cp " + cmd_folder + "/doc_managers/doc_manager_simulator.py "
                    + cmd_folder + "/doc_manager.py"]
             subprocess.Popen(CMD, shell=True)
-        
         from doc_manager import DocManager
         super(Connector, self).__init__()
         self.can_run = True
@@ -59,6 +57,7 @@ class Connector(Thread):
         self.ns_set = ns_set
         self.u_key = u_key
         self.auth_key = auth_key
+        self.auth_username = auth_username
         self.shard_set = {}
         self.oplog_progress_dict = {}
 
@@ -137,10 +136,13 @@ class Connector(Thread):
             #non sharded configuration
 
             oplog_coll = main_conn['local']['oplog.rs']
+            print oplog_coll.find().count()
             if oplog_coll.find().count() == 0:
-                err_msg = 'MongoInternal: No oplog for thread:'
+                err_msg = 'MongoConnector: No oplog for thread:'
                 logging.info('%s %s' % (err_msg, main_conn))
-                self.can_run = False
+                self.oplog_thread_join()
+                self.doc_manager.auto_commit=False
+                return
 
             shard_conn = main_conn
             address = None
@@ -148,9 +150,10 @@ class Connector(Thread):
             oplog = OplogThread(shard_conn, address, oplog_coll,
                                 is_sharded, self.doc_manager,
                                 self.oplog_progress_dict,
-                                self.ns_set, self.auth_key)
+                                self.ns_set, self.auth_key,
+                                self.auth_username)
             self.shard_set[0] = oplog
-            logging.info('MongoInternal: Starting connection thread %s' %
+            logging.info('MongoConnector: Starting connection thread %s' %
                          shard_conn)
             oplog.start()
 
@@ -176,13 +179,19 @@ class Connector(Thread):
                     oplog = OplogThread(shard_conn, self.address, oplog_coll,
                                         True, self.doc_manager,
                                         self.oplog_progress_dict,
-                                        self.ns_set, self.auth_key)
+                                        self.ns_set, self.auth_key,
+                                        self.auth_username)
                     self.shard_set[shard_id] = oplog
-                    logging.info('MongoInternal: Starting connection thread %s'
+                    logging.info('MongoConnector: Starting connection thread %s'
                                  % shard_conn)
                     oplog.start()
 
-        #time to stop running
+        self.oplog_thread_join()
+
+
+    def oplog_thread_join(self):
+        """Stops all the OplogThreads
+        """
         for thread in self.shard_set.values():
             thread.join()
 
@@ -282,6 +291,7 @@ if __name__ == '__main__':
                       """ this field can be left empty as the default """
                       """ is None.""")
 
+
     #-d is to specify the doc manager file.
     parser.add_option("-d", "--docManager", action="store", type="string",
                       dest="doc_manager", default=None, help=
@@ -290,8 +300,15 @@ if __name__ == '__main__':
                       """Absolute paths also supported. By default, it will"""
                       """use the doc_manager_simulator.py file.""")
     
-    (options, args) = parser.parse_args()
+    #-a is to specify the username for authentication.
+    parser.add_option("-a", "--admin-username", action="store", type="string",
+                      dest="admin_name", default="__system", help=
+                      """Used to specify the username of an admin user to"""
+                      """authenticate with. To use authentication, the user"""
+                      """must specify both an admin username and a keyFile."""
+                      """The default username is '__system'""")
 
+    (options, args) = parser.parse_args()
     
     try:
         if options.ns_set is None:
@@ -313,5 +330,7 @@ if __name__ == '__main__':
             exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key, option.doc_manager)
+                   ns_set, options.u_key, key, option.doc_manager,
+                   auth_username=options.admin_name)
+
     ct.run()
