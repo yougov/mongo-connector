@@ -77,7 +77,7 @@ class Connector(Thread):
         #The URL of the target system
         self.backend_url = backend_url
 
-        "The set of relevant namespaces to consider
+        #The set of relevant namespaces to consider
         self.ns_set = ns_set
 
         #The key that is a unique document identifier for the backend system.
@@ -145,7 +145,7 @@ class Connector(Thread):
         try:
             data = json.load(source)
         except json.decoder.JSONDecodeError:       # empty file
-            logging.info('MongoConnector: Can't read oplog progress file. It may be empty or corrupt')
+            logging.info("MongoConnector: Can't read oplog progress file. It may be empty or corrupt")
             return None
 
         count = 0
