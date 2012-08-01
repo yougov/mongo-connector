@@ -53,6 +53,7 @@ PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
              "CONFIG":  "27220", "MAIN":  "27217"}
 
 AUTH_KEY = None
+AUTH_USERNAME = None
 
 
 class TestOplogManager(unittest.TestCase):
@@ -86,7 +87,7 @@ class TestOplogManager(unittest.TestCase):
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
-                            namespace_set, AUTH_KEY)
+                            namespace_set, AUTH_KEY, AUTH_USERNAME)
 
         return(oplog, primary_conn, oplog_coll)
 
@@ -109,7 +110,7 @@ class TestOplogManager(unittest.TestCase):
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
-                            namespace_set, AUTH_KEY)
+                            namespace_set, AUTH_KEY, AUTH_USERNAME)
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
     def test_retrieve_doc(self):
@@ -375,6 +376,10 @@ if __name__ == '__main__':
     parser.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 
+    #-u is for the auth username
+    parser.add_option("-u", "--username", action="store", type="string",
+                      dest="auth_user", default="__system")
+
     (options, args) = parser.parse_args()
 
     PORTS_ONE["MAIN"] = options.main_addr
@@ -386,6 +391,7 @@ if __name__ == '__main__':
             key = file.read()
             re.sub(r'\s', '', key)
             AUTH_KEY = key
+            AUTH_USERNAME = options.auth_user
         except:
            # logger.error('Could not parse authentication file!')
             exit(1)

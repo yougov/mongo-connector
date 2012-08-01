@@ -35,28 +35,54 @@ class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
-                 doc_manager, oplog_progress_dict, namespace_set, auth_key):
+                 doc_manager, oplog_progress_dict, namespace_set, auth_key,
+                 auth_username):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
+
+        #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
-        self.main_address = main_address
+
+        #The mongos address for sharded setups, otherwise the same as primary_connection.
+        #The value is set later on.
+        self.main_connection = None
+
+        #The connection to the oplog collection
         self.oplog = oplog_coll
+
+        #Boolean describing whether the cluster is sharded or not
         self.is_sharded = is_sharded
+
+        #The document manager for the target system. This is the same for all threads.
         self.doc_manager = doc_manager
+
+        #Boolean describing whether or not the thread is running.
         self.running = False
+
+        #Stores the timestamp of the last oplog operation successfully processed.
         self.checkpoint = None
+
+        #A dictionary that stores OplogThread/timestamp pairs representing what the
+        #last checkpoint was for any given OplogThread.
         self.oplog_progress_dict = oplog_progress_dict
+
+        #The set of namespaces to process from the mongo cluster.
         self.namespace_set = namespace_set
+
+        #If authentication is used, this is an admin password.
         self.auth_key = auth_key
+
+        #If authentication is used, this is the username used for authentication.
+        self.auth_username = auth_username
 
         logging.info('initializing oplog thread')
 
-        if main_address is not None:
+        if is_sharded:
             self.main_connection = pymongo.Connection(main_address)
         else:
-            prim_conn = self.primary_connection.admin
-            repl_set_name = prim_conn.command("replSetGetStatus")['set']
+            prim_admin = self.primary_connection.admin
+            repl_set_name = prim_admin.command("replSetGetStatus")['set']
             host = primary_conn.host
             port = primary_conn.port
             self.primary_connection = pymongo.Connection(host + ":" + str(port),
@@ -66,7 +92,7 @@ class OplogThread(threading.Thread):
 
         if auth_key is not None:
             #Authenticate for the whole system
-            primary_conn['local'].authenticate('__system', auth_key)
+            primary_conn['admin'].authenticate(auth_username, auth_key)
 
     def run(self):
         """Start the oplog worker.
@@ -80,7 +106,7 @@ class OplogThread(threading.Thread):
                 self.running = False
                 continue
 
-            if util.retry_until_ok(cursor.count) == 1:
+            if util.retry_until_ok(cursor.count) == 1:     # the only entry is the last one we processed
                 time.sleep(1)
                 continue
 
@@ -116,7 +142,7 @@ class OplogThread(threading.Thread):
                 pass
 
             if err is True and self.auth_key is not None:
-                primary_conn['local'].authenticate('__system', auth_key)
+                primary_conn['admin'].authenticate(self.auth_username, self.auth_key)
                 err = False
 
             if last_ts is not None:
@@ -178,8 +204,7 @@ class OplogThread(threading.Thread):
             except (pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure):
                 pass
         if cursor_len == 1:     # means we are the end of the oplog
-            if self.checkpoint is not None:
-                self.checkpoint = timestamp
+            self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
             return cursor

@@ -42,7 +42,7 @@ class Connector(Thread):
     """
 
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set, u_key,
-                 auth_key):
+                 auth_key, auth_username=None):
         super(Connector, self).__init__()
         self.can_run = True
         self.oplog_checkpoint = oplog_checkpoint
@@ -51,6 +51,7 @@ class Connector(Thread):
         self.ns_set = ns_set
         self.u_key = u_key
         self.auth_key = auth_key
+        self.auth_username = auth_username
         self.shard_set = {}
         self.oplog_progress_dict = {}
 
@@ -119,7 +120,6 @@ class Connector(Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        print self.address
         main_conn = Connection(self.address)
         shard_coll = main_conn['config']['shards']
 
@@ -144,7 +144,8 @@ class Connector(Thread):
             oplog = OplogThread(shard_conn, address, oplog_coll,
                                 is_sharded, self.doc_manager,
                                 self.oplog_progress_dict,
-                                self.ns_set, self.auth_key)
+                                self.ns_set, self.auth_key,
+                                self.auth_username)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          shard_conn)
@@ -172,12 +173,13 @@ class Connector(Thread):
                     oplog = OplogThread(shard_conn, self.address, oplog_coll,
                                         True, self.doc_manager,
                                         self.oplog_progress_dict,
-                                        self.ns_set, self.auth_key)
+                                        self.ns_set, self.auth_key,
+                                        self.auth_username)
                     self.shard_set[shard_id] = oplog
                     logging.info('MongoConnector: Starting connection thread %s'
                                  % shard_conn)
                     oplog.start()
-        
+
         self.oplog_thread_join()
 
 
@@ -282,6 +284,14 @@ if __name__ == '__main__':
                       """ this field can be left empty as the default """
                       """ is None.""")
 
+    parser.add_option("-a", "--admin-username", action="store", type="string",
+                      dest="admin_name", default="__system", help=
+                      """Used to specify the username of an admin user to"""
+                      """authenticate with. To use authentication, the user"""
+                      """must specify both an admin username and a keyFile."""
+                      """The default username is '__system'""")
+
+
     (options, args) = parser.parse_args()
 
     try:
@@ -304,5 +314,5 @@ if __name__ == '__main__':
             exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key)
+                   ns_set, options.u_key, key, options.admin_name)
     ct.run()

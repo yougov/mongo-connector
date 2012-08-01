@@ -63,6 +63,7 @@ DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
 AUTH_KEY = None
+AUTH_USERNAME = None
 
 
 def safe_mongo_op(func, arg1, arg2=None):
@@ -116,7 +117,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY)
+                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -136,7 +137,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY)
+                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 
@@ -393,6 +394,10 @@ if __name__ == '__main__':
     parser.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 
+    #-u is for the auth username
+    parser.add_option("-u", "--username", action="store", type="string",
+                      dest="auth_user", default="__system")
+
     (options, args) = parser.parse_args()
 
     if options.auth_file != "":
@@ -402,6 +407,7 @@ if __name__ == '__main__':
             key = file.read()
             re.sub(r'\s', '', key)
             AUTH_KEY = key
+            AUTH_USERNAME = options.auth_user
         except:
            #  logger.error('Could not parse authentication file!')
             exit(1)
