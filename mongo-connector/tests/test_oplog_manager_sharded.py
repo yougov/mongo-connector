@@ -294,40 +294,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         os.system('rm temp_config.txt')
         print 'PASSED TEST INIT CURSOR'
 
-    def test_prepare_for_sync(self):
-        """Test prepare_for_sync in oplog_manager.
-
-        Assertion failure if it doesn't pass
-        """
-
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
-        cursor = test_oplog.prepare_for_sync()
-
-        assert (test_oplog.checkpoint is None)
-        assert (cursor is None)
-
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        cursor = test_oplog.prepare_for_sync()
-        search_ts = test_oplog.get_last_oplog_timestamp()
-
-        # ensure that the cursor is valid and the timestamp is updated properly
-        assert (test_oplog.checkpoint == search_ts)
-        assert (cursor is not None)
-        assert (cursor.count() == 1)
-
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulter'})
-        cursor = test_oplog.prepare_for_sync()
-        new_search_ts = test_oplog.get_last_oplog_timestamp()
-
-        # make sure that the newest document is in the cursor.
-        assert (cursor.count() == 2)
-        next_doc = cursor.next()
-        assert (next_doc['o']['name'] == 'paulter')
-        assert (next_doc['ts'] == new_search_ts)
-
-        # test_oplog.stop()
-        print 'PASSED TEST PREPARE FOR SYNC'
-
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
             We force a rollback by inserting a doc, killing primary, inserting

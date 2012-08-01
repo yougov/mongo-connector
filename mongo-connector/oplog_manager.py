@@ -74,8 +74,13 @@ class OplogThread(threading.Thread):
         self.running = True
 
         while self.running is True:
-            cursor = self.prepare_for_sync()
-            if cursor is None or util.retry_until_ok(cursor.count) == 1:
+            cursor = self.init_cursor()
+            if cursor is None and self.timestamp is not None:       # we've fallen too far behind
+                logging.error('OplogManager: Last entry no longer in oplog, cannot recover! %s' % self.oplog)
+                self.running = False
+                continue
+
+            if util.retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
 
@@ -162,6 +167,7 @@ class OplogThread(threading.Thread):
         if util.retry_until_ok(cursor.count) == 0:
             return None
         # Check to see if cursor is too stale
+
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
@@ -198,13 +204,6 @@ class OplogThread(threading.Thread):
         if curr.count(with_limit_and_skip=True) == 0:
             return None
 
-        return curr[0]['ts']
-
-    #used here for testing
-    def get_first_oplog_timestamp(self):
-        """Return the timestamp of the first entry in the oplog.
-        """
-        curr = self.oplog.find().sort('$natural', pymongo.ASCENDING).limit(1)
         return curr[0]['ts']
 
     def dump_collection(self, timestamp):
@@ -261,14 +260,6 @@ class OplogThread(threading.Thread):
         cursor = self.get_oplog_cursor(timestamp)
         if cursor is not None:
             self.update_checkpoint()
-
-        return cursor
-
-    def prepare_for_sync(self):
-        """ Initializes the cursor for the sync method.
-        """
-        cursor = None
-        cursor = self.init_cursor()
 
         return cursor
 

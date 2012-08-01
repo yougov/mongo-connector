@@ -271,40 +271,6 @@ class TestOplogManager(unittest.TestCase):
         os.system('rm temp_config.txt')
         print 'PASSED TEST INIT CURSOR'
 
-    def test_prepare_for_sync(self):
-        """Test prepare_for_sync in oplog_manager. Assertion failure
-            if it doesn't pass
-        """
-
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        cursor = test_oplog.prepare_for_sync()
-
-        self.assertEqual(test_oplog.checkpoint, None)
-        self.assertEqual(cursor, None)
-
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        cursor = test_oplog.prepare_for_sync()
-        search_ts = test_oplog.get_last_oplog_timestamp()
-
-        # make sure that the cursor is valid and the timestamp is
-        # updated properly
-        self.assertEqual(test_oplog.checkpoint, search_ts)
-        self.assertTrue(cursor is not None)
-        self.assertEqual(cursor.count(), 1)
-
-        primary_conn['test']['test'].insert({'name': 'paulter'})
-        cursor = test_oplog.prepare_for_sync()
-        new_search_ts = test_oplog.get_last_oplog_timestamp()
-
-        #make sure that the newest document is in the cursor.
-        self.assertEqual(cursor.count(), 2)
-        next_doc = cursor.next()
-        self.assertEqual(next_doc['o']['name'], 'paulter')
-        self.assertEqual(next_doc['ts'], new_search_ts)
-
-        #test_oplog.join()
-        print 'PASSED TEST PREPARE FOR SYNC'
-
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
             We force a rollback by inserting a doc, killing the primary,
