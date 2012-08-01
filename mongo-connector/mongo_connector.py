@@ -183,7 +183,7 @@ class Connector(Thread):
                                 self.auth_username)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
-                         shard_conn)
+                         main_conn)
             oplog.start()
 
             while self.can_run:
