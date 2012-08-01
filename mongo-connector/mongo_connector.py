@@ -176,11 +176,8 @@ class Connector(Thread):
                 self.doc_manager.auto_commit=False
                 return
 
-            shard_conn = main_conn
-            address = None
-            is_sharded = False
-            oplog = OplogThread(shard_conn, address, oplog_coll,
-                                is_sharded, self.doc_manager,
+            oplog = OplogThread(main_conn, None, oplog_coll,
+                                False, self.doc_manager,
                                 self.oplog_progress_dict,
                                 self.ns_set, self.auth_key,
                                 self.auth_username)
@@ -224,6 +221,7 @@ class Connector(Thread):
     def oplog_thread_join(self):
         """Stops all the OplogThreads
         """
+        logging.info('MongoConnector: Stopping all OplogThreads')
         for thread in self.shard_set.values():
             thread.join()
 
