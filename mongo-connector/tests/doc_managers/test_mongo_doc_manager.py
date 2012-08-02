@@ -83,7 +83,26 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(res.count() == 0)
         print 'PASSED REMOVE'
             
+    def test_full_search(self):
+        """Query ElasticSearch for all docs via API and via DocManager's
+            _search(), compare.
+            """
+        
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        MongoDoc.upsert(docc)
+        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
+        MongoDoc.upsert(docc)
+        MongoDoc.commit()
+        search = MongoDoc._search()
+        search2 = list(mongo.find())
+        self.assertTrue(len(search) == len(search2))
+        self.assertTrue(len(search) != 0)
+        for i in range(0, len(search)):
+            self.assertTrue(list(search)[i] == list(search2)[i])
+        print 'PASSED _SEARCH'
 
+
+            
     def test_search(self):
         """Query ElasticSearch for docs in a timestamp range.
 
