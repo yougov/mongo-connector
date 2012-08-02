@@ -198,27 +198,9 @@ class OplogThread(threading.Thread):
             return None
         cursor = util.retry_until_ok(self.oplog.find,
                                      {'ts': {'$lte': timestamp}})
-        
+
         if (util.retry_until_ok(cursor.count)) == 0:
             return None
-        '''print 'ho'
-        while (True):
-            try:
-                print 'trying'
-                if (cursor.count()) == 0:
-                    return None
-                break
-        
-            except:
-                print self.oplog
-                print self.primary_connection
-                print self.main_connection
-                #self.oplog = self.primary_connection['local']['oplog.rs']
-                cursor = util.retry_until_ok(self.oplog.find,
-                                             {'ts': {'$lte': timestamp}})
-                time.sleep(1)'''
-
-        #print 'passed through'
 
         # Check to see if cursor is too stale
 

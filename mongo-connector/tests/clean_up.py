@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 import time
+import inspect
 from os import path
 
 """ Global path variables
