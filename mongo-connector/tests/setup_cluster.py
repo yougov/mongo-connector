@@ -101,10 +101,8 @@ def startMongoProc(port, replSetName, data, log, key_file):
         CMD[0] += " --keyFile " + key_file
 
     CMD[0] += " &"
-    print CMD
     executeCommand(CMD)
-    if int(port) is not (PORTS_ONE['ARBITER'] or PORTS_TWO['ARBITER']):
-        checkStarted(int(port))
+    checkStarted(int(port))
 
 
 def executeCommand(command):
