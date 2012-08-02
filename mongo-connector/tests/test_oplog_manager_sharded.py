@@ -117,7 +117,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
+                            doc_manager, {}, namespace_set, AUTH_KEY,
+                            AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -137,7 +138,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = BackendSimulator()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY, AUTH_USERNAME)
+                            doc_manager, {}, namespace_set, AUTH_KEY,
+                            AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 

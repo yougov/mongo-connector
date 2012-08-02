@@ -15,7 +15,7 @@
 # This file will be used with PyPi in order to package and distribute the final
 # product.
 
-"""Test elastic search using the synchronizer, i.e. as it would be used by an
+"""Test mongo using the synchronizer, i.e. as it would be used by an
     user
 """
 import time
@@ -45,7 +45,7 @@ from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
 from threading import Timer
-from elastic_doc_manager import DocManager
+from mongo_doc_manager import DocManager
 from mongo_connector import Connector
 from optparse import OptionParser
 from util import retry_until_ok
@@ -69,15 +69,13 @@ class TestSynchronizer(unittest.TestCase):
         unittest.TestCase.__init__(self)
 
     def tearDown(self):
-        self.c.doc_manager.auto_commit = False
-        time.sleep(2)
         self.c.join()
 
     def setUp(self):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
-                           'config.txt', 'http://localhost:9200',
+                           'config.txt', 'localhost:30000',
                            ['test.test'],
-                           '_id', None, 'elastic_doc_manager.py')
+                           '_id', None, 'mongo_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             pass
@@ -113,7 +111,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 1)
         b = conn['test']['test'].find_one()
         for it in a:
-            self.assertEqual(it['_id'], str(b['_id']))
+            self.assertEqual(it['_id'], b['_id'])
             self.assertEqual(it['name'], b['name'])
         print 'PASSED TEST INSERT'
 
@@ -173,7 +171,7 @@ class TestSynchronizer(unittest.TestCase):
                 #make sure pauling is there
         for it in a:
             if it['name'] == 'pauline':
-                self.assertEqual(it['_id'], str(b['_id']))
+                self.assertEqual(it['_id'], b['_id'])
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 
         startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
@@ -247,7 +245,7 @@ class TestSynchronizer(unittest.TestCase):
         for it in a:
             if 'Pauline' in it['name']:
                 b = conn['test']['test'].find_one({'name': it['name']})
-                self.assertEqual(it['_id'], str(b['_id']))
+                self.assertEqual(it['_id'], b['_id'])
 
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
 
@@ -271,10 +269,10 @@ class TestSynchronizer(unittest.TestCase):
 
         print 'PASSED TEST STRESSED ROLBACK'
 
-
-def abort_test(self):
+    def abort_test(self):
         print 'TEST FAILED'
         sys.exit(1)
+
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
@@ -287,10 +285,15 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     PORTS_ONE['MONGOS'] = options.main_addr
-    s = DocManager('http://localhost:9200', auto_commit=False)
+    s = DocManager('localhost:30000')
     s._remove()
+
     start_cluster()
 
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                       replicaSet="demo-repl")
+    print 'starting tests'
     unittest.main(argv=[sys.argv[0]])
+
+    print 'done with tests'
+    clean_up()

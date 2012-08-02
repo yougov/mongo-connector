@@ -7,3 +7,4 @@ python test_oplog_manager_sharded.py
 python test_synchronizer.py
 python test_synchronizer.py -m 27117
 python test_util.py
+python clean_up.py
