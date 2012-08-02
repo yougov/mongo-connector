@@ -100,8 +100,8 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(conn['test']['test'].find().count(), 0)
         self.assertEqual(len(s._search()), 0)
         print 'PASSED TEST INITIAL'
-    
-    def test_insert(self):
+
+    test_insert(self):
         """Tests insert
         """
 
@@ -115,7 +115,7 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(it['_id'], b['_id'])
             self.assertEqual(it['name'], b['name'])
         print 'PASSED TEST INSERT'
-    
+
     def test_remove(self):
         """Tests remove
         """
@@ -270,9 +270,10 @@ class TestSynchronizer(unittest.TestCase):
 
         print 'PASSED TEST STRESSED ROLBACK'
 
-def abort_test(self):
+    def abort_test(self):
         print 'TEST FAILED'
         sys.exit(1)
+
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')

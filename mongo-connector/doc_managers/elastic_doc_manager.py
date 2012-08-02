@@ -52,10 +52,10 @@ class DocManager():
     def __init__(self, url, auto_commit=True):
         """Verify Elastic URL and establish a connection.
 
-        This method may vary from implementation to implementation, but it 
-        should verify the url to the backend and return None if that fails. 
-        It should also create the connection to the backend, and start a 
-        periodic committer if necessary. The Elastic uniqueKey is '_id', 
+        This method may vary from implementation to implementation, but it
+        should verify the url to the backend and return None if that fails.
+        It should also create the connection to the backend, and start a
+        periodic committer if necessary. The Elastic uniqueKey is '_id',
         but this may be overridden by user defined configuration.
         """
 

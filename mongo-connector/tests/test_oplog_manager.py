@@ -243,7 +243,7 @@ class TestOplogManager(unittest.TestCase):
         """
 
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        test_oplog.checkpoint = None # needed for these tests
+        test_oplog.checkpoint = None  # needed for these tests
 
         # initial tests with no config file and empty oplog
         self.assertEqual(test_oplog.init_cursor(), None)
