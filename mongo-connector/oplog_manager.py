@@ -44,7 +44,8 @@ class OplogThread(threading.Thread):
         #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
 
-        #The mongos address for sharded setups, otherwise the same as primary_connection.
+        #The mongos for sharded setups
+        #Otherwise the same as primary_connection.
         #The value is set later on.
         self.main_connection = None
 
@@ -54,17 +55,18 @@ class OplogThread(threading.Thread):
         #Boolean describing whether the cluster is sharded or not
         self.is_sharded = is_sharded
 
-        #The document manager for the target system. This is the same for all threads.
+        #The document manager for the target system.
+        #This is the same for all threads.
         self.doc_manager = doc_manager
 
         #Boolean describing whether or not the thread is running.
         self.running = True
 
-        #Stores the timestamp of the last oplog operation successfully processed.
+        #Stores the timestamp of the last oplog entry read.
         self.checkpoint = None
 
-        #A dictionary that stores OplogThread/timestamp pairs representing what the
-        #last checkpoint was for any given OplogThread.
+        #A dictionary that stores OplogThread/timestamp pairs.
+        #Represents the last checkpoint for a OplogThread.
         self.oplog_progress_dict = oplog_progress_dict
 
         #The set of namespaces to process from the mongo cluster.
@@ -73,7 +75,7 @@ class OplogThread(threading.Thread):
         #If authentication is used, this is an admin password.
         self.auth_key = auth_key
 
-        #If authentication is used, this is the username used for authentication.
+        #This is the username used for authentication.
         self.auth_username = auth_username
 
         logging.info('initializing oplog thread')
@@ -81,7 +83,8 @@ class OplogThread(threading.Thread):
         if is_sharded:
             self.main_connection = pymongo.Connection(main_address)
         else:
-            self.main_connection = pymongo.Connection(main_address, replicaSet=repl_set)
+            self.main_connection = pymongo.Connection(main_address,
+                                                      replicaSet=repl_set)
 
         if auth_key is not None:
             #Authenticate for the whole system
@@ -92,18 +95,22 @@ class OplogThread(threading.Thread):
             logging.error('%s %s' % (err_msg, self.main_connection))
             self.running = False
 
-
     def run(self):
         """Start the oplog worker.
         """
         while self.running is True:
             cursor = self.init_cursor()
-            if cursor is None and self.checkpoint is not None:       # we've fallen too far behind
-                logging.error('OplogManager: Last entry no longer in oplog, cannot recover! %s' % self.oplog)
+
+            # we've fallen too far behind
+            if cursor is None and self.checkpoint is not None:
+                err_msg = "OplogManager: Last entry no longer in oplog"
+                effect = "cannot recover!"
+                logging.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
                 continue
 
-            if util.retry_until_ok(cursor.count) == 1:     # the only entry is the last one we processed
+            #The only entry is the last one we processed
+            if util.retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
 
@@ -134,12 +141,14 @@ class OplogThread(threading.Thread):
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
-            except (pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure):
+            except (pymongo.errors.AutoReconnect,
+                    pymongo.errors.OperationFailure):
                 err = True
                 pass
 
             if err is True and self.auth_key is not None:
-                primary_conn['admin'].authenticate(self.auth_username, self.auth_key)
+                primary_conn['admin'].authenticate(self.auth_username,
+                                                   self.auth_key)
                 err = False
 
             if last_ts is not None:
@@ -176,7 +185,7 @@ class OplogThread(threading.Thread):
         db_name, coll_name = namespace.split('.', 1)
 
         coll = self.main_connection[db_name][coll_name]
-        doc = util.retry_until_ok(coll.find_one, {'_id':doc_id})
+        doc = util.retry_until_ok(coll.find_one, {'_id': doc_id})
 
         return doc
 
@@ -186,7 +195,8 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             return None
-        cursor = util.retry_until_ok(self.oplog.find, {'ts': {'$lte': timestamp}})
+        cursor = util.retry_until_ok(self.oplog.find,
+                                     {'ts': {'$lte': timestamp}})
         if util.retry_until_ok(cursor.count) == 0:
             return None
         # Check to see if cursor is too stale
@@ -198,7 +208,8 @@ class OplogThread(threading.Thread):
                 cursor = cursor.sort('$natural', pymongo.ASCENDING)
                 cursor_len = cursor.count()
                 break
-            except (pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure):
+            except (pymongo.errors.AutoReconnect,
+                    pymongo.errors.OperationFailure):
                 pass
         if cursor_len == 1:     # means we are the end of the oplog
             self.checkpoint = timestamp
@@ -337,10 +348,12 @@ class OplogThread(threading.Thread):
 
         for namespace, doc_list in rollback_set.iteritems():
             db, coll = namespace.split('.', 1)
-            bson_obj_id_list = [bson.objectid.ObjectId(doc['_id']) for doc in doc_list]
+            ObjId = bson.objectid.ObjectId
+            bson_obj_id_list = [ObjId(doc['_id']) for doc in doc_list]
 
-            to_update = util.retry_until_ok(self.main_connection[db][coll].find,
-                                       {'_id': {'$in': bson_obj_id_list}})
+            retry = util.retry_until_ok
+            to_update = retry(self.main_connection[db][coll].find,
+                              {'_id': {'$in': bson_obj_id_list}})
             #doc list are docs in backend engine, to_update are docs in mongo
             doc_hash = {}  # hash by _id
             for doc in doc_list:
@@ -355,7 +368,8 @@ class OplogThread(threading.Thread):
                             del doc_hash[doc['_id']]
                             to_index.append(doc)
                     break
-                except (pymongo.errors.OperationFailure, pymongo.errors.AutoReconnect):
+                except (pymongo.errors.OperationFailure,
+                        pymongo.errors.AutoReconnect):
                     count += 1
                     if count > 60:
                         sys.exit(1)
