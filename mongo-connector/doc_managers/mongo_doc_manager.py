@@ -27,12 +27,14 @@
 
 import sys
 
-from pyes import ES, ESRange, RangeQuery, MatchAllQuery
+from pymongo import Connection
+from pymongo.errors import InvalidURI
 from threading import Timer
 from util import verify_url, retry_until_ok
 from bson.objectid import ObjectId
 import simplejson as json
 from util import bson_ts_to_long
+
 
 
 class DocManager():
@@ -53,11 +55,11 @@ class DocManager():
             also create the connection to the backend, and start a periodic
             committer if necessary.
         """
-        if verify_url(url) is False:
+        try:
+            self.mongo = Connection(url)
+        except InvalidURI:
+            print 'Invalid URL'
             self.mongo = None
-            print 'Invalid Mongo address'
-            return None
-        self.mongo = Connection(url)
     
     def upsert(self, doc):
         """Update or insert a document into Mongo
@@ -71,7 +73,7 @@ class DocManager():
             The documents has ns and _ts fields.
             """
         db, coll = doc['ns'].split('.', 1)
-        self.mongo[db][coll].insert(doc)
+        self.mongo[db][coll].save(doc)
     
     def remove(self, doc):
         """Removes document from Mongo
@@ -90,7 +92,7 @@ class DocManager():
             (converted from Bson timestamp) which specify the time range. The
             return value should be an iterable set of documents.
             """
-        search_set = self.namespace_set
+        search_set = []
         db_list = self.mongo.database_names()
         for db in db_list:
             if db == "config" or db == "local":
@@ -106,8 +108,9 @@ class DocManager():
         for namespace in search_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.mongo[db][coll]
-            res.append(target_coll.find({'_ts': {'$gte': end_ts, '$lte': start_ts}}))
-                    
+            res += list(target_coll.find({'_ts': {'$lte': end_ts,
+                                          '$gte': start_ts}}))
+        
         return res
     
     def commit(self):
@@ -121,7 +124,7 @@ class DocManager():
             last document in Mongo. If there are no documents, this functions
             returns None. Otherwise, it returns the first document.
             """
-        search_set = self.namespace_set
+        search_set = []
         db_list = self.mongo.database_names()
         for db in db_list:
             if db == "config" or db == "local":
@@ -137,7 +140,7 @@ class DocManager():
         for namespace in search_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.mongo[db][coll]
-            res.append(target_coll.find().sort('_ts', -1))
+            res += list(target_coll.find().sort('_ts', -1))
 
         max_ts = 0
         max_doc = None
@@ -147,3 +150,14 @@ class DocManager():
                 max_doc = it
 
         return max_doc
+
+    def _remove(self):
+        """For test purposes only. Removes all documents in test.test
+        """
+        self.mongo['test']['test'].remove()
+
+    def _search(self):
+        """For test purposes only. Performs search on Elastic with empty query.
+        Does not have to be implemented.
+        """
+        return list(self.mongo['test']['test'].find())

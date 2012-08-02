@@ -18,7 +18,7 @@ mongo_folder = cmd_folder.rsplit("/", 2)[0]
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
-from doc_manager import DocManager
+from elastic_doc_manager import DocManager
 from pyes import ES, ESRange, RangeQuery, MatchAllQuery
 
 ElasticDoc = DocManager("http://localhost:9200", auto_commit=False)

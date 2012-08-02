@@ -18,7 +18,7 @@ mongo_folder = cmd_folder.rsplit("/", 2)[0]
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
-from doc_manager import DocManager
+from mongo_doc_manager import DocManager
 from pymongo import Connection
 
 MongoDoc = DocManager("localhost:30000")
