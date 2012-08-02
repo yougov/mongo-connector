@@ -62,6 +62,9 @@ class DocManager():
         if auto_commit:
             self.run_auto_commit()
 
+    def stop(self):
+        self.auto_commit = False
+
     def upsert(self, doc):
         """Update or insert a document into Solr
 

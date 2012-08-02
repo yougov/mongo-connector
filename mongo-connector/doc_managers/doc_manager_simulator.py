@@ -53,6 +53,9 @@ class DocManager():
         """
         self.doc_dict = {}
 
+    def stop(self):
+        pass
+
     def upsert(self, doc):
         """Adds a document to the doc dict.
 

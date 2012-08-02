@@ -11,11 +11,11 @@ connector will work with both sharded and non sharded configurations. It require
 setup.
 
 To start the system, first move your doc manager file, or one of the sample doc manager files
- provided to the main folder (mongo-connector) and rename it doc_manager.py. 
+ provided to the main folder (mongo-connector) and rename it doc_manager.py.
  It is essential that there be a `doc_manager.py` file in the same directory where the
   `mongo_connector.py` file is run, since the Connector imports the DocManager to
-   add/update/delete files from the desired target system. For example, to use the system with 
-   Solr, you can navigate to the mongo-connector subfolder and run 
+   add/update/delete files from the desired target system. For example, to use the system with
+   Solr, you can navigate to the mongo-connector subfolder and run
    `cp doc_managers/solr_doc_manager.py doc_manager.py`.
 
 For more information about making your own doc manager, see Doc Manager section.
@@ -36,8 +36,8 @@ system doesn't need URL, don't specify.
 `-o` or `--oplog-ts` is to specify the name of the file that stores the oplog progress timestamps.
 This file is used by the system to store the last timestamp read on a specific oplog. This allows
 for quick recovery from failure. By default this is `config.txt`, which starts off empty. An empty
-file causes the system to go through all the mongo oplog and sync all the documents. Whenever the 
-cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise 
+file causes the system to go through all the mongo oplog and sync all the documents. Whenever the
+cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise
 the connector will miss some documents and behave incorrectly.
 
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
@@ -52,8 +52,13 @@ which can be noted by "-u _id"
 by mongos to authenticate connections to the shards, and we'll use it in the oplog threads. If
 authentication is not used, then this field can be left empty as the default is None.
 
+`-a' or `--admin-username` is used to specify the username of an admin user to authenticate with.
+To use authentication with the system, the user must specify both this option and the keyFile
+option, which stores the password for the user. The default username is '__system', which is not
+recommended for production use.
+
 `-d` or `--docManager` is used to specify the file in the /doc_managers folder that should be used
-as the doc manager. Absolute paths are also supported. By default, it will use 
+as the doc manager. Absolute paths are also supported. By default, it will use
 the doc_manager_simulator.py file.
 
 An example of combining all of these is:
@@ -77,7 +82,7 @@ The sample XML schema is designed to work with the tests. For a more complete gu
 
 This is the only file that is engine specific. In the current version, we have provided sample
 implementations for ElasticSearch and Solr, which are in the docmanagers folder.
-If you would like to integrate MongoDB with some other engine, then you need to write a 
+If you would like to integrate MongoDB with some other engine, then you need to write a
 doc_manager.py file for that target system. The sample_doc_manager.py file gives a
 detailed description of the functions used by the Doc Manager, and the following functions must be
 implemented:
@@ -169,6 +174,16 @@ implementations for a Solr search DocManager and an ElasticSearch DocManager, bu
 Mongo-Connector to use these, it is necessary to copy the contents to the doc_manager.py file. So,
 if you wish to use the Solr manager, you could execute 'cp solr_doc_manager.py doc_manager.py' and
 then start the connector.
+
+The documents stored in the target system are equivalent to what is stored in mongo, except every
+document has two additional fields called `ns` and `_ts`. The `_ts` field stores the latest
+timestamp corresponding to that document in the oplog. For example, if document `D` was inserted
+at time `t1` and then updated at time `t2`, then after processing the update, we update the
+documents timestamp to reflect the most recent time. This is relevant for rollbacks in the system.
+
+The `ns` field stores the namespace for each document. This is relevant to prevent conflicts
+between identical documents in different namespaces, and also used for managing rollbacks and
+syncing.
 
 ## Testing scripts
 

@@ -111,6 +111,7 @@ class Connector(Thread):
         """ Joins thread, stops it from running
         """
         self.can_run = False
+        self.doc_manager.stop()
         Thread.join(self)
 
     def write_oplog_progress(self):
@@ -172,7 +173,7 @@ class Connector(Thread):
             try:
                 main_conn.admin.command("isdbgrid")
                 logging.error('MongoConnector: mongos has no shards!')
-                self.doc_manager.auto_commit = False
+                self.doc_manager.stop()
                 return
             except pymongo.errors.OperationFailure:
                 pass
@@ -202,7 +203,7 @@ class Connector(Thread):
                     effect = "unexpectedly stopped! Shutting down."
                     logging.error("%s %s %s" % (err_msg, set, effect))
                     self.oplog_thread_join()
-                    self.doc_manager.auto_commit = False
+                    self.doc_manager.stop()
                     return
 
                 self.write_oplog_progress()
@@ -222,7 +223,7 @@ class Connector(Thread):
                             effect = "unexpectedly stopped! Shutting down"
                             logging.error("%s %s %s" % (err_msg, set, effect))
                             self.oplog_thread_join()
-                            self.doc_manager.auto_commit = False
+                            self.doc_manager.stop()
                             return
 
                         self.write_oplog_progress()
@@ -234,7 +235,7 @@ class Connector(Thread):
                         cause = "The system only uses replica sets!"
                         logging.error("MongoConnector: %s", cause)
                         self.oplog_thread_join()
-                        self.doc_manager.auto_commit = False
+                        self.doc_manager.stop()
                         return
 
                     shard_conn = Connection(hosts, replicaset=repl_set)
@@ -354,14 +355,6 @@ if __name__ == '__main__':
                       """ this field can be left empty as the default """
                       """ is None.""")
 
-    #-d is to specify the doc manager file.
-    parser.add_option("-d", "--docManager", action="store", type="string",
-                      dest="doc_manager", default=None, help=
-                      """Used to specify the file in the /doc_managers"""
-                      """folder that should be used as the doc manager."""
-                      """Absolute paths also supported. By default, it will"""
-                      """use the doc_manager_simulator.py file.""")
-
     #-a is to specify the username for authentication.
     parser.add_option("-a", "--admin-username", action="store", type="string",
                       dest="admin_name", default="__system", help=
@@ -369,6 +362,14 @@ if __name__ == '__main__':
                       """authenticate with. To use authentication, the user"""
                       """must specify both an admin username and a keyFile."""
                       """The default username is '__system'""")
+
+    #-d is to specify the doc manager file.
+    parser.add_option("-d", "--docManager", action="store", type="string",
+                      dest="doc_manager", default=None, help=
+                      """Used to specify the file in the /doc_managers"""
+                      """folder that should be used as the doc manager."""
+                      """Absolute paths also supported. By default, it will"""
+                      """use the doc_manager_simulator.py file.""")
 
     (options, args) = parser.parse_args()
 
