@@ -10,7 +10,9 @@ PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
 PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
              "CONFIG": "27220", "MONGOS": "27217"}
-SETUP_DIR = path.expanduser("~/mongo-connector")
+file = inspect.getfile(inspect.currentframe())
+cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
+SETUP_DIR = path.expanduser(cmd_folder)
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
