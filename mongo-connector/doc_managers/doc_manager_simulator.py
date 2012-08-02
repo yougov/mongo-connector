@@ -54,6 +54,10 @@ class DocManager():
         self.doc_dict = {}
 
     def stop(self):
+        """Stops any running threads in the DocManager.
+
+        For some implementations this method may do nothing.
+        """
         pass
 
     def upsert(self, doc):

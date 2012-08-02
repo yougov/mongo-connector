@@ -95,7 +95,16 @@ also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
 auto_commit.
 
-__2) upsert(self, doc)__
+
+__2) stop(self)__
+
+This method also varies from implementation to implementation, but it must
+stop any threads running from the DocManager. In some cases this simply stops a
+timer thread, whereas in other DocManagers it does nothing because the manager
+doesn't use any threads. This method is only called when the MongoConnector is
+forced to terminate, either due to errors or as part of normal procedure.
+
+__3) upsert(self, doc)__
 
 Update or insert a document into your engine.
 This method should call whatever add/insert/update method exists for
@@ -109,12 +118,12 @@ contents if there is considerable delay in trailing the oplog.
 We have only one function for update and insert because incremental
 updates are not supported, so there is no update option.
 
-__3) remove(self, doc)__
+__4) remove(self, doc)__
 
 Removes document from engine
 The input is a python dictionary that represents a mongo document.
 
-__4) search(self, start_ts, end_ts)__
+__5) search(self, start_ts, end_ts)__
 
 Called to query engine for documents in a time range, including start_ts and end_ts
 This method is only used by rollbacks to query all the documents in
@@ -126,7 +135,7 @@ treating them as simple longs.
 The return value should be an iterable set of documents.
 
 
-__5) commit(self)__
+__6) commit(self)__
 
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
@@ -134,7 +143,7 @@ not meant to be called in other circumstances. The body should commit
 all documents to the target system (like auto_commit), but not have
 any timers or run itself again (unlike auto_commit).
 
-__6) get_last_doc(self)__
+__7) get_last_doc(self)__
 
 Returns the last document stored in the target engine.
 This method is used for rollbacks to establish the rollback window,
