@@ -82,7 +82,7 @@ class DocManager():
             It has ns and _ts fields.
             """
         db, coll = doc['ns'].split('.', 1)
-        self.mongo[db][coll].remove(doc)
+        self.mongo[db][coll].remove({'_id': doc['_id']})
     
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
