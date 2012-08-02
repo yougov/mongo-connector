@@ -15,7 +15,7 @@
 # This file will be used with PyPi in order to package and distribute the final
 # product.
 
-"""Test elastic search using the synchronizer, i.e. as it would be used by an
+"""Test mongo using the synchronizer, i.e. as it would be used by an
     user
 """
 import time
@@ -46,7 +46,6 @@ from pymongo import Connection
 from os import path
 from threading import Timer
 from mongo_doc_manager import DocManager
-from pysolr import Solr
 from mongo_connector import Connector
 from optparse import OptionParser
 from util import retry_until_ok
@@ -101,7 +100,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(s._search()), 0)
         print 'PASSED TEST INITIAL'
 
-    test_insert(self):
+    def test_insert(self):
         """Tests insert
         """
 
@@ -293,4 +292,8 @@ if __name__ == '__main__':
 
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                       replicaSet="demo-repl")
+    print 'starting tests'
     unittest.main(argv=[sys.argv[0]])
+
+    print 'done with tests'
+    clean_up()

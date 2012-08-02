@@ -1,4 +1,4 @@
-"""Tests each of the functions in elastic_doc_manager
+"""Tests each of the functions in mongo_doc_manager
 """
 
 import unittest
@@ -26,14 +26,14 @@ mongo = Connection("localhost:30000")['test']['test']
 
 
 class MongoDocManagerTester(unittest.TestCase):
-    """Test class for ElasticDocManager
+    """Test class for MongoDocManager
     """
 
     def runTest(self):
         unittest.TestCase.__init__(self)
 
     def setUp(self):
-        """Empty ElasticSearch at the start of every test
+        """Empty Mongo at the start of every test
         """
         mongo.remove()
 
@@ -67,7 +67,7 @@ class MongoDocManagerTester(unittest.TestCase):
         print 'PASSED UPSERT'
 
     def test_remove(self):
-        """Ensure we can properly delete from ElasticSearch via DocManager.
+        """Ensure we can properly delete from Mongo via DocManager.
         """
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
@@ -83,7 +83,7 @@ class MongoDocManagerTester(unittest.TestCase):
         print 'PASSED REMOVE'
 
     def test_full_search(self):
-        """Query ElasticSearch for all docs via API and via DocManager's
+        """Query Mongo for all docs via API and via DocManager's
         _search(), compare.
         """
 
@@ -101,7 +101,7 @@ class MongoDocManagerTester(unittest.TestCase):
         print 'PASSED _SEARCH'
 
     def test_search(self):
-        """Query ElasticSearch for docs in a timestamp range.
+        """Query Mongo for docs in a timestamp range.
 
         We use API and DocManager's search(start_ts,end_ts), and then compare.
         """
