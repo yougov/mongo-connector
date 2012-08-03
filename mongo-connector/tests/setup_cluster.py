@@ -103,7 +103,6 @@ def startMongoProc(port, replSetName, data, log, key_file):
     CMD[0] += " &"
     print CMD
     executeCommand(CMD)
-    if int(port) is PORTS_ONE['ARBITER']
     checkStarted(int(port))
 
 
@@ -159,11 +158,11 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
 
         # Kill all spawned mongos
         killMongosProc()
-    
+
         # reset data dirs
         remove_dir(DEMO_SERVER_LOG)
         remove_dir(DEMO_SERVER_DATA)
-    
+
         create_dir(DEMO_SERVER_DATA + "/standalone/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1a/journal")
         create_dir(DEMO_SERVER_DATA + "/replset1b/journal")

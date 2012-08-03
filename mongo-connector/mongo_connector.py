@@ -21,13 +21,13 @@
 import logging
 import os
 import re
-import simplejson as json
 import time
 import pymongo
 import sys
 import inspect
-import exceptions
 import subprocess
+try: import simplejson as json
+except: import json
 
 #from doc_manager import DocManager
 from pymongo import Connection
@@ -231,7 +231,7 @@ class Connector(Thread):
                         continue
                     try:
                         repl_set, hosts = shard_doc['host'].split('/')
-                    except exceptions.ValueError:
+                    except ValueError:
                         cause = "The system only uses replica sets!"
                         logging.error("MongoConnector: %s", cause)
                         self.oplog_thread_join()

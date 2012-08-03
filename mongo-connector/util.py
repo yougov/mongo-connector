@@ -24,7 +24,8 @@ import logging
 
 from bson.timestamp import Timestamp
 from pymongo import Connection
-from urllib2 import urlopen
+try: from urllib2 import urlopen
+except: from urllib.request import urlopen
 
 
 def verify_url(url):

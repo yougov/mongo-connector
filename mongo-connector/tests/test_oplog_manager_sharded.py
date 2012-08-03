@@ -44,11 +44,9 @@ from os import path
 from threading import Timer
 from oplog_manager import OplogThread
 from pysolr import Solr
-from backend_simulator import BackendSimulator
 from util import (long_to_bson_ts,
                   bson_ts_to_long,
                   retry_until_ok)
-from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
 """ Global path variables
@@ -185,7 +183,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
 
         # test_oplog.stop()
-        print 'PASSED TEST RETRIEVE DOC'
+        print("PASSED TEST RETRIEVE DOC")
 
     def test_get_oplog_cursor(self):
         """Test get_oplog_cursor in oplog_manager.
@@ -207,7 +205,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 2)
 
-        print 'PASSED TEST GET OPLOG CURSOR'
+        print("PASSED TEST GET OPLOG CURSOR")
 
     def test_get_last_oplog_timestamp(self):
         """Test get_last_oplog_timestamp in oplog_manager.
@@ -229,7 +227,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # test_oplog.stop()
 
-        print 'PASSED TEST GET OPLOG TIMESTAMP'
+        print("PASSED TEST GET OPLOG TIMESTAMP")
 
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager.
@@ -258,7 +256,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'alpha.foo')
 
-        print 'PASSED TEST DUMP COLLECTION'
+        print("PASSED TEST DUMP COLLECTION")
 
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager.
@@ -295,7 +293,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
 
         os.system('rm temp_config.txt')
-        print 'PASSED TEST INIT CURSOR'
+        print("PASSED TEST INIT CURSOR")
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -385,7 +383,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(results_doc['name'], 'paulie')
         self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
 
-        print 'PASSED TEST ROLLBACK'
+        print("PASSED TEST ROLLBACK")
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
