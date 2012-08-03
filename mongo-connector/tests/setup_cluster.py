@@ -101,7 +101,6 @@ def startMongoProc(port, replSetName, data, log, key_file):
         CMD[0] += " --keyFile " + key_file
 
     CMD[0] += " &"
-    print CMD
     executeCommand(CMD)
     checkStarted(int(port))
 

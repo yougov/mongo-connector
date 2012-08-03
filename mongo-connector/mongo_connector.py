@@ -167,7 +167,6 @@ class Connector(Thread):
         shard_coll = main_conn['config']['shards']
 
         self.read_oplog_progress()
-
         if shard_coll.find().count() == 0:
             #non sharded configuration
             try:
@@ -177,7 +176,6 @@ class Connector(Thread):
                 return
             except pymongo.errors.OperationFailure:
                 pass
-
             oplog_coll = main_conn['local']['oplog.rs']
 
             prim_admin = main_conn.admin

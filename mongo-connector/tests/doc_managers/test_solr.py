@@ -47,14 +47,13 @@ from solr_doc_manager import DocManager
 from pysolr import Solr
 from mongo_connector import Connector
 from optparse import OptionParser
-from util import retry_until_ok
 from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
 
 
 """ Global path variables
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
+             "CONFIG": "27220", "MAIN": "27217"}
 s = Solr('http://localhost:8080/solr')
 conn = None
 NUMBER_OF_DOCS = 100
@@ -68,7 +67,7 @@ class TestSynchronizer(unittest.TestCase):
         unittest.TestCase.__init__(self)
 
     def setUp(self):
-        self.c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt',
+        self.c = Connector('localhost:' + PORTS_ONE["MAIN"], 'config.txt',
                            'http://localhost:8080/solr', ['test.test'], '_id',
                            None, 'solr_doc_manager.py')
         self.c.start()
@@ -294,9 +293,9 @@ if __name__ == '__main__':
                       dest="main_addr", default="27217")
 
     (options, args) = parser.parse_args()
-    PORTS_ONE['MONGOS'] = options.main_addr
+    PORTS_ONE['MAIN'] = options.main_addr
     start_cluster()
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+    conn = Connection('localhost:' + PORTS_ONE['MAIN'],
                       replicaSet="demo-repl")
 
     unittest.main(argv=[sys.argv[0]])

@@ -85,14 +85,15 @@ class OplogThread(threading.Thread):
         else:
             self.main_connection = pymongo.Connection(main_address,
                                                       replicaSet=repl_set)
+            self.oplog = self.main_connection['local']['oplog.rs']
 
         if auth_key is not None:
             #Authenticate for the whole system
             primary_conn['admin'].authenticate(auth_username, auth_key)
 
-        if oplog_coll.find().count() == 0:
+        if self.oplog.find().count() == 0:
             err_msg = 'OplogThread: No oplog for thread:'
-            logging.error('%s %s' % (err_msg, self.main_connection))
+            logging.error('%s %s' % (err_msg, self.primary_connection))
             self.running = False
 
     def run(self):
@@ -197,8 +198,10 @@ class OplogThread(threading.Thread):
             return None
         cursor = util.retry_until_ok(self.oplog.find,
                                      {'ts': {'$lte': timestamp}})
-        if util.retry_until_ok(cursor.count) == 0:
+
+        if (util.retry_until_ok(cursor.count)) == 0:
             return None
+
         # Check to see if cursor is too stale
 
         while (True):
