@@ -109,7 +109,7 @@ class Connector(threading.Thread):
         self.oplog_progress_dict = {}
 
         if backend_url is None:
-            self.doc_manager = DocManager()
+            self.doc_manager = DocManager(None)
         else:
             self.doc_manager = DocManager(self.backend_url)
 

@@ -40,7 +40,7 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self):
+    def __init__(self, url=None):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
 
