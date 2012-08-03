@@ -43,7 +43,6 @@ class Connector(threading.Thread):
                  u_key, auth_key, doc_manager=None, auth_username=None):
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-        print sys.platform
         if doc_manager is not None:
             if (doc_manager[0] is '/') or 'C:\\' in doc_manager:
                 if ('win32' or 'win64') in sys.platform:

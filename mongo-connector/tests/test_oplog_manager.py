@@ -288,6 +288,8 @@ class TestOplogManager(unittest.TestCase):
         mongos['test']['test'].remove({})
         mongos['test']['test'].insert({'_id': obj1, 'name': 'paulie'},
                                       safe=1)
+        while (mongos['test']['test'].find().count() != 1):
+            time.sleep(1)
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
 
         obj2 = ObjectId('4ff74db3f646462b38000002')

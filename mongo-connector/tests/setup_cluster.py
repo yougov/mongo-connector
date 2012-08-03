@@ -28,6 +28,12 @@ import time
 import os
 import json
 import inspect
+file = inspect.getfile(inspect.currentframe())
+cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
+doc_folder = cmd_folder.rsplit("/", 1)[0]
+if doc_folder not in sys.path:
+    sys.path.insert(0, doc_folder)
+
 
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure, OperationFailure
@@ -102,8 +108,8 @@ def startMongoProc(port, replSetName, data, log, key_file):
 
     CMD[0] += " &"
     executeCommand(CMD)
-    if port != PORTS_ONE["ARBITER"] and port != PORTS_TWO["ARBITER"]:
-        checkStarted(int(port))
+    #if port != PORTS_ONE["ARBITER"] and port != PORTS_TWO["ARBITER"]:
+    checkStarted(int(port))
 
 
 def executeCommand(command):
