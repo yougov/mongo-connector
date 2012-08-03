@@ -20,7 +20,6 @@
 
 import os
 import time
-import fcntl
 import json
 import logging
 import inspect

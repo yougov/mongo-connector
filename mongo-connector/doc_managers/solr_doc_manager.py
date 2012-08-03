@@ -52,7 +52,7 @@ class DocManager():
         configuration.
         """
         if verify_url(url) is False:
-            print 'Invalid Solr URL'
+            print("Invalid Solr URL")
             self.solr = None
             return None
 

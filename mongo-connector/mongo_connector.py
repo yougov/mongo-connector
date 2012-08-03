@@ -147,7 +147,7 @@ class Connector(Thread):
         source = open(self.oplog_checkpoint, 'r')
         try:
             data = json.load(source)
-        except json.decoder.JSONDecodeError:       # empty file
+        except ValueError:       # empty file
             err_msg = "MongoConnector: Can't read oplog progress file."
             reason = "It may be empty or corrupt."
             logging.info("%s %s" % (err_msg, reason))

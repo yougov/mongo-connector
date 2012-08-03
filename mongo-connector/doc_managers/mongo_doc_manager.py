@@ -57,7 +57,7 @@ class DocManager():
         try:
             self.mongo = Connection(url)
         except InvalidURI:
-            print 'Invalid URL'
+            print("Invalid URL")
             self.mongo = None
 
     def stop(self):

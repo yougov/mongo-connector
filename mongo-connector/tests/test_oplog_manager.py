@@ -33,6 +33,7 @@ import json
 import re
 import unittest
 
+from doc_managers.doc_manager_simulator import DocManager
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
@@ -82,7 +83,7 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test']
-        doc_manager = BackendSimulator()
+        doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
                             namespace_set, AUTH_KEY, AUTH_USERNAME)
@@ -105,7 +106,7 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
-        doc_manager = BackendSimulator()
+        doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {},
                             namespace_set, AUTH_KEY, AUTH_USERNAME)
@@ -123,7 +124,7 @@ class TestOplogManager(unittest.TestCase):
         oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
 
         primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         target_entry = primary_conn['test']['test'].find_one()
 
         #testing for search after inserting a document
@@ -133,7 +134,7 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['test']['test'].update({'name': 'paulie'},
                                             {"$set":  {'name': 'paul'}})
 
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         target_entry = primary_conn['test']['test'].find_one()
 
         #testing for search after updating a document
@@ -141,7 +142,7 @@ class TestOplogManager(unittest.TestCase):
                          target_entry)
 
         primary_conn['test']['test'].remove({'name': 'paul'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
 
         #testing for search after deleting a document
         self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry), None)
@@ -199,7 +200,7 @@ class TestOplogManager(unittest.TestCase):
         #test non-empty oplog
         oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
         primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         self.assertEqual(test_oplog.get_last_oplog_timestamp(),
                          last_oplog_entry['ts'])
 
@@ -212,12 +213,12 @@ class TestOplogManager(unittest.TestCase):
         """
 
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        solr = BackendSimulator()
+        solr = DocManager()
         test_oplog.doc_manager = solr
 
         #for empty oplog, no documents added
         self.assertEqual(test_oplog.dump_collection(None), None)
-        self.assertEqual(len(solr.test_search()), 0)
+        self.assertEqual(len(solr._search()), 0)
 
         #with documents
         primary_conn['test']['test'].insert({'name': 'paulie'})
@@ -225,7 +226,7 @@ class TestOplogManager(unittest.TestCase):
         test_oplog.dump_collection(search_ts)
 
         test_oplog.doc_manager.commit()
-        solr_results = solr.test_search()
+        solr_results = solr._search()
         self.assertEqual(len(solr_results), 1)
         solr_doc = solr_results[0]
         self.assertEqual(long_to_bson_ts(solr_doc['_ts']), search_ts)
@@ -279,9 +280,9 @@ class TestOplogManager(unittest.TestCase):
         os.system('rm config.txt; touch config.txt')
         start_cluster()
         test_oplog, primary_conn, mongos, oplog_coll = self.get_new_oplog()
-        solr = BackendSimulator()
+        solr = DocManager()
         test_oplog.doc_manager = solr
-        solr.test_delete()          # equivalent to solr.delete(q='*: *')
+        solr._delete()          # equivalent to solr.delete(q='*: *')
         obj1 = ObjectId('4ff74db3f646462b38000001')
 
         mongos['test']['test'].remove({})
@@ -349,7 +350,7 @@ class TestOplogManager(unittest.TestCase):
 
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
-        results = solr.test_search()
+        results = solr._search()
 
         assert(len(results) == 1)
 

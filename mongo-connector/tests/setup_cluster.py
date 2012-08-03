@@ -102,7 +102,8 @@ def startMongoProc(port, replSetName, data, log, key_file):
 
     CMD[0] += " &"
     executeCommand(CMD)
-    checkStarted(int(port))
+    if port != PORTS_ONE["ARBITER"] and port != PORTS_TWO["ARBITER"]:
+        checkStarted(int(port))
 
 
 def executeCommand(command):
@@ -256,7 +257,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                print 'Could not add shard to mongos'
+                print("Could not add shard to mongos")
                 sys.exit(1)
 
         if sharded:
@@ -279,7 +280,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                print 'Could not add shard to mongos'
+                print("Could not add shard to mongos")
                 sys.exit(1)
 
             # shard on the alpha.foo collection
