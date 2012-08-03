@@ -327,7 +327,7 @@ class TestOplogManager(unittest.TestCase):
                 time.sleep(1)
                 continue
         while (mongos['test']['test'].find().count() != 2):
-            print mongos['test']['test'].find().count()
+            print(mongos['test']['test'].find().count())
             time.sleep(1)
         killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])
         startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",

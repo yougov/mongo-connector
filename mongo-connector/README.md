@@ -202,8 +202,13 @@ the Doc Managers stored in the doc_managers folder, so if any modifications are 
 changes are propogated in the corresponding file in the DocManagers folder. That is, while the actual running
 system will use the doc_manager.py file in the main mongo-connector folder, the tests use the files in the
 doc_managers folder.
+
 There are shell scripts for running all tests for each search engine (currenctly Solr and Elastic) in doc_managers/tests;
 for the general connector tests in /tests, and a script that runs all tests in the main folder.
+
+A word of caution: For some of the tests, specifically test_oplog_manager, the output prints out "ERROR:root:OplogThread:
+No oplog for thread: Connection('localhost', 27117)". This is expected behavior because the tests run some parts in isolation,
+and are not an indication of error. If the tests fail, a message will be printed at the very end stating exactly that.
 
 ## Troubleshooting
 
