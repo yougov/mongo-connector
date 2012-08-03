@@ -51,7 +51,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         MongoDoc.upsert(docc)
-        time.sleep(1)
+        time.sleep(3)
         res = mongo.find()
         self.assertTrue(res.count() == 1)
         for doc in res:
@@ -72,7 +72,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         MongoDoc.upsert(docc)
-        time.sleep(1)
+        time.sleep(3)
         res = mongo.find()
         self.assertTrue(res.count() == 1)
 
@@ -136,7 +136,7 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(doc['_id'] == '4')
         docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
         MongoDoc.upsert(docc)
-        time.sleep(1)
+        time.sleep(3)
         doc = MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
         print("PASSED GET LAST DOC")

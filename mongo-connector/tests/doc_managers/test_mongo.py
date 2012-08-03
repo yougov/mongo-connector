@@ -295,5 +295,5 @@ if __name__ == '__main__':
     print("STARTING TESTS")
     unittest.main(argv=[sys.argv[0]])
 
-    print 'done with tests'
+    print("Done with tests")
     clean_up()

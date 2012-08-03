@@ -21,19 +21,21 @@
 import inspect
 import logging
 import oplog_manager
+import optparse
+import os
 import pymongo
 import re
 import subprocess
 import sys
-import optparse
-import os
 import threading
 import time
 import util
 import shutil
 
-try: import simplejson as json
-except: import json
+try:
+    import simplejson as json
+except:
+    import json
 
 
 class Connector(threading.Thread):
@@ -159,6 +161,7 @@ class Connector(threading.Thread):
             err_msg = "MongoConnector: Can't read oplog progress file."
             reason = "It may be empty or corrupt."
             logging.info("%s %s" % (err_msg, reason))
+            source.close()
             return None
 
         count = 0
@@ -167,6 +170,8 @@ class Connector(threading.Thread):
             ts = data[count + 1]
             self.oplog_progress_dict[oplog_str] = util.long_to_bson_ts(ts)
             #stored as bson_ts
+
+        source.close()
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
@@ -193,10 +198,11 @@ class Connector(threading.Thread):
             address = host + ":" + str(port)
 
             oplog = oplog_manager.OplogThread(main_conn, address, oplog_coll,
-                                False, self.doc_manager,
-                                self.oplog_progress_dict,
-                                self.ns_set, self.auth_key,
-                                self.auth_username, repl_set=repl_set)
+                                              False, self.doc_manager,
+                                              self.oplog_progress_dict,
+                                              self.ns_set, self.auth_key,
+                                              self.auth_username,
+                                              repl_set=repl_set)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)

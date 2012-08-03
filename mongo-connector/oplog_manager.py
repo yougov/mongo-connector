@@ -18,16 +18,16 @@
 """Tails the oplog of a shard and returns entries
 """
 
-import os
-import time
+import bson
+import inspect
 import json
 import logging
-import inspect
+import os
 import pymongo
 import sys
-import bson
-import util
+import time
 import threading
+import util
 
 
 class OplogThread(threading.Thread):
