@@ -65,7 +65,7 @@ class Connector(threading.Thread):
                     #subprocess.Popen(CMD, shell=True)
                 else:
                     shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
-                                cmd_folder + "/doc_manager.py")                    
+                                cmd_folder + "/doc_manager.py")
                     #CMD = ["cp " + cmd_folder +
                     #   "/doc_managers/" + doc_manager + " " +
                     #   cmd_folder + "/doc_manager.py"]

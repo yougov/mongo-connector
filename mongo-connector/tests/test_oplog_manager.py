@@ -68,6 +68,7 @@ class TestOplogManager(unittest.TestCase):
 
             This function clears the oplog
         """
+        is_sharded = True
         primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
@@ -76,7 +77,8 @@ class TestOplogManager(unittest.TestCase):
         mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
 
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = None
+            mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+            is_sharded = False
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
 
@@ -84,9 +86,10 @@ class TestOplogManager(unittest.TestCase):
                                                 size=1000000)
         namespace_set = ['test.test']
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
+        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
                             doc_manager, {},
-                            namespace_set, AUTH_KEY, AUTH_USERNAME)
+                            namespace_set, AUTH_KEY, AUTH_USERNAME,
+                            repl_set="demo-repl")
 
         return(oplog, primary_conn, oplog_coll)
 
@@ -96,20 +99,23 @@ class TestOplogManager(unittest.TestCase):
 
             This function does not clear the oplog
         """
+        is_sharded = True
         primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
             primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
 
         mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = None
+            mongos_addr = "localhost:"+ PORTS_ONE["MAIN"]
+            is_sharded = False
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
+        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
                             doc_manager, {},
-                            namespace_set, AUTH_KEY, AUTH_USERNAME)
+                            namespace_set, AUTH_KEY, AUTH_USERNAME,
+                            repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
     def test_retrieve_doc(self):
@@ -320,7 +326,9 @@ class TestOplogManager(unittest.TestCase):
                     sys.exit(1)
                 time.sleep(1)
                 continue
-
+        while (mongos['test']['test'].find().count() != 2):
+            print mongos['test']['test'].find().count()
+            time.sleep(1)
         killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])
         startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
@@ -399,5 +407,5 @@ if __name__ == '__main__':
     else:
         start_cluster()
 
-    conn = Connection('localhost:' + PORTS_ONE['MAIN'])
+    conn = Connection('localhost:' + PORTS_ONE['MAIN'], replicaSet="demo-repl")
     unittest.main(argv=[sys.argv[0]])
