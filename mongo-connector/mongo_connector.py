@@ -45,7 +45,7 @@ class Connector(threading.Thread):
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
         print sys.platform
         if doc_manager is not None:
-            if doc_manager[0] is ('/' or '\\'):
+            if (doc_manager[0] is '/') or 'C:\\' in doc_manager:
                 if ('win32' or 'win64') in sys.platform:
                     shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
                     #CMD = ["cp " + doc_manager + " " +
