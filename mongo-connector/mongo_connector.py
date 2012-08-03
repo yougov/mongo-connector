@@ -30,6 +30,7 @@ import os
 import threading
 import time
 import util
+import shutil
 
 try: import simplejson as json
 except: import json
@@ -42,27 +43,34 @@ class Connector(threading.Thread):
                  u_key, auth_key, doc_manager=None, auth_username=None):
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
+        print sys.platform
         if doc_manager is not None:
             if doc_manager[0] is ('/' or '\\'):
-                if 'win' in sys.platform:
-                    CMD = ["cp " + doc_manager + " " +
-                           + cmd_folder + "\doc_manager.py"]
-                    subprocess.Popen(CMD, shell=True)
+                if ('win32' or 'win64') in sys.platform:
+                    shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
+                    #CMD = ["cp " + doc_manager + " " +
+                    #  + cmd_folder + "\doc_manager.py"]
+                    #subprocess.Popen(CMD, shell=True)
                 else:
-                    CMD = ["cp " + doc_manager + " " +
-                       + cmd_folder + "/doc_manager.py"]
-                    subprocess.Popen(CMD, shell=True)
+                    shutil.copy(doc_manager, cmd_folder + "/doc_manager.py")
+                    #CMD = ["cp " + doc_manager + " " +
+                    #+ cmd_folder + "/doc_manager.py"]
+                    #subprocess.Popen(CMD, shell=True)
             else:
-                if 'win' in sys.platform:
-                    CMD = ["cp " + cmd_folder +
-                           "\\doc_managers\\" + doc_manager + " " +
-                           cmd_folder + "\\doc_manager.py"]
-                    subprocess.Popen(CMD, shell=True)
+                if ('win32' or 'win64') in sys.platform:
+                    shutil.copy(cmd_folder + "\\doc_managers\\" + doc_manager,
+                                cmd_folder + "\\doc_manager.py")
+                    #CMD = ["cp " + cmd_folder +
+                    #  "\\doc_managers\\" + doc_manager + " " +
+                    #  cmd_folder + "\\doc_manager.py"]
+                    #subprocess.Popen(CMD, shell=True)
                 else:
-                    CMD = ["cp " + cmd_folder +
-                           "/doc_managers/" + doc_manager + " " +
-                           cmd_folder + "/doc_manager.py"]
-                    subprocess.Popen(CMD, shell=True)
+                    shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
+                                cmd_folder + "/doc_manager.py")                    
+                    #CMD = ["cp " + cmd_folder +
+                    #   "/doc_managers/" + doc_manager + " " +
+                    #   cmd_folder + "/doc_manager.py"]
+                    #subprocess.Popen(CMD, shell=True)
 
         time.sleep(1)
         from doc_manager import DocManager
