@@ -43,7 +43,7 @@ class MongoDocManagerTester(unittest.TestCase):
         #Invalid URL
         m = DocManager("http://doesntexistqwertasg.com")
         self.assertTrue(m.mongo is None)
-        print ('PASSED INVALID URL')
+        print("PASSED INVALID URL")
 
     def test_upsert(self):
         """Ensure we can properly insert into Mongo via DocManager.
@@ -64,7 +64,7 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(res.count() == 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
-        print 'PASSED UPSERT'
+        print("PASSED UPSERT")
 
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
@@ -80,7 +80,7 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(1)
         res = mongo.find()
         self.assertTrue(res.count() == 0)
-        print 'PASSED REMOVE'
+        print("PASSED REMOVE")
 
     def test_full_search(self):
         """Query Mongo for all docs via API and via DocManager's
@@ -98,7 +98,7 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
-        print 'PASSED _SEARCH'
+        print("PASSED _SEARCH")
 
     def test_search(self):
         """Query Mongo for docs in a timestamp range.
@@ -119,7 +119,7 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) == 2)
         self.assertTrue(list(search)[0]['name'] == 'John')
         self.assertTrue(list(search)[1]['name'] == 'John Paul')
-        print 'PASSED SEARCH'
+        print("PASSED SEARCH")
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
@@ -139,7 +139,7 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(1)
         doc = MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
-        print 'PASSED GET LAST DOC'
+        print("PASSED GET LAST DOC")
 
 if __name__ == '__main__':
     unittest.main()

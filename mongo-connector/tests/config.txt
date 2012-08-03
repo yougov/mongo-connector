@@ -1,1 +1,0 @@
-["Collection(Database(Connection([u'localhost:27117', u'localhost:27118']), u'local'), u'oplog.rs')", 5772494521803735140]

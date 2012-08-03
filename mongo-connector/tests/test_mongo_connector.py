@@ -92,7 +92,7 @@ class MongoInternalTester(unittest.TestCase):
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
         os.system('rm ' + config_file_path)
-        print 'PASSED TEST WRITE OPLOG PROGRESS'
+        print("PASSED TEST WRITE OPLOG PROGRESS")
 
     def test_read_oplog_progress(self):
         """Test read_oplog_progress
@@ -130,7 +130,7 @@ class MongoInternalTester(unittest.TestCase):
         self.assertTrue(c.oplog_progress_dict['oplog1'], Timestamp(55, 11))
 
         os.system('rm ' + config_file_path)
-        print 'PASSED TEST READ OPLOG PROGRESS'
+        print("PASSED TEST READ OPLOG PROGRESS")
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')

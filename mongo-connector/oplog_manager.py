@@ -20,7 +20,6 @@
 
 import os
 import time
-import fcntl
 import json
 import logging
 import inspect
@@ -220,7 +219,7 @@ class OplogThread(threading.Thread):
 
             return cursor
         elif cursor_len > 1:
-            doc = cursor.next()
+            doc = next(cursor)
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
@@ -349,7 +348,7 @@ class OplogThread(threading.Thread):
             else:
                 rollback_set[ns] = [doc]
 
-        for namespace, doc_list in rollback_set.iteritems():
+        for namespace, doc_list in rollback_set.items():
             db, coll = namespace.split('.', 1)
             ObjId = bson.objectid.ObjectId
             bson_obj_id_list = [ObjId(doc['_id']) for doc in doc_list]

@@ -4,6 +4,7 @@ import os
 import time
 import inspect
 from os import path
+from pymongo import Connection
 
 """ Global path variables
     """

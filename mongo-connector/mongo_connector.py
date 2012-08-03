@@ -18,28 +18,24 @@
 """Discovers the mongo cluster and starts the connector.
 """
 
-import logging
-import os
-import re
-import simplejson as json
-import time
-import pymongo
-import sys
 import inspect
-import exceptions
+import logging
+import oplog_manager
+import pymongo
+import re
 import subprocess
+import sys
+import optparse
+import os
+import threading
+import time
+import util
 
-#from doc_manager import DocManager
-from pymongo import Connection
-from oplog_manager import OplogThread
-from optparse import OptionParser
-from sys import exit
-from threading import Thread
-from util import bson_ts_to_long, long_to_bson_ts, retry_until_ok
-from bson.timestamp import Timestamp
+try: import simplejson as json
+except: import json
 
 
-class Connector(Thread):
+class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
     def __init__(self, address, oplog_checkpoint, backend_url, ns_set,
@@ -117,7 +113,7 @@ class Connector(Thread):
         """
         self.can_run = False
         self.doc_manager.stop()
-        Thread.join(self)
+        threading.Thread.join(self)
 
     def write_oplog_progress(self):
         """ Writes oplog progress to file provided by user
@@ -134,7 +130,7 @@ class Connector(Thread):
         # for each of the threads write to file
         for oplog, ts in self.oplog_progress_dict.items():
             oplog_str = str(oplog)
-            timestamp = bson_ts_to_long(ts)
+            timestamp = util.bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
             dest.write(json_str)
 
@@ -152,7 +148,7 @@ class Connector(Thread):
         source = open(self.oplog_checkpoint, 'r')
         try:
             data = json.load(source)
-        except json.decoder.JSONDecodeError:       # empty file
+        except ValueError:       # empty file
             err_msg = "MongoConnector: Can't read oplog progress file."
             reason = "It may be empty or corrupt."
             logging.info("%s %s" % (err_msg, reason))
@@ -162,13 +158,13 @@ class Connector(Thread):
         for count in range(0, len(data), 2):
             oplog_str = data[count]
             ts = data[count + 1]
-            self.oplog_progress_dict[oplog_str] = long_to_bson_ts(ts)
+            self.oplog_progress_dict[oplog_str] = util.long_to_bson_ts(ts)
             #stored as bson_ts
 
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = Connection(self.address)
+        main_conn = pymongo.Connection(self.address)
         shard_coll = main_conn['config']['shards']
 
         self.read_oplog_progress()
@@ -189,7 +185,7 @@ class Connector(Thread):
             port = main_conn.port
             address = host + ":" + str(port)
 
-            oplog = OplogThread(main_conn, address, oplog_coll,
+            oplog = oplog_manager.OplogThread(main_conn, address, oplog_coll,
                                 False, self.doc_manager,
                                 self.oplog_progress_dict,
                                 self.ns_set, self.auth_key,
@@ -234,16 +230,16 @@ class Connector(Thread):
                         continue
                     try:
                         repl_set, hosts = shard_doc['host'].split('/')
-                    except exceptions.ValueError:
+                    except ValueError:
                         cause = "The system only uses replica sets!"
                         logging.error("MongoConnector: %s", cause)
                         self.oplog_thread_join()
                         self.doc_manager.stop()
                         return
 
-                    shard_conn = Connection(hosts, replicaset=repl_set)
+                    shard_conn = pymongo.Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
-                    oplog = OplogThread(shard_conn, self.address, oplog_coll,
+                    oplog = oplog_manager.OplogThread(shard_conn, self.address, oplog_coll,
                                         True, self.doc_manager,
                                         self.oplog_progress_dict,
                                         self.ns_set, self.auth_key,
@@ -283,7 +279,7 @@ if __name__ == '__main__':
 
     logger.info('Beginning Mongo Connector')
 
-    parser = OptionParser()
+    parser = optparse.OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
@@ -383,7 +379,7 @@ if __name__ == '__main__':
             ns_set = options.ns_set.split(',')
     except:
         logger.error('Namespaces must be separated by commas!')
-        exit(1)
+        sys.exit(1)
 
     key = None
     if options.auth_file is not None:
@@ -393,7 +389,7 @@ if __name__ == '__main__':
             re.sub(r'\s', '', key)
         except:
             logger.error('Could not parse authentication file!')
-            exit(1)
+            sys.exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key, options.doc_manager,

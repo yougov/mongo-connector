@@ -36,6 +36,7 @@ import json
 import unittest
 import re
 
+from doc_managers.doc_manager_simulator import DocManager
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from optparse import OptionParser
 from pymongo import Connection
@@ -44,11 +45,9 @@ from os import path
 from threading import Timer
 from oplog_manager import OplogThread
 from pysolr import Solr
-from backend_simulator import BackendSimulator
 from util import (long_to_bson_ts,
                   bson_ts_to_long,
                   retry_until_ok)
-from checkpoint import Checkpoint
 from bson.objectid import ObjectId
 
 """ Global path variables
@@ -115,7 +114,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = BackendSimulator()
+        doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, {}, namespace_set, AUTH_KEY,
                             AUTH_USERNAME)
@@ -136,7 +135,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = BackendSimulator()
+        doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
                             doc_manager, {}, namespace_set, AUTH_KEY,
                             AUTH_USERNAME)
@@ -159,7 +158,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (oplog_cursor.count() == 0)
 
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         target_entry = mongos['alpha']['foo'].find_one()
 
         # testing for search after inserting a document
@@ -167,14 +166,14 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         safe_mongo_op(mongos['alpha']['foo'].update, {'name': 'paulie'},
                       {"$set": {'name': 'paul'}})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         target_entry = mongos['alpha']['foo'].find_one()
 
         # testing for search after updating a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
 
         safe_mongo_op(mongos['alpha']['foo'].remove, {'name': 'paul'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
 
         # testing for search after deleting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
@@ -185,7 +184,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
 
         # test_oplog.stop()
-        print 'PASSED TEST RETRIEVE DOC'
+        print("PASSED TEST RETRIEVE DOC")
 
     def test_get_oplog_cursor(self):
         """Test get_oplog_cursor in oplog_manager.
@@ -207,7 +206,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor = test_oplog.get_oplog_cursor(ts)
         assert (cursor.count() == 2)
 
-        print 'PASSED TEST GET OPLOG CURSOR'
+        print("PASSED TEST GET OPLOG CURSOR")
 
     def test_get_last_oplog_timestamp(self):
         """Test get_last_oplog_timestamp in oplog_manager.
@@ -223,13 +222,13 @@ class TestOplogManagerSharded(unittest.TestCase):
         # test non-empty oplog
         oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = oplog_cursor.next()
+        last_oplog_entry = next(oplog_cursor)
         last_ts = last_oplog_entry['ts']
         assert (test_oplog.get_last_oplog_timestamp() == last_ts)
 
         # test_oplog.stop()
 
-        print 'PASSED TEST GET OPLOG TIMESTAMP'
+        print("PASSED TEST GET OPLOG TIMESTAMP")
 
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager.
@@ -238,12 +237,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
-        solr = BackendSimulator()
+        solr = DocManager()
         test_oplog.doc_manager = solr
 
         # for empty oplog, no documents added
         assert (test_oplog.dump_collection(None) is None)
-        assert (len(solr.test_search()) == 0)
+        assert (len(solr._search()) == 0)
 
         # with documents
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
@@ -251,14 +250,14 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog.dump_collection(search_ts)
 
         test_oplog.doc_manager.commit()
-        solr_results = solr.test_search()
+        solr_results = solr._search()
         assert (len(solr_results) == 1)
         solr_doc = solr_results[0]
         assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'alpha.foo')
 
-        print 'PASSED TEST DUMP COLLECTION'
+        print("PASSED TEST DUMP COLLECTION")
 
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager.
@@ -267,7 +266,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
-        test_oplog.checkpoint = Checkpoint()         # needed for these tests
+        test_oplog.checkpoint = None           # needed for these tests
 
         # initial tests with no config file and empty oplog
         assert (test_oplog.init_cursor() is None)
@@ -295,7 +294,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
 
         os.system('rm temp_config.txt')
-        print 'PASSED TEST INIT CURSOR'
+        print("PASSED TEST INIT CURSOR")
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -309,9 +308,9 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         test_oplog, primary_conn, oplog_coll, mongos = self.get_new_oplog()
 
-        solr = BackendSimulator()
+        solr = DocManager()
         test_oplog.doc_manager = solr
-        solr.test_delete()          # equivalent to solr.delete(q='*:*')
+        solr._delete()          # equivalent to solr.delete(q='*:*')
         obj1 = ObjectId('4ff74db3f646462b38000001')
 
         safe_mongo_op(mongos['alpha']['foo'].remove, {})
@@ -377,7 +376,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog.doc_manager.upsert(second_doc)
         test_oplog.rollback()
         test_oplog.doc_manager.commit()
-        results = solr.test_search()
+        results = solr._search()
 
         self.assertEqual(len(results), 1)
 
@@ -385,7 +384,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(results_doc['name'], 'paulie')
         self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
 
-        print 'PASSED TEST ROLLBACK'
+        print("PASSED TEST ROLLBACK")
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
