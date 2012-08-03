@@ -28,8 +28,6 @@ look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
 
-from bson.objectid import ObjectId
-
 
 class DocManager():
     """BackendSimulator emulates both a target DocManager and a server.

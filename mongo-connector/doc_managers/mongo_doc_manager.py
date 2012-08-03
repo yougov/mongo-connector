@@ -25,16 +25,13 @@
     Each method is detailed to describe the desired behavior.
     """
 
+import pymongo
 import sys
 
-from pymongo import Connection
 from pymongo.errors import InvalidURI
-from threading import Timer
-from util import verify_url, retry_until_ok
-from bson.objectid import ObjectId
-import simplejson as json
-from util import bson_ts_to_long
 
+try: import simplejson as json
+except: import json
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -55,8 +52,8 @@ class DocManager():
         periodic committer if necessary.
         """
         try:
-            self.mongo = Connection(url)
-        except InvalidURI:
+            self.mongo = pymongo.Connection(url)
+        except pymongo.errors.InvalidURI:
             print("Invalid URL")
             self.mongo = None
 
