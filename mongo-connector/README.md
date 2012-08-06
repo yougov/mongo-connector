@@ -2,7 +2,7 @@
 
 The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
-in sync while the connector is running. This has been tested with python 2.7.
+in sync while the connector is running. It has been tested with python 2.7 and python 3.
 
 ## Getting Started:
 
@@ -10,17 +10,7 @@ Since the connector does real time syncing, it is necessary to have MongoDB runn
 connector will work with both sharded and non sharded configurations. It requires a replica set
 setup.
 
-To start the system, first move your doc manager file, or one of the sample doc manager files
- provided to the main folder (mongo-connector) and rename it doc_manager.py.
- It is essential that there be a `doc_manager.py` file in the same directory where the
-  `mongo_connector.py` file is run, since the Connector imports the DocManager to
-   add/update/delete files from the desired target system. For example, to use the system with
-   Solr, you can navigate to the mongo-connector subfolder and run
-   `cp doc_managers/solr_doc_manager.py doc_manager.py`.
-
-For more information about making your own doc manager, see Doc Manager section.
-
-After that, simply run "python mongo_connector.py". It is likely, however, that you will need
+To start the system, simply run "python mongo_connector.py". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
@@ -59,11 +49,11 @@ recommended for production use.
 
 `-d` or `--docManager` is used to specify the file in the /doc_managers folder that should be used
 as the doc manager. Absolute paths are also supported. By default, it will use
-the doc_manager_simulator.py file.
+the doc_manager_simulator.py file. For more information about making your own doc manager, see Doc Manager section.
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt
+	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d solr_doc_manager.py
 
 ## Usage With Solr:
 
@@ -81,38 +71,38 @@ The sample XML schema is designed to work with the tests. For a more complete gu
 ## DocManager
 
 This is the only file that is engine specific. In the current version, we have provided sample
-implementations for ElasticSearch and Solr, which are in the docmanagers folder.
+implementations for ElasticSearch, Solr and Mongo, which are in the docmanagers folder.
 If you would like to integrate MongoDB with some other engine, then you need to write a
-doc_manager.py file for that target system. The sample_doc_manager.py file gives a
-detailed description of the functions used by the Doc Manager, and the following functions must be
+doc manager file for that target system. The sample_doc_manager.py file gives a
+detailed description of the functions used by the Doc Manager; the following functions must be
 implemented:
 
-__1) init(self, url)__
+__1) init(self)__
 
-This method may vary from implementation to implementation, but it must
-verify the url to the target system and return None if that fails. It should
+This method should if needed, verify the url to the target system and return None if that fails. It should
 also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
-auto_commit.
-
+auto_commit. It requires a url paramater if mongo_connector.py is called with the -b paramater.
+Otherwise, it doesn't require any parameter (e.g. if the target engine doesn't need a URL).
+It should raise a SystemError exception if the URL is not valid.
 
 __2) stop(self)__
 
-This method also varies from implementation to implementation, but it must
-stop any threads running from the DocManager. In some cases this simply stops a
+This method must stop any threads running from the DocManager. In some cases this simply stops a
 timer thread, whereas in other DocManagers it does nothing because the manager
 doesn't use any threads. This method is only called when the MongoConnector is
 forced to terminate, either due to errors or as part of normal procedure.
 
 __3) upsert(self, doc)__
 
-Update or insert a document into your engine.
+Update or insert a document into your engine. The document has ns and _ts fields.
 This method should call whatever add/insert/update method exists for
 the target system engine and add the document in there. The input will
 always be one mongo document, represented as a Python dictionary.
 This document will be the current mongo version of the document,
 not necessarily the version at the time the upsert was made; the
 doc manager will be responsible to track the changes if necessary.
+Note this is not necessary to ensure consistency.
 It is possible to get two inserts for the same document with the same
 contents if there is considerable delay in trailing the oplog.
 We have only one function for update and insert because incremental
@@ -134,14 +124,15 @@ the function should just do a simple search for timestamps between these values
 treating them as simple longs.
 The return value should be an iterable set of documents.
 
-
 __6) commit(self)__
 
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
 not meant to be called in other circumstances. The body should commit
 all documents to the target system (like auto_commit), but not have
-any timers or run itself again (unlike auto_commit).
+any timers or run itself again (unlike auto_commit).  In the event of
+too many engine searchers, the commit can be wrapped in a
+retry_until_ok to keep trying until the commit goes through.
 
 __7) get_last_doc(self)__
 
@@ -178,12 +169,11 @@ The above three steps essentially loop forever. For usage purposes, the only rel
 DocManager, which will always get the documents from the underlying layer and is responsible for
 adding to/removing from the target system.
 
-Mongo-Connector imports a DocManager from the file doc_manager.py. We have provided sample
-implementations for a Solr search DocManager and an ElasticSearch DocManager, but for
-Mongo-Connector to use these, it is necessary to copy the contents to the doc_manager.py file. So,
-if you wish to use the Solr manager, you could execute 'cp solr_doc_manager.py doc_manager.py' and
-then start the connector.
-
+Mongo-Connector imports a DocManager from the specified file in mongo_connector.py, preferably
+from the doc_managers folder. We have provided sample implementations for a Solr search DocManager
+ and an ElasticSearch DocManager. Note that upon execution, mongo_connector.py will copy the file
+ to the main folder as doc_manager.py.
+ 
 The documents stored in the target system are equivalent to what is stored in mongo, except every
 document has two additional fields called `ns` and `_ts`. The `_ts` field stores the latest
 timestamp corresponding to that document in the oplog. For example, if document `D` was inserted
@@ -196,24 +186,26 @@ syncing.
 
 ## Testing scripts
 
-There are two sets of tests - one is for the general system, which can be found in the Tests folder, and another is for
-the Doc Managers, which is found in the tests folder inside the doc_managers folder. The doc manager tests utilize
-the Doc Managers stored in the doc_managers folder, so if any modifications are made to a Doc Manager, ensure that the
-changes are propogated in the corresponding file in the DocManagers folder. That is, while the actual running
-system will use the doc_manager.py file in the main mongo-connector folder, the tests use the files in the
-doc_managers folder.
+There are two sets of tests. One is for the general system, which can be found in the Tests folder, and the other is for
+the Doc Managers, which is found in the tests folder inside the doc_managers folder. The doc manager tests use
+the Doc Managers stored in the doc_managers folder; unlike mongo_connector.py they do not copy the file to
+doc_manager.py in the main folder.
 
-There are shell scripts for running all tests for each search engine (currenctly Solr and Elastic) in doc_managers/tests;
-for the general connector tests in /tests, and a script that runs all tests in the main folder.
+There are shell scripts for running all tests for each search engine (currenctly Solr, Elastic and Mongo),
+for the general connector tests, and a script that runs all tests. You can find them in tests/scripts.
 
 A word of caution: For some of the tests, specifically test_oplog_manager, the output prints out "ERROR:root:OplogThread:
 No oplog for thread: Connection('localhost', 27117)". This is expected behavior because the tests run some parts in isolation,
-and are not an indication of error. If the tests fail, a message will be printed at the very end stating exactly that.
+and are not an indication of error. If the tests actually fail, a distinct message will be printed at the very end stating exactly where it failed.
 
 ## Troubleshooting
 
 The most common issue when installing is to forget to clear config.txt before restarting the mongo connector.
-This config.txt file stores an oplog timestamp, so if you restart the syncing, it will only restart after
-that point. This can be a problem if you have restarted mongo and there's no more oplog entry for that
-timestamp; this will result in an error. Additionally, If you restart mongo, the target system will
- not have the data automatically wiped.
+This config.txt file stores an oplog timestamp which indicates at which point of the oplog the connector should
+start. This is made so you can stop syncing at any point by quitting the program and restart from where you left
+off later on.
+However, this can be a problem if you have restarted mongo and that timestamp happens before all entries in the
+oplog; this will result in an error, since the system will realize that you have a stale oplog timestamp. 
+Additionally, if you restart mongo, the target system will not have the data automatically wiped. This is
+of course intentional, since it would be undesirable to have the data disappear from the target system if
+mongo stops working for whatever reason.
