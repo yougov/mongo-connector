@@ -27,8 +27,7 @@
 
 import pymongo
 import sys
-
-from pymongo.errors import InvalidURI
+import time
 
 try:
     import simplejson as json
@@ -78,6 +77,7 @@ class DocManager():
         """
         db, coll = doc['ns'].split('.', 1)
         self.mongo[db][coll].save(doc)
+
 
     def remove(self, doc):
         """Removes document from Mongo

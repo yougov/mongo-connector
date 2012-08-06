@@ -51,30 +51,15 @@ class Connector(threading.Thread):
             if (doc_manager[0] is '/') or 'C:\\' in doc_manager:
                 if ('win32' or 'win64') in sys.platform:
                     shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
-                    #CMD = ["cp " + doc_manager + " " +
-                    #  + cmd_folder + "\doc_manager.py"]
-                    #subprocess.Popen(CMD, shell=True)
                 else:
                     shutil.copy(doc_manager, cmd_folder + "/doc_manager.py")
-                    #CMD = ["cp " + doc_manager + " " +
-                    #+ cmd_folder + "/doc_manager.py"]
-                    #subprocess.Popen(CMD, shell=True)
             else:
                 if ('win32' or 'win64') in sys.platform:
                     shutil.copy(cmd_folder + "\\doc_managers\\" + doc_manager,
                                 cmd_folder + "\\doc_manager.py")
-                    #CMD = ["cp " + cmd_folder +
-                    #  "\\doc_managers\\" + doc_manager + " " +
-                    #  cmd_folder + "\\doc_manager.py"]
-                    #subprocess.Popen(CMD, shell=True)
                 else:
                     shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
                                 cmd_folder + "/doc_manager.py")
-                    #CMD = ["cp " + cmd_folder +
-                    #   "/doc_managers/" + doc_manager + " " +
-                    #   cmd_folder + "/doc_manager.py"]
-                    #subprocess.Popen(CMD, shell=True)
-
         time.sleep(1)
         from doc_manager import DocManager
         super(Connector, self).__init__()
