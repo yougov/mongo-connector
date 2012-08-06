@@ -56,8 +56,7 @@ class DocManager():
         try:
             self.mongo = pymongo.Connection(url)
         except pymongo.errors.InvalidURI:
-            print("Invalid URL")
-            self.mongo = None
+            raise SystemError
 
     def stop(self):
         """Stops any running threads

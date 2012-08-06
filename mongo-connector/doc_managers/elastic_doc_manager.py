@@ -60,9 +60,7 @@ class DocManager():
         """
 
         if verify_url(url) is False:
-            self.elastic = None
-            print("Invalid ElasticSearch URL")
-            return None
+            raise SystemError
         self.elastic = ES(server=url)
         self.auto_commit = auto_commit
         self.doc_type = 'string'  # default type is string, change if needed
