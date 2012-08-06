@@ -37,6 +37,7 @@ import unittest
 import re
 
 from doc_managers.doc_manager_simulator import DocManager
+from locking_dict import LockingDict
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from optparse import OptionParser
 from pymongo import Connection
@@ -116,8 +117,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY,
-                            AUTH_USERNAME)
+                            doc_manager, LockingDict(), namespace_set,
+                            AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -137,8 +138,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, {}, namespace_set, AUTH_KEY,
-                            AUTH_USERNAME)
+                            doc_manager, LockingDict(), namespace_set,
+                            AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 
@@ -286,7 +287,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # test_oplog.oplog_file = config_file_path
         cursor = test_oplog.init_cursor()
         # config_file_size = os.stat(config_file_path)[6]
-        oplog_dict = test_oplog.oplog_progress_dict
+        oplog_dict = test_oplog.oplog_progress.dict
 
         assert(cursor.count() == 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)

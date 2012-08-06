@@ -25,12 +25,14 @@ import optparse
 import os
 import pymongo
 import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
 import util
-import shutil
+
+from locking_dict import LockingDict
 
 try:
     import simplejson as json
@@ -106,7 +108,7 @@ class Connector(threading.Thread):
         self.shard_set = {}
 
         #Dict of OplogThread/timestmap pairs to record progress
-        self.oplog_progress_dict = {}
+        self.oplog_progress = LockingDict()
 
         if backend_url is None:
             self.doc_manager = DocManager()
@@ -137,11 +139,15 @@ class Connector(threading.Thread):
         source = open(self.oplog_checkpoint + '++', 'r')
 
         # for each of the threads write to file
-        for oplog, ts in self.oplog_progress_dict.items():
+        self.oplog_progress.acquire_lock()
+
+        for oplog, ts in self.oplog_progress.dict.items():
             oplog_str = str(oplog)
             timestamp = util.bson_ts_to_long(ts)
             json_str = json.dumps([oplog_str, timestamp])
             dest.write(json_str)
+
+        self.oplog_progress.release_lock()
 
         dest.close()
         source.close()
@@ -152,6 +158,15 @@ class Connector(threading.Thread):
         """
 
         if self.oplog_checkpoint is None:
+            return None
+
+        # Check for empty file
+        try:
+            if os.stat(self.oplog_checkpoint).st_size == 0:
+                logging.info("MongoConnector: Empty oplog progress file.")
+                return None
+        except OSError:
+            pass
             return None
 
         source = open(self.oplog_checkpoint, 'r')
@@ -168,7 +183,7 @@ class Connector(threading.Thread):
         for count in range(0, len(data), 2):
             oplog_str = data[count]
             ts = data[count + 1]
-            self.oplog_progress_dict[oplog_str] = util.long_to_bson_ts(ts)
+            self.oplog_progress.dict[oplog_str] = util.long_to_bson_ts(ts)
             #stored as bson_ts
 
         source.close()
@@ -199,7 +214,7 @@ class Connector(threading.Thread):
 
             oplog = oplog_manager.OplogThread(main_conn, address, oplog_coll,
                                               False, self.doc_manager,
-                                              self.oplog_progress_dict,
+                                              self.oplog_progress,
                                               self.ns_set, self.auth_key,
                                               self.auth_username,
                                               repl_set=repl_set)
@@ -252,11 +267,13 @@ class Connector(threading.Thread):
 
                     shard_conn = pymongo.Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
-                    oplog = oplog_manager.OplogThread(shard_conn, self.address, oplog_coll,
-                                        True, self.doc_manager,
-                                        self.oplog_progress_dict,
-                                        self.ns_set, self.auth_key,
-                                        self.auth_username)
+                    oplog = oplog_manager.OplogThread(shard_conn, self.address,
+                                                      oplog_coll, True,
+                                                      self.doc_manager,
+                                                      self.oplog_progress,
+                                                      self.ns_set,
+                                                      self.auth_key,
+                                                      self.auth_username)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     logging.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -408,4 +425,14 @@ if __name__ == '__main__':
                    ns_set, options.u_key, key, options.doc_manager,
                    auth_username=options.admin_name)
 
-    ct.run()
+    ct.start()
+
+    while True:
+        try:
+            time.sleep(5)
+            if not ct.is_alive():
+                break
+        except KeyboardInterrupt:
+            logging.info("Caught keyboard interrupt, exiting!")
+            ct.join()
+            break

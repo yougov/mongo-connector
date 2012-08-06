@@ -34,6 +34,7 @@ import re
 import unittest
 
 from doc_managers.doc_manager_simulator import DocManager
+from locking_dict import LockingDict
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from pymongo.errors import ConnectionFailure
@@ -87,7 +88,7 @@ class TestOplogManager(unittest.TestCase):
         namespace_set = ['test.test']
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, {},
+                            doc_manager, LockingDict(),
                             namespace_set, AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
 
@@ -106,14 +107,14 @@ class TestOplogManager(unittest.TestCase):
 
         mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = "localhost:"+ PORTS_ONE["MAIN"]
+            mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
             is_sharded = False
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, {},
+                            doc_manager, LockingDict(),
                             namespace_set, AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
@@ -267,7 +268,7 @@ class TestOplogManager(unittest.TestCase):
         # test_oplog.oplog_file = config_file_path
         cursor = test_oplog.init_cursor()
         # config_file_size = os.stat(config_file_path)[6]
-        oplog_dict = test_oplog.oplog_progress_dict
+        oplog_dict = test_oplog.oplog_progress.dict
 
         self.assertEqual(cursor.count(), 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)

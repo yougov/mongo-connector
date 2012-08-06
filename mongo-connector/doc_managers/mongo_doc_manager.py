@@ -29,8 +29,11 @@ import pymongo
 import sys
 import time
 
-try: import simplejson as json
-except: import json
+try:
+    import simplejson as json
+except:
+    import json
+
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
