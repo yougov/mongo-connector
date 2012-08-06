@@ -44,8 +44,13 @@ class ElasticDocManagerTester(unittest.TestCase):
         """Ensure DocManager fails for a bad Solr url.
         """
         #Invalid URL
-        e = DocManager("http://doesntexistqwertasg.com")
-        self.assertTrue(e.elastic is None)
+        #Invalid URL
+        count = 0
+        try:
+            e = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
+        except SystemError:
+            count += 1
+        self.assertTrue(count == 1)
         print("PASSED INVALID URL")
 
     def test_upsert(self):

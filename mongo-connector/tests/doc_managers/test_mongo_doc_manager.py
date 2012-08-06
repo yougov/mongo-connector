@@ -37,15 +37,7 @@ class MongoDocManagerTester(unittest.TestCase):
         """Empty Mongo at the start of every test
         """
         mongo.remove()
-    '''
-    def test_invalid_URL(self):
-        """Ensure DocManager fails for a bad url.
-        """
-        #Invalid URL
-        m = DocManager("http://doesntexistqwertasg.com")
-        self.assertTrue(m.mongo is None)
-        print("PASSED INVALID URL")
-    '''
+
     def test_upsert(self):
         """Ensure we can properly insert into Mongo via DocManager.
         """

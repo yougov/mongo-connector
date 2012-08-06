@@ -57,8 +57,12 @@ class SolrDocManagerTester(unittest.TestCase):
         """Ensure DocManager fails for a bad Solr url.
         """
         #Invalid URL
-        s = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
-        self.assertTrue(s.solr is None)
+        count = 0
+        try:
+            s = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
+        except SystemError:
+            count += 1
+        self.assertTrue(count == 1)
         print("PASSED INVALID URL")
 
     def test_upsert(self):
