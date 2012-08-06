@@ -51,18 +51,18 @@ class DocManager():
         It should raise a SystemError exception if the URL is not valid.
         """
         raise exceptions.NotImplementedError
-    
+
     def stop(self):
 
-        """This method must stop any threads running from the DocManager. 
-        In some cases this simply stops a timer thread, whereas in other 
-        DocManagers it does nothing because the manager doesn't use any 
+        """This method must stop any threads running from the DocManager.
+        In some cases this simply stops a timer thread, whereas in other
+        DocManagers it does nothing because the manager doesn't use any
         threads. This method is only called when the MongoConnector is
         forced to terminate, either due to errors or as part of normal
         procedure.
         """
         raise exceptions.NotImplementedError
-            
+
     def upsert(self, doc):
         """Update or insert a document into engine.
         The documents has ns and _ts fields.
@@ -94,8 +94,8 @@ class DocManager():
 
         This method is only used by rollbacks to query all the documents in
         engine within a certain timestamp window. The input will be two longs
-        (converted from Bson timestamp) which specify the time range. 
-        The 32 most significant bits are the Unix Epoch Time, and the other 
+        (converted from Bson timestamp) which specify the time range.
+        The 32 most significant bits are the Unix Epoch Time, and the other
         bits are the increment. For all purposes, the function should just
         do a simple search for timestamps between these values
         treating them as simple longs. The return value should be an iterable
