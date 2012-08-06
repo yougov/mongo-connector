@@ -72,7 +72,7 @@ class MongoInternalTester(unittest.TestCase):
         #test that None is returned if there is no config file specified.
         self.assertEqual(c.write_oplog_progress(), None)
 
-        c.oplog_progress_dict[1] = Timestamp(12, 34)
+        c.oplog_progress.dict[1] = Timestamp(12, 34)
         #pretend to insert a thread/timestamp pair
         c.write_oplog_progress()
 
@@ -84,7 +84,7 @@ class MongoInternalTester(unittest.TestCase):
         self.assertFalse(os.path.exists(config_file_path + '~'))
 
         #ensure that updates work properly
-        c.oplog_progress_dict[1] = Timestamp(44, 22)
+        c.oplog_progress.dict[1] = Timestamp(44, 22)
         c.write_oplog_progress()
 
         data = json.load(open(config_file_path, 'r'))
@@ -112,22 +112,22 @@ class MongoInternalTester(unittest.TestCase):
         self.assertEqual(c.read_oplog_progress(), None)
 
         #add a value to the file, delete the dict, and then read in the value
-        c.oplog_progress_dict['oplog1'] = Timestamp(12, 34)
+        c.oplog_progress.dict['oplog1'] = Timestamp(12, 34)
         c.write_oplog_progress()
-        del c.oplog_progress_dict['oplog1']
+        del c.oplog_progress.dict['oplog1']
 
-        self.assertEqual(len(c.oplog_progress_dict), 0)
+        self.assertEqual(len(c.oplog_progress.dict), 0)
 
         c.read_oplog_progress()
 
-        self.assertTrue('oplog1' in c.oplog_progress_dict.keys())
-        self.assertTrue(c.oplog_progress_dict['oplog1'], Timestamp(12, 34))
+        self.assertTrue('oplog1' in c.oplog_progress.dict.keys())
+        self.assertTrue(c.oplog_progress.dict['oplog1'], Timestamp(12, 34))
 
-        c.oplog_progress_dict['oplog1'] = Timestamp(55, 11)
+        c.oplog_progress.dict['oplog1'] = Timestamp(55, 11)
 
         #see if oplog progress dict is properly updated
         c.read_oplog_progress()
-        self.assertTrue(c.oplog_progress_dict['oplog1'], Timestamp(55, 11))
+        self.assertTrue(c.oplog_progress.dict['oplog1'], Timestamp(55, 11))
 
         os.system('rm ' + config_file_path)
         print("PASSED TEST READ OPLOG PROGRESS")

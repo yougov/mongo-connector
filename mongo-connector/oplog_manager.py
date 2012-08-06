@@ -66,7 +66,7 @@ class OplogThread(threading.Thread):
 
         #A dictionary that stores OplogThread/timestamp pairs.
         #Represents the last checkpoint for a OplogThread.
-        self.oplog_progress_dict = oplog_progress_dict
+        self.oplog_progress = oplog_progress_dict
 
         #The set of namespaces to process from the mongo cluster.
         self.namespace_set = namespace_set
@@ -300,16 +300,22 @@ class OplogThread(threading.Thread):
     def update_checkpoint(self):
         """Store the current checkpoint in the oplog progress dictionary.
         """
-        self.oplog_progress_dict[str(self.oplog)] = self.checkpoint
+        self.oplog_progress.acquire_lock()
+        self.oplog_progress.dict[str(self.oplog)] = self.checkpoint
+        self.oplog_progress.release_lock()
 
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
         oplog_str = str(self.oplog)
 
-        if oplog_str in self.oplog_progress_dict.keys():
-            return self.oplog_progress_dict[oplog_str]
+        self.oplog_progress.acquire_lock()
+
+        if oplog_str in self.oplog_progress.dict.keys():
+            self.oplog_progress.release_lock()
+            return self.oplog_progress.dict[oplog_str]
         else:
+            self.oplog_progress.release_lock()
             return None
 
     def rollback(self):
