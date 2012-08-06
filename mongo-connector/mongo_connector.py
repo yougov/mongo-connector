@@ -107,7 +107,8 @@ class Connector(threading.Thread):
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):
-                logging.critical("MongoConnector: Can't find OplogProgress file!")
+                info_str = "MongoConnector: Can't find OplogProgress file!"
+                logging.critical(info_str)
                 self.doc_manager.stop()
                 self.can_run = False
 

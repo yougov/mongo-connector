@@ -20,11 +20,7 @@
 Receives documents from the oplog worker threads and indexes them
 into the backend.
 
-The intent is that this file can be used as an example to add on different
-backends. To extend this to other systems, simply implement the exact same
-class and replace the method definitions with API calls for the desired
-backend. Each method is detailed to describe the desired behavior. Please
-look at the Solr and ElasticSearch doc manager classes for a sample
+Please look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
 
@@ -43,35 +39,22 @@ class DocManager():
     def __init__(self, url=None):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
-
-        This method may vary from implementation to implementation, but it
-        should verify the url return None if that fails. It must also create
-        the connection to the backend, and start a periodic committer if
-        necessary.
         """
         self.doc_dict = {}
 
     def stop(self):
         """Stops any running threads in the DocManager.
-
-        For some implementations this method may do nothing.
         """
         pass
 
     def upsert(self, doc):
         """Adds a document to the doc dict.
-
-        This method should call whatever add/insert/update method exists for
-        the backend engine and add the document in there. The input will
-        always be one mongo document, represented as a Python dictionary.
         """
 
         self.doc_dict[doc['_id']] = doc
 
     def remove(self, doc):
         """Removes the document from the doc dict.
-
-        The input is a python dictionary that represents a mongo document.
         """
         del self.doc_dict[doc['_id']]
 
@@ -86,8 +69,6 @@ class DocManager():
         which specify the time range. The start_ts refers to the timestamp
         of the last oplog entry after a rollback. The end_ts is the timestamp
         of the last document committed to the backend.
-
-        The return value should be an iterable set of documents.
         """
         ret_list = []
         for stored_doc in self.doc_dict.values():
@@ -99,22 +80,12 @@ class DocManager():
 
     def commit(self):
         """Simply passes since we're not using an engine that needs commiting.
-
-        This function exists only because the DocManager is set to Backend
-        Simulator, and the rollback function calles doc_manager.commit(),
-        so we have a dummy here.
         """
         pass
 
     def get_last_doc(self):
         """Searches through the doc dict to find the document with the latest
             timestamp.
-
-        This method is used for rollbacks to establish the rollback window,
-        which is the gap between the last document on a mongo shard and the
-        last document in the target engine.
-        If there are no documents, this functions
-        returns None. Otherwise, it returns the first document.
         """
 
         last_doc = None

@@ -58,7 +58,7 @@ class MongoDocManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
         print("PASSED UPSERT")
-    
+
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
         """
@@ -133,6 +133,6 @@ class MongoDocManagerTester(unittest.TestCase):
         doc = MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
         print("PASSED GET LAST DOC")
-    
+
 if __name__ == '__main__':
     unittest.main()
