@@ -110,14 +110,21 @@ class Connector(threading.Thread):
         #Dict of OplogThread/timestmap pairs to record progress
         self.oplog_progress = LockingDict()
 
-        if backend_url is None:
-            self.doc_manager = DocManager()
-        else:
-            self.doc_manager = DocManager(self.backend_url)
-
-        if self.doc_manager is None:
-            logging.critical('Bad backend URL!')
+        try:
+            if backend_url is None:
+                self.doc_manager = DocManager()
+            else:
+                self.doc_manager = DocManager(self.backend_url)
+        except SystemError:
+            logging.critical("MongoConnector: Bad target system URL!")
+            self.can_run = False
             return
+
+
+        if not os.path.exists(self.oplog_checkpoint):
+            logging.critical("MongoConnector: Can't find OplogProgress file!")
+            self.doc_manager.stop()
+            self.can_run = False
 
     def join(self):
         """ Joins thread, stops it from running
@@ -166,7 +173,6 @@ class Connector(threading.Thread):
                 logging.info("MongoConnector: Empty oplog progress file.")
                 return None
         except OSError:
-            pass
             return None
 
         source = open(self.oplog_checkpoint, 'r')
@@ -195,6 +201,7 @@ class Connector(threading.Thread):
         shard_coll = main_conn['config']['shards']
 
         self.read_oplog_progress()
+
         if shard_coll.find().count() == 0:
             #non sharded configuration
             try:
@@ -429,7 +436,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            time.sleep(5)
+            time.sleep(3)
             if not ct.is_alive():
                 break
         except KeyboardInterrupt:

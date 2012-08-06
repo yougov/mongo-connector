@@ -26,6 +26,7 @@ Each method is detailed to describe the desired behavior.
 """
 #!/usr/env/python
 import sys
+import logging
 
 from pysolr import Solr
 from threading import Timer
@@ -52,9 +53,7 @@ class DocManager():
         configuration.
         """
         if verify_url(url) is False:
-            print("Invalid Solr URL")
-            self.solr = None
-            return None
+            raise SystemError
 
         self.solr = Solr(url)
         self.unique_key = unique_key
