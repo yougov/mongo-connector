@@ -77,7 +77,7 @@ class OplogThread(threading.Thread):
         #This is the username used for authentication.
         self.auth_username = auth_username
 
-        logging.info('initializing oplog thread')
+        logging.info('OplogManager: Initializing oplog thread')
 
         if is_sharded:
             self.main_connection = pymongo.Connection(main_address)
