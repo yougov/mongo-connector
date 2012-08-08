@@ -366,14 +366,22 @@ if __name__ == '__main__':
     #-k is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
     #threads.
-    parser.add_option("-k", "--keyFile", action="store", type="string",
+    parser.add_option("-f", "--password-file", action="store", type="string",
                       dest="auth_file", default=None, help=
-                      """Used to specify the path to the authentication key"""
-                      """file. This file is used by mongos to authenticate"""
-                      """ connections to the shards, and we'll use it in the"""
+                      """ Used to store the password for authentication."""
+                      """ Use this option if you wish to specify a"""
+                      """ username and password but don't want to"""
+                      """ type in the password. The contents of this"""
+                      """ file should be the password for the admin user.""")
+
+    #-p is to specify the password used for authentication.
+    parser.add_option("-p", "--password", action="store", type="string",
+                      dest="password", default=None, help=
+                      """ Used to specify the password."""
+                      """ This is used by mongos to authenticate"""
+                      """ connections to the shards, and in the"""
                       """ oplog threads. If authentication is not used, then"""
-                      """ this field can be left empty as the default """
-                      """ is None.""")
+                      """ this field can be left empty as the default """)
 
     #-a is to specify the username for authentication.
     parser.add_option("-a", "--admin-username", action="store", type="string",
@@ -409,8 +417,11 @@ if __name__ == '__main__':
             key = file.read()
             re.sub(r'\s', '', key)
         except:
-            logger.error('Could not parse authentication file!')
+            logger.error('Could not parse password authentication file!')
             sys.exit(1)
+
+    if options.password is not None:
+        key = options.password
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key, options.doc_manager,
