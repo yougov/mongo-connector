@@ -13,13 +13,12 @@ setup.
 To start the system, simply run "python mongo_connector.py". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
-`-m` or `--mongos` is to specify the mongos address, which is a host:port pair, or for clusters with
- one shard, the primary's address. For example, `-m localhost:27217` would be a valid argument
- to `-m`. It is not necessary to specify double-quotes aroung the argument to `-m`.
-Don't use quotes around the address.
+`-m` or `--mongos` is to specify the main address, which is a host:port pair. For sharded clusters, 
+this should be the mongos address. For individual replica sets, supply the address of the primary.
+For example, `-m localhost:27217` would be a valid argument to `-m`. Don't use quotes around the address.
 
-`-b` or `--backend-url` is to specify the URL to the target system being used. For example, if you
-were using Solr out of the box, you could use '-b http://localhost:8080/solr' with the
+`-t` or `--target-url` is to specify the URL to the target system being used. For example, if you
+were using Solr out of the box, you could use '-t http://localhost:8080/solr' with the
 SolrDocManager to establish a proper connection. Don't use quotes around address. If target
 system doesn't need URL, don't specify.
 
@@ -35,7 +34,8 @@ wished to store all documents from the test.test and alpha.foo namespaces, we co
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
 databases, and also ignoring the "system.indexes" collection in any database.
 
-`-u` or `--unique-key` is used to specify the uniqueKey used by the target system. The default is "_id",
+`-u` or `--unique-key` is used to specify the mongoDB field that will serve
+as the unique key for the target system.  The default is "_id",
 which can be noted by "-u _id"
 
 `-k` or `--keyFile` is used to specify the path to the authentication key file. This file is used

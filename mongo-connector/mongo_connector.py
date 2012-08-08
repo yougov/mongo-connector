@@ -92,14 +92,14 @@ class Connector(threading.Thread):
         #The set of OplogThreads created
         self.shard_set = {}
 
-        #Dict of OplogThread/timestmap pairs to record progress
+        #Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
 
         try:
             if backend_url is None:
                 self.doc_manager = DocManager()
             else:
-                self.doc_manager = DocManager(self.backend_url)
+                self.doc_manager = DocManager(self.backend_url, unique_key=u_key)
         except SystemError:
             logging.critical("MongoConnector: Bad target system URL!")
             self.can_run = False
@@ -127,27 +127,27 @@ class Connector(threading.Thread):
                 return None
 
         # write to temp file
-        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '++')
+        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '.backup')
         dest = open(self.oplog_checkpoint, 'w')
-        source = open(self.oplog_checkpoint + '++', 'r')
+        source = open(self.oplog_checkpoint + '.backup', 'r')
 
         # for each of the threads write to file
         self.oplog_progress.acquire_lock()
-
-        for oplog, ts in self.oplog_progress.dict.items():
-            oplog_str = str(oplog)
-            timestamp = util.bson_ts_to_long(ts)
-            json_str = json.dumps([oplog_str, timestamp])
-            dest.write(json_str)
-
-        self.oplog_progress.release_lock()
-
-        dest.close()
-        source.close()
-        os.remove(self.oplog_checkpoint + '++')
+        try:
+            for oplog, ts in self.oplog_progress.dict.items():
+                oplog_str = str(oplog)
+                timestamp = util.bson_ts_to_long(ts)
+                json_str = json.dumps([oplog_str, timestamp])
+                dest.write(json_str)
+        finally:
+            self.oplog_progress.release_lock()
+            dest.close()
+            source.close()
+            os.remove(self.oplog_checkpoint + '.backup')
 
     def read_oplog_progress(self):
-        """Reads oplog progress from file provided by user
+        """Reads oplog progress from file provided by user.
+        This method is only called once before any threads are spanwed.
         """
 
         if self.oplog_checkpoint is None:
@@ -170,6 +170,8 @@ class Connector(threading.Thread):
             logging.info("%s %s" % (err_msg, reason))
             source.close()
             return None
+        
+        source.close()
 
         count = 0
         for count in range(0, len(data), 2):
@@ -178,25 +180,22 @@ class Connector(threading.Thread):
             self.oplog_progress.dict[oplog_str] = util.long_to_bson_ts(ts)
             #stored as bson_ts
 
-        source.close()
-
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         main_conn = pymongo.Connection(self.address)
-        shard_coll = main_conn['config']['shards']
-
         self.read_oplog_progress()
+        conn_type = None
 
-        if shard_coll.find().count() == 0:
+        try:
+            main_conn.admin.command("isdbgrid")
+        except pymongo.errors.OperationFailure:
+            conn_type = "REPLSET"
+            
+        
+
+        if conn_type == "REPLSET":
             #non sharded configuration
-            try:
-                main_conn.admin.command("isdbgrid")
-                logging.error('MongoConnector: mongos has no shards!')
-                self.doc_manager.stop()
-                return
-            except pymongo.errors.OperationFailure:
-                pass
             oplog_coll = main_conn['local']['oplog.rs']
 
             prim_admin = main_conn.admin
@@ -232,6 +231,7 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
+                shard_coll = main_conn['config']['shards']
                 shard_cursor = shard_coll.find()
 
                 for shard_doc in shard_cursor:
@@ -290,11 +290,6 @@ if __name__ == '__main__':
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
-    fh = logging.FileHandler('mongo_connector_log.txt')
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
@@ -308,13 +303,13 @@ if __name__ == '__main__':
     #mongos. For non sharded clusters, it can be the primary.
     parser.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="localhost:27217",
-                      help="""Specify the mongos address, which is a """
-                      """host:port pair, or for clusters with one shard,"""
-                      """the primary's adderess. For example, `-m """
-                      """localhost:27217` would be a valid argument"""
-                      """to `-m`. It is not necessary to specify """
-                      """double-quotes aroung the argument to `-m`. Don't """
-                      """ use quotes around the address.""")
+                      help="""Specify the main address, which is a"""
+                      """ host:port pair. For sharded clusters,  this"""
+                      """ should be the mongos address. For individual"""
+                      """ replica sets, supply the address of the"""
+                      """ primary. For example, `-m localhost:27217`"""
+                      """ would be a valid argument to `-m`. Don't use"""
+                      """ quotes around the address""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
@@ -334,12 +329,12 @@ if __name__ == '__main__':
                       """ the connector will miss some documents and behave"""
                       """incorrectly.""")
 
-    #-b is to specify the URL to the backend engine being used.
-    parser.add_option("-b", "--backend-url", action="store", type="string",
+    #-t is to specify the URL to the target system being used.
+    parser.add_option("-t", "--target-url", action="store", type="string",
                       dest="url", default=None,
-                      help="""Specify the URL to the backend engine being """
+                      help="""Specify the URL to the target system being """
                       """used. For example, if you were using Solr out of """
-                      """the box, you could use '-b """
+                      """the box, you could use '-t """
                       """ http://localhost:8080/solr' with the """
                       """ SolrDocManager to establish a proper connection."""
                       """ Don't use quotes around address."""
@@ -358,10 +353,12 @@ if __name__ == '__main__':
                       """ also ignoring the "system.indexes" collection in """
                       """any database.""")
 
-    #-u is to specify the uniqueKey used by the backend,
+    #-u is to specify the mongoDB field that will serve as the unique key
+    #for the target system,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id", help=
-                      """Used to specify the uniqueKey used by the backend."""
+                      """Used to specify the mongoDB field that will serve"""
+                      """as the unique key for the target system"""
                       """The default is "_id", which can be noted by """
                       """  '-u _id'""")
 

@@ -231,24 +231,12 @@ class OplogThread(threading.Thread):
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
 
-    def get_last_oplog_timestamp(self):
-        """Return the timestamp of the latest entry in the oplog.
-        """
-        curr = self.oplog.find().sort('$natural', pymongo.DESCENDING).limit(1)
-        if curr.count(with_limit_and_skip=True) == 0:
-            return None
-
-        return curr[0]['ts']
-
-    def dump_collection(self, timestamp):
+    def dump_collection(self):
         """Dumps collection into backend engine.
 
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
-
-        if timestamp is None:
-            return None
 
         dump_set = self.namespace_set
 
@@ -265,16 +253,60 @@ class OplogThread(threading.Thread):
                     namespace = str(db) + "." + str(coll)
                     dump_set.append(namespace)
 
+        long_ts = None
+
         for namespace in dump_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.main_connection[db][coll]
-            cursor = util.retry_until_ok(target_coll.find)
-            long_ts = util.bson_ts_to_long(timestamp)
+            cursor = util.retry_until_ok(target_coll.find).sort('$natural', pymongo.DESCENDING)
+            oplog_cursor = util.retry_until_ok(self.oplog.find).sort('$natural', pymongo.DESCENDING)
 
-            for doc in cursor:
-                doc['ns'] = namespace
-                doc['_ts'] = long_ts
-                self.doc_manager.upsert(doc)
+            for entry in oplog_cursor:
+
+                if entry['op'] != 'i':
+                    continue
+                #The 'o' field represents the document
+                search_doc = entry['o']
+                cursor.rewind()
+                for doc in cursor:
+                    if search_doc == doc:
+                        long_ts = util.bson_ts_to_long(entry['ts'])
+                        break
+
+                if long_ts:
+                    break
+
+            cursor.rewind()
+
+            try:
+                for doc in cursor:
+                    doc['ns'] = namespace
+                    doc['_ts'] = long_ts
+                    self.doc_manager.upsert(doc)
+            except (pymongo.errors.AutoReconnect,
+                    pymongo.errors.OperationFailure):
+
+                err_msg = "OplogManager: Failed during dump collection"
+                effect = "cannot recover!"
+                logging.error('%s %s %s' % (err_msg, effect, self.oplog))
+                self.running = False
+                return
+
+            if long_ts:
+                long_ts = util.long_to_bson_ts(long_ts)
+            else:  # Implies that we are just initiating the set
+                long_ts = self.get_last_oplog_timestamp()
+
+            return long_ts
+
+    def get_last_oplog_timestamp(self):
+        """Return the timestamp of the latest entry in the oplog.
+        """
+        curr = self.oplog.find().sort('$natural', pymongo.DESCENDING).limit(1)
+        if curr.count(with_limit_and_skip=True) == 0:
+            return None
+
+        return curr[0]['ts']
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -285,8 +317,7 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
-            self.dump_collection(timestamp)
+            timestamp = self.dump_collection()
             logging.info('OplogManager: %s Dumped collection into backend'
                          % self.oplog)
 
@@ -312,8 +343,9 @@ class OplogThread(threading.Thread):
         self.oplog_progress.acquire_lock()
 
         if oplog_str in self.oplog_progress.dict.keys():
+            ret_val = self.oplog_progress.dict[oplog_str]
             self.oplog_progress.release_lock()
-            return self.oplog_progress.dict[oplog_str]
+            return ret_val
         else:
             self.oplog_progress.release_lock()
             return None
