@@ -47,7 +47,7 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, auto_commit=True):
+    def __init__(self, url, auto_commit=True, unique_key='_id'):
         """Verify Elastic URL and establish a connection.
         """
 
@@ -56,6 +56,7 @@ class DocManager():
         self.elastic = ES(server=url)
         self.auto_commit = auto_commit
         self.doc_type = 'string'  # default type is string, change if needed
+        self.unique_key = unique_key
         if auto_commit:
             self.run_auto_commit()
 
@@ -71,8 +72,8 @@ class DocManager():
         """
         doc_type = self.doc_type
         index = doc['ns']
-        doc['_id'] = str(doc['_id'])
-        doc_id = doc['_id']
+        doc[self.unique_key] = str(doc[self.unique_key])
+        doc_id = doc[self.unique_key]
         self.elastic.index(doc, index, doc_type, doc_id)
 
     def remove(self, doc):
@@ -81,7 +82,7 @@ class DocManager():
         The input is a python dictionary that represents a mongo document.
         """
         try:
-            self.elastic.delete(doc['ns'], 'string', str(doc['_id']))
+            self.elastic.delete(doc['ns'], 'string', str(doc[self.unique_key]))
         except:
             pass
 

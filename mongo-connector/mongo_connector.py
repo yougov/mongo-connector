@@ -50,16 +50,20 @@ class Connector(threading.Thread):
         if doc_manager is not None:
             if (doc_manager[0] is '/') or 'C:\\' in doc_manager:
                 if ('win32' or 'win64') in sys.platform:
-                    shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
+                    #shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
+                    sys.path.append(doc_manager)
                 else:
-                    shutil.copy(doc_manager, cmd_folder + "/doc_manager.py")
+                    #shutil.copy(doc_manager, cmd_folder + "/doc_manager.py")
+                    sys.path.append(doc_manager)
             else:
                 if ('win32' or 'win64') in sys.platform:
-                    shutil.copy(cmd_folder + "\\doc_managers\\" + doc_manager,
-                                cmd_folder + "\\doc_manager.py")
+                    #shutil.copy(cmd_folder + "\\doc_managers\\" + doc_manager,
+                    #            cmd_folder + "\\doc_manager.py")
+                    sys.path.append(cmd_folder + "\\docmanagers\\" + doc_manager)
                 else:
-                    shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
-                                cmd_folder + "/doc_manager.py")
+                    #shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
+                    #            cmd_folder + "/doc_manager.py")
+                    sys.path.append(cmd_folder + "/doc_managers/" + doc_manager)
         time.sleep(1)
         from doc_manager import DocManager
         super(Connector, self).__init__()

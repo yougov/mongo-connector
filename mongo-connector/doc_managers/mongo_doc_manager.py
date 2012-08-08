@@ -46,13 +46,14 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url):
+    def __init__(self, url, unique_key='_id'):
         """ Verify URL and establish a connection.
         """
         try:
             self.mongo = pymongo.Connection(url)
         except pymongo.errors.InvalidURI:
             raise SystemError
+        self.unique_key = unique_key
 
     def stop(self):
         """Stops any running threads
@@ -72,7 +73,7 @@ class DocManager():
         The documents has ns and _ts fields.
         """
         db, coll = doc['ns'].split('.', 1)
-        self.mongo[db][coll].remove({'_id': doc['_id']})
+        self.mongo[db][coll].remove({self.unique_key: doc[self.unique_key]})
 
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.

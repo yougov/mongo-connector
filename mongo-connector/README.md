@@ -82,8 +82,10 @@ __1) init(self)__
 This method should if needed, verify the url to the target system and return None if that fails. It should
 also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
-auto_commit. It requires a url paramater if mongo_connector.py is called with the -b paramater.
-Otherwise, it doesn't require any parameter (e.g. if the target engine doesn't need a URL).
+auto_commit.
+The unique_key should default to '_id' and it is an obligatory parameter.
+It requires a url paramater iff mongo_connector.py is called with the -b paramater.
+Otherwise, it doesn't require any other parameter (e.g. if the target engine doesn't need a URL).
 It should raise a SystemError exception if the URL is not valid.
 
 __2) stop(self)__
