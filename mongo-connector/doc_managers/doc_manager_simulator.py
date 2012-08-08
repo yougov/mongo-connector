@@ -36,10 +36,11 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None):
+    def __init__(self, url=None, unique_key='_id'):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
         """
+        self.unique_key = unique_key
         self.doc_dict = {}
 
     def stop(self):
@@ -51,12 +52,12 @@ class DocManager():
         """Adds a document to the doc dict.
         """
 
-        self.doc_dict[doc['_id']] = doc
+        self.doc_dict[doc[unique_key]] = doc
 
     def remove(self, doc):
         """Removes the document from the doc dict.
         """
-        del self.doc_dict[doc['_id']]
+        del self.doc_dict[doc[unique_key]]
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents within the
