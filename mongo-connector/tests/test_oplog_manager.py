@@ -223,14 +223,10 @@ class TestOplogManager(unittest.TestCase):
         solr = DocManager()
         test_oplog.doc_manager = solr
 
-        #for empty oplog, no documents added
-        self.assertEqual(test_oplog.dump_collection(None), None)
-        self.assertEqual(len(solr._search()), 0)
-
         #with documents
         primary_conn['test']['test'].insert({'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.dump_collection(search_ts)
+        test_oplog.dump_collection()
 
         test_oplog.doc_manager.commit()
         solr_results = solr._search()

@@ -199,7 +199,7 @@ class TestSynchronizer(unittest.TestCase):
         while len(s._search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)})
+            conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
 
         while len(s._search()) != NUMBER_OF_DOCS:
             time.sleep(1)

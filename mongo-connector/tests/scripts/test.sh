@@ -1,4 +1,5 @@
 cd ..
+cp ../doc_managers/doc_manager_simulator.py ../doc_manager.py
 python test_mongo_connector.py
 python test_mongo_connector.py -m 27117
 python test_oplog_manager.py

@@ -22,7 +22,6 @@
     is that this file can be used as an example to add on different backends.
     To extend this to other systems, simply implement the exact same class and
     replace the method definitions with API calls for the desired backend.
-    Each method is detailed to describe the desired behavior.
     """
 
 import pymongo
@@ -48,10 +47,7 @@ class DocManager():
         """
 
     def __init__(self, url):
-        """ This method may vary from implementation to implementation, but it
-        should verify the url to the backend and return None if that fails.
-        It should also create the connection to the backend, and start a
-        periodic committer if necessary.
+        """ Verify URL and establish a connection.
         """
         try:
             self.mongo = pymongo.Connection(url)
@@ -65,35 +61,21 @@ class DocManager():
 
     def upsert(self, doc):
         """Update or insert a document into Mongo
-
-        This method should call whatever add/insert/update method exists for
-        the backend engine and add the document in there. The input will
-        always be one mongo document, represented as a Python dictionary.
-        If you'd like to have different types of document in your database,
-        you can store the doc type as a field in Mongo and set doc_type to
-        that field. (e.g. doc_type = doc['_type'])
-        The documents has ns and _ts fields.
         """
         db, coll = doc['ns'].split('.', 1)
         self.mongo[db][coll].save(doc)
 
-
     def remove(self, doc):
         """Removes document from Mongo
 
-            The input is a python dictionary that represents a mongo document.
-            It has ns and _ts fields.
-            """
+        The input is a python dictionary that represents a mongo document.
+        The documents has ns and _ts fields.
+        """
         db, coll = doc['ns'].split('.', 1)
         self.mongo[db][coll].remove({'_id': doc['_id']})
 
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
-
-        This method is only used by rollbacks to query all the documents in
-        Mongo within a certain timestamp window. The input will be two longs
-        (converted from Bson timestamp) which specify the time range. The
-        return value should be an iterable set of documents.
         """
         search_set = []
         db_list = self.mongo.database_names()
@@ -121,12 +103,7 @@ class DocManager():
 
     def get_last_doc(self):
         """Returns the last document stored in Mongo.
-
-            This method is used for rollbacks to establish the rollback window,
-            which is the gap between the last document on a mongo shard and the
-            last document in Mongo. If there are no documents, this functions
-            returns None. Otherwise, it returns the first document.
-            """
+        """
         search_set = []
         db_list = self.mongo.database_names()
         for db in db_list:

@@ -34,29 +34,50 @@ class DocManager():
 
     The reason for storing id/doc pairs as opposed to doc's is so that
     multiple updates to the same doc reflect the most up to date version as
-    opposed to
-    multiple, slightly different versions of a doc.
+    opposed to multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url, auto_commit=True):
+    def __init__(self, url=None, auto_commit=True):
         """Verify URL and establish a connection.
 
-        This method may vary from implementation to implementation, but it must
-        verify the url to the backend and return None if that fails. It should
-        also create the connection to the backend, and start a periodic
-        committer if necessary. The uniqueKey is '_id', but this may be
-        overridden
-        by user defined configuration.
-        Both URL and auto_commit are optional parameters.
+        This method should, if necessarity, verify the url to the backend
+        and return None if that fails.
+        It should also create the connection to the backend, and start a
+        periodic committer if necessary. The uniqueKey is '_id', but
+        this may be overridden by user defined configuration.
+        It requires a url parameter if mongo_connector.py is called with the
+        -b parameter. Otherwise, it doesn't require any parameter (e.g. if
+        the target engine doesn't need a URL)
+        It should raise a SystemError exception if the URL is not valid.
+        """
+        raise exceptions.NotImplementedError
+
+    def stop(self):
+
+        """This method must stop any threads running from the DocManager.
+        In some cases this simply stops a timer thread, whereas in other
+        DocManagers it does nothing because the manager doesn't use any
+        threads. This method is only called when the MongoConnector is
+        forced to terminate, either due to errors or as part of normal
+        procedure.
         """
         raise exceptions.NotImplementedError
 
     def upsert(self, doc):
-        """Update or insert a document into engine
+        """Update or insert a document into engine.
+        The documents has ns and _ts fields.
 
         This method should call whatever add/insert/update method exists for
         the backend engine and add the document in there. The input will
         always be one mongo document, represented as a Python dictionary.
+        This document will be the current mongo version of the document,
+        not necessarily the version at the time the upsert was made; the
+        doc manager will be responsible to track the changes if necessary.
+        Note this is not necessary to ensure consistency.
+        It is possible to get two inserts for the same document with the same
+        contents if there is considerable delay in trailing the oplog.
+        We have only one function for update and insert because incremental
+        updates are not supported, so there is no update option.
         """
         raise exceptions.NotImplementedError
 
@@ -68,12 +89,17 @@ class DocManager():
         raise exceptions.NotImplementedError
 
     def search(self, start_ts, end_ts):
-        """Called to query engine for documents in a time range.
+        """Called to query engine for documents in a time range,
+        including start_ts and end_ts
 
         This method is only used by rollbacks to query all the documents in
         engine within a certain timestamp window. The input will be two longs
-        (converted from Bson timestamp) which specify the time range. The
-        return value should be an iterable set of documents.
+        (converted from Bson timestamp) which specify the time range.
+        The 32 most significant bits are the Unix Epoch Time, and the other
+        bits are the increment. For all purposes, the function should just
+        do a simple search for timestamps between these values
+        treating them as simple longs. The return value should be an iterable
+        set of documents.
         """
         raise exceptions.NotImplementedError
 
@@ -84,8 +110,8 @@ class DocManager():
         not meant to be called in other circumstances. The body should commit
         all documents to the backend engine (like auto_commit), but not have
         any timers or run itself again (unlike auto_commit). In the event of
-        too many engine searchers, the commit is wrapped in a retry_until_ok
-        to keep trying until the commit goes through.
+        too many engine searchers, the commit can be wrapped in a
+        retry_until_ok to keep trying until the commit goes through.
         """
         raise exceptions.NotImplementedError
 
@@ -93,11 +119,12 @@ class DocManager():
         """Periodically commits to the engine server, if needed.
 
         This function commits all changes to the engine, and then
-        starts a
-        timer that calls this function again in one second. The reason for this
-        function is to prevent overloading engine from other searchers. This
-        function may be modified based on the backend engine and how commits
-        are handled, as timers may not be necessary in all instances.
+        starts a timer that calls this function again in one second.
+        The reason for this function is to prevent overloading engine from
+        other searchers. This function may be modified based on the backend
+        engine and how commits are handled, as timers may not be necessary
+        in all instances. It does not have to be implemented if commits
+        are not necessary
         """
         raise exceptions.NotImplementedError
 
