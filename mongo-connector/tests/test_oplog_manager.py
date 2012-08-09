@@ -260,11 +260,8 @@ class TestOplogManager(unittest.TestCase):
         # with config file, assert that size != 0
         os.system('touch temp_config.txt')
 
-        # config_file_path = os.getcwd() + '/'+ 'temp_config.txt'
-        # test_oplog.oplog_file = config_file_path
         cursor = test_oplog.init_cursor()
-        # config_file_size = os.stat(config_file_path)[6]
-        oplog_dict = test_oplog.oplog_progress.dict
+        oplog_dict = test_oplog.oplog_progress.get_dict()
 
         self.assertEqual(cursor.count(), 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)

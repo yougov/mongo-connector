@@ -52,12 +52,12 @@ class DocManager():
         """Adds a document to the doc dict.
         """
 
-        self.doc_dict[doc[unique_key]] = doc
+        self.doc_dict[doc[self.unique_key]] = doc
 
     def remove(self, doc):
         """Removes the document from the doc dict.
         """
-        del self.doc_dict[doc[unique_key]]
+        del self.doc_dict[doc[self.unique_key]]
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents within the

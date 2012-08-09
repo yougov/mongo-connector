@@ -134,7 +134,8 @@ class Connector(threading.Thread):
         # for each of the threads write to file
         self.oplog_progress.acquire_lock()
         try:
-            for oplog, ts in self.oplog_progress.dict.items():
+            oplog_dict = self.oplog_progress.get_dict()
+            for oplog, ts in oplog_dict.items():
                 oplog_str = str(oplog)
                 timestamp = util.bson_ts_to_long(ts)
                 json_str = json.dumps([oplog_str, timestamp])
@@ -170,14 +171,15 @@ class Connector(threading.Thread):
             logging.info("%s %s" % (err_msg, reason))
             source.close()
             return None
-        
+
         source.close()
 
         count = 0
+        oplog_dict = self.oplog_progress.get_dict()
         for count in range(0, len(data), 2):
             oplog_str = data[count]
             ts = data[count + 1]
-            self.oplog_progress.dict[oplog_str] = util.long_to_bson_ts(ts)
+            oplog_dict[oplog_str] = util.long_to_bson_ts(ts)
             #stored as bson_ts
 
     def run(self):
@@ -191,8 +193,8 @@ class Connector(threading.Thread):
             main_conn.admin.command("isdbgrid")
         except pymongo.errors.OperationFailure:
             conn_type = "REPLSET"
-            
-        
+
+
 
         if conn_type == "REPLSET":
             #non sharded configuration
