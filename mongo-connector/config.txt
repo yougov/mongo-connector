@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 ["Collection(Database(Connection(['localhost:27117', u'localhost:27118']), u'local'), u'oplog.rs')", 5774682820525948929]
+=======
+["Collection(Database(Connection([u'localhost:27117', u'localhost:27118']), u'local'), u'oplog.rs')", 5774421085218930689]
+>>>>>>> 276f5d020ac4ffbbb6b5eb1d3a415e04c117ac48

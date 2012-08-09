@@ -292,12 +292,12 @@ class OplogThread(threading.Thread):
                 self.running = False
                 return
 
-            if long_ts:
-                long_ts = util.long_to_bson_ts(long_ts)
-            else:  # Implies that we are just initiating the set
-                long_ts = self.get_last_oplog_timestamp()
+        if long_ts:
+            long_ts = util.long_to_bson_ts(long_ts)
+        else:  # Implies that we are just initiating the set
+            long_ts = self.get_last_oplog_timestamp()
 
-            return long_ts
+        return long_ts
 
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
@@ -332,7 +332,8 @@ class OplogThread(threading.Thread):
         """Store the current checkpoint in the oplog progress dictionary.
         """
         self.oplog_progress.acquire_lock()
-        self.oplog_progress.dict[str(self.oplog)] = self.checkpoint
+        oplog_progress_dict = self.oplog_progress.get_dict()
+        oplog_progress_dict[str(self.oplog)] = self.checkpoint
         self.oplog_progress.release_lock()
 
     def read_last_checkpoint(self):
@@ -341,9 +342,9 @@ class OplogThread(threading.Thread):
         oplog_str = str(self.oplog)
 
         self.oplog_progress.acquire_lock()
-
-        if oplog_str in self.oplog_progress.dict.keys():
-            ret_val = self.oplog_progress.dict[oplog_str]
+        oplog_dict = self.oplog_progress.get_dict()
+        if oplog_str in oplog_dict.keys():
+            ret_val = oplog_dict[oplog_str]
             self.oplog_progress.release_lock()
             return ret_val
         else:

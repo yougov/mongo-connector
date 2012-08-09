@@ -72,7 +72,7 @@ class MongoInternalTester(unittest.TestCase):
         #test that None is returned if there is no config file specified.
         self.assertEqual(c.write_oplog_progress(), None)
 
-        c.oplog_progress.dict[1] = Timestamp(12, 34)
+        c.oplog_progress.get_dict()[1] = Timestamp(12, 34)
         #pretend to insert a thread/timestamp pair
         c.write_oplog_progress()
 
@@ -84,7 +84,7 @@ class MongoInternalTester(unittest.TestCase):
         self.assertFalse(os.path.exists(config_file_path + '~'))
 
         #ensure that updates work properly
-        c.oplog_progress.dict[1] = Timestamp(44, 22)
+        c.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         c.write_oplog_progress()
 
         data = json.load(open(config_file_path, 'r'))
@@ -111,23 +111,25 @@ class MongoInternalTester(unittest.TestCase):
         #testing with empty file
         self.assertEqual(c.read_oplog_progress(), None)
 
-        #add a value to the file, delete the dict, and then read in the value
-        c.oplog_progress.dict['oplog1'] = Timestamp(12, 34)
-        c.write_oplog_progress()
-        del c.oplog_progress.dict['oplog1']
+        oplog_dict = c.oplog_progress.get_dict()
 
-        self.assertEqual(len(c.oplog_progress.dict), 0)
+        #add a value to the file, delete the dict, and then read in the value
+        oplog_dict['oplog1'] = Timestamp(12, 34)
+        c.write_oplog_progress()
+        del oplog_dict['oplog1']
+
+        self.assertEqual(len(oplog_dict), 0)
 
         c.read_oplog_progress()
 
-        self.assertTrue('oplog1' in c.oplog_progress.dict.keys())
-        self.assertTrue(c.oplog_progress.dict['oplog1'], Timestamp(12, 34))
+        self.assertTrue('oplog1' in oplog_dict.keys())
+        self.assertTrue(oplog_dict['oplog1'], Timestamp(12, 34))
 
-        c.oplog_progress.dict['oplog1'] = Timestamp(55, 11)
+        oplog_dict['oplog1'] = Timestamp(55, 11)
 
         #see if oplog progress dict is properly updated
         c.read_oplog_progress()
-        self.assertTrue(c.oplog_progress.dict['oplog1'], Timestamp(55, 11))
+        self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
         os.system('rm ' + config_file_path)
         print("PASSED TEST READ OPLOG PROGRESS")

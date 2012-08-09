@@ -241,14 +241,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         solr = DocManager()
         test_oplog.doc_manager = solr
 
-        # for empty oplog, no documents added
-        assert (test_oplog.dump_collection(None) is None)
-        assert (len(solr._search()) == 0)
-
         # with documents
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.dump_collection(search_ts)
+        test_oplog.dump_collection()
 
         test_oplog.doc_manager.commit()
         solr_results = solr._search()
@@ -283,11 +279,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         # with config file, assert that size != 0
         os.system('touch temp_config.txt')
 
-        # config_file_path = os.getcwd() + '/'+ 'temp_config.txt'
-        # test_oplog.oplog_file = config_file_path
         cursor = test_oplog.init_cursor()
-        # config_file_size = os.stat(config_file_path)[6]
-        oplog_dict = test_oplog.oplog_progress.dict
+        oplog_dict = test_oplog.oplog_progress.get_dict()
 
         assert(cursor.count() == 1)
         self.assertTrue(str(test_oplog.oplog) in oplog_dict)
