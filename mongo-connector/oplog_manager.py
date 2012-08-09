@@ -258,8 +258,10 @@ class OplogThread(threading.Thread):
         for namespace in dump_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.main_connection[db][coll]
-            cursor = util.retry_until_ok(target_coll.find).sort('$natural', pymongo.DESCENDING)
-            oplog_cursor = util.retry_until_ok(self.oplog.find).sort('$natural', pymongo.DESCENDING)
+            cursor = util.retry_until_ok(target_coll.find)
+            cursor = cursor.sort('$natural', pymongo.DESCENDING)
+            oplog_cursor = util.retry_until_ok(self.oplog.find)
+            oplog_cursor = oplog_cursor.sort('$natural', pymongo.DESCENDING)
 
             for entry in oplog_cursor:
 
@@ -318,8 +320,9 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             timestamp = self.dump_collection()
-            logging.info('OplogManager: %s Dumped collection into target system'
-                         % self.oplog)
+            msg = "Dumped collection into target system"
+            logging.info('OplogManager: %s %s'
+                         % (self.oplog, msg))
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)

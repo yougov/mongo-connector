@@ -93,9 +93,11 @@ class Connector(threading.Thread):
                     self.doc_manager = doc_manager.DocManager(unique_key=u_key)
             else:
                 if doc_manager is None:
-                    self.doc_manager = DocManager(self.target_url, unique_key=u_key)
+                    self.doc_manager = DocManager(self.target_url,
+                                                  unique_key=u_key)
                 else:
-                    self.doc_manager = doc_manager.DocManager(self.target_url, unique_key=u_key)
+                    self.doc_manager = doc_manager.DocManager(self.target_url,
+                                                              unique_key=u_key)
         except SystemError:
             logging.critical("MongoConnector: Bad target system URL!")
             self.can_run = False
@@ -189,8 +191,6 @@ class Connector(threading.Thread):
             main_conn.admin.command("isdbgrid")
         except pymongo.errors.OperationFailure:
             conn_type = "REPLSET"
-
-
 
         if conn_type == "REPLSET":
             #non sharded configuration
