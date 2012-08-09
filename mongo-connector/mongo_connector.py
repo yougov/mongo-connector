@@ -360,7 +360,7 @@ if __name__ == '__main__':
                       """The default is "_id", which can be noted by """
                       """  '-u _id'""")
 
-    #-k is to specify the authentication key file. This file is used by mongos
+    #-f is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
     #threads.
     parser.add_option("-f", "--password-file", action="store", type="string",

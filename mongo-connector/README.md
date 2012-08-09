@@ -13,7 +13,7 @@ setup.
 To start the system, simply run "python mongo_connector.py". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
-`-m` or `--mongos` is to specify the main address, which is a host:port pair. For sharded clusters, 
+`-m` or `--mongos` is to specify the main address, which is a host:port pair. For sharded clusters,
 this should be the mongos address. For individual replica sets, supply the address of the primary.
 For example, `-m localhost:27217` would be a valid argument to `-m`. Don't use quotes around the address.
 
@@ -38,9 +38,14 @@ databases, and also ignoring the "system.indexes" collection in any database.
 as the unique key for the target system.  The default is "_id",
 which can be noted by "-u _id"
 
-`-k` or `--keyFile` is used to specify the path to the authentication key file. This file is used
-by mongos to authenticate connections to the shards, and we'll use it in the oplog threads. If
-authentication is not used, then this field can be left empty as the default is None.
+`-f` is to specify a file which contains the password for authentication.
+This file is used by mongos to authenticate connections to the shards,
+and we'll use it in the oplog threads. The main use of this option is to specify a
+password without entering it as plaintext.
+
+`-p` is to specify the password used for authentication. If this option is specified along
+with `-f`, then the password specified here will be used regardless of the contents of the
+password file.
 
 `-a' or `--admin-username` is used to specify the username of an admin user to authenticate with.
 To use authentication with the system, the user must specify both this option and the keyFile
@@ -175,7 +180,7 @@ Mongo-Connector imports a DocManager from the specified file in mongo_connector.
 from the doc_managers folder. We have provided sample implementations for a Solr search DocManager
  and an ElasticSearch DocManager. Note that upon execution, mongo_connector.py will copy the file
  to the main folder as doc_manager.py.
- 
+
 The documents stored in the target system are equivalent to what is stored in mongo, except every
 document has two additional fields called `ns` and `_ts`. The `_ts` field stores the latest
 timestamp corresponding to that document in the oplog. For example, if document `D` was inserted
@@ -207,7 +212,7 @@ This config.txt file stores an oplog timestamp which indicates at which point of
 start. This is made so you can stop syncing at any point by quitting the program and restart from where you left
 off later on.
 However, this can be a problem if you have restarted mongo and that timestamp happens before all entries in the
-oplog; this will result in an error, since the system will realize that you have a stale oplog timestamp. 
+oplog; this will result in an error, since the system will realize that you have a stale oplog timestamp.
 Additionally, if you restart mongo, the target system will not have the data automatically wiped. This is
 of course intentional, since it would be undesirable to have the data disappear from the target system if
 mongo stops working for whatever reason.
