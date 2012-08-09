@@ -94,8 +94,8 @@ class DocManager():
         for namespace in search_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.mongo[db][coll]
-            res += list(target_coll.find({'_ts': {'$lte': end_ts,
-                                          '$gte': start_ts}}))
+            res.extend(list(target_coll.find({'_ts': {'$lte': end_ts,
+                                          '$gte': start_ts}})))
 
         return res
 
@@ -121,7 +121,7 @@ class DocManager():
         for namespace in search_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.mongo[db][coll]
-            res += list(target_coll.find().sort('_ts', -1))
+            res.extend(list(target_coll.find().sort('_ts', -1)))
 
         max_ts = 0
         max_doc = None

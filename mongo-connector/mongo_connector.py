@@ -4,8 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
-#
+# http://www.apache.org/licenses/LICENSE-2.0#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,6 +30,7 @@ import sys
 import threading
 import time
 import util
+import imp
 
 from locking_dict import LockingDict
 
@@ -48,24 +48,10 @@ class Connector(threading.Thread):
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
         if doc_manager is not None:
-            if (doc_manager[0] is '/') or 'C:\\' in doc_manager:
-                if ('win32' or 'win64') in sys.platform:
-                    #shutil.copy(doc_manager, cmd_folder + "\\doc_manager.py")
-                    sys.path.append(doc_manager)
-                else:
-                    #shutil.copy(doc_manager, cmd_folder + "/doc_manager.py")
-                    sys.path.append(doc_manager)
-            else:
-                if ('win32' or 'win64') in sys.platform:
-                    #shutil.copy(cmd_folder + "\\doc_managers\\" + doc_manager,
-                    #            cmd_folder + "\\doc_manager.py")
-                    sys.path.append(cmd_folder + "\\docmanagers\\" + doc_manager)
-                else:
-                    #shutil.copy(cmd_folder + "/doc_managers/" + doc_manager,
-                    #            cmd_folder + "/doc_manager.py")
-                    sys.path.append(cmd_folder + "/doc_managers/" + doc_manager)
+            doc_manager = imp.load_source('DocManager', doc_manager)
+        else:
+            doc_manager = imp.load_source('DocManager', cmd_folder)
         time.sleep(1)
-        from doc_manager import DocManager
         super(Connector, self).__init__()
 
         #can_run is set to false when we join the thread
@@ -101,9 +87,9 @@ class Connector(threading.Thread):
 
         try:
             if backend_url is None:
-                self.doc_manager = DocManager()
+                self.doc_manager = doc_manager.DocManager()
             else:
-                self.doc_manager = DocManager(self.backend_url, unique_key=u_key)
+                self.doc_manager = doc_manager.DocManager(self.backend_url, unique_key=u_key)
         except SystemError:
             logging.critical("MongoConnector: Bad target system URL!")
             self.can_run = False
