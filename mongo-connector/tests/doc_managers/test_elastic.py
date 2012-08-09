@@ -77,7 +77,7 @@ class TestSynchronizer(unittest.TestCase):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
                            'config.txt', 'http://localhost:9200',
                            ['test.test'],
-                           '_id', None, 'elastic_doc_manager.py')
+                           '_id', None, cmd_folder + '/../../doc_managers/elastic_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             pass

@@ -75,7 +75,7 @@ class TestSynchronizer(unittest.TestCase):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
                            'config.txt', 'localhost:30000',
                            ['test.test'],
-                           '_id', None, 'mongo_doc_manager.py')
+                           '_id', None, cmd_folder + '/../../doc_managers/mongo_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             pass
