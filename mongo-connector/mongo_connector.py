@@ -50,7 +50,7 @@ class Connector(threading.Thread):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
-            doc_manager = imp.load_source('DocManager', cmd_folder)
+            from doc_manager import DocManager
         time.sleep(1)
         super(Connector, self).__init__()
 
@@ -87,9 +87,15 @@ class Connector(threading.Thread):
 
         try:
             if backend_url is None:
-                self.doc_manager = doc_manager.DocManager()
+                if doc_manager is None:
+                    self.doc_manager = DocManager(unique_key=u_key)
+                else:
+                    self.doc_manager = doc_manager.DocManager(unique_key=u_key)
             else:
-                self.doc_manager = doc_manager.DocManager(self.backend_url, unique_key=u_key)
+                if doc_manager is None:
+                    self.doc_manager = DocManager(self.backend_url, unique_key=u_key)
+                else:
+                    self.doc_manager = doc_manager.DocManager(self.backend_url, unique_key=u_key)
         except SystemError:
             logging.critical("MongoConnector: Bad target system URL!")
             self.can_run = False
