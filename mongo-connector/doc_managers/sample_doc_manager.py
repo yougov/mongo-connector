@@ -37,17 +37,18 @@ class DocManager():
     opposed to multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, auto_commit=True):
+    def __init__(self, url=None, auto_commit=True, unique_key='_id'):
         """Verify URL and establish a connection.
 
         This method should, if necessarity, verify the url to the backend
         and return None if that fails.
         It should also create the connection to the backend, and start a
-        periodic committer if necessary. The uniqueKey is '_id', but
-        this may be overridden by user defined configuration.
-        It requires a url parameter if mongo_connector.py is called with the
-        -b parameter. Otherwise, it doesn't require any parameter (e.g. if
-        the target engine doesn't need a URL)
+        periodic committer if necessary. 
+        The unique_key should default to '_id' and it is an obligatory 
+        parameter.
+        It requires a url parameter iff mongo_connector.py is called with 
+        the -b parameter. Otherwise, it doesn't require any other parameter 
+        (e.g. if the target engine doesn't need a URL)
         It should raise a SystemError exception if the URL is not valid.
         """
         raise exceptions.NotImplementedError
