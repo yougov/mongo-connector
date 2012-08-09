@@ -43,7 +43,7 @@ except:
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
-    def __init__(self, address, oplog_checkpoint, backend_url, ns_set,
+    def __init__(self, address, oplog_checkpoint, target_url, ns_set,
                  u_key, auth_key, doc_manager=None, auth_username=None):
         file = inspect.getfile(inspect.currentframe())
         cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
@@ -78,12 +78,12 @@ class Connector(threading.Thread):
         self.address = address
 
         #The URL of the target system
-        self.backend_url = backend_url
+        self.target_url = target_url
 
         #The set of relevant namespaces to consider
         self.ns_set = ns_set
 
-        #The key that is a unique document identifier for the backend system.
+        #The key that is a unique document identifier for the target system.
         #Not necessarily the mongo unique key.
         self.u_key = u_key
 
@@ -100,10 +100,10 @@ class Connector(threading.Thread):
         self.oplog_progress = LockingDict()
 
         try:
-            if backend_url is None:
+            if target_url is None:
                 self.doc_manager = DocManager()
             else:
-                self.doc_manager = DocManager(self.backend_url, unique_key=u_key)
+                self.doc_manager = DocManager(self.target_url, unique_key=u_key)
         except SystemError:
             logging.critical("MongoConnector: Bad target system URL!")
             self.can_run = False

@@ -232,7 +232,7 @@ class OplogThread(threading.Thread):
             return self.get_oplog_cursor(timestamp)
 
     def dump_collection(self):
-        """Dumps collection into backend engine.
+        """Dumps collection into the target system.
 
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
@@ -318,7 +318,7 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             timestamp = self.dump_collection()
-            logging.info('OplogManager: %s Dumped collection into backend'
+            logging.info('OplogManager: %s Dumped collection into target system'
                          % self.oplog)
 
         self.checkpoint = timestamp
@@ -352,12 +352,12 @@ class OplogThread(threading.Thread):
             return None
 
     def rollback(self):
-        """Rollback backend engine to consistent state.
+        """Rollback target system to consistent state.
 
-        The strategy is to find the latest timestamp in the backend and
-        the largest timestamp in the oplog less than the latest backend
+        The strategy is to find the latest timestamp in the target system and
+        the largest timestamp in the oplog less than the latest target system
         timestamp. This defines the rollback window and we just roll these
-        back until the oplog and backend are in consistent states.
+        back until the oplog and target system are in consistent states.
         """
         self.doc_manager.commit()
         last_inserted_doc = self.doc_manager.get_last_doc()
@@ -365,8 +365,8 @@ class OplogThread(threading.Thread):
         if last_inserted_doc is None:
             return None
 
-        backend_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': backend_ts}},
+        target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
+        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': target_ts}},
                                                sort=[('$natural',
                                                pymongo.DESCENDING)])
         if last_oplog_entry is None:
@@ -394,7 +394,7 @@ class OplogThread(threading.Thread):
             retry = util.retry_until_ok
             to_update = retry(self.main_connection[db][coll].find,
                               {'_id': {'$in': bson_obj_id_list}})
-            #doc list are docs in backend engine, to_update are docs in mongo
+            #doc list are docs in  target system, to_update are docs in mongo
             doc_hash = {}  # hash by _id
             for doc in doc_list:
                 doc_hash[bson.objectid.ObjectId(doc['_id'])] = doc

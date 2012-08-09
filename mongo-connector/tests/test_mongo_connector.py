@@ -87,11 +87,13 @@ class MongoInternalTester(unittest.TestCase):
         c.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         c.write_oplog_progress()
 
-        data = json.load(open(config_file_path, 'r'))
+        config_file = open(config_file_path, 'r')
+        data = json.load(config_file)
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
         os.system('rm ' + config_file_path)
+        config_file.close()
         print("PASSED TEST WRITE OPLOG PROGRESS")
 
     def test_read_oplog_progress(self):
