@@ -391,10 +391,16 @@ if __name__ == '__main__':
     #-d is to specify the doc manager file.
     parser.add_option("-d", "--docManager", action="store", type="string",
                       dest="doc_manager", default=None, help=
-                      """Used to specify the file in the /doc_managers"""
-                      """folder that should be used as the doc manager."""
-                      """Absolute paths also supported. By default, it will"""
-                      """use the doc_manager_simulator.py file.""")
+                      """Used to specify the doc manager file that"""
+                      """ is going to be used. You should send the"""
+                      """ path of the file you want to be used."""
+                      """ By default, it will use the """
+                      """ doc_manager_simulator.py file. It is"""
+                      """ recommended that all doc manager files be"""
+                      """ kept in the doc_managers folder in"""
+                      """ mongo-connector. For more information"""
+                      """ about making your own doc manager,"""
+                      """ see Doc Manager section.""")
 
     (options, args) = parser.parse_args()
 

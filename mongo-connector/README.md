@@ -52,13 +52,15 @@ To use authentication with the system, the user must specify both this option an
 option, which stores the password for the user. The default username is '__system', which is not
 recommended for production use.
 
-`-d` or `--docManager` is used to specify the file in the /doc_managers folder that should be used
-as the doc manager. Absolute paths are also supported. By default, it will use
-the doc_manager_simulator.py file. For more information about making your own doc manager, see Doc Manager section.
+`-d` or `--docManager` is used to specify the doc manager file that is going to be used.
+You should send the path of the file you want to be used. By default, it will use
+the doc_manager_simulator.py file. It is recommended that all doc manager files be kept
+in the doc_managers folder in mongo-connector.
+For more information about making your own doc manager, see Doc Manager section.
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d solr_doc_manager.py
+	python mongo_connector.py -m localhost:27217 -b http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
 ## Usage With Solr:
 
