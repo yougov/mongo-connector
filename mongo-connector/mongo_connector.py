@@ -87,9 +87,9 @@ class Connector(threading.Thread):
 
         try:
             if target_url is None:
-                if doc_manager is None:
+                if doc_manager is None:  # imported using from... import
                     self.doc_manager = DocManager(unique_key=u_key)
-                else:
+                else:  # imported using load source
                     self.doc_manager = doc_manager.DocManager(unique_key=u_key)
             else:
                 if doc_manager is None:
@@ -105,7 +105,7 @@ class Connector(threading.Thread):
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):
-                info_str = "MongoConnector: Can't find OplogProgress file!"
+                info_str = "MongoC`onnector: Can't find OplogProgress file!"
                 logging.critical(info_str)
                 self.doc_manager.stop()
                 self.can_run = False
@@ -407,7 +407,9 @@ if __name__ == '__main__':
                       """ see Doc Manager section.""")
 
     (options, args) = parser.parse_args()
-
+    
+    if options.doc_manager is None:
+        logger.info('No doc manager specified, using simulator.')
     try:
         if options.ns_set is None:
             ns_set = []
