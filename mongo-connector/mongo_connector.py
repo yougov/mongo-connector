@@ -407,7 +407,7 @@ if __name__ == '__main__':
                       """ see Doc Manager section.""")
 
     (options, args) = parser.parse_args()
-    
+
     if options.doc_manager is None:
         logger.info('No doc manager specified, using simulator.')
     try:

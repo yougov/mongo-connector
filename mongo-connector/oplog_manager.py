@@ -343,7 +343,7 @@ class OplogThread(threading.Thread):
         """
         oplog_str = str(self.oplog)
         ret_val = None
- 
+
         with self.oplog_progress as oplog_prog:
             oplog_dict = oplog_prog.get_dict()
             if oplog_str in oplog_dict.keys():
