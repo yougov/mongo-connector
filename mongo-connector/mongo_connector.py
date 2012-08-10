@@ -125,24 +125,28 @@ class Connector(threading.Thread):
                 return None
 
         # write to temp file
-        os.rename(self.oplog_checkpoint, self.oplog_checkpoint + '.backup')
-        dest = open(self.oplog_checkpoint, 'w')
-        source = open(self.oplog_checkpoint + '.backup', 'r')
+        backup_file = self.oplog_checkpoint + '.backup'
+        os.rename(self.oplog_checkpoint, backup_file)
 
         # for each of the threads write to file
-        self.oplog_progress.acquire_lock()
-        try:
-            oplog_dict = self.oplog_progress.get_dict()
-            for oplog, ts in oplog_dict.items():
-                oplog_str = str(oplog)
-                timestamp = util.bson_ts_to_long(ts)
-                json_str = json.dumps([oplog_str, timestamp])
-                dest.write(json_str)
-        finally:
-            self.oplog_progress.release_lock()
-            dest.close()
-            source.close()
-            os.remove(self.oplog_checkpoint + '.backup')
+        with open(self.oplog_checkpoint, 'w') as dest:
+            with self.oplog_progress as oplog_prog:
+
+                oplog_dict = oplog_prog.get_dict()
+                for oplog, ts in oplog_dict.items():
+                    oplog_str = str(oplog)
+                    timestamp = util.bson_ts_to_long(ts)
+                    json_str = json.dumps([oplog_str, timestamp])
+                    try:
+                        dest.write(json_str)
+                    except IOError:
+                        # Basically wipe the file, copy from backup
+                        dest.truncate()
+                        with open(backup_file, 'r') as backup:
+                            shutil.copyfile(backup, dest)
+                        break
+
+        os.remove(self.oplog_checkpoint + '.backup')
 
     def read_oplog_progress(self):
         """Reads oplog progress from file provided by user.
@@ -425,6 +429,10 @@ if __name__ == '__main__':
 
     if options.password is not None:
         key = options.password
+
+    if key is None and options.admin_name != "__system":
+        logger.error("Admin username specified without password!")
+        sys.exit(1)
 
     ct = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key, options.doc_manager,

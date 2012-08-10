@@ -334,25 +334,22 @@ class OplogThread(threading.Thread):
     def update_checkpoint(self):
         """Store the current checkpoint in the oplog progress dictionary.
         """
-        self.oplog_progress.acquire_lock()
-        oplog_progress_dict = self.oplog_progress.get_dict()
-        oplog_progress_dict[str(self.oplog)] = self.checkpoint
-        self.oplog_progress.release_lock()
+        with self.oplog_progress as oplog_prog:
+            oplog_dict = oplog_prog.get_dict()
+            oplog_dict[str(self.oplog)] = self.checkpoint
 
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
         oplog_str = str(self.oplog)
+        ret_val = None
+ 
+        with self.oplog_progress as oplog_prog:
+            oplog_dict = oplog_prog.get_dict()
+            if oplog_str in oplog_dict.keys():
+                ret_val = oplog_dict[oplog_str]
 
-        self.oplog_progress.acquire_lock()
-        oplog_dict = self.oplog_progress.get_dict()
-        if oplog_str in oplog_dict.keys():
-            ret_val = oplog_dict[oplog_str]
-            self.oplog_progress.release_lock()
-            return ret_val
-        else:
-            self.oplog_progress.release_lock()
-            return None
+        return ret_val
 
     def rollback(self):
         """Rollback target system to consistent state.

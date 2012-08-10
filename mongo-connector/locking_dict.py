@@ -8,6 +8,13 @@ class LockingDict():
         self.dict = {}
         self.lock = threading.Lock()
 
+    def __enter__(self):
+        self.acquire_lock()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.release_lock()
+
     def get_dict(self):
         return self.dict
 

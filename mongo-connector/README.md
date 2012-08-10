@@ -41,16 +41,21 @@ which can be noted by "-u _id"
 `-f` is to specify a file which contains the password for authentication.
 This file is used by mongos to authenticate connections to the shards,
 and we'll use it in the oplog threads. The main use of this option is to specify a
-password without entering it as plaintext.
+password without entering it as plaintext on the command line.
 
 `-p` is to specify the password used for authentication. If this option is specified along
 with `-f`, then the password specified here will be used regardless of the contents of the
-password file.
+password file. For sharded clusters, the admin username/password must exist in every shard's 
+admin database, otherwise the system will fail to authenticate. This is because of how the 
+connector authenticates against the shards, which is described in depth in the System Internals
+section below. 
 
 `-a' or `--admin-username` is used to specify the username of an admin user to authenticate with.
-To use authentication with the system, the user must specify both this option and the keyFile
+To use authentication with the system, the user must specify both this option and the password or password file
 option, which stores the password for the user. The default username is '__system', which is not
-recommended for production use.
+recommended for production use. If using this and one of the password options in a sharded environment,
+it is essential that the username/password exists in the admin database of every shard in the cluster. Otherwise,
+authentication will fail. 
 
 `-d` or `--docManager` is used to specify the doc manager file that is going to be used.
 You should send the path of the file you want to be used. By default, it will use
