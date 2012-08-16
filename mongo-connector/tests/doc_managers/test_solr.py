@@ -70,7 +70,8 @@ class TestSynchronizer(unittest.TestCase):
 
         self.c = Connector('localhost:' + PORTS_ONE["MAIN"], 'config.txt',
                            'http://localhost:8080/solr', ['test.test'], '_id',
-                           None, cmd_folder + '/../../doc_managers/solr_doc_manager.py')
+                           None, cmd_folder +
+                           '/../../doc_managers/solr_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)
