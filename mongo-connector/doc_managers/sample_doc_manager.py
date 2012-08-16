@@ -43,11 +43,11 @@ class DocManager():
         This method should, if necessarity, verify the url to the backend
         and return None if that fails.
         It should also create the connection to the backend, and start a
-        periodic committer if necessary. 
-        The unique_key should default to '_id' and it is an obligatory 
+        periodic committer if necessary.
+        The unique_key should default to '_id' and it is an obligatory
         parameter.
-        It requires a url parameter iff mongo_connector.py is called with 
-        the -b parameter. Otherwise, it doesn't require any other parameter 
+        It requires a url parameter iff mongo_connector.py is called with
+        the -b parameter. Otherwise, it doesn't require any other parameter
         (e.g. if the target engine doesn't need a URL)
         It should raise a SystemError exception if the URL is not valid.
         """
