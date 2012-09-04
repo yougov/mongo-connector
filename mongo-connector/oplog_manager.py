@@ -253,32 +253,14 @@ class OplogThread(threading.Thread):
                     namespace = str(db) + "." + str(coll)
                     dump_set.append(namespace)
 
-        long_ts = None
-
+        timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
+        if timestamp is None:
+            return None
         for namespace in dump_set:
             db, coll = namespace.split('.', 1)
             target_coll = self.main_connection[db][coll]
             cursor = util.retry_until_ok(target_coll.find)
-            cursor = cursor.sort('$natural', pymongo.DESCENDING)
-            oplog_cursor = util.retry_until_ok(self.oplog.find)
-            oplog_cursor = oplog_cursor.sort('$natural', pymongo.DESCENDING)
-
-            for entry in oplog_cursor:
-
-                if entry['op'] != 'i':
-                    continue
-                #The 'o' field represents the document
-                search_doc = entry['o']
-                cursor.rewind()
-                for doc in cursor:
-                    if search_doc == doc:
-                        long_ts = util.bson_ts_to_long(entry['ts'])
-                        break
-
-                if long_ts:
-                    break
-
-            cursor.rewind()
+            long_ts = util.bson_ts_to_long(timestamp)
 
             try:
                 for doc in cursor:
@@ -294,12 +276,7 @@ class OplogThread(threading.Thread):
                 self.running = False
                 return
 
-        if long_ts:
-            long_ts = util.long_to_bson_ts(long_ts)
-        else:  # Implies that we are just initiating the set
-            long_ts = self.get_last_oplog_timestamp()
-
-        return long_ts
+        return timestamp
 
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
