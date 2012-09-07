@@ -95,7 +95,7 @@ class DocManager():
             db, coll = namespace.split('.', 1)
             target_coll = self.mongo[db][coll]
             res.extend(list(target_coll.find({'_ts': {'$lte': end_ts,
-                                          '$gte': start_ts}})))
+                                                      '$gte': start_ts}})))
 
         return res
 
