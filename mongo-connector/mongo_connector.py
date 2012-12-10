@@ -188,6 +188,8 @@ class Connector(threading.Thread):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         main_conn = pymongo.Connection(self.address)
+        if self.auth_key is not None:
+            main_conn['admin'].authenticate(self.auth_username, self.auth_key) 
         self.read_oplog_progress()
         conn_type = None
 
