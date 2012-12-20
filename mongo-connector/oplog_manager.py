@@ -28,7 +28,7 @@ import sys
 import time
 import threading
 import util
-
+import warnings
 
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
@@ -136,6 +136,10 @@ class OplogThread(threading.Thread):
                     elif operation == 'i' or operation == 'u':
                         doc = self.retrieve_doc(entry)
                         if doc is not None:
+                            if '_ts' in doc or 'ns' in doc:
+                                warnings.warn('Source document contains ns or _ts field. Fields copied to __ns and __ts.')
+                                doc['__ts'] = doc.get('_ts', None)
+                                doc['__ns'] = doc.get('ns', None)
                             doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                             doc['ns'] = ns
                             self.doc_manager.upsert(doc)
@@ -265,6 +269,10 @@ class OplogThread(threading.Thread):
 
             try:
                 for doc in cursor:
+                    if '_ts' in doc or 'ns' in doc:
+                        warnings.warn('Source document contains ns or _ts field. Fields copied to __ns and __ts.')
+                        doc['__ts'] = doc.get('_ts', None)
+                        doc['__ns'] = doc.get('ns', None)
                     doc['ns'] = namespace
                     doc['_ts'] = long_ts
                     self.doc_manager.upsert(doc)
