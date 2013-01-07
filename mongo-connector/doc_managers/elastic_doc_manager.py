@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright 2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +33,7 @@ from pyes import ES, ESRange, RangeQuery, MatchAllQuery
 from threading import Timer
 from util import verify_url, retry_until_ok
 from bson.objectid import ObjectId
-import simplejson as json
+import bson.json_util as bsjson
 from util import bson_ts_to_long
 
 
@@ -74,7 +76,11 @@ class DocManager():
         index = doc['ns']
         doc[self.unique_key] = str(doc[self.unique_key])
         doc_id = doc[self.unique_key]
-        self.elastic.index(doc, index, doc_type, doc_id)
+        
+        # it’s important to run the doc through bson.json_utils.dumps before
+        # sending it to pyes because pyes uses json from stdlib, which chokes
+        # on ObjectIds, DBRefs, etc, whereas bson.json_utils.dumps handles them
+        self.elastic.index(bsjson.dumps(doc), index, doc_type, doc_id)
 
     def remove(self, doc):
         """Removes documents from Elastic
