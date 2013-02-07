@@ -19,6 +19,7 @@
 
 import inspect
 import logging
+import logging.handlers
 import oplog_manager
 import optparse
 import os
@@ -289,18 +290,6 @@ if __name__ == '__main__':
     """Runs mongo connector
     """
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-    logger.info('Beginning Mongo Connector')
-
     parser = optparse.OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
@@ -408,7 +397,40 @@ if __name__ == '__main__':
                       """ about making your own doc manager,"""
                       """ see Doc Manager section.""")
 
+    #-s is to enable syslog logging.
+    parser.add_option("-s","--enable-syslog", action="store_true",
+                      dest="enable_syslog", default=False, help=
+                      """Used to enable logging to syslog."""
+                      """ Use -l to specify syslog host.""")
+
+    #--syslog-host is to specify the syslog host.
+    parser.add_option("--syslog-host", action="store", type="string",
+                      dest="syslog_host", default="localhost:514", help=
+                      """Used to specify the syslog host."""
+                      """ The default is 'localhost:514'""")
+
+    #--syslog-facility is to specify the syslog facility.
+    parser.add_option("--syslog-facility", action="store", type="string",
+                      dest="syslog_facility", default="user", help=
+                      """Used to specify the syslog facility."""
+                      """ The default is 'user'""")
+
     (options, args) = parser.parse_args()
+
+    logger = logging.getLogger()
+    
+    if options.enable_syslog:
+        lh = options.syslog_host.split(":")
+        sh = logging.handlers.SysLogHandler(address=(lh[0], int(lh[1])),facility=options.syslog_facility)
+        logger.addHandler(sh)
+    else:
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+
+    logger.info('Beginning Mongo Connector')
 
     if options.doc_manager is None:
         logger.info('No doc manager specified, using simulator.')
