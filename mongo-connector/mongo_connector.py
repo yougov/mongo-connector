@@ -106,7 +106,7 @@ class Connector(threading.Thread):
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):
-                info_str = "MongoC`onnector: Can't find OplogProgress file!"
+                info_str = "MongoConnector: Can't find OplogProgress file!"
                 logging.critical(info_str)
                 self.doc_manager.stop()
                 self.can_run = False
@@ -418,14 +418,17 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
+    loglevel = logging.INFO
+    logger.setLevel(loglevel)
     
     if options.enable_syslog:
         lh = options.syslog_host.split(":")
         sh = logging.handlers.SysLogHandler(address=(lh[0], int(lh[1])),facility=options.syslog_facility)
+        sh.setLevel(loglevel)
         logger.addHandler(sh)
     else:
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
+        ch.setLevel(loglevel)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
