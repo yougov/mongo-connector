@@ -103,7 +103,7 @@ class DocManager():
         """
         try:
             self.elastic.delete(doc['ns'], 'string', str(doc[self.unique_key]))
-        except:
+        except Exception, e:
             logger.exception("Could not remove doc due to %s. Doc: %r", e, doc)
 
     def _remove(self):
