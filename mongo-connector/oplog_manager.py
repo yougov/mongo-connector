@@ -110,7 +110,7 @@ class OplogThread(threading.Thread):
                 continue
 
             #The only entry is the last one we processed
-            if util.retry_until_ok(cursor.count) == 1:
+            if cursor is None or util.retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
 
