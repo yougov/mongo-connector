@@ -88,7 +88,7 @@ class OplogThread(threading.Thread):
 
         if auth_key is not None:
             #Authenticate for the whole system
-            primary_conn['admin'].authenticate(auth_username, auth_key)
+            self.primary_connection['admin'].authenticate(auth_username, auth_key)
             self.main_connection['admin'].authenticate(auth_username, auth_key)
         if self.oplog.find().count() == 0:
             err_msg = 'OplogThread: No oplog for thread:'
@@ -147,7 +147,7 @@ class OplogThread(threading.Thread):
                 pass
 
             if err is True and self.auth_key is not None:
-                primary_conn['admin'].authenticate(self.auth_username, self.auth_key)
+                self.primary_connection['admin'].authenticate(self.auth_username, self.auth_key)
                 self.main_connection['admin'].authenticate(self.auth_username, self.auth_key)
                 err = False
 
