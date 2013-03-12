@@ -47,7 +47,7 @@ setup(name="mongo-connector",
       #packages = find_packages('src'),  # include all packages under src
       #package_dir = {'':'src'},   # tell distutils packages are under src
       #      scripts=[],
-      install_requires=['pymongo', 'pyes', 'pysolr', 'simplejson'],
+      install_requires=['pymongo', 'pyes', 'pysolr ==2.1.0', 'simplejson'],
 
       package_data={
           '': ['*.xml'],
