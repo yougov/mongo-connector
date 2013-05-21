@@ -72,6 +72,28 @@ class ElasticDocManagerTester(unittest.TestCase):
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
         print("PASSED UPSERT")
 
+    def test_upsert_dbref(self):
+        """
+        Ensure we can properly insert a Doc with a DBRef into ElasticSearch
+        via DocManager.
+        """
+
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        ElasticDoc.upsert(docc)
+        ElasticDoc.commit()
+        res = elastic.search(MatchAllQuery())
+        for doc in res:
+            self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
+
+        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test',
+                'partner': DBRef('test', '1')}
+        ElasticDoc.upsert(docc)
+        ElasticDoc.commit()
+        res = elastic.search(MatchAllQuery())
+        for doc in res:
+            self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
+        print("PASSED UPSERT WITH DBREF")
+
     def test_remove(self):
         """Ensure we can properly delete from ElasticSearch via DocManager.
         """

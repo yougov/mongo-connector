@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright 2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,14 +27,18 @@
     desired backend.
     """
 
+import logging
 import sys
 
 from pyes import ES, ESRange, RangeQuery, MatchAllQuery
 from threading import Timer
 from util import verify_url, retry_until_ok
 from bson.objectid import ObjectId
-import simplejson as json
+import bson.json_util as bsjson
 from util import bson_ts_to_long
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
 
 
 class DocManager():
@@ -74,7 +80,21 @@ class DocManager():
         index = doc['ns']
         doc[self.unique_key] = str(doc[self.unique_key])
         doc_id = doc[self.unique_key]
-        self.elastic.index(doc, index, doc_type, doc_id)
+        
+        try:
+            # it’s important to run the doc through bson.json_utils.dumps before
+            # sending it to pyes because pyes uses json from stdlib, which chokes
+            # on ObjectIds, DBRefs, etc, whereas bson.json_utils.dumps handles them
+            doc_string = bsjson.dumps(doc)
+        except Exception, e:
+            logger.exception("Could not convert BSON document to JSON string due to: %s. Doc: %r", e, doc)
+            return
+
+        try:
+            self.elastic.index(doc_string, index, doc_type, doc_id)
+        except Exception, e:
+            logger.exception("Could not upsert doc due to %s. Doc: %s", e, doc_string)
+
 
     def remove(self, doc):
         """Removes documents from Elastic
@@ -83,8 +103,8 @@ class DocManager():
         """
         try:
             self.elastic.delete(doc['ns'], 'string', str(doc[self.unique_key]))
-        except:
-            pass
+        except Exception, e:
+            logger.exception("Could not remove doc due to %s. Doc: %r", e, doc)
 
     def _remove(self):
         """For test purposes only. Removes all documents in test.test
