@@ -31,6 +31,7 @@ import inspect
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
 doc_folder = cmd_folder.rsplit("/", 1)[0]
+doc_folder += '/doc_managers'
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
 

@@ -50,8 +50,8 @@ setup(name="mongo-connector",
       install_requires=['pymongo', 'pyes', 'pysolr', 'simplejson'],
 
       package_data={
-          '': ['*.xml'],
-          'mongo-connector': ['README.md', 'config.txt']
+          '': ['*.xml', 'README'],
+          'mongo-connector': ['config.txt']
           # If any package contains *.txt files, include them:
           # And include any *.dat files found in the 'data' subdirectory
           # of the 'mypkg' package, also:

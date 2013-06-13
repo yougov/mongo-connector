@@ -22,20 +22,21 @@ import time
 import unittest
 import sys
 import inspect
+
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 2)[0]
+doc_folder = cmd_folder.rsplit("/", 1)[0]
 doc_folder += '/doc_managers'
-
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
 
-test_folder = cmd_folder.rsplit("/", 1)[0]
+test_folder = cmd_folder
 
 if test_folder not in sys.path:
     sys.path.insert(0, test_folder)
 
-mongo_folder = cmd_folder.rsplit("/", 2)[0]
+mongo_folder = cmd_folder.rsplit("/", 1)[0]
+mongo_folder += "/mongo-connector"
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
@@ -43,7 +44,7 @@ from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
 from threading import Timer
-from solr_doc_manager import DocManager
+from doc_managers.solr_doc_manager import DocManager
 from pysolr import Solr
 from mongo_connector import Connector
 from optparse import OptionParser
@@ -54,7 +55,7 @@ from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MAIN": "27217"}
-s = Solr('http://localhost:8080/solr')
+s = Solr('http://localhost:8983/solr')
 conn = None
 NUMBER_OF_DOCS = 100
 
@@ -69,9 +70,9 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
 
         self.c = Connector('localhost:' + PORTS_ONE["MAIN"], 'config.txt',
-                           'http://localhost:8080/solr', ['test.test'], '_id',
-                           None, cmd_folder +
-                           '/../../doc_managers/solr_doc_manager.py')
+                           'http://localhost:8983/solr', ['test.test'], '_id',
+                           None, 
+                           '../mongo-connector/doc_managers/solr_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             time.sleep(1)

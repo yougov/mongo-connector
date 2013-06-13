@@ -26,18 +26,18 @@ import inspect
 
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 2)[0]
+doc_folder = cmd_folder.rsplit("/", 1)[0]
 doc_folder += '/doc_managers'
-
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
 
-test_folder = cmd_folder.rsplit("/", 1)[0]
+test_folder = cmd_folder
 
 if test_folder not in sys.path:
     sys.path.insert(0, test_folder)
 
-mongo_folder = cmd_folder.rsplit("/", 2)[0]
+mongo_folder = cmd_folder.rsplit("/", 1)[0]
+mongo_folder += "/mongo-connector"
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
@@ -45,7 +45,7 @@ from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from pymongo import Connection
 from os import path
 from threading import Timer
-from elastic_doc_manager import DocManager
+from doc_managers.elastic_doc_manager import DocManager
 from mongo_connector import Connector
 from optparse import OptionParser
 from util import retry_until_ok
@@ -77,8 +77,8 @@ class TestSynchronizer(unittest.TestCase):
         self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
                            'config.txt', 'http://localhost:9200',
                            ['test.test'],
-                           '_id', None, cmd_folder +
-                           '/../../doc_managers/elastic_doc_manager.py')
+                           '_id', None,
+                           '../mongo-connector/doc_managers/elastic_doc_manager.py')
         self.c.start()
         while len(self.c.shard_set) == 0:
             pass

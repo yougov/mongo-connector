@@ -23,21 +23,22 @@ import inspect
 
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 2)[0]
+doc_folder = cmd_folder.rsplit("/", 1)[0]
 doc_folder += '/doc_managers'
 
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
 
-mongo_folder = cmd_folder.rsplit("/", 2)[0]
+mongo_folder = cmd_folder.rsplit("/", 1)[0]
+mongo_folder += "/mongo-connector"
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
-from solr_doc_manager import DocManager
+from doc_managers.solr_doc_manager import DocManager
 from pysolr import Solr
 
-SolrDoc = DocManager("http://localhost:8080/solr/")
-solr = Solr("http://localhost:8080/solr/")
+SolrDoc = DocManager("http://localhost:8983/solr/")
+solr = Solr("http://localhost:8983/solr/")
 
 
 class SolrDocManagerTester(unittest.TestCase):
