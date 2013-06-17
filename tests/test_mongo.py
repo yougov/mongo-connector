@@ -23,6 +23,7 @@ import unittest
 import os
 import sys
 import inspect
+import logging
 
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
@@ -91,7 +92,7 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.assertEqual(len(self.c.shard_set), 1)
-        print("PASSED TEST SHARD LENGTH")
+        logging.info("PASSED TEST SHARD LENGTH")
 
     def test_initial(self):
         """Tests search and assures that the databases are clear.
@@ -100,7 +101,7 @@ class TestSynchronizer(unittest.TestCase):
         conn['test']['test'].remove(safe=True)
         self.assertEqual(conn['test']['test'].find().count(), 0)
         self.assertEqual(len(s._search()), 0)
-        print("PASSED TEST INITIAL")
+        logging.info("PASSED TEST INITIAL")
 
     def test_insert(self):
         """Tests insert
@@ -115,7 +116,7 @@ class TestSynchronizer(unittest.TestCase):
         for it in a:
             self.assertEqual(it['_id'], b['_id'])
             self.assertEqual(it['name'], b['name'])
-        print("PASSED TEST INSERT")
+        logging.info("PASSED TEST INSERT")
 
     def test_remove(self):
         """Tests remove
@@ -130,7 +131,7 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         a = s._search()
         self.assertEqual(len(a), 0)
-        print("PASSED TEST REMOVE")
+        logging.info("PASSED TEST REMOVE")
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
@@ -191,7 +192,7 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(it['name'], 'paul')
         find_cursor = retry_until_ok(conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
-        print("PASSED TEST ROLLBACK")
+        logging.info("PASSED TEST ROLLBACK")
 
     def test_stress(self):
         """Test stress by inserting and removing the number of documents
@@ -210,7 +211,7 @@ class TestSynchronizer(unittest.TestCase):
             for it in a:
                 if(it['name'] == 'Paul' + str(i)):
                     self.assertEqual(it['_id'], it['_id'])
-        print("PASSED TEST STRESS")
+        logging.info("PASSED TEST STRESS")
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
@@ -269,10 +270,10 @@ class TestSynchronizer(unittest.TestCase):
         find_cursor = retry_until_ok(conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
 
-        print("PASSED TEST STRESSED ROLBACK")
+        logging.info("PASSED TEST STRESSED ROLBACK")
 
     def abort_test(self):
-        print("TEST FAILED")
+        logging.error("TEST FAILED")
         sys.exit(1)
 
 
@@ -294,8 +295,8 @@ if __name__ == '__main__':
 
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                       replicaSet="demo-repl")
-    print("STARTING TESTS")
+    logging.info("STARTING TESTS")
     unittest.main(argv=[sys.argv[0]])
 
-    print("Done with tests")
+    logging.info("Done with tests")
     clean_up()

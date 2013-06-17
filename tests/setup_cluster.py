@@ -28,6 +28,7 @@ import time
 import os
 import json
 import inspect
+import logging
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
 doc_folder = cmd_folder.rsplit("/", 1)[0]
@@ -264,7 +265,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                print("Could not add shard to mongos")
+                logging.info("Could not add shard to mongos")
                 sys.exit(1)
 
         if sharded:
@@ -287,7 +288,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                print("Could not add shard to mongos")
+                logging.info("Could not add shard to mongos")
                 sys.exit(1)
 
             # shard on the alpha.foo collection

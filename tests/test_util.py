@@ -21,6 +21,7 @@
 import os
 import sys
 import inspect
+import logging
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
 cmd_folder = cmd_folder.rsplit("/", 1)[0]
@@ -68,7 +69,7 @@ class UtilTester(unittest.TestCase):
         self.assertFalse(verify_url(no_http_url))
         self.assertFalse(verify_url(bad_url))
         self.assertFalse(verify_url(good_host_bad_path))
-        print("PASSED TEST VERIFY URL")
+        logging.info("PASSED TEST VERIFY URL")
 
     def test_bson_ts_to_long(self):
         """Test bson_ts_to_long and long_to_bson_ts
@@ -78,7 +79,7 @@ class UtilTester(unittest.TestCase):
 
         self.assertEqual(0x1234567890abcdef, bson_ts_to_long(ts))
         self.assertEqual(long_to_bson_ts(0x1234567890abcdef), ts)
-        print("PASSED BSON TS TO LONG")
+        logging.info("PASSED BSON TS TO LONG")
 
     def test_retry_until_ok(self):
         """Test retry_until_ok
@@ -86,7 +87,7 @@ class UtilTester(unittest.TestCase):
 
         self.assertTrue(retry_until_ok(err_func))
         self.assertEqual(err_func.counter, 3)
-        print("PASSED RETRY UNTIL OK")
+        logging.info("PASSED RETRY UNTIL OK")
 
 
 if __name__ == '__main__':
