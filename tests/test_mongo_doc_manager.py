@@ -21,7 +21,10 @@ if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
 from doc_managers.mongo_doc_manager import DocManager
-from pymongo import Connection
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
 
 MongoDoc = DocManager("localhost:30000")
 mongo = Connection("localhost:30000")['test']['test']

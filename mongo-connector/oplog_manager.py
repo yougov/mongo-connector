@@ -29,6 +29,10 @@ import time
 import threading
 import util
 
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
 
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
@@ -80,9 +84,9 @@ class OplogThread(threading.Thread):
         logging.info('OplogManager: Initializing oplog thread')
 
         if is_sharded:
-            self.main_connection = pymongo.Connection(main_address)
+            self.main_connection = Connection(main_address)
         else:
-            self.main_connection = pymongo.Connection(main_address,
+            self.main_connection = Connection(main_address,
                                                       replicaSet=repl_set)
             self.oplog = self.main_connection['local']['oplog.rs']
 

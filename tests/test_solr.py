@@ -40,8 +40,12 @@ mongo_folder += "/mongo-connector"
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
+
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
-from pymongo import Connection
 from os import path
 from threading import Timer
 from doc_managers.solr_doc_manager import DocManager

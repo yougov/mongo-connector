@@ -4,7 +4,11 @@ import os
 import time
 import inspect
 from os import path
-from pymongo import Connection
+
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
 
 """ Global path variables
     """

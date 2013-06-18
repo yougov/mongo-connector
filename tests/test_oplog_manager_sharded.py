@@ -38,11 +38,15 @@ import json
 import unittest
 import re
 
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
+
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
 from setup_cluster import killMongoProc, startMongoProc, start_cluster
 from optparse import OptionParser
-from pymongo import Connection
 from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
 from threading import Timer
