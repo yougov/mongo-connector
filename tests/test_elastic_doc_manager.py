@@ -52,7 +52,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         except SystemError:
             count += 1
         self.assertTrue(count == 1)
-        logging.info("PASSED INVALID URL")
 
     def test_upsert(self):
         """Ensure we can properly insert into ElasticSearch via DocManager.
@@ -71,7 +70,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         res = elastic.search(MatchAllQuery())
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
-        logging.info("PASSED UPSERT")
 
     def test_remove(self):
         """Ensure we can properly delete from ElasticSearch via DocManager.
@@ -87,7 +85,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         ElasticDoc.commit()
         res = elastic.search(MatchAllQuery())
         self.assertTrue(len(res) == 0)
-        logging.info("PASSED REMOVE")
 
     def test_full_search(self):
         """Query ElasticSearch for all docs via API and via DocManager's
@@ -105,7 +102,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
-        logging.info("PASSED _SEARCH")
 
     def test_search(self):
         """Query ElasticSearch for docs in a timestamp range.
@@ -127,7 +123,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) == 2)
         self.assertTrue(list(search)[0]['name'] == 'John')
         self.assertTrue(list(search)[1]['name'] == 'John Paul')
-        logging.info("PASSED SEARCH")
 
     def test_elastic_commit(self):
         """Test that documents get properly added to ElasticSearch.
@@ -142,7 +137,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         assert(len(res) != 0)
         for it in res:
             assert(it['name'] == 'Waldo')
-        logging.info("PASSED COMMIT")
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
@@ -162,7 +156,6 @@ class ElasticDocManagerTester(unittest.TestCase):
         elastic.refresh()
         doc = ElasticDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
-        logging.info("PASSED GET LAST DOC")
 
 if __name__ == '__main__':
     unittest.main()

@@ -33,7 +33,6 @@ import time
 import json
 import re
 import unittest
-import logging
 
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
@@ -162,7 +161,6 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry), None)
 
         #test_oplog.join()
-        logging.info("PASSED TEST RETRIEVE DOC")
 
     def test_get_oplog_cursor(self):
         """Test get_oplog_cursor in oplog_manager. Assertion failure if
@@ -194,7 +192,6 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['test']['test'].insert({'name': 'pauline'})
         self.assertEqual(test_oplog.get_oplog_cursor(ts), None)
         #test_oplog.join()
-        logging.info("PASSED TEST GET OPLOG CURSOR")
         #need to add tests for 'except' part of get_oplog_cursor
 
     def test_get_last_oplog_timestamp(self):
@@ -214,7 +211,6 @@ class TestOplogManager(unittest.TestCase):
                          last_oplog_entry['ts'])
 
         #test_oplog.join()
-        logging.info("PASSED TEST GET LAST OPLOG TIMESTAMP")
 
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager. Assertion failure if it
@@ -239,7 +235,6 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(solr_doc['ns'], 'test.test')
 
         #test_oplog.join()
-        logging.info("PASSED TEST DUMP COLLECTION")
 
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it
@@ -271,7 +266,6 @@ class TestOplogManager(unittest.TestCase):
                         test_oplog.checkpoint)
 
         os.system('rm temp_config.txt')
-        logging.info("PASSED TEST INIT CURSOR")
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -318,7 +312,6 @@ class TestOplogManager(unittest.TestCase):
                 count += 1
                 if count > 60:
                     string = 'Call to insert doc failed too many times'
-                    logging.error(string)
                     sys.exit(1)
                 time.sleep(1)
                 continue
@@ -364,7 +357,6 @@ class TestOplogManager(unittest.TestCase):
         self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
 
         #test_oplog.join()
-        logging.info("PASSED TEST ROLLBACK")
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')

@@ -21,7 +21,6 @@
 import os
 import sys
 import inspect
-import logging
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
 cmd_folder = cmd_folder.rsplit("/", 1)[0]
@@ -96,7 +95,6 @@ class MongoInternalTester(unittest.TestCase):
 
         os.system('rm ' + config_file_path)
         config_file.close()
-        logging.info("PASSED TEST WRITE OPLOG PROGRESS")
 
     def test_read_oplog_progress(self):
         """Test read_oplog_progress
@@ -136,7 +134,6 @@ class MongoInternalTester(unittest.TestCase):
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
         os.system('rm ' + config_file_path)
-        logging.info("PASSED TEST READ OPLOG PROGRESS")
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')

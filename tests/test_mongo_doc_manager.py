@@ -7,7 +7,6 @@ import time
 import sys
 import inspect
 import os
-import logging
 
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
@@ -59,7 +58,6 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(res.count() == 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
-        logging.info("PASSED UPSERT")
 
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
@@ -75,7 +73,6 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(1)
         res = mongo.find()
         self.assertTrue(res.count() == 0)
-        logging.info("PASSED REMOVE")
 
     def test_full_search(self):
         """Query Mongo for all docs via API and via DocManager's
@@ -93,7 +90,6 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
-        logging.info("PASSED _SEARCH")
 
     def test_search(self):
         """Query Mongo for docs in a timestamp range.
@@ -114,7 +110,6 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(len(search) == 2)
         self.assertTrue(list(search)[0]['name'] == 'John')
         self.assertTrue(list(search)[1]['name'] == 'John Paul')
-        logging.info("PASSED SEARCH")
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
@@ -134,7 +129,6 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(3)
         doc = MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
-        logging.info("PASSED GET LAST DOC")
 
 if __name__ == '__main__':
     unittest.main()

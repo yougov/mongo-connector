@@ -22,7 +22,6 @@ import time
 import unittest
 import sys
 import inspect
-import logging
 
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
@@ -88,7 +87,6 @@ class TestSynchronizer(unittest.TestCase):
                 if count > 60:
                     string = 'Call to remove failed too many times'
                     string += ' in setUp'
-                    logging.error(string)
                     sys.exit(1)
         while (len(s.search('*:*')) != 0):
             time.sleep(1)
@@ -103,7 +101,6 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.assertEqual(len(self.c.shard_set), 1)
-        logging.info("PASSED TEST SHARD LENGTH")
 
     def test_initial(self):
         """Tests search and assures that the databases are clear.
@@ -119,7 +116,6 @@ class TestSynchronizer(unittest.TestCase):
         s.delete(q='*:*')
         self.assertEqual(conn['test']['test'].find().count(), 0)
         self.assertEqual(len(s.search('*:*')), 0)
-        logging.info("PASSED TEST INITIAL")
 
     def test_insert(self):
         """Tests insert
@@ -134,7 +130,6 @@ class TestSynchronizer(unittest.TestCase):
         for it in a:
             self.assertEqual(it['_id'], str(b['_id']))
             self.assertEqual(it['name'], b['name'])
-        logging.info("PASSED TEST INSERT")
 
     def test_remove(self):
         """Tests remove
@@ -145,7 +140,6 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         a = s.search('paulie')
         self.assertEqual(len(a), 0)
-        logging.info("PASSED TEST REMOVE")
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by inserting one doc, killing
@@ -177,7 +171,6 @@ class TestSynchronizer(unittest.TestCase):
                 if count > 60:
                     string = 'Call to insert failed too many times'
                     string += ' in test_rollback'
-                    logging.error(string)
                     sys.exit(1)
                 time.sleep(1)
                 continue
@@ -206,7 +199,6 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 0)
         a = s.search('paul')
         self.assertEqual(len(a), 1)
-        logging.info("PASSED TEST ROLLBACK")
 
     def test_stress(self):
         """Test stress by inserting and removing a large amount of docs.
@@ -222,7 +214,6 @@ class TestSynchronizer(unittest.TestCase):
             b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
             for it in a:
                 self.assertEqual(it['_id'], it['_id'])
-        logging.info("PASSED TEST STRESS")
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
@@ -280,10 +271,8 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 0)
         a = s.search('Paul', rows=NUMBER_OF_DOCS * 2)
         self.assertEqual(len(a), NUMBER_OF_DOCS)
-        logging.info("PASSED TEST STRESSED ROLBACK")
 
     def abort_test(self):
-        logging.error("TEST FAILED")
         sys.exit(1)
 
 if __name__ == '__main__':
