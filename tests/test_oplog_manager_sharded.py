@@ -76,9 +76,7 @@ def safe_mongo_op(func, arg1, arg2=None):
         time.sleep(1)
         count += 1
         if (count > 60):
-            string = 'Call to %s failed too many times' % func
-            string += ' in safe_mongo_op'
-            sys.exit(1)
+            self.fail('Call to %s failed too many times in safe_mongo_op')
         try:
             if arg2:
                 func(arg1, arg2, safe=True)
@@ -95,6 +93,11 @@ class TestOplogManagerSharded(unittest.TestCase):
 
     def runTest(self):
         unittest.TestCase.__init__(self)
+
+    @classmethod
+    def setUpClass(cls):
+        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
+            self.fail("Shards cannot be added to mongos")
 
     def get_oplog_thread(self):
         """ Set up connection with mongo.
@@ -294,7 +297,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         os.system('rm config.txt; touch config.txt')
-        start_cluster(sharded=True)
+        if start_cluster(sharded=True) == False:
+            self.fail("Shards cannot be added to mongos")
 
         test_oplog, primary_conn, oplog_coll, mongos = self.get_new_oplog()
 
@@ -329,9 +333,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                 time.sleep(1)
                 count += 1
                 if count > 60:
-                    string = 'Insert failed too many times'
-                    string += ' in rollback'
-                    sys.exit(1)
+                    self.fail('Insert failed too many times in rollback')
                 continue
 
         killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])
@@ -390,7 +392,6 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     if options.auth_file != "":
-        start_cluster(sharded=True, key_file=options.auth_file)
         try:
             file = open(options.auth_file)
             key = file.read()
@@ -398,10 +399,7 @@ if __name__ == '__main__':
             AUTH_KEY = key
             AUTH_USERNAME = options.auth_user
         except:
-           #  logger.error('Could not parse authentication file!')
-            exit(1)
-    else:
-        start_cluster(sharded=True)
+            self.fail('Could not parse authentication file!')
 
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
     unittest.main(argv=[sys.argv[0]])

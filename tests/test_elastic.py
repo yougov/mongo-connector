@@ -67,6 +67,11 @@ class TestSynchronizer(unittest.TestCase):
 
     def runTest(self):
         unittest.TestCase.__init__(self)
+    
+    @classmethod
+    def setUpClass(cls):    
+        if start_cluster() == False:
+            self.fail("Shards cannot be added to mongos")
 
     def tearDown(self):
         self.c.doc_manager.auto_commit = False
@@ -265,10 +270,6 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
 
 
-
-def abort_test(self):
-        sys.exit(1)
-
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
     parser = OptionParser()
@@ -282,7 +283,6 @@ if __name__ == '__main__':
     PORTS_ONE['MONGOS'] = options.main_addr
     s = DocManager('http://localhost:9200', auto_commit=False)
     s._remove()
-    start_cluster()
 
     conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                       replicaSet="demo-repl")

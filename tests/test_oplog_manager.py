@@ -64,6 +64,11 @@ class TestOplogManager(unittest.TestCase):
     def runTest(self):
         unittest.TestCase.__init__(self)
 
+    @classmethod
+    def setUpClass(cls):
+        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
+            self.fail("Shards cannot be added to mongos")
+
     def get_oplog_thread(self):
         """ Set up connection with mongo. Returns oplog, the connection and
             oplog collection
@@ -119,7 +124,7 @@ class TestOplogManager(unittest.TestCase):
                             namespace_set, AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
-
+    
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't
             pass
@@ -274,16 +279,18 @@ class TestOplogManager(unittest.TestCase):
             both.
         """
         os.system('rm config.txt; touch config.txt')
-        start_cluster()
         test_oplog, primary_conn, mongos, oplog_coll = self.get_new_oplog()
+
         solr = DocManager()
         test_oplog.doc_manager = solr
         solr._delete()          # equivalent to solr.delete(q='*: *')
         obj1 = ObjectId('4ff74db3f646462b38000001')
 
         mongos['test']['test'].remove({})
-        mongos['test']['test'].insert({'_id': obj1, 'name': 'paulie'},
-                                      safe=1)
+        mongos['test']['test'].insert( {'_id': obj1, 
+                                     'name': 'paulie'},
+                                     safe=True
+                                     )
         while (mongos['test']['test'].find().count() != 1):
             time.sleep(1)
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
@@ -297,7 +304,6 @@ class TestOplogManager(unittest.TestCase):
         killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
-
         admin = new_primary_conn['admin']
         while admin.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -305,14 +311,12 @@ class TestOplogManager(unittest.TestCase):
         count = 0
         while True:
             try:
-                current_conn = mongos['test']['test']
-                current_conn.insert({'_id':  obj2, 'name':  'paul'}, safe=1)
+                mongos['test']['test'].insert({'_id':  obj2, 'name':  'paul'}, safe=True)
                 break
-            except:
+            except e:
                 count += 1
                 if count > 60:
-                    string = 'Call to insert doc failed too many times'
-                    sys.exit(1)
+                    self.fail('Call to insert doc failed too many times')
                 time.sleep(1)
                 continue
         while (mongos['test']['test'].find().count() != 2):
@@ -332,7 +336,7 @@ class TestOplogManager(unittest.TestCase):
         admin = new_primary_conn['admin']
         while admin.command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
-
+        
         while retry_until_ok(mongos['test']['test'].find().count) != 1:
             time.sleep(1)
 
@@ -380,19 +384,6 @@ if __name__ == '__main__':
 
     PORTS_ONE["MAIN"] = options.main_addr
 
-    if options.auth_file != "":
-        start_cluster(key_file=options.auth_file)
-        try:
-            file = open(options.auth_file)
-            key = file.read()
-            re.sub(r'\s', '', key)
-            AUTH_KEY = key
-            AUTH_USERNAME = options.auth_user
-        except:
-           # logger.error('Could not parse authentication file!')
-            exit(1)
-    else:
-        start_cluster()
 
     conn = Connection('localhost:' + PORTS_ONE['MAIN'], replicaSet="demo-repl")
     unittest.main(argv=[sys.argv[0]])

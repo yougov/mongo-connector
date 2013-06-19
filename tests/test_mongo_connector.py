@@ -45,6 +45,14 @@ class MongoInternalTester(unittest.TestCase):
     def runTest(self):
         unittest.TestCase.__init__(self)
 
+    @classmethod
+    def setUpClass(cls):    
+        use_mongos=True
+        if main_address.split(":")[1] != "27217":
+            use_mongos = False
+        if start_cluster(use_mongos=use_mongos) == False:
+            self.fail("Shards cannot be added to mongos")
+
     def test_connector(self):
         """Test whether the connector initiates properly
         """
@@ -147,9 +155,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     main_address = "localhost:" + options.main_addr
-    if options.main_addr != "27217":
-        start_cluster(use_mongos=False)
-    else:
-        start_cluster(use_mongos=True)
+
+        
 
     unittest.main(argv=[sys.argv[0]])

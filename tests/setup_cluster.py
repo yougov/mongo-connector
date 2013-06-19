@@ -95,6 +95,14 @@ def killAllMongoProc(host, ports):
     for port in ports.values():
         killMongoProc(host, port)
 
+""" Creates a single mongod instance """
+def startSingleMongodInstance(port, data, log):
+    remove_dir(DEMO_SERVER_DATA + data)
+    create_dir(DEMO_SERVER_DATA + data) 
+    CMD = ["mongod --fork --noprealloc --port %s --dbpath %s/%s --logpath %s/%s --logappend" 
+         % (port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log) ]         
+    executeCommand(CMD[0])
+    checkStarted(int(port))
 
 def startMongoProc(port, replSetName, data, log, key_file):
     """Create the replica set
@@ -264,7 +272,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                sys.exit(1)
+                return False
 
         if sharded:
             primary2 = Connection('localhost:27317')
@@ -286,7 +294,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                     time.sleep(1)
 
             if counter == 0:
-                sys.exit(1)
+                return False
 
             # shard on the alpha.foo collection
             admin_db = mongos.admin
@@ -300,3 +308,4 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
         secondary = Connection('localhost:27118')
         while secondary.admin.command("replSetGetStatus")['myState'] is not 2:
             time.sleep(1)
+        return True    

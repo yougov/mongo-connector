@@ -21,6 +21,7 @@
 import os
 import sys
 import inspect
+
 file = inspect.getfile(inspect.currentframe())
 cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
 
@@ -32,7 +33,6 @@ if cmd_folder not in sys.path:
 doc_folder = cmd_folder + '/doc_managers'
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
-
 
 import time
 import unittest
@@ -51,19 +51,35 @@ from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
 """
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27117"}
-conn = None
 NUMBER_OF_DOCS = 100
 c = None
 s = None
-
 
 class TestSynchronizer(unittest.TestCase):
 
     def runTest(self):
         unittest.TestCase.__init__(self)
 
+    @classmethod
+    def setUpClass(cls):
+        use_mongos = True    
+        if PORTS_ONE['MONGOS'] != "27217":
+            use_mongos = False
+
+        if start_cluster(use_mongos=use_mongos) == False:
+            self.fail("Shards cannot be added to mongos")
+            
+        cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+                          replicaSet="demo-repl")
+        t = Timer(60, abort_test)
+        t.start()
+        c.start()
+        while len(c.shard_set) == 0:
+            pass
+        t.cancel()
+
     def setUp(self):
-        conn['test']['test'].remove(safe=True)
+        self.conn['test']['test'].remove(safe=True)
         while (len(s._search()) != 0):
             time.sleep(1)
 
@@ -75,20 +91,20 @@ class TestSynchronizer(unittest.TestCase):
     def test_initial(self):
         """Tests search and assures that the databases are clear.
         """
-        conn['test']['test'].remove(safe=True)
+        self.conn['test']['test'].remove(safe=True)
         s._delete()
-        self.assertEqual(conn['test']['test'].find().count(), 0)
+        self.assertEqual(self.conn['test']['test'].find().count(), 0)
         self.assertEqual(len(s._search()), 0)
 
     def test_insert(self):
         """Tests insert
         """
-        conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
         while (len(s._search()) == 0):
             time.sleep(1)
         a = s._search()
         self.assertEqual(len(a), 1)
-        b = conn['test']['test'].find_one()
+        b = self.conn['test']['test'].find_one()
         for it in a:
             self.assertEqual(it['_id'], b['_id'])
             self.assertEqual(it['name'], b['name'])
@@ -97,10 +113,10 @@ class TestSynchronizer(unittest.TestCase):
         """Tests remove
         """
 
-        conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
         while (len(s._search()) != 1):
             time.sleep(1)
-        conn['test']['test'].remove({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
 
         while (len(s._search()) == 1):
             time.sleep(1)
@@ -114,8 +130,8 @@ class TestSynchronizer(unittest.TestCase):
         """
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
-        conn['test']['test'].insert({'name': 'paul'}, safe=True)
-        while conn['test']['test'].find({'name': 'paul'}).count() != 1:
+        self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
 
         killMongoProc('localhost', PORTS_ONE['PRIMARY'])
@@ -129,20 +145,18 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while True:
             try:
-                a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
+                a = self.conn['test']['test'].insert({'name': 'pauline'}, safe=True)
                 break
             except:
                 count += 1
                 if count > 60:
-                    string = 'Call to insert failed too many times'
-                    string += ' in test_rollback'
-                    sys.exit(1)
+                    self.fail('Call to insert failed too many times in test_rollback')
                 time.sleep(1)
                 continue
         while (len(s._search()) != 2):
             time.sleep(1)
         a = s._search()
-        b = conn['test']['test'].find_one({'name': 'pauline'})
+        b = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(a), 2)
         for it in a:
             if it['name'] == 'pauline':
@@ -162,7 +176,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), 1)
         for it in a:
             self.assertEqual(it['name'], 'paul')
-        find_cursor = retry_until_ok(conn['test']['test'].find)
+        find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
                 #self.assertEqual(conn['test']['test'].find().count(), 1)
 
@@ -170,7 +184,7 @@ class TestSynchronizer(unittest.TestCase):
         """Stress test the system by inserting a large number of docs.
         """
         for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)})
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
         while len(s._search()) != NUMBER_OF_DOCS:
             time.sleep(5)
@@ -178,7 +192,7 @@ class TestSynchronizer(unittest.TestCase):
         for i in range(0, NUMBER_OF_DOCS):
             #a = s.search('Paul ' + str(i))
             a = s._search()
-            b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
+            b = self.conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
             for it in a:
                 if (it['name'] == 'Paul' + str(i)):
                     self.assertEqual(it['_id'], it['_id'])
@@ -191,7 +205,7 @@ class TestSynchronizer(unittest.TestCase):
         while len(s._search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
 
         while len(s._search()) != NUMBER_OF_DOCS:
             time.sleep(1)
@@ -207,17 +221,17 @@ class TestSynchronizer(unittest.TestCase):
         while count + 1 < NUMBER_OF_DOCS:
             try:
                 count += 1
-                conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
+                self.conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
                                             safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(s._search()) != conn['test']['test'].find().count()):
+        while (len(s._search()) != self.conn['test']['test'].find().count()):
             time.sleep(1)
         a = s._search()
         i = 0
         for it in a:
             if 'Pauline' in it['name']:
-                b = conn['test']['test'].find_one({'name': it['name']})
+                b = self.conn['test']['test'].find_one({'name': it['name']})
                 self.assertEqual(it['_id'], b['_id'])
 
         killMongoProc('localhost', PORTS_ONE['SECONDARY'])
@@ -237,7 +251,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(a), NUMBER_OF_DOCS)
         for it in a:
             self.assertTrue('Paul' in it['name'])
-        find_cursor = retry_until_ok(conn['test']['test'].find)
+        find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
 
 
@@ -259,17 +273,5 @@ if __name__ == '__main__':
     c = Connector('localhost:' + PORTS_ONE["MONGOS"], 'config.txt', None,
                   ['test.test'], '_id', None, None)
     s = c.doc_manager
-    if options.main_addr != "27217":
-        start_cluster(use_mongos=False)
-    else:
-        start_cluster()
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
-                      replicaSet="demo-repl")
-    t = Timer(60, abort_test)
-    t.start()
-    c.start()
-    while len(c.shard_set) == 0:
-        pass
-    t.cancel()
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main()
     c.join()
