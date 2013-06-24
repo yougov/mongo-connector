@@ -71,6 +71,11 @@ class TestSynchronizer(unittest.TestCase):
     def runTest(self):
         unittest.TestCase.__init__(self)
 
+    @classmethod
+    def setUpClass(cls):
+        if not start_cluster():
+            self.fail("Shards cannot be added to mongos")
+
     def setUp(self):
 
         self.c = Connector('localhost:' + PORTS_ONE["MAIN"], 'config.txt',
@@ -89,9 +94,8 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
                 count += 1
                 if count > 60:
-                    string = 'Call to remove failed too many times'
-                    string += ' in setUp'
-                    sys.exit(1)
+                    unittest.SkipTest('Call to remove failed too '
+                    'many times in setup')
         while (len(s.search('*:*')) != 0):
             time.sleep(1)
 
@@ -173,9 +177,8 @@ class TestSynchronizer(unittest.TestCase):
             except:
                 count += 1
                 if count > 60:
-                    string = 'Call to insert failed too many times'
-                    string += ' in test_rollback'
-                    sys.exit(1)
+                    self.fail('Call to insert failed too many '
+                    'times in test_rollback')
                 time.sleep(1)
                 continue
 
@@ -276,9 +279,6 @@ class TestSynchronizer(unittest.TestCase):
         a = s.search('Paul', rows=NUMBER_OF_DOCS * 2)
         self.assertEqual(len(a), NUMBER_OF_DOCS)
 
-    def abort_test(self):
-        sys.exit(1)
-
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
     s.delete(q='*:*')
@@ -291,7 +291,6 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     PORTS_ONE['MAIN'] = options.main_addr
-    start_cluster()
     conn = Connection('localhost:' + PORTS_ONE['MAIN'],
                       replicaSet="demo-repl")
 
