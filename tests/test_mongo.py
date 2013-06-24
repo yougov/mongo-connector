@@ -42,7 +42,10 @@ mongo_folder += "/mongo-connector"
 if mongo_folder not in sys.path:
     sys.path.insert(0, mongo_folder)
 
-from setup_cluster import killMongoProc, startMongoProc, start_cluster, startSingleMongodInstance
+from setup_cluster import (killMongoProc,
+                           startMongoProc,
+                           start_cluster,
+                            startSingleMongodInstance)
 from pymongo import Connection
 from os import path
 from threading import Timer
@@ -73,7 +76,7 @@ class TestSynchronizer(unittest.TestCase):
         startSingleMongodInstance("30000", "/MC", "MC_log")
         cls.s = DocManager('localhost:30000')
         cls.s._remove()
-        if start_cluster() == False:
+        if not start_cluster():
             self.fail("Shards cannot be added to mongos")
         cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                           replicaSet="demo-repl")
@@ -165,7 +168,8 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while True:
             try:
-                a = self.conn['test']['test'].insert({'name': 'pauline'}, safe=True)
+                a = self.conn['test']['test'].insert({'name': 'pauline'}, 
+                    safe=True)
                 break
             except:
                 time.sleep(1)
@@ -226,7 +230,8 @@ class TestSynchronizer(unittest.TestCase):
         while len(self.s._search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, 
+                safe=True)
 
         while len(self.s._search()) != NUMBER_OF_DOCS:
             time.sleep(1)
@@ -243,11 +248,12 @@ class TestSynchronizer(unittest.TestCase):
         while count + 1 < NUMBER_OF_DOCS:
             try:
                 count += 1
-                self.conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
-                                            safe=True)
+                self.conn['test']['test'].insert({'name': 'Pauline ' + 
+                    str(count)}, safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(self.s._search()) != self.conn['test']['test'].find().count()):
+        while (len(self.s._search()) != 
+                self.conn['test']['test'].find().count()):
             time.sleep(1)
         a = self.s._search()
         for it in a:

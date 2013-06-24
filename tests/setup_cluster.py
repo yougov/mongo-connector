@@ -99,8 +99,9 @@ def killAllMongoProc(host, ports):
 def startSingleMongodInstance(port, data, log):
     remove_dir(DEMO_SERVER_DATA + data)
     create_dir(DEMO_SERVER_DATA + data) 
-    CMD = ["mongod --fork --noprealloc --port %s --dbpath %s/%s --logpath %s/%s --logappend" 
-         % (port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log) ]         
+    CMD = ("mongod --fork --noprealloc --port %s --dbpath %s/%s "
+           "--logpath %s/%s --logappend" %
+          (port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log))
     executeCommand(CMD[0])
     checkStarted(int(port))
 

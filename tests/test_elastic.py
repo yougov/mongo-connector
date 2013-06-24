@@ -70,7 +70,7 @@ class TestSynchronizer(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):    
-        if start_cluster() == False:
+        if not start_cluster():
             self.fail("Shards cannot be added to mongos")
 
     def tearDown(self):

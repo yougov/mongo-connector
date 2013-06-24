@@ -66,7 +66,7 @@ class TestSynchronizer(unittest.TestCase):
         if PORTS_ONE['MONGOS'] != "27217":
             use_mongos = False
 
-        if start_cluster(use_mongos=use_mongos) == False:
+        if not start_cluster(use_mongos=use_mongos):
             self.fail("Shards cannot be added to mongos")
             
         cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
@@ -205,7 +205,8 @@ class TestSynchronizer(unittest.TestCase):
         while len(s._search()) != 0:
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOCS):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)},
+                 safe=True)
 
         while len(s._search()) != NUMBER_OF_DOCS:
             time.sleep(1)
@@ -221,8 +222,8 @@ class TestSynchronizer(unittest.TestCase):
         while count + 1 < NUMBER_OF_DOCS:
             try:
                 count += 1
-                self.conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
-                                            safe=True)
+                self.conn['test']['test'].insert({'name': 'Pauline ' 
+                    + str(count)}, safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
         while (len(s._search()) != self.conn['test']['test'].find().count()):

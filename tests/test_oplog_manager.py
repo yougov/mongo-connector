@@ -66,7 +66,7 @@ class TestOplogManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
+        if not start_cluster(sharded=True, key_file=AUTH_KEY):
             self.fail("Shards cannot be added to mongos")
 
     def get_oplog_thread(self):
@@ -124,7 +124,7 @@ class TestOplogManager(unittest.TestCase):
                             namespace_set, AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
-    
+
     def test_retrieve_doc(self):
         """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't
             pass
@@ -311,9 +311,11 @@ class TestOplogManager(unittest.TestCase):
         count = 0
         while True:
             try:
-                mongos['test']['test'].insert({'_id':  obj2, 'name':  'paul'}, safe=True)
+                mongos['test']['test'].insert({'_id':  obj2, 
+                                              'name':  'paul'}, 
+                                              safe=True)
                 break
-            except e:
+            except Exception:
                 count += 1
                 if count > 60:
                     self.fail('Call to insert doc failed too many times')
@@ -336,7 +338,6 @@ class TestOplogManager(unittest.TestCase):
         admin = new_primary_conn['admin']
         while admin.command("replSetGetStatus")['myState'] != 2:
             time.sleep(1)
-        
         while retry_until_ok(mongos['test']['test'].find().count) != 1:
             time.sleep(1)
 

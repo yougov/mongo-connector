@@ -50,7 +50,7 @@ class MongoInternalTester(unittest.TestCase):
         use_mongos=True
         if main_address.split(":")[1] != "27217":
             use_mongos = False
-        if start_cluster(use_mongos=use_mongos) == False:
+        if not start_cluster(use_mongos=use_mongos):
             self.fail("Shards cannot be added to mongos")
 
     def test_connector(self):

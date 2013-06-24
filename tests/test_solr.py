@@ -69,7 +69,7 @@ class TestSynchronizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if start_cluster() == False:
+        if not start_cluster():
             self.fail("Shards cannot be added to mongos")
 
     def setUp(self):
@@ -90,7 +90,8 @@ class TestSynchronizer(unittest.TestCase):
                 time.sleep(1)
                 count += 1
                 if count > 60:
-                    unittest.SkipTest('Call to remove failed too many times in setup')
+                    unittest.SkipTest('Call to remove failed too '
+                    'many times in setup')
         while (len(s.search('*:*')) != 0):
             time.sleep(1)
 
@@ -172,7 +173,8 @@ class TestSynchronizer(unittest.TestCase):
             except:
                 count += 1
                 if count > 60:
-                    self.fail('Call to insert failed too many times in test_rollback')
+                    self.fail('Call to insert failed too many '
+                    'times in test_rollback')
                 time.sleep(1)
                 continue
 

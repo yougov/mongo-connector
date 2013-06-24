@@ -76,7 +76,7 @@ def safe_mongo_op(func, arg1, arg2=None):
         time.sleep(1)
         count += 1
         if (count > 60):
-            self.fail('Call to %s failed too many times in safe_mongo_op')
+            self.fail('Call %s failed too many times in safe_mongo_op' % (func))
         try:
             if arg2:
                 func(arg1, arg2, safe=True)
@@ -96,7 +96,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
+        if not start_cluster(sharded=True, key_file=AUTH_KEY):
             self.fail("Shards cannot be added to mongos")
 
     def get_oplog_thread(self):
@@ -297,7 +297,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         os.system('rm config.txt; touch config.txt')
-        if start_cluster(sharded=True) == False:
+        if not start_cluster(sharded=True):
             self.fail("Shards cannot be added to mongos")
 
         test_oplog, primary_conn, oplog_coll, mongos = self.get_new_oplog()
