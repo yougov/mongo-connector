@@ -35,8 +35,11 @@ doc_folder += '/doc_managers'
 if doc_folder not in sys.path:
     sys.path.insert(0, doc_folder)
 
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
 
-from pymongo import Connection
 from pymongo.errors import ConnectionFailure, OperationFailure
 from os import path
 from util import retry_until_ok

@@ -23,7 +23,6 @@ import time
 import logging
 
 from bson.timestamp import Timestamp
-from pymongo import Connection
 try:
     from urllib2 import urlopen
 except:

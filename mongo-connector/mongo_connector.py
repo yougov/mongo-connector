@@ -36,6 +36,11 @@ import imp
 from locking_dict import LockingDict
 
 try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
+
+try:
     import simplejson as json
 except:
     import json
@@ -188,7 +193,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = pymongo.Connection(self.address)
+        main_conn = Connection(self.address)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key) 
         self.read_oplog_progress()
@@ -263,7 +268,7 @@ class Connector(threading.Thread):
                         self.doc_manager.stop()
                         return
 
-                    shard_conn = pymongo.Connection(hosts, replicaset=repl_set)
+                    shard_conn = Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
                     oplog = oplog_manager.OplogThread(shard_conn, self.address,
                                                       oplog_coll, True,
