@@ -27,7 +27,7 @@
 
 import sys
 
-from pyes import ES, ESRange, RangeQuery, MatchAllQuery
+from pyes import ES, ESRange, RangeQuery, MatchAllQuery, TextQuery
 from threading import Timer
 from util import verify_url, retry_until_ok
 from bson.objectid import ObjectId
@@ -69,12 +69,24 @@ class DocManager():
         If you'd like to have different types of document in your database,
         you can store the doc type as a field in Mongo and set doc_type to
         that field. (e.g. doc_type = doc['_type'])
+
         """
+
+        # There is a problem with ES .90.0 and possibly .90.1 with indices not be correctly handled.
+        # This ensures that an upsert correctly happens
+
         doc_type = self.doc_type
         index = doc['ns']
         doc[self.unique_key] = str(doc[self.unique_key])
         doc_id = doc[self.unique_key]
-        self.elastic.index(doc, index, doc_type, doc_id)
+        id_query = TextQuery('_id', doc_id)
+        elastic_cursor = self.elastic.search(query=id_query, indices=index)
+
+        if elastic_cursor.total == 0:
+          self.elastic.index(doc, index, doc_type, doc_id)
+        else:  
+          self.elastic.update(doc, index, doc_type, doc_id)
+        self.elastic.refresh()
 
     def remove(self, doc):
         """Removes documents from Elastic
@@ -128,7 +140,7 @@ class DocManager():
 
         it = None
         q = MatchAllQuery()
-        result = self.elastic.search(q, size=1, sort={'_ts:desc'})
+        result = self.elastic.search(q, size=1, sort='_ts:desc')
         for it in result:
             r = it
             break

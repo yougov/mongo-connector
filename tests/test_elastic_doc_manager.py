@@ -131,7 +131,7 @@ class ElasticDocManagerTester(unittest.TestCase):
         docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
         ElasticDoc.upsert(docc)
         res = ElasticDoc._search()
-        assert(len(res) == 0)
+        assert(len(res) == 1)
         time.sleep(2)
         res = ElasticDoc._search()
         assert(len(res) != 0)

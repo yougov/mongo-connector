@@ -102,7 +102,7 @@ def startSingleMongodInstance(port, data, log):
     CMD = ("mongod --fork --noprealloc --port %s --dbpath %s/%s "
            "--logpath %s/%s --logappend" %
           (port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log))
-    executeCommand(CMD[0])
+    executeCommand(CMD)
     checkStarted(int(port))
 
 def startMongoProc(port, replSetName, data, log, key_file):
