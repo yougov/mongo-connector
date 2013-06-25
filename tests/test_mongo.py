@@ -46,7 +46,10 @@ from setup_cluster import (killMongoProc,
                            startMongoProc,
                            start_cluster,
                             startSingleMongodInstance)
-from pymongo import Connection
+try:
+    from pymongo import MongoClient as Connection
+except ImportError:
+    from pymongo import Connection    
 from os import path
 from threading import Timer
 from doc_managers.mongo_doc_manager import DocManager
