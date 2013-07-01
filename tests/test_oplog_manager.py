@@ -21,58 +21,73 @@
 import os
 import sys
 import inspect
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-cmd_folder = cmd_folder.rsplit("/", 1)[0]
-cmd_folder += "/mongo-connector"
-if cmd_folder not in sys.path:
-    sys.path.insert(0, cmd_folder)
-
-import subprocess
 import time
-import json
-import re
 import unittest
+import re
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
+CMD_DIR += "/mongo-connector"
+if CMD_DIR not in sys.path:
+    sys.path.insert(0, CMD_DIR)
+
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
-from setup_cluster import killMongoProc, startMongoProc, start_cluster
-from pymongo.errors import ConnectionFailure
-from os import path
+from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from pymongo.errors import OperationFailure
 from optparse import OptionParser
 from oplog_manager import OplogThread
-from pysolr import Solr
 from util import(long_to_bson_ts,
                  bson_ts_to_long,
                  retry_until_ok)
 from bson.objectid import ObjectId
 
-""" Global path variables
-"""
 PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
              "CONFIG":  "27220", "MAIN":  "27217"}
 
-AUTH_KEY = None
+AUTH_FILE = None
 AUTH_USERNAME = None
-
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
         cluster
     """
     def runTest(self):
+        """Runs all Tests
+        """
         unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
-        if not start_cluster(sharded=True, key_file=AUTH_KEY):
+        """ Initializes the cluster
+        """
+        cls.AUTH_KEY = None
+        cls.flag = True
+        if AUTH_FILE:
+            # We want to get the credentials from this file
+            try:
+                key = (open(AUTH_FILE)).read()
+                re.sub(r'\s', '', key)
+                cls.AUTH_KEY = key
+            except IOError:
+                print('Could not parse authentication file!')
+
+        if not start_cluster(key_file=AUTH_FILE):
+            cls.flag = False
+
+    def setUp(self):
+        """ Fails if we were unable to start the cluster
+        """
+        if not self.flag:
             self.fail("Shards cannot be added to mongos")
 
-    def get_oplog_thread(self):
+    @classmethod
+    def get_oplog_thread(cls):
         """ Set up connection with mongo. Returns oplog, the connection and
             oplog collection
 
@@ -98,12 +113,13 @@ class TestOplogManager(unittest.TestCase):
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
                             doc_manager, LockingDict(),
-                            namespace_set, AUTH_KEY, AUTH_USERNAME,
+                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
 
         return(oplog, primary_conn, oplog_coll)
-
-    def get_new_oplog(self):
+    
+    @classmethod    
+    def get_new_oplog(cls):
         """ Set up connection with mongo. Returns oplog, the connection and
             oplog collection
 
@@ -124,7 +140,7 @@ class TestOplogManager(unittest.TestCase):
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
                             doc_manager, LockingDict(),
-                            namespace_set, AUTH_KEY, AUTH_USERNAME,
+                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
@@ -181,13 +197,13 @@ class TestOplogManager(unittest.TestCase):
 
         #test with one document
         primary_conn['test']['test'].insert({'name': 'paulie'})
-        ts = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.get_oplog_cursor(ts)
+        timestamp = test_oplog.get_last_oplog_timestamp()
+        cursor = test_oplog.get_oplog_cursor(timestamp)
         self.assertEqual(cursor.count(), 1)
 
-        #test with two documents, one after the ts
+        #test with two documents, one after the timestamp
         primary_conn['test']['test'].insert({'name': 'paul'})
-        cursor = test_oplog.get_oplog_cursor(ts)
+        cursor = test_oplog.get_oplog_cursor(timestamp)
         self.assertEqual(cursor.count(), 2)
 
         #test case where timestamp is not in oplog which implies we're too
@@ -198,7 +214,7 @@ class TestOplogManager(unittest.TestCase):
                                                 size=10000)
 
         primary_conn['test']['test'].insert({'name': 'pauline'})
-        self.assertEqual(test_oplog.get_oplog_cursor(ts), None)
+        self.assertEqual(test_oplog.get_oplog_cursor(timestamp), None)
         #test_oplog.join()
         #need to add tests for 'except' part of get_oplog_cursor
 
@@ -225,7 +241,7 @@ class TestOplogManager(unittest.TestCase):
             doesn't pass
         """
 
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog, primary_conn, search_ts = self.get_oplog_thread()
         solr = DocManager()
         test_oplog.doc_manager = solr
 
@@ -249,7 +265,7 @@ class TestOplogManager(unittest.TestCase):
             doesn't pass
         """
 
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        test_oplog, primary_conn, search_ts = self.get_oplog_thread()
         test_oplog.checkpoint = None  # needed for these tests
 
         # initial tests with no config file and empty oplog
@@ -282,29 +298,31 @@ class TestOplogManager(unittest.TestCase):
             both.
         """
         os.system('rm config.txt; touch config.txt')
-        test_oplog, primary_conn, mongos, oplog_coll = self.get_new_oplog()
+        test_oplog, primary_conn, mongos, solr = self.get_new_oplog()
+
+        if not start_cluster():
+            self.fail('Cluster could not be started successfully!')
 
         solr = DocManager()
         test_oplog.doc_manager = solr
         solr._delete()          # equivalent to solr.delete(q='*: *')
-        obj1 = ObjectId('4ff74db3f646462b38000001')
 
         mongos['test']['test'].remove({})
-        mongos['test']['test'].insert( {'_id': obj1, 
-                                     'name': 'paulie'},
-                                     safe=True
-                                     )
+        mongos['test']['test'].insert( 
+             {'_id': ObjectId('4ff74db3f646462b38000001'),
+             'name': 'paulie'},
+             safe=True
+             )
         while (mongos['test']['test'].find().count() != 1):
             time.sleep(1)
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
 
-        obj2 = ObjectId('4ff74db3f646462b38000002')
         first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
                      'ns': 'test.test',
-                     '_id':  obj1}
+                     '_id':  ObjectId('4ff74db3f646462b38000001')}
 
         #try kill one, try restarting
-        killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
         admin = new_primary_conn['admin']
@@ -314,11 +332,12 @@ class TestOplogManager(unittest.TestCase):
         count = 0
         while True:
             try:
-                mongos['test']['test'].insert({'_id':  obj2, 
-                                              'name':  'paul'}, 
-                                              safe=True)
+                mongos['test']['test'].insert({
+                    '_id': ObjectId('4ff74db3f646462b38000002'),
+                    'name': 'paul'}, 
+                    safe=True)
                 break
-            except Exception:
+            except OperationFailure:
                 count += 1
                 if count > 60:
                     self.fail('Call to insert doc failed too many times')
@@ -326,15 +345,15 @@ class TestOplogManager(unittest.TestCase):
                 continue
         while (mongos['test']['test'].find().count() != 2):
             time.sleep(1)
-        killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
 
         #wait for master to be established
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-                time.sleep(1)
+            time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
         #wait for secondary to be established
@@ -349,7 +368,8 @@ class TestOplogManager(unittest.TestCase):
 
         last_ts = test_oplog.get_last_oplog_timestamp()
         second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
-                      'ns': 'test.test', '_id':  obj2}
+                      'ns': 'test.test', 
+                      '_id': ObjectId('4ff74db3f646462b38000002')}
 
         test_oplog.doc_manager.upsert(first_doc)
         test_oplog.doc_manager.upsert(second_doc)
@@ -360,34 +380,32 @@ class TestOplogManager(unittest.TestCase):
 
         assert(len(results) == 1)
 
-        results_doc = results[0]
-        self.assertEqual(results_doc['name'], 'paulie')
-        self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
+        self.assertEqual(results[0]['name'], 'paulie')
+        self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
 
         #test_oplog.join()
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
 
-    parser = OptionParser()
+    PARSER = OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
-    parser.add_option("-m", "--main", action="store", type="string",
+    PARSER.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
 
     #-a is for the auth address
-    parser.add_option("-a", "--auth", action="store", type="string",
-                      dest="auth_file", default="")
+    PARSER.add_option("-a", "--auth", action="store", type="string",
+                      dest="auth_file", default=None)
 
     #-u is for the auth username
-    parser.add_option("-u", "--username", action="store", type="string",
+    PARSER.add_option("-u", "--username", action="store", type="string",
                       dest="auth_user", default="__system")
 
-    (options, args) = parser.parse_args()
+    (OPTIONS, ARGS) = PARSER.parse_args()
+    PORTS_ONE["MAIN"] = OPTIONS.main_addr
+    AUTH_FILE = OPTIONS.auth_file
+    AUTH_USERNAME = OPTIONS.auth_user
 
-    PORTS_ONE["MAIN"] = options.main_addr
-
-
-    conn = Connection('localhost:' + PORTS_ONE['MAIN'], replicaSet="demo-repl")
     unittest.main(argv=[sys.argv[0]])

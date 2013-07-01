@@ -25,14 +25,6 @@
     """
 
 import pymongo
-import sys
-import time
-
-try:
-    import simplejson as json
-except:
-    import json
-
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -53,6 +45,8 @@ class DocManager():
             self.mongo = pymongo.Connection(url)
         except pymongo.errors.InvalidURI:
             raise SystemError
+        except pymongo.errors.ConnectionFailure:
+            raise SystemError    
         self.unique_key = unique_key
 
     def stop(self):
@@ -63,8 +57,11 @@ class DocManager():
     def upsert(self, doc):
         """Update or insert a document into Mongo
         """
-        db, coll = doc['ns'].split('.', 1)
-        self.mongo[db][coll].save(doc)
+        database, coll = doc['ns'].split('.', 1)
+        try:
+            self.mongo[database][coll].save(doc)
+        except pymongo.errors.OperationFailure:
+            raise SystemError    
 
     def remove(self, doc):
         """Removes document from Mongo
@@ -72,34 +69,37 @@ class DocManager():
         The input is a python dictionary that represents a mongo document.
         The documents has ns and _ts fields.
         """
-        db, coll = doc['ns'].split('.', 1)
-        self.mongo[db][coll].remove({self.unique_key: doc[self.unique_key]})
+        database, coll = doc['ns'].split('.', 1)
+        self.mongo[database][coll].remove(
+            {self.unique_key: doc[self.unique_key]})
 
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
         """
         search_set = []
         db_list = self.mongo.database_names()
-        for db in db_list:
-            if db == "config" or db == "local":
+        for database in db_list:
+            if database == "config" or database == "local":
                 continue
-            coll_list = self.mongo[db].collection_names()
+            coll_list = self.mongo[database].collection_names()
             for coll in coll_list:
                 if coll.startswith("system"):
                     continue
-                namespace = str(db) + "." + str(coll)
+                namespace = str(database) + "." + str(coll)
                 search_set.append(namespace)
 
         res = []
         for namespace in search_set:
-            db, coll = namespace.split('.', 1)
-            target_coll = self.mongo[db][coll]
+            database, coll = namespace.split('.', 1)
+            target_coll = self.mongo[database][coll]
             res.extend(list(target_coll.find({'_ts': {'$lte': end_ts,
                                                       '$gte': start_ts}})))
 
         return res
-
+        
     def commit(self):
+        """ Performs a commit
+        """
         return
 
     def get_last_doc(self):
@@ -107,28 +107,28 @@ class DocManager():
         """
         search_set = []
         db_list = self.mongo.database_names()
-        for db in db_list:
-            if db == "config" or db == "local":
+        for database in db_list:
+            if database == "config" or database == "local":
                 continue
-            coll_list = self.mongo[db].collection_names()
+            coll_list = self.mongo[database].collection_names()
             for coll in coll_list:
                 if coll.startswith("system"):
                     continue
-                namespace = str(db) + "." + str(coll)
+                namespace = str(database) + "." + str(coll)
                 search_set.append(namespace)
 
         res = []
         for namespace in search_set:
-            db, coll = namespace.split('.', 1)
-            target_coll = self.mongo[db][coll]
+            database, coll = namespace.split('.', 1)
+            target_coll = self.mongo[database][coll]
             res.extend(list(target_coll.find().sort('_ts', -1)))
 
         max_ts = 0
         max_doc = None
-        for it in res:
-            if it['_ts'] > max_ts:
-                max_ts = it['_ts']
-                max_doc = it
+        for item in res:
+            if item['_ts'] > max_ts:
+                max_ts = item['_ts']
+                max_doc = item
 
         return max_doc
 

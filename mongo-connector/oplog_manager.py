@@ -19,10 +19,7 @@
 """
 
 import bson
-import inspect
-import json
 import logging
-import os
 import pymongo
 import sys
 import time
@@ -92,8 +89,10 @@ class OplogThread(threading.Thread):
 
         if auth_key is not None:
             #Authenticate for the whole system
-            self.primary_connection['admin'].authenticate(auth_username, auth_key)
-            self.main_connection['admin'].authenticate(auth_username, auth_key)
+            self.primary_connection['admin'].authenticate(
+                auth_username, auth_key)
+            self.main_connection['admin'].authenticate(
+                auth_username, auth_key)
         if self.oplog.find().count() == 0:
             err_msg = 'OplogThread: No oplog for thread:'
             logging.error('%s %s' % (err_msg, self.primary_connection))
@@ -124,11 +123,11 @@ class OplogThread(threading.Thread):
                 for entry in cursor:
                     #sync the current oplog operation
                     operation = entry['op']
-                    ns = entry['ns']
 
                     #check if ns is excluded or not.
                     #also ensure non-empty namespace set.
-                    if ns not in self.namespace_set and self.namespace_set:
+                    if (entry['ns'] not in self.namespace_set 
+                            and self.namespace_set):
                         continue
 
                     #delete
@@ -141,18 +140,19 @@ class OplogThread(threading.Thread):
                         doc = self.retrieve_doc(entry)
                         if doc is not None:
                             doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                            doc['ns'] = ns
+                            doc['ns'] = entry['ns']
                             self.doc_manager.upsert(doc)
 
                     last_ts = entry['ts']
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
-                pass
 
             if err is True and self.auth_key is not None:
-                self.primary_connection['admin'].authenticate(self.auth_username, self.auth_key)
-                self.main_connection['admin'].authenticate(self.auth_username, self.auth_key)
+                self.primary_connection['admin'].authenticate(
+                    self.auth_username, self.auth_key)
+                self.main_connection['admin'].authenticate(
+                    self.auth_username, self.auth_key)
                 err = False
 
             if last_ts is not None:
@@ -248,22 +248,22 @@ class OplogThread(threading.Thread):
         #no namespaces specified
         if not self.namespace_set:
             db_list = self.main_connection.database_names()
-            for db in db_list:
-                if db == "config" or db == "local":
+            for database in db_list:
+                if database == "config" or database == "local":
                     continue
-                coll_list = self.main_connection[db].collection_names()
+                coll_list = self.main_connection[database].collection_names()
                 for coll in coll_list:
                     if coll.startswith("system"):
                         continue
-                    namespace = str(db) + "." + str(coll)
+                    namespace = str(database) + "." + str(coll)
                     dump_set.append(namespace)
 
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
         for namespace in dump_set:
-            db, coll = namespace.split('.', 1)
-            target_coll = self.main_connection[db][coll]
+            database, coll = namespace.split('.', 1)
+            target_coll = self.main_connection[database][coll]
             cursor = util.retry_until_ok(target_coll.find)
             long_ts = util.bson_ts_to_long(timestamp)
 
@@ -358,24 +358,21 @@ class OplogThread(threading.Thread):
         start_ts = util.bson_ts_to_long(rollback_cutoff_ts)
         end_ts = last_inserted_doc['_ts']
 
-        docs_to_rollback = self.doc_manager.search(start_ts, end_ts)
-
         rollback_set = {}   # this is a dictionary of ns:list of docs
-        for doc in docs_to_rollback:
-            ns = doc['ns']
-            if ns in rollback_set:
-                rollback_set[ns].append(doc)
+        for doc in self.doc_manager.search(start_ts, end_ts):
+            if doc['ns'] in rollback_set:
+                rollback_set[doc['ns']].append(doc)
             else:
-                rollback_set[ns] = [doc]
+                rollback_set[doc['ns']] = [doc]
 
         for namespace, doc_list in rollback_set.items():
-            db, coll = namespace.split('.', 1)
-            ObjId = bson.objectid.ObjectId
-            bson_obj_id_list = [ObjId(doc['_id']) for doc in doc_list]
+            database, coll = namespace.split('.', 1)
+            obj_id = bson.objectid.ObjectId
+            bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
 
-            retry = util.retry_until_ok
-            to_update = retry(self.main_connection[db][coll].find,
-                              {'_id': {'$in': bson_obj_id_list}})
+            to_update = util.retry_until_ok(
+                self.main_connection[database][coll].find,
+                {'_id': {'$in': bson_obj_id_list}})
             #doc list are docs in  target system, to_update are docs in mongo
             doc_hash = {}  # hash by _id
             for doc in doc_list:

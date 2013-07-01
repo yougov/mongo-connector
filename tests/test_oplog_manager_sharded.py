@@ -25,16 +25,14 @@ import os
 import sys
 import inspect
 
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-cmd_folder = cmd_folder.rsplit("/", 1)[0]
-cmd_folder += "/mongo-connector"
-if cmd_folder not in sys.path:
-    sys.path.insert(0, cmd_folder)
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
+CMD_DIR += "/mongo-connector"
+if CMD_DIR not in sys.path:
+    sys.path.insert(0, CMD_DIR)
 
-import subprocess
 import time
-import json
 import unittest
 import re
 
@@ -45,20 +43,16 @@ except ImportError:
 
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
-from setup_cluster import killMongoProc, startMongoProc, start_cluster
+from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
 from optparse import OptionParser
-from pymongo.errors import ConnectionFailure, OperationFailure
+from pymongo.errors import OperationFailure
 from os import path
-from threading import Timer
 from oplog_manager import OplogThread
-from pysolr import Solr
 from util import (long_to_bson_ts,
                   bson_ts_to_long,
                   retry_until_ok)
 from bson.objectid import ObjectId
 
-""" Global path variables
-"""
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
 PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
@@ -96,14 +90,19 @@ class TestOplogManagerSharded(unittest.TestCase):
     """
 
     def runTest(self):
+        """ Runs the tests
+        """
         unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
-        if not start_cluster(sharded=True, key_file=AUTH_KEY):
+        """ Initializes the cluster
+        """
+        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
             self.fail("Shards cannot be added to mongos")
-
-    def get_oplog_thread(self):
+    
+    @classmethod
+    def get_oplog_thread(cls):
         """ Set up connection with mongo.
 
         Returns oplog, the connection and oplog collection.
@@ -130,7 +129,8 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
-    def get_new_oplog(self):
+    @classmethod
+    def get_new_oplog(cls):
         """ Set up connection with mongo.
 
         Returns oplog, the connection and oplog collection
@@ -157,7 +157,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Assertion failure if it doesn't pass
         """
 
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
+        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
         # testing for entry as none type
         entry = None
         assert (test_oplog.retrieve_doc(entry) is None)
@@ -199,19 +199,19 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         Assertion failure if it doesn't pass
         """
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
+        test_oplog, timestamp, cursor, mongos = self.get_oplog_thread()
         # test None cursor
         assert (test_oplog.get_oplog_cursor(None) is None)
 
         # test with one document
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        ts = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.get_oplog_cursor(ts)
+        timestamp = test_oplog.get_last_oplog_timestamp()
+        cursor = test_oplog.get_oplog_cursor(timestamp)
         assert (cursor.count() == 1)
 
         # test with two documents, one after the ts
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paul'})
-        cursor = test_oplog.get_oplog_cursor(ts)
+        cursor = test_oplog.get_oplog_cursor(timestamp)
         assert (cursor.count() == 2)
 
 
@@ -222,7 +222,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         # test empty oplog
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
+        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
 
         assert (test_oplog.get_last_oplog_timestamp() is None)
 
@@ -242,7 +242,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Assertion failure if it doesn't pass
         """
 
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
+        test_oplog, search_ts, solr, mongos = self.get_oplog_thread()
         solr = DocManager()
         test_oplog.doc_manager = solr
 
@@ -266,7 +266,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Assertion failure if it doesn't pass
         """
 
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_oplog_thread()
+        test_oplog, search_ts, cursor, mongos = self.get_oplog_thread()
         test_oplog.checkpoint = None           # needed for these tests
 
         # initial tests with no config file and empty oplog
@@ -304,24 +304,25 @@ class TestOplogManagerSharded(unittest.TestCase):
         if not start_cluster(sharded=True):
             self.fail("Shards cannot be added to mongos")
 
-        test_oplog, primary_conn, oplog_coll, mongos = self.get_new_oplog()
+        test_oplog, primary_conn, solr, mongos = self.get_new_oplog()
 
         solr = DocManager()
         test_oplog.doc_manager = solr
         solr._delete()          # equivalent to solr.delete(q='*:*')
-        obj1 = ObjectId('4ff74db3f646462b38000001')
 
         safe_mongo_op(mongos['alpha']['foo'].remove, {})
         safe_mongo_op(mongos['alpha']['foo'].insert,
-                      {'_id': obj1, 'name': 'paulie'})
+                      {'_id': ObjectId('4ff74db3f646462b38000001'),
+                      'name': 'paulie'})
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
 
         obj2 = ObjectId('4ff74db3f646462b38000002')
         first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
-                     'ns': 'alpha.foo', '_id': obj1}
+                     'ns': 'alpha.foo', 
+                     '_id': ObjectId('4ff74db3f646462b38000001')}
 
         # try kill one, try restarting
-        killMongoProc(primary_conn.host, PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
@@ -331,25 +332,25 @@ class TestOplogManagerSharded(unittest.TestCase):
         count = 0
         while True:
             try:
-                mongos['alpha']['foo'].insert, {'_id': obj2, 'name': 'paul'}
+                mongos['alpha']['foo'].insert({'_id': obj2, 'name': 'paul'})
                 break
-            except:
+            except OperationFailure:
                 time.sleep(1)
                 count += 1
                 if count > 60:
                     self.fail('Insert failed too many times in rollback')
                 continue
 
-        killMongoProc(primary_conn.host, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
 
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
 
         # wait for master to be established
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
         # wait for secondary to be established
@@ -383,27 +384,25 @@ class TestOplogManagerSharded(unittest.TestCase):
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
 
-    parser = OptionParser()
+    PARSER = OptionParser()
 
     # -a is to specify the auth file.
-    parser.add_option("-a", "--auth", action="store", type="string",
+    PARSER.add_option("-a", "--auth", action="store", type="string",
                       dest="auth_file", default="")
 
     #-u is for the auth username
-    parser.add_option("-u", "--username", action="store", type="string",
+    PARSER.add_option("-u", "--username", action="store", type="string",
                       dest="auth_user", default="__system")
 
-    (options, args) = parser.parse_args()
+    (OPTIONS, ARGS) = PARSER.parse_args()
 
-    if options.auth_file != "":
+    if OPTIONS.auth_file != "":
         try:
-            file = open(options.auth_file)
-            key = file.read()
-            re.sub(r'\s', '', key)
-            AUTH_KEY = key
-            AUTH_USERNAME = options.auth_user
-        except:
-            self.fail('Could not parse authentication file!')
+            KEY = (open(OPTIONS.auth_file)).read()
+            re.sub(r'\s', '', KEY)
+            AUTH_KEY = KEY
+            AUTH_USERNAME = OPTIONS.auth_user
+        except IOError:
+            print('Could not parse authentication file!')
 
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'])
     unittest.main(argv=[sys.argv[0]])

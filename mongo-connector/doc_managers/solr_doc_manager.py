@@ -23,9 +23,6 @@ is that this file can be used as an example to add on different backends.
 To extend this to other systems, simply implement the exact same class and
 replace the method definitions with API calls for the desired backend.
 """
-import sys
-import logging
-
 from pysolr import Solr
 from threading import Timer
 from util import verify_url, retry_until_ok
@@ -54,6 +51,8 @@ class DocManager():
             self.run_auto_commit()
 
     def stop(self):
+        """ Stops the instance
+        """
         self.auto_commit = False
 
     def upsert(self, doc):

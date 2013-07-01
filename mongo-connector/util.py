@@ -24,9 +24,9 @@ import logging
 
 from bson.timestamp import Timestamp
 try:
-    from urllib2 import urlopen
-except:
-    from urllib.request import urlopen
+    from urllib2 import urlopen, URLError
+except ImportError:
+    from urllib.request import urlopen, URLError
 
 
 def verify_url(url):
@@ -35,7 +35,7 @@ def verify_url(url):
     try:
         urlopen(url)
         return True
-    except:
+    except (ValueError, URLError):
         return False
 
 

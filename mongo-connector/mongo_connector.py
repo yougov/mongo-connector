@@ -17,7 +17,6 @@
 """Discovers the mongo cluster and starts the connector.
 """
 
-import inspect
 import logging
 import logging.handlers
 import oplog_manager
@@ -26,7 +25,6 @@ import os
 import pymongo
 import re
 import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -42,7 +40,7 @@ except ImportError:
 
 try:
     import simplejson as json
-except:
+except ImportError:
     import json
 
 
@@ -51,8 +49,6 @@ class Connector(threading.Thread):
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
                  u_key, auth_key, doc_manager=None, auth_username=None):
-        file = inspect.getfile(inspect.currentframe())
-        cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -128,7 +124,7 @@ class Connector(threading.Thread):
         """
 
         if self.oplog_checkpoint is None:
-                return None
+            return None
 
         # write to temp file
         backup_file = self.oplog_checkpoint + '.backup'
@@ -139,9 +135,9 @@ class Connector(threading.Thread):
             with self.oplog_progress as oplog_prog:
 
                 oplog_dict = oplog_prog.get_dict()
-                for oplog, ts in oplog_dict.items():
+                for oplog, time_stamp in oplog_dict.items():
                     oplog_str = str(oplog)
-                    timestamp = util.bson_ts_to_long(ts)
+                    timestamp = util.bson_ts_to_long(time_stamp)
                     json_str = json.dumps([oplog_str, timestamp])
                     try:
                         dest.write(json_str)
@@ -174,9 +170,9 @@ class Connector(threading.Thread):
         try:
             data = json.load(source)
         except ValueError:       # empty file
-            err_msg = "MongoConnector: Can't read oplog progress file."
             reason = "It may be empty or corrupt."
-            logging.info("%s %s" % (err_msg, reason))
+            logging.info("MongoConnector: Can't read oplog progress file. %s" %
+                (reason))
             source.close()
             return None
 
@@ -186,8 +182,8 @@ class Connector(threading.Thread):
         oplog_dict = self.oplog_progress.get_dict()
         for count in range(0, len(data), 2):
             oplog_str = data[count]
-            ts = data[count + 1]
-            oplog_dict[oplog_str] = util.long_to_bson_ts(ts)
+            time_stamp = data[count + 1]
+            oplog_dict[oplog_str] = util.long_to_bson_ts(time_stamp)
             #stored as bson_ts
 
     def run(self):
@@ -210,16 +206,15 @@ class Connector(threading.Thread):
 
             prim_admin = main_conn.admin
             repl_set = prim_admin.command("replSetGetStatus")['set']
-            host = main_conn.host
-            port = main_conn.port
-            address = host + ":" + str(port)
-
-            oplog = oplog_manager.OplogThread(main_conn, address, oplog_coll,
-                                              False, self.doc_manager,
-                                              self.oplog_progress,
-                                              self.ns_set, self.auth_key,
-                                              self.auth_username,
-                                              repl_set=repl_set)
+            
+            oplog = oplog_manager.OplogThread(main_conn, 
+                (main_conn.host + ":" + str(main_conn.port)),
+                oplog_coll,
+                False, self.doc_manager,
+                self.oplog_progress,
+                self.ns_set, self.auth_key,
+                self.auth_username,
+                repl_set=repl_set)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)
@@ -227,10 +222,9 @@ class Connector(threading.Thread):
 
             while self.can_run:
                 if not self.shard_set[0].running:
-                    err_msg = "MongoConnector: OplogThread"
-                    set = str(self.shard_set[0])
-                    effect = "unexpectedly stopped! Shutting down."
-                    logging.error("%s %s %s" % (err_msg, set, effect))
+                    logging.error("MongoConnector: OplogThread"
+                        " %s unexpectedly stopped! Shutting down" %
+                        (str(self.shard_set[0])))
                     self.oplog_thread_join()
                     self.doc_manager.stop()
                     return
@@ -241,17 +235,13 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
-                shard_coll = main_conn['config']['shards']
-                shard_cursor = shard_coll.find()
-
-                for shard_doc in shard_cursor:
+                for shard_doc in main_conn['config']['shards'].find():
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
-                            err_msg = "MongoConnector: OplogThread"
-                            set = str(self.shard_set[shard_id])
-                            effect = "unexpectedly stopped! Shutting down"
-                            logging.error("%s %s %s" % (err_msg, set, effect))
+                            logging.error("MongoConnector: OplogThread"
+                                " %s unexpectedly stopped! Shutting down" %
+                                (str(self.shard_set[shard_id])))
                             self.oplog_thread_join()
                             self.doc_manager.stop()
                             return
@@ -291,10 +281,9 @@ class Connector(threading.Thread):
         for thread in self.shard_set.values():
             thread.join()
 
-if __name__ == '__main__':
-    """Runs mongo connector
+def main():
+    """ Starts the mongo connector (assuming CLI)
     """
-
     parser = optparse.OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
@@ -403,7 +392,7 @@ if __name__ == '__main__':
                       """ see Doc Manager section.""")
 
     #-s is to enable syslog logging.
-    parser.add_option("-s","--enable-syslog", action="store_true",
+    parser.add_option("-s", "--enable-syslog", action="store_true",
                       dest="enable_syslog", default=False, help=
                       """Used to enable logging to syslog."""
                       """ Use -l to specify syslog host.""")
@@ -423,41 +412,38 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
-    loglevel = logging.INFO
+    loglevel = logging.info
     logger.setLevel(loglevel)
     
     if options.enable_syslog:
-        lh = options.syslog_host.split(":")
-        sh = logging.handlers.SysLogHandler(address=(lh[0], int(lh[1])),facility=options.syslog_facility)
-        sh.setLevel(loglevel)
-        logger.addHandler(sh)
+        syslog_info = options.syslog_host.split(":")
+        syslog_host = logging.handlers.SysLogHandler(address=(syslog_info[0], 
+            int(syslog_info[1])),facility=options.syslog_facility)
+        syslog_host.setLevel(loglevel)
+        logger.addHandler(syslog_host)
     else:
-        ch = logging.StreamHandler()
-        ch.setLevel(loglevel)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
+        log_out = logging.StreamHandler()
+        log_out.setLevel(loglevel)
+        log_out.setFormatter(logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(log_out)
 
     logger.info('Beginning Mongo Connector')
 
     if options.doc_manager is None:
         logger.info('No doc manager specified, using simulator.')
-    try:
-        if options.ns_set is None:
-            ns_set = []
-        else:
-            ns_set = options.ns_set.split(',')
-    except:
-        logger.error('Namespaces must be separated by commas!')
-        sys.exit(1)
+
+    if options.ns_set is None:
+        ns_set = []
+    else:
+        ns_set = options.ns_set.split(',')
 
     key = None
     if options.auth_file is not None:
         try:
-            file = open(options.auth_file)
-            key = file.read()
+            key = open(options.auth_file).read()
             re.sub(r'\s', '', key)
-        except:
+        except IOError:
             logger.error('Could not parse password authentication file!')
             sys.exit(1)
 
@@ -468,18 +454,21 @@ if __name__ == '__main__':
         logger.error("Admin username specified without password!")
         sys.exit(1)
 
-    ct = Connector(options.main_addr, options.oplog_config, options.url,
+    connector = Connector(options.main_addr, options.oplog_config, options.url,
                    ns_set, options.u_key, key, options.doc_manager,
                    auth_username=options.admin_name)
 
-    ct.start()
+    connector.start()
 
     while True:
         try:
             time.sleep(3)
-            if not ct.is_alive():
+            if not connector.is_alive():
                 break
         except KeyboardInterrupt:
             logging.info("Caught keyboard interrupt, exiting!")
-            ct.join()
+            connector.join()
             break
+
+if __name__ == '__main__':
+    main()

@@ -23,72 +23,77 @@ import unittest
 import sys
 import inspect
 
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 1)[0]
-doc_folder += '/doc_managers'
-if doc_folder not in sys.path:
-    sys.path.insert(0, doc_folder)
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
+DOC_DIR += '/doc_managers'
+if DOC_DIR not in sys.path:
+    sys.path.insert(0, DOC_DIR)
 
-test_folder = cmd_folder
+TEST = CMD_DIR
 
-if test_folder not in sys.path:
-    sys.path.insert(0, test_folder)
+if TEST not in sys.path:
+    sys.path.insert(0, TEST)
 
-mongo_folder = cmd_folder.rsplit("/", 1)[0]
-mongo_folder += "/mongo-connector"
-if mongo_folder not in sys.path:
-    sys.path.insert(0, mongo_folder)
+MONGO = CMD_DIR.rsplit("/", 1)[0]
+MONGO += "/mongo-connector"
+if MONGO not in sys.path:
+    sys.path.insert(0, MONGO)
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
-from setup_cluster import killMongoProc, startMongoProc, start_cluster
-from os import path
-from threading import Timer
-from doc_managers.solr_doc_manager import DocManager
-from pysolr import Solr
+from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from pysolr import Solr, SolrError
 from mongo_connector import Connector
 from optparse import OptionParser
-from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
+from pymongo.errors import OperationFailure, AutoReconnect
+from requests.exceptions import MissingSchema
 
 
-""" Global path variables
-"""
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MAIN": "27217"}
-s = Solr('http://localhost:8983/solr')
-conn = None
-NUMBER_OF_DOCS = 100
+NUMBER_OF_DOC_DIRS = 100
 
 
 class TestSynchronizer(unittest.TestCase):
-
-    c = None  # used for the Connector
+    """ Tests Solr
+    """
 
     def runTest(self):
+        """ Runs tests
+        """
         unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
         if not start_cluster():
             self.fail("Shards cannot be added to mongos")
+        cls.conn = Connection('localhost:' + PORTS_ONE['MAIN'],
+            replicaSet="demo-repl")
+        # Creating a Solr object with an invalid URL doesn't create an exception
+        cls.solr_conn = Solr('http://localhost:8983/solr')
+        try:
+            cls.solr_conn.commit()
+        except (SolrError, MissingSchema):
+            self.fail("Cannot connect to Solr!")
+        cls.solr_conn.delete(q='*:*')
 
     def setUp(self):
 
-        self.c = Connector('localhost:' + PORTS_ONE["MAIN"], 'config.txt',
-                           'http://localhost:8983/solr', ['test.test'], '_id',
-                           None, 
-                           '../mongo-connector/doc_managers/solr_doc_manager.py')
-        self.c.start()
-        while len(self.c.shard_set) == 0:
+        self.connector = Connector('localhost:' + PORTS_ONE["MAIN"], 
+            'config.txt', 'http://localhost:8983/solr', ['test.test'], '_id',
+            None, 
+            '../mongo-connector/doc_managers/solr_doc_manager.py')
+        self.connector.start()
+        while len(self.connector.shard_set) == 0:
             time.sleep(1)
         count = 0
         while (True):
             try:
-                conn['test']['test'].remove(safe=True)
+                self.conn['test']['test'].remove(safe=True)
                 break
             except (AutoReconnect, OperationFailure):
                 time.sleep(1)
@@ -96,19 +101,19 @@ class TestSynchronizer(unittest.TestCase):
                 if count > 60:
                     unittest.SkipTest('Call to remove failed too '
                     'many times in setup')
-        while (len(s.search('*:*')) != 0):
+        while (len(self.solr_conn.search('*:*')) != 0):
             time.sleep(1)
 
     def tearDown(self):
-        self.c.doc_manager.auto_commit = False
+        self.connector.doc_manager.auto_commit = False
         time.sleep(2)
-        self.c.join()
+        self.connector.join()
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
         """
 
-        self.assertEqual(len(self.c.shard_set), 1)
+        self.assertEqual(len(self.connector.shard_set), 1)
 
     def test_initial(self):
         """Tests search and assures that the databases are clear.
@@ -116,38 +121,38 @@ class TestSynchronizer(unittest.TestCase):
 
         while (True):
             try:
-                conn['test']['test'].remove(safe=True)
+                self.conn['test']['test'].remove(safe=True)
                 break
-            except:
+            except OperationFailure:
                 continue
 
-        s.delete(q='*:*')
-        self.assertEqual(conn['test']['test'].find().count(), 0)
-        self.assertEqual(len(s.search('*:*')), 0)
+        self.solr_conn.delete(q='*:*')
+        self.assertEqual(self.conn['test']['test'].find().count(), 0)
+        self.assertEqual(len(self.solr_conn.search('*:*')), 0)
 
     def test_insert(self):
         """Tests insert
         """
 
-        conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        while (len(s.search('*:*')) == 0):
+        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        while (len(self.solr_conn.search('*:*')) == 0):
             time.sleep(1)
-        a = s.search('paulie')
-        self.assertEqual(len(a), 1)
-        b = conn['test']['test'].find_one()
-        for it in a:
-            self.assertEqual(it['_id'], str(b['_id']))
-            self.assertEqual(it['name'], b['name'])
+        result_set_1 = self.solr_conn.search('paulie')
+        self.assertEqual(len(result_set_1), 1)
+        result_set_2 = self.conn['test']['test'].find_one()
+        for item in result_set_1:
+            self.assertEqual(item['_id'], str(result_set_2['_id']))
+            self.assertEqual(item['name'], result_set_2['name'])
 
     def test_remove(self):
         """Tests remove
         """
 
-        conn['test']['test'].remove({'name': 'paulie'}, safe=True)
-        while (len(s.search('*:*')) == 1):
+        self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
+        while (len(self.solr_conn.search('*:*')) == 1):
             time.sleep(1)
-        a = s.search('paulie')
-        self.assertEqual(len(a), 0)
+        result_set_1 = self.solr_conn.search('paulie')
+        self.assertEqual(len(result_set_1), 0)
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by inserting one doc, killing
@@ -157,12 +162,12 @@ class TestSynchronizer(unittest.TestCase):
 
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
-        conn['test']['test'].insert({'name': 'paul'}, safe=True)
-        while conn['test']['test'].find({'name': 'paul'}).count() != 1:
+        self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
-        while len(s.search('*:*')) != 1:
+        while len(self.solr_conn.search('*:*')) != 1:
             time.sleep(1)
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
@@ -172,55 +177,56 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while True:
             try:
-                a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
+                self.conn['test']['test'].insert(
+                    {'name': 'pauline'}, safe=True)
                 break
-            except:
+            except OperationFailure:
                 count += 1
                 if count > 60:
-                    self.fail('Call to insert failed too many '
-                    'times in test_rollback')
+                    self.fail('Call to insert failed too ' 
+                        'many times in test_rollback')
                 time.sleep(1)
                 continue
 
-        while (len(s.search('*:*')) != 2):
+        while (len(self.solr_conn.search('*:*')) != 2):
             time.sleep(1)
 
-        a = s.search('pauline')
-        b = conn['test']['test'].find_one({'name': 'pauline'})
-        self.assertEqual(len(a), 1)
-        for it in a:
-            self.assertEqual(it['_id'], str(b['_id']))
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
+        result_set_1 = self.solr_conn.search('pauline')
+        result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
+        self.assertEqual(len(result_set_1), 1)
+        for item in result_set_1:
+            self.assertEqual(item['_id'], str(result_set_2['_id']))
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
         time.sleep(2)
-        a = s.search('pauline')
-        self.assertEqual(len(a), 0)
-        a = s.search('paul')
-        self.assertEqual(len(a), 1)
+        result_set_1 = self.solr_conn.search('pauline')
+        self.assertEqual(len(result_set_1), 0)
+        result_set_2 = self.solr_conn.search('paul')
+        self.assertEqual(len(result_set_2), 1)
 
     def test_stress(self):
         """Test stress by inserting and removing a large amount of docs.
         """
         #stress test
-        for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)})
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while len(s.search('*:*', rows=NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
+        while  (len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS))
+                != NUMBER_OF_DOC_DIRS):
             time.sleep(5)
-        for i in range(0, NUMBER_OF_DOCS):
-            a = s.search('Paul ' + str(i))
-            b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
-            for it in a:
-                self.assertEqual(it['_id'], it['_id'])
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            result_set_1 = self.solr_conn.search('Paul ' + str(i))
+            for item in result_set_1:
+                self.assertEqual(item['_id'], item['_id'])
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
@@ -228,16 +234,18 @@ class TestSynchronizer(unittest.TestCase):
             but with more docs
         """
 
-        conn['test']['test'].remove()
-        while len(s.search('*:*', rows=NUMBER_OF_DOCS)) != 0:
+        self.conn['test']['test'].remove()
+        while len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS)) != 0:
             time.sleep(1)
-        for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            self.conn['test']['test'].insert(
+                {'name': 'Paul ' + str(i)}, safe=True)
 
-        while len(s.search('*:*', rows=NUMBER_OF_DOCS)) != NUMBER_OF_DOCS:
+        while (len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS)) 
+                != NUMBER_OF_DOC_DIRS):
             time.sleep(1)
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
@@ -246,52 +254,55 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         time.sleep(5)
         count = -1
-        while count + 1 < NUMBER_OF_DOCS:
+        while count + 1 < NUMBER_OF_DOC_DIRS:
             try:
                 count += 1
-                conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
+                self.conn['test']['test'].insert(
+                    {'name': 'Pauline ' + str(count)},
                                             safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
 
-        while (len(s.search('*:*', rows=NUMBER_OF_DOCS * 2)) !=
-               conn['test']['test'].find().count()):
+        while (len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS * 2)) !=
+               self.conn['test']['test'].find().count()):
             time.sleep(1)
-        a = s.search('Pauline', rows=NUMBER_OF_DOCS * 2, sort='_id asc')
-        for it in a:
-            b = conn['test']['test'].find_one({'name': it['name']})
-            self.assertEqual(it['_id'], str(b['_id']))
+        result_set_1 = self.solr_conn.search('Pauline', 
+            rows=NUMBER_OF_DOC_DIRS * 2, sort='_id asc')
+        for item in result_set_1:
+            result_set_2 = self.conn['test']['test'].find_one(
+                {'name': item['name']})
+            self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
-        while (len(s.search('Pauline', rows=NUMBER_OF_DOCS * 2)) != 0):
+        while (len(self.solr_conn.search('Pauline',
+                rows=NUMBER_OF_DOC_DIRS * 2)) != 0):
             time.sleep(15)
-        a = s.search('Pauline', rows=NUMBER_OF_DOCS * 2)
-        self.assertEqual(len(a), 0)
-        a = s.search('Paul', rows=NUMBER_OF_DOCS * 2)
-        self.assertEqual(len(a), NUMBER_OF_DOCS)
+        result_set_1 = self.solr_conn.search('Pauline',
+            rows=NUMBER_OF_DOC_DIRS * 2)
+        self.assertEqual(len(result_set_1), 0)
+        result_set_2 = self.solr_conn.search('Paul', 
+            rows=NUMBER_OF_DOC_DIRS * 2)
+        self.assertEqual(len(result_set_2), NUMBER_OF_DOC_DIRS)
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
-    s.delete(q='*:*')
-    parser = OptionParser()
+    PARSER = OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
-    parser.add_option("-m", "--main", action="store", type="string",
+    PARSER.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
 
-    (options, args) = parser.parse_args()
-    PORTS_ONE['MAIN'] = options.main_addr
-    conn = Connection('localhost:' + PORTS_ONE['MAIN'],
-                      replicaSet="demo-repl")
+    (OPTIONS, ARGS) = PARSER.parse_args()
+    PORTS_ONE['MAIN'] = OPTIONS.main_addr
 
     unittest.main(argv=[sys.argv[0]])

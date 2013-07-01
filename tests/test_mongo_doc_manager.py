@@ -8,26 +8,24 @@ import sys
 import inspect
 import os
 
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 1)[0]
-doc_folder += '/doc_managers'
-if doc_folder not in sys.path:
-    sys.path.insert(0, doc_folder)
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
+DOC_DIR += '/doc_managers'
+if DOC_DIR not in sys.path:
+    sys.path.insert(0, DOC_DIR)
 
-mongo_folder = cmd_folder.rsplit("/", 1)[0]
-mongo_folder += "/mongo-connector"
-if mongo_folder not in sys.path:
-    sys.path.insert(0, mongo_folder)
+MONGO = CMD_DIR.rsplit("/", 1)[0]
+MONGO += "/mongo-connector"
+if MONGO not in sys.path:
+    sys.path.insert(0, MONGO)
 
 from doc_managers.mongo_doc_manager import DocManager
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
-
-MongoDoc = DocManager("localhost:30000")
-mongo = Connection("localhost:30000")['test']['test']
+from setup_cluster import start_single_mongod_instance, kill_mongo_proc
 
 
 class MongoDocManagerTester(unittest.TestCase):
@@ -35,29 +33,41 @@ class MongoDocManagerTester(unittest.TestCase):
     """
 
     def runTest(self):
+        """ Runs the tests
+        """
         unittest.TestCase.__init__(self)
+
+    @classmethod
+    def setUpClass(cls):    
+        start_single_mongod_instance("30000", "/MC", "MC_log")
+        cls.MongoDoc = DocManager("localhost:30000")
+        cls.mongo = Connection("localhost:30000")['test']['test']
+
+    @classmethod
+    def tearDownClass(cls):        
+        kill_mongo_proc('localhost', 30000)
 
     def setUp(self):
         """Empty Mongo at the start of every test
         """
-        mongo.remove()
+        self.mongo.remove()
 
     def test_upsert(self):
         """Ensure we can properly insert into Mongo via DocManager.
         """
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         time.sleep(3)
-        res = mongo.find()
+        res = self.mongo.find()
         self.assertTrue(res.count() == 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
         docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         time.sleep(1)
-        res = mongo.find()
+        res = self.mongo.find()
         self.assertTrue(res.count() == 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
@@ -67,14 +77,14 @@ class MongoDocManagerTester(unittest.TestCase):
         """
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         time.sleep(3)
-        res = mongo.find()
+        res = self.mongo.find()
         self.assertTrue(res.count() == 1)
 
-        MongoDoc.remove(docc)
+        self.MongoDoc.remove(docc)
         time.sleep(1)
-        res = mongo.find()
+        res = self.mongo.find()
         self.assertTrue(res.count() == 0)
 
     def test_full_search(self):
@@ -83,12 +93,12 @@ class MongoDocManagerTester(unittest.TestCase):
         """
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
-        MongoDoc.commit()
-        search = MongoDoc._search()
-        search2 = list(mongo.find())
+        self.MongoDoc.upsert(docc)
+        self.MongoDoc.commit()
+        search = self.MongoDoc._search()
+        search2 = list(self.mongo.find())
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
@@ -102,14 +112,14 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865,
                 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         docc2 = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866,
                  'ns': 'test.test'}
-        MongoDoc.upsert(docc2)
+        self.MongoDoc.upsert(docc2)
         docc3 = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870,
                  'ns': 'test.test'}
-        MongoDoc.upsert(docc3)
-        search = MongoDoc.search(5767301236327972865, 5767301236327972866)
+        self.MongoDoc.upsert(docc3)
+        search = self.MongoDoc.search(5767301236327972865, 5767301236327972866)
         self.assertTrue(len(search) == 2)
         self.assertTrue(list(search)[0]['name'] == 'John')
         self.assertTrue(list(search)[1]['name'] == 'John Paul')
@@ -119,18 +129,18 @@ class MongoDocManagerTester(unittest.TestCase):
             the latest timestamp.
         """
         docc = {'_id': '4', 'name': 'Hare', '_ts': 3, 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         docc = {'_id': '5', 'name': 'Tortoise', '_ts': 2, 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         docc = {'_id': '6', 'name': 'Mr T.', '_ts': 1, 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         time.sleep(1)
-        doc = MongoDoc.get_last_doc()
+        doc = self.MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4')
         docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
-        MongoDoc.upsert(docc)
+        self.MongoDoc.upsert(docc)
         time.sleep(3)
-        doc = MongoDoc.get_last_doc()
+        doc = self.MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
 
 if __name__ == '__main__':

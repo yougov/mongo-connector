@@ -24,75 +24,82 @@ import os
 import sys
 import inspect
 
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 1)[0]
-doc_folder += '/doc_managers'
-if doc_folder not in sys.path:
-    sys.path.insert(0, doc_folder)
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
+DOC_DIR += '/doc_managers'
+if DOC_DIR not in sys.path:
+    sys.path.insert(0, DOC_DIR)
 
-test_folder = cmd_folder
+TEST_DIR = CMD_DIR
 
-if test_folder not in sys.path:
-    sys.path.insert(0, test_folder)
+if TEST_DIR not in sys.path:
+    sys.path.insert(0, TEST_DIR)
 
-mongo_folder = cmd_folder.rsplit("/", 1)[0]
-mongo_folder += "/mongo-connector"
-if mongo_folder not in sys.path:
-    sys.path.insert(0, mongo_folder)
+MONGO_DIR = CMD_DIR.rsplit("/", 1)[0]
+MONGO_DIR += "/mongo-connector"
+if MONGO_DIR not in sys.path:
+    sys.path.insert(0, MONGO_DIR)
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
-from setup_cluster import killMongoProc, startMongoProc, start_cluster
-from os import path
-from threading import Timer
+from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
 from doc_managers.elastic_doc_manager import DocManager
 from mongo_connector import Connector
 from optparse import OptionParser
 from util import retry_until_ok
-from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
+from pymongo.errors import OperationFailure, AutoReconnect
 
 
-""" Global path variables
-"""
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
-s = None
-conn = None
-NUMBER_OF_DOCS = 100
+NUMBER_OF_DOC_DIRS = 100
 
 
-class TestSynchronizer(unittest.TestCase):
-
-    c = None  # used for the connector
+class TestElastic(unittest.TestCase):
+    """ Tests the Elastic instance
+    """
 
     def runTest(self):
+        """ Runs the tests
+        """
         unittest.TestCase.__init__(self)
-    
+
     @classmethod
     def setUpClass(cls):    
+        """ Starts the cluster
+        """
+        cls.elastic_doc = DocManager('http://localhost:9200', 
+            auto_commit=False)
+        cls.elastic_doc._remove()
         if not start_cluster():
             self.fail("Shards cannot be added to mongos")
+        cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+                        replicaSet="demo-repl")
 
     def tearDown(self):
-        self.c.doc_manager.auto_commit = False
+        """ Ends the connector
+        """
+        self.connector.doc_manager.auto_commit = False
         time.sleep(2)
-        self.c.join()
+        self.connector.join()
 
     def setUp(self):
-        self.c = Connector('localhost:' + PORTS_ONE["MONGOS"],
-                           'config.txt', 'http://localhost:9200',
-                           ['test.test'],
-                           '_id', None,
-                           '../mongo-connector/doc_managers/elastic_doc_manager.py')
-        self.c.start()
-        while len(self.c.shard_set) == 0:
+        """ Starts a new connector for every test
+        """
+        self.connector = Connector('localhost:' + PORTS_ONE["MONGOS"],
+            'config.txt', 'http://localhost:9200',
+            ['test.test'],
+            '_id', None,
+            '../mongo-connector/doc_managers/elastic_doc_manager.py')
+        self.connector.start()
+        while len(self.connector.shard_set) == 0:
             pass
-        conn['test']['test'].remove(safe=True)
-        while(len(s._search()) != 0):
+        self.conn['test']['test'].remove(safe=True)
+        while(len(self.elastic_doc._search()) != 0):
             time.sleep(1)
 
     def test_shard_length(self):
@@ -100,43 +107,43 @@ class TestSynchronizer(unittest.TestCase):
             properly
         """
 
-        self.assertEqual(len(self.c.shard_set), 1)
+        self.assertEqual(len(self.connector.shard_set), 1)
 
     def test_initial(self):
         """Tests search and assures that the databases are clear.
         """
 
-        conn['test']['test'].remove(safe=True)
-        self.assertEqual(conn['test']['test'].find().count(), 0)
-        self.assertEqual(len(s._search()), 0)
+        self.conn['test']['test'].remove(safe=True)
+        self.assertEqual(self.conn['test']['test'].find().count(), 0)
+        self.assertEqual(len(self.elastic_doc._search()), 0)
 
     def test_insert(self):
         """Tests insert
         """
 
-        conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        while(len(s._search()) == 0):
+        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        while(len(self.elastic_doc._search()) == 0):
             time.sleep(1)
-        a = s._search()
-        self.assertEqual(len(a), 1)
-        b = conn['test']['test'].find_one()
-        for it in a:
-            self.assertEqual(it['_id'], str(b['_id']))
-            self.assertEqual(it['name'], b['name'])
+        result_set_1 = self.elastic_doc._search()
+        self.assertEqual(len(result_set_1), 1)
+        result_set_2 = self.conn['test']['test'].find_one()
+        for item in result_set_1:
+            self.assertEqual(item['_id'], str(result_set_2['_id']))
+            self.assertEqual(item['name'], result_set_2['name'])
 
     def test_remove(self):
         """Tests remove
         """
 
-        conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        while(len(s._search()) != 1):
+        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        while(len(self.elastic_doc._search()) != 1):
             time.sleep(1)
-        conn['test']['test'].remove({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
 
-        while(len(s._search()) == 1):
+        while(len(self.elastic_doc._search()) == 1):
             time.sleep(1)
-        a = s._search()
-        self.assertEqual(len(a), 0)
+        result_set_1 = self.elastic_doc._search()
+        self.assertEqual(len(result_set_1), 0)
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
@@ -146,13 +153,13 @@ class TestSynchronizer(unittest.TestCase):
 
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
 
-        conn['test']['test'].insert({'name': 'paul'}, safe=True)
-        while conn['test']['test'].find({'name': 'paul'}).count() != 1:
+        self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
-        while len(s._search()) != 1:
+        while len(self.elastic_doc._search()) != 1:
             time.sleep(1)
 
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
 
@@ -163,39 +170,40 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while True:
             try:
-                a = conn['test']['test'].insert({'name': 'pauline'}, safe=True)
+                self.conn['test']['test'].insert(
+                    {'name': 'pauline'}, safe=True)
                 break
-            except:
+            except OperationFailure:
                 time.sleep(1)
                 count += 1
                 if count >= 60:
                     sys.exit(1)
                 continue
-        while(len(s._search()) != 2):
+        while(len(self.elastic_doc._search()) != 2):
             time.sleep(1)
-        a = s._search()
-        b = conn['test']['test'].find_one({'name': 'pauline'})
-        self.assertEqual(len(a), 2)
+        result_set_1 = self.elastic_doc._search()
+        result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
+        self.assertEqual(len(result_set_1), 2)
                 #make sure pauling is there
-        for it in a:
-            if it['name'] == 'pauline':
-                self.assertEqual(it['_id'], str(b['_id']))
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
+        for item in result_set_1:
+            if item['name'] == 'pauline':
+                self.assertEqual(item['_id'], str(result_set_2['_id']))
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
         time.sleep(2)
-        a = s._search()
-        self.assertEqual(len(a), 1)
-        for it in a:
-            self.assertEqual(it['name'], 'paul')
-        find_cursor = retry_until_ok(conn['test']['test'].find)
+        result_set_1 = self.elastic_doc._search()
+        self.assertEqual(len(result_set_1), 1)
+        for item in result_set_1:
+            self.assertEqual(item['name'], 'paul')
+        find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
 
     def test_stress(self):
@@ -204,32 +212,32 @@ class TestSynchronizer(unittest.TestCase):
             variable
         """
 
-        for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)})
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while len(s._search()) != NUMBER_OF_DOCS:
+        while len(self.elastic_doc._search()) != NUMBER_OF_DOC_DIRS:
             time.sleep(5)
-        for i in range(0, NUMBER_OF_DOCS):
-            a = s._search()
-            b = conn['test']['test'].find_one({'name': 'Paul ' + str(i)})
-            for it in a:
-                if(it['name'] == 'Paul' + str(i)):
-                    self.assertEqual(it['_id'], it['_id'])
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            result_set_1 = self.elastic_doc._search()
+            for item in result_set_1:
+                if(item['name'] == 'Paul' + str(i)):
+                    self.assertEqual(item['_id'], item['_id'])
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
             in global variable. Strategy for rollback is the same as before.
         """
 
-        while len(s._search()) != 0:
+        while len(self.elastic_doc._search()) != 0:
             time.sleep(1)
-        for i in range(0, NUMBER_OF_DOCS):
-            conn['test']['test'].insert({'name': 'Paul ' + str(i)}, safe=True)
+        for i in range(0, NUMBER_OF_DOC_DIRS):
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, 
+                safe=True)
 
-        while len(s._search()) != NUMBER_OF_DOCS:
+        while len(self.elastic_doc._search()) != NUMBER_OF_DOC_DIRS:
             time.sleep(1)
         primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        killMongoProc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
 
@@ -238,56 +246,57 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         time.sleep(5)
         count = -1
-        while count + 1 < NUMBER_OF_DOCS:
+        while count + 1 < NUMBER_OF_DOC_DIRS:
             try:
                 count += 1
-                conn['test']['test'].insert({'name': 'Pauline ' + str(count)},
-                                            safe=True)
+                self.conn['test']['test'].insert(
+                    {'name': 'Pauline ' + str(count)}, safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(s._search()) != conn['test']['test'].find().count()):
+        while (len(self.elastic_doc._search())
+                != self.conn['test']['test'].find().count()):
             time.sleep(1)
-        a = s._search()
-        for it in a:
-            if 'Pauline' in it['name']:
-                b = conn['test']['test'].find_one({'name': it['name']})
-                self.assertEqual(it['_id'], str(b['_id']))
+        result_set_1 = self.elastic_doc._search()
+        for item in result_set_1:
+            if 'Pauline' in item['name']:
+                result_set_2 = self.conn['test']['test'].find_one(
+                    {'name': item['name']})
+                self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        killMongoProc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
-        startMongoProc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(1)
-        startMongoProc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
-        while(len(s._search()) != NUMBER_OF_DOCS):
+        while(len(self.elastic_doc._search()) != NUMBER_OF_DOC_DIRS):
             time.sleep(5)
 
-        a = s._search()
-        self.assertEqual(len(a), NUMBER_OF_DOCS)
-        for it in a:
-            self.assertTrue('Paul' in it['name'])
-        find_cursor = retry_until_ok(conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOCS)
+        result_set_1 = self.elastic_doc._search()
+        self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
+        for item in result_set_1:
+            self.assertTrue('Paul' in item['name'])
+        find_cursor = retry_until_ok(self.conn['test']['test'].find)
+        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOC_DIRS)
 
+def abort_test():
+    """Aborts the test
+    """
+    sys.exit(1)
 
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
-    parser = OptionParser()
+    PARSER = OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
-    parser.add_option("-m", "--main", action="store", type="string",
+    PARSER.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
 
-    (options, args) = parser.parse_args()
-    PORTS_ONE['MONGOS'] = options.main_addr
-    s = DocManager('http://localhost:9200', auto_commit=False)
-    s._remove()
-
-    conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
-                      replicaSet="demo-repl")
+    (OPTIONS, ARGS) = PARSER.parse_args()
+    PORTS_ONE['MONGOS'] = OPTIONS.main_addr
     unittest.main(argv=[sys.argv[0]])

@@ -25,15 +25,10 @@
     desired backend.
     """
 
-import sys
-
 from pyes import ES, ESRange, RangeQuery, MatchAllQuery, TextQuery
+from pyes.exceptions import IndexMissingException
 from threading import Timer
 from util import verify_url, retry_until_ok
-from bson.objectid import ObjectId
-import simplejson as json
-from util import bson_ts_to_long
-
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -61,6 +56,8 @@ class DocManager():
             self.run_auto_commit()
 
     def stop(self):
+        """ Stops the instance
+        """
         self.auto_commit = False
 
     def upsert(self, doc):
@@ -72,7 +69,8 @@ class DocManager():
 
         """
 
-        # There is a problem with ES .90.0 and possibly .90.1 with indices not be correctly handled.
+        # There is a problem with ES .90.0 and possibly .90.1 with 
+        # indices not be correctly handled.
         # This ensures that an upsert correctly happens
 
         doc_type = self.doc_type
@@ -83,9 +81,9 @@ class DocManager():
         elastic_cursor = self.elastic.search(query=id_query, indices=index)
 
         if elastic_cursor.total == 0:
-          self.elastic.index(doc, index, doc_type, doc_id)
+            self.elastic.index(doc, index, doc_type, doc_id)
         else:  
-          self.elastic.update(doc, index, doc_type, doc_id)
+            self.elastic.update(doc, index, doc_type, doc_id)
         self.elastic.refresh()
 
     def remove(self, doc):
@@ -95,7 +93,7 @@ class DocManager():
         """
         try:
             self.elastic.delete(doc['ns'], 'string', str(doc[self.unique_key]))
-        except:
+        except IndexMissingException:
             pass
 
     def _remove(self):
@@ -103,15 +101,14 @@ class DocManager():
         """
         try:
             self.elastic.delete('test.test', 'string', '')
-        except:
+        except IndexMissingException:
             pass
 
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
         """
         res = ESRange('_ts', from_value=start_ts, to_value=end_ts)
-        q = RangeQuery(res)
-        results = self.elastic.search(q)
+        results = self.elastic.search(RangeQuery(res))
         return results
 
     def _search(self):
@@ -138,10 +135,8 @@ class DocManager():
         """Returns the last document stored in the Elastic engine.
         """
 
-        it = None
-        q = MatchAllQuery()
-        result = self.elastic.search(q, size=1, sort='_ts:desc')
-        for it in result:
-            r = it
+        result = self.elastic.search(MatchAllQuery(), size=1, sort='_ts:desc')
+        for item in result:
+            res = item
             break
-        return r
+        return res

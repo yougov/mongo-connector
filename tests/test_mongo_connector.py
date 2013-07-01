@@ -21,12 +21,12 @@
 import os
 import sys
 import inspect
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-cmd_folder = cmd_folder.rsplit("/", 1)[0]
-cmd_folder += "/mongo-connector"
-if cmd_folder not in sys.path:
-    sys.path.insert(0, cmd_folder)
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
+CMD_DIR += "/mongo-connector"
+if CMD_DIR not in sys.path:
+    sys.path.insert(0, CMD_DIR)
 
 import unittest
 import time
@@ -37,18 +37,26 @@ from setup_cluster import start_cluster
 from bson.timestamp import Timestamp
 from util import long_to_bson_ts
 
-main_address = '27217'
+MAIN_ADDRESS = '27217'
 
 
 class MongoInternalTester(unittest.TestCase):
+    """ Test Class for the Mongo Connector
+    """
 
     def runTest(self):
+        """ Runs the tests
+        """
+
         unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):    
-        use_mongos=True
-        if main_address.split(":")[1] != "27217":
+        """ Initializes the cluster
+        """
+
+        use_mongos = True
+        if MAIN_ADDRESS.split(":")[1] != "27217":
             use_mongos = False
         if not start_cluster(use_mongos=use_mongos):
             self.fail("Shards cannot be added to mongos")
@@ -57,17 +65,17 @@ class MongoInternalTester(unittest.TestCase):
         """Test whether the connector initiates properly
         """
 
-        c = Connector(main_address, 'config.txt', None, ['test.test'],
+        conn = Connector(MAIN_ADDRESS, 'config.txt', None, ['test.test'],
                       '_id', None, None)
-        c.start()
+        conn.start()
 
-        while len(c.shard_set) != 1:
+        while len(conn.shard_set) != 1:
             time.sleep(2)
-        c.join()
+        conn.join()
 
-        self.assertFalse(c.can_run)
+        self.assertFalse(conn.can_run)
         time.sleep(5)
-        for thread in c.shard_set.values():
+        for thread in conn.shard_set.values():
             self.assertFalse(thread.running)
 
     def test_write_oplog_progress(self):
@@ -75,15 +83,15 @@ class MongoInternalTester(unittest.TestCase):
         """
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
-        c = Connector(main_address, config_file_path, None, ['test.test'],
+        conn = Connector(MAIN_ADDRESS, config_file_path, None, ['test.test'],
                       '_id', None, None)
 
         #test that None is returned if there is no config file specified.
-        self.assertEqual(c.write_oplog_progress(), None)
+        self.assertEqual(conn.write_oplog_progress(), None)
 
-        c.oplog_progress.get_dict()[1] = Timestamp(12, 34)
+        conn.oplog_progress.get_dict()[1] = Timestamp(12, 34)
         #pretend to insert a thread/timestamp pair
-        c.write_oplog_progress()
+        conn.write_oplog_progress()
 
         data = json.load(open(config_file_path, 'r'))
         self.assertEqual(1, int(data[0]))
@@ -93,8 +101,8 @@ class MongoInternalTester(unittest.TestCase):
         self.assertFalse(os.path.exists(config_file_path + '~'))
 
         #ensure that updates work properly
-        c.oplog_progress.get_dict()[1] = Timestamp(44, 22)
-        c.write_oplog_progress()
+        conn.oplog_progress.get_dict()[1] = Timestamp(44, 22)
+        conn.write_oplog_progress()
 
         config_file = open(config_file_path, 'r')
         data = json.load(config_file)
@@ -108,29 +116,29 @@ class MongoInternalTester(unittest.TestCase):
         """Test read_oplog_progress
         """
 
-        c = Connector(main_address, None, None, ['test.test'], '_id',
+        conn = Connector(MAIN_ADDRESS, None, None, ['test.test'], '_id',
                       None, None)
 
         #testing with no file
-        self.assertEqual(c.read_oplog_progress(), None)
+        self.assertEqual(conn.read_oplog_progress(), None)
 
         os.system('touch temp_config.txt')
         config_file_path = os.getcwd() + '/temp_config.txt'
-        c.oplog_checkpoint = config_file_path
+        conn.oplog_checkpoint = config_file_path
 
         #testing with empty file
-        self.assertEqual(c.read_oplog_progress(), None)
+        self.assertEqual(conn.read_oplog_progress(), None)
 
-        oplog_dict = c.oplog_progress.get_dict()
+        oplog_dict = conn.oplog_progress.get_dict()
 
         #add a value to the file, delete the dict, and then read in the value
         oplog_dict['oplog1'] = Timestamp(12, 34)
-        c.write_oplog_progress()
+        conn.write_oplog_progress()
         del oplog_dict['oplog1']
 
         self.assertEqual(len(oplog_dict), 0)
 
-        c.read_oplog_progress()
+        conn.read_oplog_progress()
 
         self.assertTrue('oplog1' in oplog_dict.keys())
         self.assertTrue(oplog_dict['oplog1'], Timestamp(12, 34))
@@ -138,7 +146,7 @@ class MongoInternalTester(unittest.TestCase):
         oplog_dict['oplog1'] = Timestamp(55, 11)
 
         #see if oplog progress dict is properly updated
-        c.read_oplog_progress()
+        conn.read_oplog_progress()
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
         os.system('rm ' + config_file_path)
@@ -146,15 +154,15 @@ class MongoInternalTester(unittest.TestCase):
 if __name__ == '__main__':
     os.system('rm config.txt; touch config.txt')
 
-    parser = OptionParser()
+    PARSER = OptionParser()
 
     #-m is for the main address, which is a host:port pair, ideally of the
     #mongos. For non sharded clusters, it can be the primary.
-    parser.add_option("-m", "--main", action="store", type="string",
+    PARSER.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="27217")
 
-    (options, args) = parser.parse_args()
-    main_address = "localhost:" + options.main_addr
+    (OPTIONS, ARGS) = PARSER.parse_args()
+    MAIN_ADDRESS = "localhost:" + OPTIONS.main_addr
 
         
 

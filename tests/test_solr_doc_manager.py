@@ -21,46 +21,51 @@ import time
 import sys
 import inspect
 
-file = inspect.getfile(inspect.currentframe())
-cmd_folder = os.path.realpath(os.path.abspath(os.path.split(file)[0]))
-doc_folder = cmd_folder.rsplit("/", 1)[0]
-doc_folder += '/doc_managers'
+CURRENT_DIR = inspect.getfile(inspect.currentframe())
+CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
+DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
+DOC_DIR += '/doc_managers'
 
-if doc_folder not in sys.path:
-    sys.path.insert(0, doc_folder)
+if DOC_DIR not in sys.path:
+    sys.path.insert(0, DOC_DIR)
 
-mongo_folder = cmd_folder.rsplit("/", 1)[0]
-mongo_folder += "/mongo-connector"
-if mongo_folder not in sys.path:
-    sys.path.insert(0, mongo_folder)
+MONGO = CMD_DIR.rsplit("/", 1)[0]
+MONGO += "/mongo-connector"
+if MONGO not in sys.path:
+    sys.path.insert(0, MONGO)
 
 from doc_managers.solr_doc_manager import DocManager
 from pysolr import Solr
-
-SolrDoc = DocManager("http://localhost:8983/solr/")
-solr = Solr("http://localhost:8983/solr/")
-
 
 class SolrDocManagerTester(unittest.TestCase):
     """Test class for SolrDocManager
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """ Initializes the DocManager and a direct connection
+        """
+        cls.SolrDoc = DocManager("http://localhost:8983/solr/")
+        cls.solr = Solr("http://localhost:8983/solr/")
+
     def runTest(self):
+        """ Runs the tests
+        """
         unittest.TestCase.__init__(self)
 
     def setUp(self):
         """Empty Solr at the start of every test
         """
 
-        solr.delete(q='*:*')
+        self.solr.delete(q='*:*')
 
-    def test_invalid_URL(self):
+    def test_invalid_url(self):
         """Ensure DocManager fails for a bad Solr url.
         """
         #Invalid URL
         count = 0
         try:
-            s = DocManager("http://doesntexist.cskjdfhskdjfhdsom")
+            DocManager("http://doesntexist.cskjdfhskdjfhdsom")
         except SystemError:
             count += 1
         self.assertTrue(count == 1)
@@ -70,16 +75,16 @@ class SolrDocManagerTester(unittest.TestCase):
         """
         #test upsert
         docc = {'_id': '1', 'name': 'John'}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        res = solr.search('*:*')
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        res = self.solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
         docc = {'_id': '1', 'name': 'Paul'}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        res = solr.search('*:*')
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        res = self.solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
 
@@ -88,14 +93,14 @@ class SolrDocManagerTester(unittest.TestCase):
         """
         #test remove
         docc = {'_id': '1', 'name': 'John'}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        res = solr.search('*:*')
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        res = self.solr.search('*:*')
         self.assertTrue(len(res) == 1)
 
-        SolrDoc.remove(docc)
-        solr.commit()
-        res = solr.search('*:*')
+        self.SolrDoc.remove(docc)
+        self.solr.commit()
+        res = self.solr.search('*:*')
         self.assertTrue(len(res) == 0)
 
     def test_full_search(self):
@@ -103,12 +108,12 @@ class SolrDocManagerTester(unittest.TestCase):
         """
         #test _search
         docc = {'_id': '1', 'name': 'John'}
-        SolrDoc.upsert(docc)
+        self.SolrDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'Paul'}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        search = SolrDoc._search('*:*')
-        search2 = solr.search('*:*')
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        search = self.SolrDoc._search('*:*')
+        search2 = self.solr.search('*:*')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
@@ -121,14 +126,14 @@ class SolrDocManagerTester(unittest.TestCase):
         """
         #test search
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865}
-        SolrDoc.upsert(docc)
+        self.SolrDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866}
-        SolrDoc.upsert(docc)
+        self.SolrDoc.upsert(docc)
         docc = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        search = SolrDoc.search(5767301236327972865, 5767301236327972866)
-        search2 = solr.search('John')
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        search = self.SolrDoc.search(5767301236327972865, 5767301236327972866)
+        search2 = self.solr.search('John')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
@@ -139,29 +144,29 @@ class SolrDocManagerTester(unittest.TestCase):
         """
         #test solr commit
         docc = {'_id': '3', 'name': 'Waldo'}
-        SolrDoc.upsert(docc)
-        res = SolrDoc._search('Waldo')
+        self.SolrDoc.upsert(docc)
+        res = self.SolrDoc._search('Waldo')
         assert(len(res) == 0)
         time.sleep(2)
-        res = SolrDoc._search('Waldo')
+        res = self.SolrDoc._search('Waldo')
         assert(len(res) != 0)
-        SolrDoc.auto_commit = False
+        self.SolrDoc.auto_commit = False
 
     def test_get_last_doc(self):
         """Insert documents, Verify the doc with the latest timestamp.
         """
         #test get last doc
         docc = {'_id': '4', 'name': 'Hare', '_ts': '2'}
-        SolrDoc.upsert(docc)
+        self.SolrDoc.upsert(docc)
         docc = {'_id': '5', 'name': 'Tortoise', '_ts': '1'}
-        SolrDoc.upsert(docc)
-        solr.commit()
-        doc = SolrDoc.get_last_doc()
+        self.SolrDoc.upsert(docc)
+        self.solr.commit()
+        doc = self.SolrDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4')
 
         docc = {'_id': '6', 'name': 'HareTwin', 'ts': '2'}
-        solr.commit()
-        doc = SolrDoc.get_last_doc()
+        self.solr.commit()
+        doc = self.SolrDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4' or doc['_id'] == '6')
 
 if __name__ == '__main__':

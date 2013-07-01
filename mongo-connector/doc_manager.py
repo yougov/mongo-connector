@@ -73,8 +73,8 @@ class DocManager():
         """
         ret_list = []
         for stored_doc in self.doc_dict.values():
-            ts = stored_doc['_ts']
-            if ts <= end_ts or ts >= start_ts:
+            time_stamp = stored_doc['_ts']
+            if time_stamp <= end_ts or time_stamp >= start_ts:
                 ret_list.append(stored_doc)
 
         return ret_list
@@ -93,10 +93,10 @@ class DocManager():
         last_ts = None
 
         for stored_doc in self.doc_dict.values():
-            ts = stored_doc['_ts']
-            if last_ts is None or ts >= last_ts:
+            time_stamp = stored_doc['_ts']
+            if last_ts is None or time_stamp >= last_ts:
                 last_doc = stored_doc
-                last_ts = ts
+                last_ts = time_stamp
 
         return last_doc
 
