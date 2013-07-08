@@ -313,4 +313,4 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
     secondary = Connection('localhost:27118')
     while secondary.admin.command("replSetGetStatus")['myState'] is not 2:
         time.sleep(1)
-    return True    
+    return True

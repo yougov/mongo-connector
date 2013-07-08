@@ -28,7 +28,7 @@ import inspect
 CURRENT_DIR = inspect.getfile(inspect.currentframe())
 CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
 CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo-connector"
+CMD_DIR += "/mongo_connector"
 if CMD_DIR not in sys.path:
     sys.path.insert(0, CMD_DIR)
 
@@ -57,7 +57,7 @@ PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
 PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
              "CONFIG": "27220", "MONGOS": "27217"}
-SETUP_DIR = path.expanduser("~/mongo-connector")
+SETUP_DIR = path.expanduser("~/mongo_connector")
 DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
@@ -98,8 +98,29 @@ class TestOplogManagerSharded(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
-        if start_cluster(sharded=True, key_file=AUTH_KEY) == False:
-            self.fail("Shards cannot be added to mongos")
+        cls.AUTH_KEY = None
+        cls.flag = True
+        if AUTH_FILE:
+            # We want to get the credentials from this file
+            try:
+                key = (open(AUTH_FILE)).read()
+                re.sub(r'\s', '', key)
+                cls.AUTH_KEY = key
+            except IOError:
+                print('Could not parse authentication file!')
+                cls.flag = False
+                cls.err_msg = "Could not read key file!"
+
+        if not start_cluster(sharded=True, key_file=AUTH_KEY):
+            cls.flag = False
+            cls.err_msg = "Shards cannot be added to mongos"
+    
+    def setUp(self):
+        """ Fails if we can't read the key file or if the
+        cluster cannot be created.
+        """
+        if not self.flag:
+            self.fail(self.err_msg)
     
     @classmethod
     def get_oplog_thread(cls):
@@ -395,14 +416,7 @@ if __name__ == '__main__':
                       dest="auth_user", default="__system")
 
     (OPTIONS, ARGS) = PARSER.parse_args()
-
-    if OPTIONS.auth_file != "":
-        try:
-            KEY = (open(OPTIONS.auth_file)).read()
-            re.sub(r'\s', '', KEY)
-            AUTH_KEY = KEY
-            AUTH_USERNAME = OPTIONS.auth_user
-        except IOError:
-            print('Could not parse authentication file!')
+    AUTH_FILE = OPTIONS.auth_file
+    AUTH_USERNAME = OPTIONS.auth_user
 
     unittest.main(argv=[sys.argv[0]])

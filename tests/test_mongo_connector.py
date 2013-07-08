@@ -24,7 +24,7 @@ import inspect
 CURRENT_DIR = inspect.getfile(inspect.currentframe())
 CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
 CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo-connector"
+CMD_DIR += "/mongo_connector"
 if CMD_DIR not in sys.path:
     sys.path.insert(0, CMD_DIR)
 
@@ -58,12 +58,13 @@ class MongoInternalTester(unittest.TestCase):
         use_mongos = True
         if MAIN_ADDRESS.split(":")[1] != "27217":
             use_mongos = False
-        if not start_cluster(use_mongos=use_mongos):
-            self.fail("Shards cannot be added to mongos")
+        cls.flag = start_cluster(use_mongos=use_mongos)
 
     def test_connector(self):
         """Test whether the connector initiates properly
         """
+        if not self.flag:
+            self.fail("Shards cannot be added to mongos")
 
         conn = Connector(MAIN_ADDRESS, 'config.txt', None, ['test.test'],
                       '_id', None, None)

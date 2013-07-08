@@ -36,7 +36,7 @@ if TEST not in sys.path:
     sys.path.insert(0, TEST)
 
 MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo-connector"
+MONGO += "/mongo_connector"
 if MONGO not in sys.path:
     sys.path.insert(0, MONGO)
 
@@ -69,24 +69,31 @@ class TestSynchronizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if not start_cluster():
-            self.fail("Shards cannot be added to mongos")
-        cls.conn = Connection('localhost:' + PORTS_ONE['MAIN'],
-            replicaSet="demo-repl")
-        # Creating a Solr object with an invalid URL doesn't create an exception
-        cls.solr_conn = Solr('http://localhost:8983/solr')
-        try:
-            cls.solr_conn.commit()
-        except (SolrError, MissingSchema):
-            self.fail("Cannot connect to Solr!")
-        cls.solr_conn.delete(q='*:*')
+        cls.flag = start_cluster()
+        if cls.flag:
+            cls.conn = Connection('localhost:' + PORTS_ONE['MAIN'],
+                replicaSet="demo-repl")
+            # Creating a Solr object with an invalid URL 
+            # doesn't create an exception
+            cls.solr_conn = Solr('http://localhost:8983/solr')
+            try:
+                cls.solr_conn.commit()
+            except (SolrError, MissingSchema):
+                cls.err_msg = "Cannot connect to Solr!"
+                cls.flag = False
+            if cls.flag:    
+                cls.solr_conn.delete(q='*:*')
+        else:
+            cls.err_msg = "Shards cannot be added to mongos"        
 
     def setUp(self):
+        if not self.flag:
+            self.fail(self.err_msg)
 
         self.connector = Connector('localhost:' + PORTS_ONE["MAIN"], 
             'config.txt', 'http://localhost:8983/solr', ['test.test'], '_id',
             None, 
-            '../mongo-connector/doc_managers/solr_doc_manager.py')
+            '../mongo_connector/doc_managers/solr_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             time.sleep(1)

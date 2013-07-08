@@ -32,7 +32,7 @@ except ImportError:
 CURRENT_DIR = inspect.getfile(inspect.currentframe())
 CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
 CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo-connector"
+CMD_DIR += "/mongo_connector"
 if CMD_DIR not in sys.path:
     sys.path.insert(0, CMD_DIR)
 
@@ -76,15 +76,18 @@ class TestOplogManager(unittest.TestCase):
                 cls.AUTH_KEY = key
             except IOError:
                 print('Could not parse authentication file!')
+                cls.flag = False
+                cls.err_msg = "Could not read key file!"
 
         if not start_cluster(key_file=AUTH_FILE):
             cls.flag = False
+            cls.err_msg = "Shards cannot be added to mongos"
 
     def setUp(self):
         """ Fails if we were unable to start the cluster
         """
         if not self.flag:
-            self.fail("Shards cannot be added to mongos")
+            self.fail(self.err_msg)
 
     @classmethod
     def get_oplog_thread(cls):

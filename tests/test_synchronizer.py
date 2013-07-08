@@ -25,7 +25,7 @@ CURRENT_DIR = inspect.getfile(inspect.currentframe())
 CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
 
 CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo-connector"
+CMD_DIR += "/mongo_connector"
 if CMD_DIR not in sys.path:
     sys.path.insert(0, CMD_DIR)
 
@@ -68,20 +68,19 @@ class TestSynchronizer(unittest.TestCase):
         if PORTS_ONE['MONGOS'] != "27217":
             use_mongos = False
 
-        if not start_cluster(use_mongos=use_mongos):
-            self.fail("Shards cannot be added to mongos")
-            
-        cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
-                          replicaSet="demo-repl")
-        timer = Timer(60, abort_test)
-        cls.connector = Connector('localhost:' + PORTS_ONE["MONGOS"], 
-            'config.txt', None, ['test.test'], '_id', None, None)
-        cls.synchronizer = cls.connector.doc_manager
-        timer.start()
-        cls.connector.start()
-        while len(cls.connector.shard_set) == 0:
-            pass
-        timer.cancel()
+        cls.flag =  start_cluster(use_mongos=use_mongos)
+        if cls.flag:
+            cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+                              replicaSet="demo-repl")
+            timer = Timer(60, abort_test)
+            cls.connector = Connector('localhost:' + PORTS_ONE["MONGOS"], 
+                'config.txt', None, ['test.test'], '_id', None, None)
+            cls.synchronizer = cls.connector.doc_manager
+            timer.start()
+            cls.connector.start()
+            while len(cls.connector.shard_set) == 0:
+                pass
+            timer.cancel()
 
     @classmethod
     def tearDownClass(cls):
@@ -92,6 +91,9 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         """ Clears the db
         """
+        if not self.flag:
+            self.fail("Shards cannot be added to mongos")
+
         self.conn['test']['test'].remove(safe=True)
         while (len(self.synchronizer._search()) != 0):
             time.sleep(1)

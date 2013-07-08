@@ -24,7 +24,7 @@ import inspect
 CURRENT_DIR = inspect.getfile(inspect.currentframe())
 CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
 CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo-connector"
+CMD_DIR += "/mongo_connector"
 if CMD_DIR not in sys.path:
     sys.path.insert(0, CMD_DIR)
 

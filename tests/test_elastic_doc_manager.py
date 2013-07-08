@@ -15,7 +15,7 @@ if DOC_DIR not in sys.path:
     sys.path.insert(0, DOC_DIR)
 
 MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo-connector"
+MONGO += "/mongo_connector"
 if MONGO not in sys.path:
     sys.path.insert(0, MONGO)
 

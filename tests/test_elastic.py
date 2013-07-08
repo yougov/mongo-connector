@@ -37,7 +37,7 @@ if TEST_DIR not in sys.path:
     sys.path.insert(0, TEST_DIR)
 
 MONGO_DIR = CMD_DIR.rsplit("/", 1)[0]
-MONGO_DIR += "/mongo-connector"
+MONGO_DIR += "/mongo_connector"
 if MONGO_DIR not in sys.path:
     sys.path.insert(0, MONGO_DIR)
 
@@ -75,9 +75,9 @@ class TestElastic(unittest.TestCase):
         cls.elastic_doc = DocManager('http://localhost:9200', 
             auto_commit=False)
         cls.elastic_doc._remove()
-        if not start_cluster():
-            self.fail("Shards cannot be added to mongos")
-        cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+        cls.flag = start_cluster()
+        if cls.flag:
+            cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                         replicaSet="demo-repl")
 
     def tearDown(self):
@@ -90,11 +90,13 @@ class TestElastic(unittest.TestCase):
     def setUp(self):
         """ Starts a new connector for every test
         """
+        if not self.flag:
+            self.fail("Shards cannot be added to mongos")
         self.connector = Connector('localhost:' + PORTS_ONE["MONGOS"],
             'config.txt', 'http://localhost:9200',
             ['test.test'],
             '_id', None,
-            '../mongo-connector/doc_managers/elastic_doc_manager.py')
+            '../mongo_connector/doc_managers/elastic_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             pass

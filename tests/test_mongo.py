@@ -38,7 +38,7 @@ if TEST not in sys.path:
     sys.path.insert(0, TEST)
 
 MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo-connector"
+MONGO += "/mongo_connector"
 if MONGO not in sys.path:
     sys.path.insert(0, MONGO)
 
@@ -76,9 +76,9 @@ class TestSynchronizer(unittest.TestCase):
         start_single_mongod_instance("30000", "/MC", "MC_log")
         cls.mongo_doc = DocManager('localhost:30000')
         cls.mongo_doc._remove()
-        if not start_cluster():
-            self.fail("Shards cannot be added to mongos")
-        cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+        cls.flag = start_cluster()
+        if cls.flag:
+            cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                           replicaSet="demo-repl")
     @classmethod
     def tearDownClass(cls):        
@@ -88,11 +88,13 @@ class TestSynchronizer(unittest.TestCase):
         self.connector.join()
 
     def setUp(self):
+        if not self.flag:
+            self.fail("Shards cannot be added to mongos")
         self.connector = Connector('localhost:' + PORTS_ONE["MONGOS"],
            'config.txt', 'localhost:30000',
            ['test.test'],
            '_id', None,
-           '../mongo-connector/doc_managers/mongo_doc_manager.py')
+           '../mongo_connector/doc_managers/mongo_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             pass
