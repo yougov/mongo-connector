@@ -412,7 +412,7 @@ def main():
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
-    loglevel = logging.info
+    loglevel = logging.INFO
     logger.setLevel(loglevel)
     
     if options.enable_syslog:
