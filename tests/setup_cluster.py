@@ -27,21 +27,17 @@ import sys
 import time
 import os
 import inspect
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
-DOC_DIR += '/doc_managers'
-if DOC_DIR not in sys.path:
-    sys.path.insert(0, DOC_DIR)
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
+sys.path[0:0] = [""]
+
 from pymongo.errors import ConnectionFailure, OperationFailure, AutoReconnect
 from os import path
-from util import retry_until_ok
+from mongo_connector.util import retry_until_ok
 
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
                         "CONFIG": "27220", "MONGOS": "27217"}

@@ -20,18 +20,9 @@
 import os
 import sys
 import inspect
+import socket
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-
-CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo_connector"
-if CMD_DIR not in sys.path:
-    sys.path.insert(0, CMD_DIR)
-
-DOC_DIR = CMD_DIR + '/doc_managers'
-if DOC_DIR not in sys.path:
-    sys.path.insert(0, DOC_DIR)
+sys.path[0:0] = [""]
 
 try:
     from pymongo import MongoClient as Connection
@@ -40,16 +31,18 @@ except ImportError:
 
 import time
 import unittest
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from tests.setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
 from threading import Timer
-from mongo_connector import Connector
-from optparse import OptionParser
-from util import retry_until_ok
+from mongo_connector.mongo_connector import Connector
+from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27117"}
 NUMBER_OF_DOC_DIRS = 100
+HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
+CONFIG = os.environ.get('CONFIG', "config.txt")
 
 class TestSynchronizer(unittest.TestCase):
     """ Tests the synchronizers
@@ -64,17 +57,18 @@ class TestSynchronizer(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         use_mongos = True    
         if PORTS_ONE['MONGOS'] != "27217":
             use_mongos = False
 
         cls.flag =  start_cluster(use_mongos=use_mongos)
         if cls.flag:
-            cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
+            cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
                               replicaSet="demo-repl")
             timer = Timer(60, abort_test)
-            cls.connector = Connector('localhost:' + PORTS_ONE["MONGOS"], 
-                'config.txt', None, ['test.test'], '_id', None, None)
+            cls.connector = Connector("%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
+                CONFIG, None, ['test.test'], '_id', None, None)
             cls.synchronizer = cls.connector.doc_manager
             timer.start()
             cls.connector.start()
@@ -143,15 +137,15 @@ class TestSynchronizer(unittest.TestCase):
             killing primary, inserting another doc, killing secondary,
             and then restarting both.
         """
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
 
         self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
         while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
 
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
 
         while admin_db.command("isMaster")['ismaster'] is False:
@@ -177,7 +171,7 @@ class TestSynchronizer(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
@@ -224,10 +218,10 @@ class TestSynchronizer(unittest.TestCase):
 
         while len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS:
             time.sleep(1)
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -251,7 +245,7 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], result_set_2['_id'])
 
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
@@ -279,14 +273,4 @@ def abort_test(self):
 
 
 if __name__ == '__main__':
-    os.system('rm config.txt; touch config.txt')
-    PARSER = OptionParser()
-
-    #-m is for the main address, which is a host:port pair, ideally of the
-    #mongos. For non sharded clusters, it can be the primary.
-    PARSER.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="27217")
-
-    (OPTIONS, ARGS) = PARSER.parse_args()
-    PORTS_ONE['MONGOS'] = OPTIONS.main_addr
     unittest.main()

@@ -22,33 +22,18 @@ import time
 import unittest
 import sys
 import inspect
+import socket
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
-DOC_DIR += '/doc_managers'
-if DOC_DIR not in sys.path:
-    sys.path.insert(0, DOC_DIR)
-
-TEST = CMD_DIR
-
-if TEST not in sys.path:
-    sys.path.insert(0, TEST)
-
-MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo_connector"
-if MONGO not in sys.path:
-    sys.path.insert(0, MONGO)
+sys.path[0:0] = [""]
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from tests.setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
 from pysolr import Solr, SolrError
-from mongo_connector import Connector
-from optparse import OptionParser
+from mongo_connector.mongo_connector import Connector
 from pymongo.errors import OperationFailure, AutoReconnect
 from requests.exceptions import MissingSchema
 
@@ -56,6 +41,10 @@ from requests.exceptions import MissingSchema
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MAIN": "27217"}
 NUMBER_OF_DOC_DIRS = 100
+HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
+CONFIG = os.environ.get('CONFIG', "config.txt")
+PORTS_ONE['MAIN'] = MAIN_ADDR
 
 
 class TestSynchronizer(unittest.TestCase):
@@ -69,9 +58,10 @@ class TestSynchronizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.flag = start_cluster()
         if cls.flag:
-            cls.conn = Connection('localhost:' + PORTS_ONE['MAIN'],
+            cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN']),
                 replicaSet="demo-repl")
             # Creating a Solr object with an invalid URL 
             # doesn't create an exception
@@ -90,10 +80,10 @@ class TestSynchronizer(unittest.TestCase):
         if not self.flag:
             self.fail(self.err_msg)
 
-        self.connector = Connector('localhost:' + PORTS_ONE["MAIN"], 
-            'config.txt', 'http://localhost:8983/solr', ['test.test'], '_id',
+        self.connector = Connector(('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
+            CONFIG, 'http://localhost:8983/solr', ['test.test'], '_id',
             None, 
-            '../mongo_connector/doc_managers/solr_doc_manager.py')
+            'mongo_connector/doc_managers/solr_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             time.sleep(1)
@@ -167,16 +157,16 @@ class TestSynchronizer(unittest.TestCase):
             restarting both the servers.
         """
 
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
 
         self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
         while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
         while len(self.solr_conn.search('*:*')) != 1:
             time.sleep(1)
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -203,7 +193,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
@@ -251,10 +241,10 @@ class TestSynchronizer(unittest.TestCase):
         while (len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS)) 
                 != NUMBER_OF_DOC_DIRS):
             time.sleep(1)
-        primary_conn = Connection('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
 
         while admin_db.command("isMaster")['ismaster'] is False:
@@ -280,7 +270,7 @@ class TestSynchronizer(unittest.TestCase):
                 {'name': item['name']})
             self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
 
@@ -301,15 +291,4 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(result_set_2), NUMBER_OF_DOC_DIRS)
 
 if __name__ == '__main__':
-    os.system('rm config.txt; touch config.txt')
-    PARSER = OptionParser()
-
-    #-m is for the main address, which is a host:port pair, ideally of the
-    #mongos. For non sharded clusters, it can be the primary.
-    PARSER.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="27217")
-
-    (OPTIONS, ARGS) = PARSER.parse_args()
-    PORTS_ONE['MAIN'] = OPTIONS.main_addr
-
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main()

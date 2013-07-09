@@ -7,19 +7,9 @@ import sys
 import inspect
 import os
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
-DOC_DIR += '/doc_managers'
-if DOC_DIR not in sys.path:
-    sys.path.insert(0, DOC_DIR)
+sys.path[0:0] = [""]
 
-MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo_connector"
-if MONGO not in sys.path:
-    sys.path.insert(0, MONGO)
-
-from doc_managers.elastic_doc_manager import DocManager
+from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from pyes import ES, MatchAllQuery
 from pyes.exceptions import (IndexMissingException,
                             NoServerAvailable,

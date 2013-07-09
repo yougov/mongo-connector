@@ -24,25 +24,20 @@ import inspect
 import time
 import unittest
 import re
+import socket
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo_connector"
-if CMD_DIR not in sys.path:
-    sys.path.insert(0, CMD_DIR)
+sys.path[0:0] = [""]
 
-from doc_managers.doc_manager_simulator import DocManager
-from locking_dict import LockingDict
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from mongo_connector.doc_managers.doc_manager_simulator import DocManager
+from mongo_connector.locking_dict import LockingDict
+from tests.setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
 from pymongo.errors import OperationFailure
-from optparse import OptionParser
-from oplog_manager import OplogThread
-from util import(long_to_bson_ts,
+from mongo_connector.oplog_manager import OplogThread
+from mongo_connector.util import(long_to_bson_ts,
                  bson_ts_to_long,
                  retry_until_ok)
 from bson.objectid import ObjectId
@@ -50,8 +45,12 @@ from bson.objectid import ObjectId
 PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
              "CONFIG":  "27220", "MAIN":  "27217"}
 
-AUTH_FILE = None
-AUTH_USERNAME = None
+AUTH_FILE = os.environ.get('AUTH_FILE', None)
+AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
+HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+PORTS_ONE['MAIN'] = os.environ.get('MAIN_ADDR', "27217")
+CONFIG = os.environ.get('CONFIG', "config.txt")
+TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
@@ -66,6 +65,7 @@ class TestOplogManager(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.AUTH_KEY = None
         cls.flag = True
         if AUTH_FILE:
@@ -97,15 +97,15 @@ class TestOplogManager(unittest.TestCase):
             This function clears the oplog
         """
         is_sharded = True
-        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
+            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
         primary_conn['test']['test'].drop()
-        mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
 
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+            mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
             is_sharded = False
         oplog_coll = primary_conn['local']['oplog.rs']
         oplog_coll.drop()           # reset the oplog
@@ -129,13 +129,13 @@ class TestOplogManager(unittest.TestCase):
             This function does not clear the oplog
         """
         is_sharded = True
-        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
+            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
-        mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = "localhost:" + PORTS_ONE["MAIN"]
+            mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
             is_sharded = False
         oplog_coll = primary_conn['local']['oplog.rs']
 
@@ -327,7 +327,7 @@ class TestOplogManager(unittest.TestCase):
         #try kill one, try restarting
         kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin = new_primary_conn['admin']
         while admin.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -389,26 +389,4 @@ class TestOplogManager(unittest.TestCase):
         #test_oplog.join()
 
 if __name__ == '__main__':
-    os.system('rm config.txt; touch config.txt')
-
-    PARSER = OptionParser()
-
-    #-m is for the main address, which is a host:port pair, ideally of the
-    #mongos. For non sharded clusters, it can be the primary.
-    PARSER.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="27217")
-
-    #-a is for the auth address
-    PARSER.add_option("-a", "--auth", action="store", type="string",
-                      dest="auth_file", default=None)
-
-    #-u is for the auth username
-    PARSER.add_option("-u", "--username", action="store", type="string",
-                      dest="auth_user", default="__system")
-
-    (OPTIONS, ARGS) = PARSER.parse_args()
-    PORTS_ONE["MAIN"] = OPTIONS.main_addr
-    AUTH_FILE = OPTIONS.auth_file
-    AUTH_USERNAME = OPTIONS.auth_user
-
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main()

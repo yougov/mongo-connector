@@ -147,6 +147,7 @@ class OplogThread(threading.Thread):
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
+                pass
 
             if err is True and self.auth_key is not None:
                 self.primary_connection['admin'].authenticate(

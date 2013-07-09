@@ -21,23 +21,23 @@
 import os
 import sys
 import inspect
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo_connector"
-if CMD_DIR not in sys.path:
-    sys.path.insert(0, CMD_DIR)
+import socket
+
+sys.path[0:0] = [""]
 
 import unittest
 import time
 import json
-from mongo_connector import Connector
-from optparse import OptionParser
-from setup_cluster import start_cluster
+from mongo_connector.mongo_connector import Connector
+from tests.setup_cluster import start_cluster
 from bson.timestamp import Timestamp
-from util import long_to_bson_ts
+from mongo_connector.util import long_to_bson_ts
 
-MAIN_ADDRESS = '27217'
+HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
+MAIN_ADDRESS = "%s:%s" % (HOSTNAME, MAIN_ADDR)
+CONFIG = os.environ.get('CONFIG', "config.txt")
+TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 
 
 class MongoInternalTester(unittest.TestCase):
@@ -55,6 +55,7 @@ class MongoInternalTester(unittest.TestCase):
         """ Initializes the cluster
         """
 
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         use_mongos = True
         if MAIN_ADDRESS.split(":")[1] != "27217":
             use_mongos = False
@@ -66,7 +67,7 @@ class MongoInternalTester(unittest.TestCase):
         if not self.flag:
             self.fail("Shards cannot be added to mongos")
 
-        conn = Connector(MAIN_ADDRESS, 'config.txt', None, ['test.test'],
+        conn = Connector(MAIN_ADDRESS, CONFIG, None, ['test.test'],
                       '_id', None, None)
         conn.start()
 
@@ -82,8 +83,8 @@ class MongoInternalTester(unittest.TestCase):
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
         """
-        os.system('touch temp_config.txt')
-        config_file_path = os.getcwd() + '/temp_config.txt'
+        os.system('touch %s' % (TEMP_CONFIG))
+        config_file_path = TEMP_CONFIG
         conn = Connector(MAIN_ADDRESS, config_file_path, None, ['test.test'],
                       '_id', None, None)
 
@@ -123,9 +124,8 @@ class MongoInternalTester(unittest.TestCase):
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)
 
-        os.system('touch temp_config.txt')
-        config_file_path = os.getcwd() + '/temp_config.txt'
-        conn.oplog_checkpoint = config_file_path
+        os.system('touch %s' % (TEMP_CONFIG))
+        conn.oplog_checkpoint = TEMP_CONFIG
 
         #testing with empty file
         self.assertEqual(conn.read_oplog_progress(), None)
@@ -150,21 +150,7 @@ class MongoInternalTester(unittest.TestCase):
         conn.read_oplog_progress()
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
-        os.system('rm ' + config_file_path)
+        os.system('rm ' + TEMP_CONFIG)
 
 if __name__ == '__main__':
-    os.system('rm config.txt; touch config.txt')
-
-    PARSER = OptionParser()
-
-    #-m is for the main address, which is a host:port pair, ideally of the
-    #mongos. For non sharded clusters, it can be the primary.
-    PARSER.add_option("-m", "--main", action="store", type="string",
-                      dest="main_addr", default="27217")
-
-    (OPTIONS, ARGS) = PARSER.parse_args()
-    MAIN_ADDRESS = "localhost:" + OPTIONS.main_addr
-
-        
-
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main()

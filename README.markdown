@@ -200,13 +200,32 @@ syncing.
 
 ## Testing scripts
 
-There are two sets of tests. One is for the general system, which can be found in the Tests folder, and the other is for
-the Doc Managers, which is found in the tests folder inside the doc_managers folder. The doc manager tests use
-the Doc Managers stored in the doc_managers folder; unlike mongo_connector.py they do not copy the file to
-doc_manager.py in the main folder.
+Tests are stored in the tests folder which is not in the general distribution (they can be found on github).
+The tests should be run with unittests, so to run them properly, navigate to the general "mongo-connector" folder and run:
 
-There are shell scripts for running all tests for each search engine (currenctly Solr, Elastic and Mongo),
-for the general connector tests, and a script that runs all tests. You can find them in tests/scripts.
+    python -m unittest discover
+
+This should run all of the tests in the folder. 
+To specify a specific test, run
+
+    python -m unittest tests.<name_of_module>
+
+The tests use environment variables for certain parameters.
+The variables in question are MAIN_ADDR, CONFIG, and TEMP_CONFIG.
+CONFIG refers to where the config file should be placed, as well as TEMP_CONFIG.
+To set these variables, you can simply place them in a shell script like so:
+
+    #!/bin/bash
+    MAIN_ADDR="27217"
+    export MAIN_ADDR
+    CONFIG="/home/username/mongo-connector/mongo_connector/config.txt"
+    export CONFIG
+    TEMP_CONFIG="/home/username/mongo-connector/mongo_connector/temp_config.txt"
+    export TEMP_CONFIG
+
+And then correctly set them by sourcing them, ie:
+
+    source <name_of_script>    
 
 A word of caution: For some of the tests, specifically test_oplog_manager, the output prints out "ERROR:root:OplogThread:
 No oplog for thread: Connection('localhost', 27117)". This is expected behavior because the tests run some parts in isolation,

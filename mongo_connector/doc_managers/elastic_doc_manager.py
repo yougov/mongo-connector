@@ -26,9 +26,11 @@
     """
 
 from pyes import ES, ESRange, RangeQuery, MatchAllQuery, TextQuery
-from pyes.exceptions import IndexMissingException
+from pyes.exceptions import (IndexMissingException,
+                             NotFoundException,
+                             TypeMissingException)
 from threading import Timer
-from util import verify_url, retry_until_ok
+from mongo_connector.util import verify_url, retry_until_ok
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -69,7 +71,7 @@ class DocManager():
 
         """
 
-        # There is a problem with ES .90.0 and possibly .90.1 with 
+        # There is a problem with ES .90.0 and possibly .90.1 with
         # indices not be correctly handled.
         # This ensures that an upsert correctly happens
 
@@ -82,7 +84,7 @@ class DocManager():
 
         if elastic_cursor.total == 0:
             self.elastic.index(doc, index, doc_type, doc_id)
-        else:  
+        else:
             self.elastic.update(doc, index, doc_type, doc_id)
         self.elastic.refresh()
 
@@ -93,7 +95,7 @@ class DocManager():
         """
         try:
             self.elastic.delete(doc['ns'], 'string', str(doc[self.unique_key]))
-        except IndexMissingException:
+        except (NotFoundException, TypeMissingException, IndexMissingException):
             pass
 
     def _remove(self):
@@ -101,7 +103,7 @@ class DocManager():
         """
         try:
             self.elastic.delete('test.test', 'string', '')
-        except IndexMissingException:
+        except (NotFoundException, TypeMissingException, IndexMissingException):
             pass
 
     def search(self, start_ts, end_ts):
