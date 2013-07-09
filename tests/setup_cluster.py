@@ -110,6 +110,15 @@ def start_single_mongod_instance(port, data, log):
     execute_command(cmd)
     check_started(int(port))
 
+def kill_all():
+    """Kills all running mongod and mongos instances
+    """
+    kill_all_mongo_proc("localhost", PORTS_ONE)
+    kill_all_mongo_proc("localhost", PORTS_TWO)
+    kill_mongos_proc()
+    remove_dir(DEMO_SERVER_LOG)
+    remove_dir(DEMO_SERVER_DATA)
+
 def start_mongo_proc(port, repl_set_name, data, log, key_file):
     """Create the replica set
     """

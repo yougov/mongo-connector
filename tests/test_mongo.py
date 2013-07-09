@@ -47,6 +47,7 @@ try:
 except ImportError:
     from pymongo import Connection    
 from setup_cluster import (kill_mongo_proc, 
+                           kill_all,
                            start_mongo_proc, 
                            start_cluster, 
                            start_single_mongod_instance)
@@ -82,7 +83,10 @@ class TestSynchronizer(unittest.TestCase):
                           replicaSet="demo-repl")
     @classmethod
     def tearDownClass(cls):        
+        """ Kills cluster instance
+        """
         kill_mongo_proc('localhost', 30000)
+        kill_all()
 
     def tearDown(self):
         self.connector.join()

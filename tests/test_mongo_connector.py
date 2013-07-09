@@ -33,7 +33,7 @@ import time
 import json
 from mongo_connector import Connector
 from optparse import OptionParser
-from setup_cluster import start_cluster
+from setup_cluster import start_cluster, kill_all
 from bson.timestamp import Timestamp
 from util import long_to_bson_ts
 
@@ -59,6 +59,12 @@ class MongoInternalTester(unittest.TestCase):
         if MAIN_ADDRESS.split(":")[1] != "27217":
             use_mongos = False
         cls.flag = start_cluster(use_mongos=use_mongos)
+
+    @classmethod
+    def tearDownClass(cls):
+        """ Kills cluster instance
+        """
+        kill_all()
 
     def test_connector(self):
         """Test whether the connector initiates properly

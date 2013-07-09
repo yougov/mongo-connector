@@ -43,7 +43,10 @@ except ImportError:
 
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from setup_cluster import (kill_mongo_proc,
+                           start_mongo_proc,
+                           start_cluster,
+                           kill_all)
 from optparse import OptionParser
 from pymongo.errors import OperationFailure
 from os import path
@@ -122,6 +125,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         if not self.flag:
             self.fail(self.err_msg)
     
+    @classmethod
+    def tearDownClass(cls):
+        """ Kills cluster instance
+        """
+        kill_all()
+
     @classmethod
     def get_oplog_thread(cls):
         """ Set up connection with mongo.

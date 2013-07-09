@@ -38,7 +38,10 @@ if CMD_DIR not in sys.path:
 
 from doc_managers.doc_manager_simulator import DocManager
 from locking_dict import LockingDict
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from setup_cluster import (kill_mongo_proc,
+                           start_mongo_proc,
+                           start_cluster,
+                           kill_all)
 from pymongo.errors import OperationFailure
 from optparse import OptionParser
 from oplog_manager import OplogThread
@@ -82,6 +85,12 @@ class TestOplogManager(unittest.TestCase):
         if not start_cluster(key_file=AUTH_FILE):
             cls.flag = False
             cls.err_msg = "Shards cannot be added to mongos"
+
+    @classmethod
+    def tearDownClass(cls):
+        """ Kills cluster instance
+        """
+        kill_all()
 
     def setUp(self):
         """ Fails if we were unable to start the cluster

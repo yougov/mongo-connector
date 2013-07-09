@@ -40,7 +40,10 @@ except ImportError:
 
 import time
 import unittest
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from setup_cluster import (kill_mongo_proc,
+                           start_mongo_proc,
+                           start_cluster,
+                           kill_all)
 from threading import Timer
 from mongo_connector import Connector
 from optparse import OptionParser
@@ -87,6 +90,7 @@ class TestSynchronizer(unittest.TestCase):
         """ Tears down connector
         """
         cls.connector.join()
+        kill_all()
 
     def setUp(self):
         """ Clears the db

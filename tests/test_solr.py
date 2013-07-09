@@ -45,7 +45,10 @@ try:
 except ImportError:
     from pymongo import Connection    
 
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from setup_cluster import (kill_mongo_proc,
+                           start_mongo_proc,
+                           start_cluster,
+                           kill_all)
 from pysolr import Solr, SolrError
 from mongo_connector import Connector
 from optparse import OptionParser
@@ -85,6 +88,13 @@ class TestSynchronizer(unittest.TestCase):
                 cls.solr_conn.delete(q='*:*')
         else:
             cls.err_msg = "Shards cannot be added to mongos"        
+
+    @classmethod
+    def tearDownClass(cls):
+        """ Kills cluster instance
+        """
+        kill_all()
+
 
     def setUp(self):
         if not self.flag:

@@ -46,7 +46,10 @@ try:
 except ImportError:
     from pymongo import Connection    
 
-from setup_cluster import kill_mongo_proc, start_mongo_proc, start_cluster
+from setup_cluster import (kill_mongo_proc,
+                          start_mongo_proc,
+                          start_cluster,
+                          kill_all)
 from doc_managers.elastic_doc_manager import DocManager
 from mongo_connector import Connector
 from optparse import OptionParser
@@ -79,6 +82,11 @@ class TestElastic(unittest.TestCase):
         if cls.flag:
             cls.conn = Connection('localhost:' + PORTS_ONE['MONGOS'],
                         replicaSet="demo-repl")
+    @classmethod
+    def tearDownClass(cls):
+        """ Kills cluster instance
+        """
+        kill_all()
 
     def tearDown(self):
         """ Ends the connector
