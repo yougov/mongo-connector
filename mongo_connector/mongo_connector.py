@@ -116,7 +116,6 @@ class Connector(threading.Thread):
                         and not os.access(self.oplog_checkpoint, os.R_OK )):
                     logging.critical("Invalid permissions on %s! Exiting" %
                         (self.oplog_checkpoint))
-                    self.can_run = False
                     sys.exit(1)
 
     def join(self):
