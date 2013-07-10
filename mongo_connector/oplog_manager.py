@@ -141,7 +141,10 @@ class OplogThread(threading.Thread):
                         if doc is not None:
                             doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
-                            self.doc_manager.upsert(doc)
+                            try:
+                                self.doc_manager.upsert(doc)
+                            except SystemError:
+                                logging.error("Unable to insert %s" % (doc))
 
                     last_ts = entry['ts']
             except (pymongo.errors.AutoReconnect,
@@ -271,7 +274,10 @@ class OplogThread(threading.Thread):
                 for doc in cursor:
                     doc['ns'] = namespace
                     doc['_ts'] = long_ts
-                    self.doc_manager.upsert(doc)
+                    try:
+                        self.doc_manager.upsert(doc)
+                    except SystemError:
+                        logging.error("Unable to insert %s" % (doc))
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
 
@@ -402,6 +408,9 @@ class OplogThread(threading.Thread):
             for doc in to_index:
                 doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
-                self.doc_manager.upsert(doc)
+                try:
+                    self.doc_manager.upsert(doc)
+                except SystemError:
+                    logging.error("Unable to insert %s" % (doc))
 
         return rollback_cutoff_ts
