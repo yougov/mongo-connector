@@ -24,13 +24,9 @@ finaltests.py
 import os
 import sys
 import inspect
+import socket
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo_connector"
-if CMD_DIR not in sys.path:
-    sys.path.insert(0, CMD_DIR)
+sys.path[0:0] = [""]
 
 import time
 import unittest
@@ -41,17 +37,16 @@ try:
 except ImportError:
     from pymongo import Connection    
 
-from doc_managers.doc_manager_simulator import DocManager
-from locking_dict import LockingDict
-from setup_cluster import (kill_mongo_proc,
-                           start_mongo_proc,
-                           start_cluster,
-                           kill_all)
-from optparse import OptionParser
+from mongo_connector.doc_managers.doc_manager_simulator import DocManager
+from mongo_connectorlocking_dict import LockingDict
+from tests.setup_cluster import (kill_mongo_proc,
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all)
 from pymongo.errors import OperationFailure
 from os import path
-from oplog_manager import OplogThread
-from util import (long_to_bson_ts,
+from mongo_connector.oplog_manager import OplogThread
+from mongo_connector.util import (long_to_bson_ts,
                   bson_ts_to_long,
                   retry_until_ok)
 from bson.objectid import ObjectId
@@ -65,8 +60,11 @@ DEMO_SERVER_DATA = SETUP_DIR + "/data"
 DEMO_SERVER_LOG = SETUP_DIR + "/logs"
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
-AUTH_KEY = None
-AUTH_USERNAME = None
+AUTH_FILE = os.environ.get('AUTH_FILE', None)
+AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
+HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
+CONFIG = os.environ.get('CONFIG', "config.txt")
 
 
 def safe_mongo_op(func, arg1, arg2=None):
@@ -101,6 +99,7 @@ class TestOplogManagerSharded(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.AUTH_KEY = None
         cls.flag = True
         if AUTH_FILE:
@@ -114,7 +113,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                 cls.flag = False
                 cls.err_msg = "Could not read key file!"
 
-        if not start_cluster(sharded=True, key_file=AUTH_KEY):
+        if not start_cluster(sharded=True, key_file=cls.AUTH_KEY):
             cls.flag = False
             cls.err_msg = "Shards cannot be added to mongos"
     
@@ -138,11 +137,11 @@ class TestOplogManagerSharded(unittest.TestCase):
         Returns oplog, the connection and oplog collection.
         This function clears the oplog.
         """
-        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
+        primary_conn = Connection(HOSTNAME,int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
+            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
-        mongos_addr = "localhost:" + PORTS_ONE["MONGOS"]
+        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
         mongos = Connection(mongos_addr)
         mongos['alpha']['foo'].drop()
 
@@ -155,7 +154,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -166,18 +165,18 @@ class TestOplogManagerSharded(unittest.TestCase):
         Returns oplog, the connection and oplog collection
         This function does not clear the oplog
         """
-        primary_conn = Connection('localhost', int(PORTS_ONE["PRIMARY"]))
+        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection('localhost', int(PORTS_ONE["SECONDARY"]))
+            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
-        mongos = "localhost:" + PORTS_ONE["MONGOS"]
+        mongos = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test', 'alpha.foo']
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 
@@ -311,7 +310,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (test_oplog.checkpoint == search_ts)
 
         # with config file, assert that size != 0
-        os.system('touch temp_config.txt')
+        os.system('touch %s' % (TEMP_CONFIG))
 
         cursor = test_oplog.init_cursor()
         oplog_dict = test_oplog.oplog_progress.get_dict()
@@ -321,7 +320,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         commit_ts = test_oplog.checkpoint
         self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
 
-        os.system('rm temp_config.txt')
+        os.system('rm %s' % (TEMP_CONFIG))
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -330,7 +329,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             servers.
         """
 
-        os.system('rm config.txt; touch config.txt')
+        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         if not start_cluster(sharded=True):
             self.fail("Shards cannot be added to mongos")
 
@@ -354,7 +353,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # try kill one, try restarting
         kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -412,20 +411,4 @@ class TestOplogManagerSharded(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    os.system('rm config.txt; touch config.txt')
-
-    PARSER = OptionParser()
-
-    # -a is to specify the auth file.
-    PARSER.add_option("-a", "--auth", action="store", type="string",
-                      dest="auth_file", default="")
-
-    #-u is for the auth username
-    PARSER.add_option("-u", "--username", action="store", type="string",
-                      dest="auth_user", default="__system")
-
-    (OPTIONS, ARGS) = PARSER.parse_args()
-    AUTH_FILE = OPTIONS.auth_file
-    AUTH_USERNAME = OPTIONS.auth_user
-
-    unittest.main(argv=[sys.argv[0]])
+    unittest.main()
