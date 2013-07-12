@@ -111,6 +111,12 @@ class Connector(threading.Thread):
                 logging.critical(info_str)
                 self.doc_manager.stop()
                 self.can_run = False
+            else:    
+                if (not os.access(self.oplog_checkpoint, os.W_OK) 
+                        and not os.access(self.oplog_checkpoint, os.R_OK )):
+                    logging.critical("Invalid permissions on %s! Exiting" %
+                        (self.oplog_checkpoint))
+                    sys.exit(1)
 
     def join(self):
         """ Joins thread, stops it from running
