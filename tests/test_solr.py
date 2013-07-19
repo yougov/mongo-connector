@@ -21,7 +21,6 @@ import os
 import time
 import unittest
 import sys
-import inspect
 import socket
 
 sys.path[0:0] = [""]
@@ -299,6 +298,73 @@ class TestSynchronizer(unittest.TestCase):
         result_set_2 = self.solr_conn.search('Paul', 
             rows=NUMBER_OF_DOC_DIRS * 2)
         self.assertEqual(len(result_set_2), NUMBER_OF_DOC_DIRS)
+
+    def test_valid_fields(self):
+        """ Tests documents with field definitions
+        """
+        inserted_obj = self.conn['test']['test'].insert(
+            {'name':'test_valid'})
+        self.conn['test']['test'].update({'_id' : inserted_obj},
+            {'$set':{'popularity' : 1 }})
+
+        for _ in range(60):
+            if len(self.connector.doc_manager._search("*:*")) != 0:
+                break
+            time.sleep(1)
+        else:
+            self.fail("Timeout when removing docs from Solr")
+
+        result = self.connector.doc_manager.get_last_doc()
+        self.assertIn('popularity', result)
+        self.assertEqual(len(self.connector.doc_manager._search(
+            "name=test_valid")), 1)
+
+    def test_invalid_fields(self):
+        """ Tests documents without field definitions
+        """
+        inserted_obj = self.conn['test']['test'].insert(
+            {'name':'test_invalid'})
+        self.conn['test']['test'].update({'_id' : inserted_obj},
+            {'$set':{'break_this_test' : 1 }})
+
+        for _ in range(60):
+            if len(self.connector.doc_manager._search("*:*")) != 0:
+                break
+            time.sleep(1)
+        else:
+            self.fail("Timeout when removing docs from Solr")
+
+        result = self.connector.doc_manager.get_last_doc()
+        self.assertNotIn('break_this_test', result)
+        self.assertEqual(len(self.connector.doc_manager._search(
+            "name=test_invalid")), 1)
+
+    def test_dynamic_fields(self):
+        """ Tests dynamic field definitions
+        The following field in the supplied schema.xml:
+        <dynamicField name="*_i" type="int" indexed="true" stored="true"/>
+        <dynamicField name="i_*" type="int" indexed="true" stored="true"/>
+        """
+        inserted_obj = self.conn['test']['test'].insert({
+            'name':'test_dynamic',
+            'foo_i':1,
+            'i_foo':1})
+        self.assertEqual(self.conn['test']['test'].find().count(), 1)
+
+        for _ in range(60):
+            if len(self.connector.doc_manager._search("*:*")) != 0:
+                break
+            time.sleep(1)
+        else:
+            self.fail("Timeout when removing docs from Solr")
+
+        result = self.connector.doc_manager.get_last_doc()
+        self.assertIn('i_foo', result)
+        self.assertIn('foo_i', result)
+        self.assertEqual(len(self.connector.doc_manager._search(
+            "i_foo:1")), 1)
+        self.assertEqual(len(self.connector.doc_manager._search(
+            "foo_i:1")), 1)
 
 if __name__ == '__main__':
     unittest.main()

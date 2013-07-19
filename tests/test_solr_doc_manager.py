@@ -135,7 +135,7 @@ class SolrDocManagerTester(unittest.TestCase):
         docc = {'_id': '3', 'name': 'Waldo'}
         self.SolrDoc.upsert(docc)
         res = self.SolrDoc._search('Waldo')
-        assert(len(res) == 0)
+        assert(len(res) == 1)
         time.sleep(2)
         res = self.SolrDoc._search('Waldo')
         assert(len(res) != 0)

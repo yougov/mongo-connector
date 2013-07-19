@@ -119,7 +119,7 @@ def start_mongo_proc(port, repl_set_name, data, log, key_file):
     """Create the replica set
     """
     cmd = ("mongod --fork --replSet %s --noprealloc --port %s --dbpath %s%s"
-           " --shardsvr --rest --logpath %s%s --logappend" %
+           " --shardsvr --nojournal --rest --logpath %s%s --logappend" %
            (repl_set_name, port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log))
 
     if key_file is not None:
@@ -145,29 +145,15 @@ def execute_command(command):
 #========================================= #
 
 
-def try_connection(port):
-    """Uses pymongo to try to connect to mongod
-    """
-    error = 0
-    try:
-        Connection('localhost', port)
-    except ConnectionFailure:
-        error = 1
-    return error
-
-
 def check_started(port):
     """Checks if our the mongod has started
     """
-    connected = False
-
-    while not connected:
-        error = try_connection(port)
-        if error:
-            #Check every 1 second
+    while True:
+        try:
+            Connection('localhost', port)
+            break
+        except ConnectionFailure:    
             time.sleep(1)
-        else:
-            connected = True
 
 #========================================= #
 #   Start Cluster                          #
