@@ -26,34 +26,32 @@ Topic :: Software Development :: Libraries :: Python Modules
 Operating System :: Unix
 """
 
-from distutils.core import setup
-import sys
+try:
+    from setuptools import setup
+except ImportError:
+    from ez_setup import setup
+    use_setup_tools()
+    from setuptools import setup    
 
-__doc__ = ""
-doclines = __doc__.split("\n")
-
-setup(name="mongo-connector",
-      version="1.0.0",
-      maintainer="10Gen",
-      maintainer_email="leonardo.stedile@10gen.com",
-      #url = "https://github.com/AayushU/mongo-connector",
+setup(name='mongo-connector',
+      version="1.1.0",
+      author="10Gen",
+      author_email='mongodb-user@googlegroups.com',
+      description='Mongo Connector',
+      keywords='mongo-connector',
+      url='https://github.com/10gen-labs/mongo-connector',
       license="http://www.apache.org/licenses/LICENSE-2.0.html",
       platforms=["any"],
-      description=doclines[0],
       classifiers=filter(None, classifiers.split("\n")),
-      long_description="\n".join(doclines[2:]),
-      #include_package_data=True,
-      packages=['mongo-connector.doc_managers', 'mongo-connector'],
-      #packages = find_packages('src'),  # include all packages under src
-      #package_dir = {'':'src'},   # tell distutils packages are under src
-      #      scripts=[],
-      install_requires=['pymongo', 'pyes', 'pysolr', 'simplejson'],
-
+      install_requires=['pymongo', 'simplejson'],
+      package_dir={'':'mongo_connector'},
       package_data={
           '': ['*.xml', 'README'],
-          'mongo-connector': ['config.txt']
-          # If any package contains *.txt files, include them:
-          # And include any *.dat files found in the 'data' subdirectory
-          # of the 'mypkg' package, also:
+          'mongo_connector': ['config.txt']
+      },
+      entry_points={
+          'console_scripts' : [
+              'mongo-connector = mongo_connector.mongo_connector:main',
+          ],
       }
       )
