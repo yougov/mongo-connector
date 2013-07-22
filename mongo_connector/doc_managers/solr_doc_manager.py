@@ -25,7 +25,7 @@ replace the method definitions with API calls for the desired backend.
 """
 from pysolr import Solr
 from threading import Timer
-from util import verify_url, retry_until_ok
+from mongo_connector.util import verify_url, retry_until_ok
 
 
 class DocManager():

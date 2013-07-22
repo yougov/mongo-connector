@@ -21,16 +21,12 @@
 import os
 import sys
 import inspect
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-CMD_DIR = CMD_DIR.rsplit("/", 1)[0]
-CMD_DIR += "/mongo_connector"
-if CMD_DIR not in sys.path:
-    sys.path.insert(0, CMD_DIR)
+
+sys.path[0:0] = [""]
 
 import unittest
 from bson import timestamp
-from util import (verify_url,
+from mongo_connector.util import (verify_url,
                   bson_ts_to_long,
                   long_to_bson_ts,
                   retry_until_ok)

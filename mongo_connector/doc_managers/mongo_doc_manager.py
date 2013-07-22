@@ -25,6 +25,7 @@
     """
 
 import pymongo
+from bson.errors import InvalidDocument
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -61,7 +62,9 @@ class DocManager():
         try:
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
-            raise SystemError    
+            raise SystemError
+        except InvalidDocument:
+            raise SystemError
 
     def remove(self, doc):
         """Removes document from Mongo

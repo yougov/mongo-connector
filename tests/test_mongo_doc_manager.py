@@ -8,24 +8,14 @@ import sys
 import inspect
 import os
 
-CURRENT_DIR = inspect.getfile(inspect.currentframe())
-CMD_DIR = os.path.realpath(os.path.abspath(os.path.split(CURRENT_DIR)[0]))
-DOC_DIR = CMD_DIR.rsplit("/", 1)[0]
-DOC_DIR += '/doc_managers'
-if DOC_DIR not in sys.path:
-    sys.path.insert(0, DOC_DIR)
+sys.path[0:0] = [""]
 
-MONGO = CMD_DIR.rsplit("/", 1)[0]
-MONGO += "/mongo_connector"
-if MONGO not in sys.path:
-    sys.path.insert(0, MONGO)
-
-from doc_managers.mongo_doc_manager import DocManager
+from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection    
-from setup_cluster import start_single_mongod_instance, kill_mongo_proc
+from tests.setup_cluster import start_single_mongod_instance, kill_mongo_proc
 
 
 class MongoDocManagerTester(unittest.TestCase):
