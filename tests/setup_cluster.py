@@ -100,6 +100,7 @@ def start_single_mongod_instance(port, data, log):
     """
     remove_dir(DEMO_SERVER_DATA + data)
     create_dir(DEMO_SERVER_DATA + data) 
+    create_dir(DEMO_SERVER_LOG) 
     cmd = ("mongod --fork --noprealloc --port %s --dbpath %s/%s "
            "--logpath %s/%s --logappend" %
           (port, DEMO_SERVER_DATA, data, DEMO_SERVER_LOG, log))        

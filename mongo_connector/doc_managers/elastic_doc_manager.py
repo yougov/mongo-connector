@@ -73,10 +73,6 @@ class DocManager():
 
         """
 
-        # There is a problem with ES .90.0 and possibly .90.1 with
-        # indices not be correctly handled.
-        # This ensures that an upsert correctly happens
-
         doc_type = self.doc_type
         index = doc['ns']
         doc[self.unique_key] = str(doc[self.unique_key])
@@ -84,13 +80,10 @@ class DocManager():
         id_query = TextQuery('_id', doc_id)
         elastic_cursor = self.elastic.search(query=id_query, indices=index)
 
-        if elastic_cursor.total == 0:
+        try:
             self.elastic.index(bsjson.dumps(doc), index, doc_type, doc_id)
-        else:
-            try:
-                self.elastic.update(bsjson.dumps(doc), index, doc_type, doc_id)
-            except ValueError:
-                logging.info("Could not update %s" % (doc,))
+        except ValueError:
+            logging.info("Could not update %s" % (doc,))
         self.elastic.refresh()
 
     def remove(self, doc):

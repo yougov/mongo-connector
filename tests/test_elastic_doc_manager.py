@@ -64,13 +64,6 @@ class elastic_docManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
-        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery())
-        for doc in res:
-            self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
-
     def test_remove(self):
         """Ensure we can properly delete from ElasticSearch via DocManager.
         """
@@ -124,7 +117,7 @@ class elastic_docManagerTester(unittest.TestCase):
         self.assertTrue(len(search) == 2)
         self.assertTrue(list(search)[0]['name'] == 'John')
         self.assertTrue(list(search)[1]['name'] == 'John Paul')
-
+    
     def test_elastic_commit(self):
         """Test that documents get properly added to ElasticSearch.
         """
@@ -133,9 +126,6 @@ class elastic_docManagerTester(unittest.TestCase):
         self.elastic_doc.upsert(docc)
         res = self.elastic_doc._search()
         assert(len(res) == 1)
-        time.sleep(2)
-        res = self.elastic_doc._search()
-        assert(len(res) != 0)
         for result in res:
             assert(result['name'] == 'Waldo')
 
@@ -149,14 +139,15 @@ class elastic_docManagerTester(unittest.TestCase):
         self.elastic_doc.upsert(docc)
         docc = {'_id': '6', 'name': 'Mr T.', '_ts': 1, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        self.elastic_conn.refresh()
+        self.assertEqual(self.elastic_doc.elastic.count()['count'], 3)
         doc = self.elastic_doc.get_last_doc()
-        self.assertTrue(doc['_id'] == '4')
+        self.assertEqual(doc['_id'], '4')
+
         docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        self.elastic_conn.refresh()
         doc = self.elastic_doc.get_last_doc()
-        self.assertTrue(doc['_id'] == '6')
+        self.assertEqual(doc['_id'], '6')
+        self.assertEqual(self.elastic_doc.elastic.count()['count'], 3)
 
 if __name__ == '__main__':
     unittest.main()

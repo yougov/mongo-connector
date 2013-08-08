@@ -38,7 +38,7 @@ except ImportError:
     from pymongo import Connection    
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
-from mongo_connectorlocking_dict import LockingDict
+from mongo_connector.locking_dict import LockingDict
 from tests.setup_cluster import (kill_mongo_proc,
                                  start_mongo_proc,
                                  start_cluster,
