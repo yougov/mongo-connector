@@ -36,9 +36,13 @@ from tests.setup_cluster import (kill_mongo_proc,
                                  start_mongo_proc,
                                  start_cluster,
                                  kill_all)
+from bson.dbref import DBRef
+from bson.objectid import ObjectId
+from bson.code import Code
+from bson.binary import Binary
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.mongo_connector import Connector
-from mongo_conector.util import retry_until_ok
+from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 
 
@@ -70,6 +74,11 @@ class TestElastic(unittest.TestCase):
         if cls.flag:
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
                         replicaSet="demo-repl")
+
+        import logging        
+        logger = logging.getLogger()
+        loglevel = logging.INFO
+        logger.setLevel(loglevel)
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
@@ -281,6 +290,34 @@ class TestElastic(unittest.TestCase):
             self.assertTrue('Paul' in item['name'])
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOC_DIRS)
+
+    def test_non_standard_fields(self):
+        """ Tests ObjectIds, DBrefs, etc
+        """
+        # This test can break if it attempts to insert before the dump takes
+        # place- this prevents it (other tests affected too actually)
+        while (self.connector.shard_set['demo-repl'].checkpoint is None):
+            time.sleep(1)
+        docs = [
+            {'foo': [1, 2]},
+            {'bar': {'hello': 'world'}},
+            {'code': Code("function x() { return 1; }")},
+            {'dbref': {'_ref': DBRef('simple',
+                ObjectId('509b8db456c02c5ab7e63c34'))}}
+        ]
+        try:
+            self.conn['test']['test'].insert(docs)
+        except OperationFailure:
+            self.fail("Cannot insert documents into Elastic!")
+        
+        for _ in range(1, 60): 
+            if (len(self.elastic_doc._search()) == len(docs)):
+                break
+            time.sleep(1)
+        else:
+            self.fail("Did not get all expected documents")
+
+        self.assertIn("dbref", self.elastic_doc.get_last_doc())
 
 def abort_test():
     """Aborts the test

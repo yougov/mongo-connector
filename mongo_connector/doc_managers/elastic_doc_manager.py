@@ -24,6 +24,8 @@
     same class and replace the method definitions with API calls for the
     desired backend.
     """
+import logging
+import bson.json_util as bsjson
 
 from pyes import ES, ESRange, RangeQuery, MatchAllQuery, TextQuery
 from pyes.exceptions import (IndexMissingException,
@@ -83,9 +85,12 @@ class DocManager():
         elastic_cursor = self.elastic.search(query=id_query, indices=index)
 
         if elastic_cursor.total == 0:
-            self.elastic.index(doc, index, doc_type, doc_id)
+            self.elastic.index(bsjson.dumps(doc), index, doc_type, doc_id)
         else:
-            self.elastic.update(doc, index, doc_type, doc_id)
+            try:
+                self.elastic.update(bsjson.dumps(doc), index, doc_type, doc_id)
+            except ValueError:
+                logging.info("Could not update %s" % (doc,))
         self.elastic.refresh()
 
     def remove(self, doc):
@@ -139,6 +144,4 @@ class DocManager():
 
         result = self.elastic.search(MatchAllQuery(), size=1, sort='_ts:desc')
         for item in result:
-            res = item
-            break
-        return res
+            return item
