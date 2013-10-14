@@ -409,7 +409,9 @@ def main():
                       """ namespaces, we could use `-n test.test,alpha.foo`."""
                       """ You must have equal number of destination """
                       """ namespaces to origin namespaces if you are """
-                      """ defining.  The default is to use the origin namespace.""")
+                      """ defining.  The default is to use the origin namespace."""
+                      """ This is currently only implemented for mongo-to-mongo """
+                      """ connections. """)
 
     #-s is to enable syslog logging.
     parser.add_option("-s", "--enable-syslog", action="store_true",
