@@ -1,0 +1,1 @@
+["Collection(Database(MongoClient('localhost', 27017), u'local'), u'oplog.rs')", 5934742958724087809]
