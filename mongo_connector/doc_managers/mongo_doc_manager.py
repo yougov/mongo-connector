@@ -59,8 +59,6 @@ class DocManager():
         """Update or insert a document into Mongo
         """
         database, coll = doc['ns'].split('.', 1)
-        del doc['ns']
-        del doc['_ts']
         try:
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:

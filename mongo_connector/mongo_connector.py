@@ -47,7 +47,7 @@ except ImportError:
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
-    def __init__(self, address, oplog_checkpoint, target_url, ns_set,
+    def __init__(self, address, oplog_checkpoint, target_url, ns_set, dest_ns_set,
                  u_key, auth_key, doc_manager=None, auth_username=None):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
@@ -70,6 +70,9 @@ class Connector(threading.Thread):
 
         #The set of relevant namespaces to consider
         self.ns_set = ns_set
+
+        #The set of destination namespaces to consider
+        self.dest_ns_set = dest_ns_set
 
         #The key that is a unique document identifier for the target system.
         #Not necessarily the mongo unique key.
@@ -218,7 +221,7 @@ class Connector(threading.Thread):
                 oplog_coll,
                 False, self.doc_manager,
                 self.oplog_progress,
-                self.ns_set, self.auth_key,
+                self.ns_set, self.dest_ns_set, self.auth_key,
                 self.auth_username,
                 repl_set=repl_set)
             self.shard_set[0] = oplog
@@ -397,6 +400,19 @@ def main():
                       """ about making your own doc manager,"""
                       """ see Doc Manager section.""")
 
+    #-g is the destination namespace
+    parser.add_option("-g", "--dest-namespace-set", action="store", type="string",
+                      dest="dest_ns_set", default=None, help=
+                      """Used to specify the destination namespaces we want to """
+                      """ consider. For example, if we wished to store all """
+                      """ documents from the test.test and alpha.foo """
+                      """ namespaces, we could use `-n test.test,alpha.foo`."""
+                      """ You must have equal number of destination """
+                      """ namespaces to origin namespaces if you are """
+                      """ defining.  The default is to use the origin namespace."""
+                      """ This is currently only implemented for mongo-to-mongo """
+                      """ connections. """)
+
     #-s is to enable syslog logging.
     parser.add_option("-s", "--enable-syslog", action="store_true",
                       dest="enable_syslog", default=False, help=
@@ -444,6 +460,15 @@ def main():
     else:
         ns_set = options.ns_set.split(',')
 
+    if options.dest_ns_set is None:
+        dest_ns_set = ns_set
+    else:
+        dest_ns_set = options.dest_ns_set.split(',')
+
+    if len(dest_ns_set) != len(ns_set):
+        logger.error("Destination namespace must be the same length as the origin namespace!")
+        sys.exit(1)
+
     key = None
     if options.auth_file is not None:
         try:
@@ -461,7 +486,7 @@ def main():
         sys.exit(1)
 
     connector = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key, options.doc_manager,
+                   ns_set, dest_ns_set, options.u_key, key, options.doc_manager,
                    auth_username=options.admin_name)
 
     connector.start()
