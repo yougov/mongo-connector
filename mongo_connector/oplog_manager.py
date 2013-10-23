@@ -106,7 +106,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         while self.running is True:
-            cursor = self.init_cursor()
+            cursor, cursor_len = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -117,7 +117,7 @@ class OplogThread(threading.Thread):
                 continue
 
             #The only entry is the last one we processed
-            if cursor is None or util.retry_until_ok(cursor.count) == 1:
+            if cursor is None or cursor_len == 1:
                 time.sleep(1)
                 continue
 
@@ -207,17 +207,18 @@ class OplogThread(threading.Thread):
         if timestamp is None:
             return None
         cursor = util.retry_until_ok(self.oplog.find,
-                                     {'ts': {'$lte': timestamp}})
+                                     {'ts': {'$lte': timestamp}},
+                                     limit=2)
 
-        if (util.retry_until_ok(cursor.count)) == 0:
+        if (util.retry_until_ok(cursor.count, True)) == 0:
             return None
 
         # Check to see if cursor is too stale
 
         while (True):
+            spec = {'ts': {'$gte': timestamp}}
             try:
-                cursor = self.oplog.find({'ts': {'$gte': timestamp}},
-                                         tailable=True, await_data=True)
+                cursor = self.oplog.find(spec, tailable=True, await_data=True)
                 cursor = cursor.sort('$natural', pymongo.ASCENDING)
                 cursor_len = cursor.count()
                 break
@@ -228,14 +229,14 @@ class OplogThread(threading.Thread):
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
-            return cursor
+            return cursor, cursor_len
         elif cursor_len > 1:
             doc = next(cursor)
             if timestamp == doc['ts']:
-                return cursor
+                return cursor, cursor_len
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
-                return None
+                return None, cursor_len
         else:
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
@@ -321,11 +322,11 @@ class OplogThread(threading.Thread):
                              % (self.oplog, msg))
 
         self.checkpoint = timestamp
-        cursor = self.get_oplog_cursor(timestamp)
+        cursor, cursor_len = self.get_oplog_cursor(timestamp)
         if cursor is not None:
             self.update_checkpoint()
 
-        return cursor
+        return (cursor, cursor_len)
 
     def update_checkpoint(self):
         """Store the current checkpoint in the oplog progress dictionary.
