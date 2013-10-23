@@ -29,6 +29,13 @@ file causes the system to go through all the mongo oplog and sync all the docume
 cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise
 the connector will miss some documents and behave incorrectly.
 
+`--no-dump` tells mongo connector to begin scanning from the the top of the
+ oplog rather than dump the entire namespace, if and only if the --oplog-ts
+ file doesn't already have a record for the oplog.  Why might you want this?
+  By default, if there is no timestamp for an oplog (ie if the --oplog-ts file
+ is empty), mongo connector will dump the entire namespace.  You may want
+ to disable that functionality.
+
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config

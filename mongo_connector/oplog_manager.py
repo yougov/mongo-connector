@@ -29,20 +29,24 @@ import util
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
 
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username, repl_set=None):
+                 auth_username, no_dump, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
 
         #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
+
+        #Boolean chooses whether to dump the entire collection if no timestamp
+        # is present in the config file
+        self._no_dump = no_dump
 
         #The mongos for sharded setups
         #Otherwise the same as primary_connection.
@@ -126,7 +130,7 @@ class OplogThread(threading.Thread):
 
                     #check if ns is excluded or not.
                     #also ensure non-empty namespace set.
-                    if (entry['ns'] not in self.namespace_set 
+                    if (entry['ns'] not in self.namespace_set
                             and self.namespace_set):
                         continue
 
@@ -307,10 +311,14 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            timestamp = self.dump_collection()
-            msg = "Dumped collection into target system"
-            logging.info('OplogManager: %s %s'
-                         % (self.oplog, msg))
+            if self._no_dump:
+                # set timestamp to top of oplog
+                timestamp = self.get_last_oplog_timestamp()
+            else:
+                timestamp = self.dump_collection()
+                msg = "Dumped collection into target system"
+                logging.info('OplogManager: %s %s'
+                             % (self.oplog, msg))
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
