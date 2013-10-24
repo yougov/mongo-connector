@@ -31,15 +31,18 @@ try:
 except ImportError:
     from pymongo import Connection
 
+
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username, no_dump, repl_set=None):
+                 auth_username, no_dump, batch_size, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
+
+        self.batch_size = batch_size
 
         #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
@@ -124,7 +127,7 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                for entry in cursor:
+                for n, entry in enumerate(cursor):
                     #sync the current oplog operation
                     operation = entry['op']
 
@@ -151,6 +154,9 @@ class OplogThread(threading.Thread):
                                 logging.error("Unable to insert %s" % (doc))
 
                     last_ts = entry['ts']
+                    if n % self.batch_size == 1:
+                        self.checkpoint = last_ts
+                        self.update_checkpoint()
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True

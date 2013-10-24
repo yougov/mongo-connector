@@ -36,6 +36,13 @@ the connector will miss some documents and behave incorrectly.
  is empty), mongo connector will dump the entire namespace.  You may want
  to disable that functionality.
 
+`--batch-size` <int> lets you choose how many oplog documents to iterate
+ through before updating the config file (pointed to by --oplog-ts) with the
+ latest position read from the oplog.  By default, the oplog config isn't
+ updated until we've read through the entire oplog.  You may want more
+ frequent updates if the mongo connector process is at risk of falling behind
+ the earliest timestamp in the oplog
+
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
