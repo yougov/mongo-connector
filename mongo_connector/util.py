@@ -66,10 +66,6 @@ def retry_until_ok(func, *args, **kwargs):
 
     result = True
     count = 0
-    # hack for backwards compatibility
-    # necessary hack?
-    if len(args) == 0:
-        args = (None, )
     while True:
         try:
             result = func(*args, **kwargs)

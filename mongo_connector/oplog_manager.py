@@ -211,13 +211,13 @@ class OplogThread(threading.Thread):
         """
 
         if timestamp is None:
-            return None
+            return None, 0
         cursor = util.retry_until_ok(self.oplog.find,
                                      {'ts': {'$lte': timestamp}},
                                      limit=2)
 
         if (util.retry_until_ok(cursor.count, True)) == 0:
-            return None
+            return None, 0
 
         # Check to see if cursor is too stale
 
