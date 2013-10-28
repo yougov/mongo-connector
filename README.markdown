@@ -6,9 +6,10 @@ in sync while the connector is running. It has been tested with python 2.7 and p
 
 ## Setup:
 
-sudo apt-get install build-essential python-dev
-sudo python ez_setup.py install
-sudo python setup.py install
+    sudo apt-get install build-essential python-dev
+    cd [YOUR-WORKFOLDER]/mongo_connector
+    sudo python ez_setup.py install
+    sudo python setup.py install
 
 ## Getting Started:
 
