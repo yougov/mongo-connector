@@ -4,6 +4,12 @@ The mongo-connector system is designed to hook up mongoDB to any target system. 
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
 in sync while the connector is running. It has been tested with python 2.7 and python 3.
 
+## Setup:
+
+sudo apt-get install build-essential python-dev
+sudo python ez_setup.py install
+sudo python setup.py install
+
 ## Getting Started:
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
