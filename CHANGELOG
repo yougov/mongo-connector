@@ -1,0 +1,5 @@
+# Changelog
+## v1.1.1
+
+- Fixes and cleanup to setup.py for easy installation
+- Renamed mongo_connector.py to connector.py to avoid namespace conflicts
