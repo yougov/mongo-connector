@@ -31,11 +31,11 @@ try:
 except ImportError:
     from ez_setup import setup
     use_setup_tools()
-    from setuptools import setup    
+    from setuptools import setup
 
 setup(name='mongo-connector',
-      version="1.1.0",
-      author="10Gen",
+      version="1.1.1",
+      author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
       keywords='mongo-connector',
@@ -44,10 +44,10 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo', 'pyes', 'pysolr >= 3.1.0', 'simplejson'],
-      packages=["mongo_connector"],
+      packages=["mongo_connector", "mongo_connector.doc_managers"],
+      test_suite="tests",
       package_data={
-          '': ['*.xml', 'README'],
-          'mongo_connector': ['config.txt']
+          'mongo_connector.doc_managers': ['schema.xml']
       },
       entry_points={
           'console_scripts' : [
