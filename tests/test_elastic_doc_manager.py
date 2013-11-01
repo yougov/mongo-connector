@@ -114,9 +114,10 @@ class elastic_docManagerTester(unittest.TestCase):
         self.elastic_doc.commit()
         search = self.elastic_doc.search(
             5767301236327972865, 5767301236327972866)
-        self.assertTrue(len(search) == 2)
-        self.assertTrue(list(search)[0]['name'] == 'John')
-        self.assertTrue(list(search)[1]['name'] == 'John Paul')
+        self.assertEqual(len(search), 2)
+        result_names = [result.get("name") for result in search]
+        self.assertIn('John', result_names)
+        self.assertIn('John Paul', result_names)
     
     def test_elastic_commit(self):
         """Test that documents get properly added to ElasticSearch.
