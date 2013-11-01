@@ -60,7 +60,7 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery())
+        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
@@ -71,12 +71,12 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery())
+        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
         self.assertTrue(len(res) == 1)
 
         self.elastic_doc.remove(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery())
+        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
         self.assertTrue(len(res) == 0)
 
     def test_full_search(self):
@@ -90,7 +90,7 @@ class elastic_docManagerTester(unittest.TestCase):
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
         search = self.elastic_doc._search()
-        search2 = self.elastic_conn.search(MatchAllQuery())
+        search2 = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
