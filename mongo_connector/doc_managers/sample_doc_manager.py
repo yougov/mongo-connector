@@ -46,7 +46,7 @@ class DocManager():
         periodic committer if necessary.
         The unique_key should default to '_id' and it is an obligatory
         parameter.
-        It requires a url parameter iff mongo_connector.py is called with
+        It requires a url parameter iff connector.py is called with
         the -b parameter. Otherwise, it doesn't require any other parameter
         (e.g. if the target engine doesn't need a URL)
         It should raise a SystemError exception if the URL is not valid.
