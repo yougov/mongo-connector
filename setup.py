@@ -44,14 +44,14 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo', 'pyes', 'pysolr >= 3.1.0', 'simplejson'],
-      package_dir={'':'mongo_connector'},
+      packages=["mongo_connector"],
       package_data={
           '': ['*.xml', 'README'],
           'mongo_connector': ['config.txt']
       },
       entry_points={
           'console_scripts' : [
-              'mongo-connector = mongo_connector.mongo_connector:main',
+              'mongo-connector = mongo_connector.connector:main',
           ],
       }
-      )
+)

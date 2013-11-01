@@ -28,7 +28,7 @@ sys.path[0:0] = [""]
 import unittest
 import time
 import json
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from tests.setup_cluster import start_cluster, kill_all
 from bson.timestamp import Timestamp
 from mongo_connector.util import long_to_bson_ts
