@@ -1,12 +1,12 @@
-## System Overview:
+## System Overview
 
 The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
 in sync while the connector is running. It has been tested with python 2.7 and python 3.
 
-## Getting Started:
+## Getting Started
 
-### Installation:
+### Installation
 
 The easiest way to install mongo-connector is with [pip](https://pypi.python.org/pypi/pip):
 
@@ -22,7 +22,7 @@ You can also install the development version of mongo-connector manually:
 You might have to run `python setup.py install` with `sudo`, depending on where you're installing
 mongo-connector and what privileges you have.
 
-### Using mongo-connector:
+### Using mongo-connector
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations. It requires a replica set
@@ -85,7 +85,7 @@ An example of combining all of these is:
 
      mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
-## Usage With Solr:
+## Usage With Solr
 
 We have provided an example Solr schema called `schema.xml`, which provides field definitions for the 'name', '_ts', `ns`, and `_id` fields. The schema also sets the `_id` field to be the unique key by adding this line:
 
@@ -174,7 +174,7 @@ last document. If there are no documents, this functions
 returns None. Otherwise, it returns the first document.
 
 
-## System Internals:
+## System Internals
 
 The main Connector thread connects to either a mongod or a mongos, depending on cluster setup, and
 spawns an OplogThread for every primary node in the cluster. These OplogThreads continuously poll
