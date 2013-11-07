@@ -142,7 +142,10 @@ class OplogThread(threading.Thread):
                             if doc is not None:
                                 doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                                 doc['ns'] = ns
-                                self.doc_manager.upsert(doc)
+                                try:
+                                    self.doc_manager.upsert(doc)
+                                except SystemError:
+                                    logging.error("Unable to insert %s" % (doc))
 
                         last_ts = entry['ts']
                     if not cursor.alive:
