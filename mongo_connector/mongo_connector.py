@@ -273,7 +273,7 @@ class Connector(threading.Thread):
                                                       oplog_coll, True,
                                                       self.doc_manager,
                                                       self.oplog_progress,
-                                                      self.ns_set,
+                                                      self.ns_set,self.dest_ns_set,
                                                       self.auth_key,
                                                       self.auth_username)
                     self.shard_set[shard_id] = oplog
