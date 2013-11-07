@@ -68,10 +68,7 @@ class DocManager():
     def build_fields(self):
         """ Builds a list of valid fields
         """
-        try:
-            declared_fields = self.solr._send_request('get', ADMIN_URL)
-        except SolrError:
-           pass
+        declared_fields = self.solr._send_request('get', ADMIN_URL)
         result = decoder.decode(declared_fields)
         self.field_list = self._parse_fields(result, 'fields'),
         self.dynamic_field_list = self._parse_fields(result, 'dynamicFields')
