@@ -107,10 +107,16 @@ class Connector(threading.Thread):
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):
-                info_str = "MongoConnector: Can't find OplogProgress file!"
-                logging.critical(info_str)
-                self.doc_manager.stop()
-                self.can_run = False
+                info_str = ("MongoConnector: Can't find %s, attempting to create an empty progress log" %
+                            self.oplog_checkpoint)
+                logging.info(info_str)
+                try:
+                    # Truncate the progress log
+                    open(self.oplog_checkpoint, "w").close()
+                except IOError as e:
+                    logging.critical("MongoConnector: Could not create a progress log: %s" %
+                                     str(e))
+                    sys.exit(1)
             else:
                 if (not os.access(self.oplog_checkpoint, os.W_OK)
                         and not os.access(self.oplog_checkpoint, os.R_OK )):
