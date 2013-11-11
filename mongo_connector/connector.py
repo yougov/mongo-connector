@@ -112,7 +112,7 @@ class Connector(threading.Thread):
                             self.oplog_checkpoint)
                 logging.info(info_str)
                 try:
-                    # Truncate the progress log
+                    # Create oplog progress file
                     open(self.oplog_checkpoint, "w").close()
                 except IOError as e:
                     logging.critical("MongoConnector: Could not "
