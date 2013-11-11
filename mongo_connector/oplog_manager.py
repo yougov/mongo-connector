@@ -120,7 +120,7 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                while True:
+                while cursor.alive
                     for entry in cursor:
                         #sync the current oplog operation
                         operation = entry['op']
@@ -148,8 +148,6 @@ class OplogThread(threading.Thread):
                                     logging.error("Unable to insert %s" % (doc))
 
                         last_ts = entry['ts']
-                    if not cursor.alive:
-                        break
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
