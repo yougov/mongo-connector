@@ -35,7 +35,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                 start_cluster,
                                 kill_all)
 from pysolr import Solr, SolrError
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from pymongo.errors import OperationFailure, AutoReconnect
 from requests.exceptions import MissingSchema
 

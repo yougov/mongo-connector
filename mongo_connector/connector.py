@@ -36,7 +36,7 @@ from locking_dict import LockingDict
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
 
 try:
     import simplejson as json
@@ -111,8 +111,8 @@ class Connector(threading.Thread):
                 logging.critical(info_str)
                 self.doc_manager.stop()
                 self.can_run = False
-            else:    
-                if (not os.access(self.oplog_checkpoint, os.W_OK) 
+            else:
+                if (not os.access(self.oplog_checkpoint, os.W_OK)
                         and not os.access(self.oplog_checkpoint, os.R_OK )):
                     logging.critical("Invalid permissions on %s! Exiting" %
                         (self.oplog_checkpoint))
@@ -197,7 +197,7 @@ class Connector(threading.Thread):
         """
         main_conn = Connection(self.address)
         if self.auth_key is not None:
-            main_conn['admin'].authenticate(self.auth_username, self.auth_key) 
+            main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
         conn_type = None
 
@@ -212,8 +212,8 @@ class Connector(threading.Thread):
 
             prim_admin = main_conn.admin
             repl_set = prim_admin.command("replSetGetStatus")['set']
-            
-            oplog = oplog_manager.OplogThread(main_conn, 
+
+            oplog = oplog_manager.OplogThread(main_conn,
                 (main_conn.host + ":" + str(main_conn.port)),
                 oplog_coll,
                 False, self.doc_manager,
@@ -420,10 +420,10 @@ def main():
     logger = logging.getLogger()
     loglevel = logging.INFO
     logger.setLevel(loglevel)
-    
+
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
-        syslog_host = logging.handlers.SysLogHandler(address=(syslog_info[0], 
+        syslog_host = logging.handlers.SysLogHandler(address=(syslog_info[0],
             int(syslog_info[1])),facility=options.syslog_facility)
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)

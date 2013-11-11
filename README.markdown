@@ -10,7 +10,7 @@ Since the connector does real time syncing, it is necessary to have MongoDB runn
 connector will work with both sharded and non sharded configurations. It requires a replica set
 setup.
 
-To start the system, simply run "python mongo_connector.py". It is likely, however, that you will need
+To start the system, simply run "mongo-connector". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the main address, which is a host:port pair. For sharded clusters,
@@ -65,7 +65,7 @@ For more information about making your own doc manager, see Doc Manager section.
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
+     mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
 ## Usage With Solr:
 
@@ -96,9 +96,8 @@ also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
 auto_commit.
 The unique_key should default to '_id' and it is an obligatory parameter.
-It requires a url paramater iff mongo_connector.py is called with the -b paramater.
-Otherwise, it doesn't require any other parameter (e.g. if the target engine doesn't need a URL).
-It should raise a SystemError exception if the URL is not valid.
+The `url` parameter provides the URL to the target engine and needs to be validated before use by the doc manager.
+`__init__` should raise a SystemError exception if the URL is not valid.
 
 __2) stop(self)__
 
@@ -183,10 +182,10 @@ The above three steps essentially loop forever. For usage purposes, the only rel
 DocManager, which will always get the documents from the underlying layer and is responsible for
 adding to/removing from the target system.
 
-Mongo-Connector imports a DocManager from the specified file in mongo_connector.py, preferably
+Mongo-Connector imports a DocManager from the specified file in connector.py, preferably
 from the doc_managers folder. We have provided sample implementations for a Solr search DocManager
- and an ElasticSearch DocManager. Note that upon execution, mongo_connector.py will copy the file
- to the main folder as doc_manager.py.
+and an ElasticSearch DocManager. Note that upon execution, connector.py will copy the file
+to the main folder as doc_manager.py.
 
 The documents stored in the target system are equivalent to what is stored in mongo, except every
 document has two additional fields called `ns` and `_ts`. The `_ts` field stores the latest

@@ -36,7 +36,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                 start_cluster,
                                 kill_all)
 from threading import Timer
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 
