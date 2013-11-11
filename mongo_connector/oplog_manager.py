@@ -29,7 +29,7 @@ import util
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
 
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
@@ -120,33 +120,34 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                for entry in cursor:
-                    #sync the current oplog operation
-                    operation = entry['op']
+                while cursor.alive:
+                    for entry in cursor:
+                        #sync the current oplog operation
+                        operation = entry['op']
+                        ns = entry['ns']
 
-                    #check if ns is excluded or not.
-                    #also ensure non-empty namespace set.
-                    if (entry['ns'] not in self.namespace_set 
-                            and self.namespace_set):
-                        continue
+                        #check if ns is excluded or not.
+                        #also ensure non-empty namespace set.
+                        if ns not in self.namespace_set and self.namespace_set:
+                            continue
 
-                    #delete
-                    if operation == 'd':
-                        entry['_id'] = entry['o']['_id']
-                        self.doc_manager.remove(entry)
-                    #insert/update. They are equal because of lack of support
-                    #for partial update
-                    elif operation == 'i' or operation == 'u':
-                        doc = self.retrieve_doc(entry)
-                        if doc is not None:
-                            doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                            doc['ns'] = entry['ns']
-                            try:
-                                self.doc_manager.upsert(doc)
-                            except SystemError:
-                                logging.error("Unable to insert %s" % (doc))
+                        #delete
+                        if operation == 'd':
+                            entry['_id'] = entry['o']['_id']
+                            self.doc_manager.remove(entry)
+                        #insert/update. They are equal because of lack of support
+                        #for partial update
+                        elif operation == 'i' or operation == 'u':
+                            doc = self.retrieve_doc(entry)
+                            if doc is not None:
+                                doc['_ts'] = util.bson_ts_to_long(entry['ts'])
+                                doc['ns'] = ns
+                                try:
+                                    self.doc_manager.upsert(doc)
+                                except SystemError:
+                                    logging.error("Unable to insert %s" % (doc))
 
-                    last_ts = entry['ts']
+                        last_ts = entry['ts']
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
