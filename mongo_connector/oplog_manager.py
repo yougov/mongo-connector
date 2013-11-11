@@ -120,7 +120,7 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                while cursor.alive
+                while cursor.alive:
                     for entry in cursor:
                         #sync the current oplog operation
                         operation = entry['op']
