@@ -1,10 +1,28 @@
-## System Overview:
+## System Overview
 
 The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
 in sync while the connector is running. It has been tested with python 2.7 and python 3.
 
-## Getting Started:
+## Getting Started
+
+### Installation
+
+The easiest way to install mongo-connector is with [pip](https://pypi.python.org/pypi/pip):
+
+    pip install mongo-connector
+
+You can also install the development version of mongo-connector manually:
+
+    cd your/installation/directory
+    git clone https://github.com/10gen-labs/mongo-connector.git
+    cd mongo-connector
+    python setup.py install
+
+You might have to run `python setup.py install` with `sudo`, depending on where you're installing
+mongo-connector and what privileges you have.
+
+### Using mongo-connector
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
 connector will work with both sharded and non sharded configurations. It requires a replica set
@@ -45,17 +63,17 @@ password without entering it as plaintext on the command line.
 
 `-p` is to specify the password used for authentication. If this option is specified along
 with `-f`, then the password specified here will be used regardless of the contents of the
-password file. For sharded clusters, the admin username/password must exist in every shard's 
-admin database, otherwise the system will fail to authenticate. This is because of how the 
+password file. For sharded clusters, the admin username/password must exist in every shard's
+admin database, otherwise the system will fail to authenticate. This is because of how the
 connector authenticates against the shards, which is described in depth in the System Internals
-section below. 
+section below.
 
 `-a' or `--admin-username` is used to specify the username of an admin user to authenticate with.
 To use authentication with the system, the user must specify both this option and the password or password file
 option, which stores the password for the user. The default username is '__system', which is not
 recommended for production use. If using this and one of the password options in a sharded environment,
 it is essential that the username/password exists in the admin database of every shard in the cluster. Otherwise,
-authentication will fail. 
+authentication will fail.
 
 `-d` or `--docManager` is used to specify the doc manager file that is going to be used.
 You should send the path of the file you want to be used. By default, it will use
@@ -67,7 +85,7 @@ An example of combining all of these is:
 
      mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
-## Usage With Solr:
+## Usage With Solr
 
 We have provided an example Solr schema called `schema.xml`, which provides field definitions for the 'name', '_ts', `ns`, and `_id` fields. The schema also sets the `_id` field to be the unique key by adding this line:
 
@@ -156,7 +174,7 @@ last document. If there are no documents, this functions
 returns None. Otherwise, it returns the first document.
 
 
-## System Internals:
+## System Internals
 
 The main Connector thread connects to either a mongod or a mongos, depending on cluster setup, and
 spawns an OplogThread for every primary node in the cluster. These OplogThreads continuously poll
@@ -204,7 +222,7 @@ The tests should be run with unittests, so to run them properly, navigate to the
 
     python -m unittest discover
 
-This should run all of the tests in the folder. 
+This should run all of the tests in the folder.
 To specify a specific test, run
 
     python -m unittest tests.<name_of_module>
@@ -224,7 +242,7 @@ To set these variables, you can simply place them in a shell script like so:
 
 And then correctly set them by sourcing them, ie:
 
-    source <name_of_script>    
+    source <name_of_script>
 
 A word of caution: For some of the tests, specifically test_oplog_manager, the output prints out "ERROR:root:OplogThread:
 No oplog for thread: Connection('localhost', 27117)". This is expected behavior because the tests run some parts in isolation,
