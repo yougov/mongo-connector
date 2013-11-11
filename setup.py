@@ -34,7 +34,7 @@ except ImportError:
     from setuptools import setup
 
 setup(name='mongo-connector',
-      version="1.1.1",
+      version="1.1.1+",
       author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
@@ -44,7 +44,7 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo', 'pyes', 'pysolr >= 3.1.0', 'simplejson'],
-      packages=["mongo_connector", "mongo_connector.doc_managers"],
+      packages=["mongo_connector"],
       test_suite="tests",
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']
