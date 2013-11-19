@@ -309,9 +309,10 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             timestamp = self.dump_collection()
-            msg = "Dumped collection into target system"
-            logging.info('OplogManager: %s %s'
-                         % (self.oplog, msg))
+            if timestamp:
+                msg = "Dumped collection into target system"
+                logging.info('OplogManager: %s %s'
+                             % (self.oplog, msg))
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
