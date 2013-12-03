@@ -287,6 +287,7 @@ class Connector(threading.Thread):
                     oplog.start()
 
         self.oplog_thread_join()
+        self.write_oplog_progress()
 
     def oplog_thread_join(self):
         """Stops all the OplogThreads
