@@ -120,8 +120,12 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                while cursor.alive:
+                while cursor.alive and self.running:
                     for entry in cursor:
+                        # Break out if this thread should stop
+                        if not self.running:
+                            break
+
                         #sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
