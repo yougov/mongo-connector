@@ -29,7 +29,7 @@ import logging
 
 from pysolr import Solr, SolrError
 from threading import Timer
-from mongo_connector.util import verify_url, retry_until_ok
+from mongo_connector.util import retry_until_ok
 ADMIN_URL = 'admin/luke?show=Schema&wt=json'
 
 decoder = json.JSONDecoder()
@@ -46,9 +46,6 @@ class DocManager():
     def __init__(self, url, auto_commit=False, unique_key='_id'):
         """Verify Solr URL and establish a connection.
         """
-        if verify_url(url) is False:
-            raise SystemError
-
         self.solr = Solr(url)
         self.unique_key = unique_key
         self.auto_commit = auto_commit
@@ -66,15 +63,12 @@ class DocManager():
         for key, value in result.get('schema', {}).get(field_name, {}).items():
             if key not in field_list:
                 field_list.append(key)
-        return field_list    
+        return field_list
 
     def build_fields(self):
         """ Builds a list of valid fields
         """
-        try:
-            declared_fields = self.solr._send_request('get', ADMIN_URL)
-        except SolrError:
-           pass 
+        declared_fields = self.solr._send_request('get', ADMIN_URL)
         result = decoder.decode(declared_fields)
         self.field_list = self._parse_fields(result, 'fields'),
         self.dynamic_field_list = self._parse_fields(result, 'dynamicFields')
@@ -102,7 +96,7 @@ class DocManager():
                     if regex.match(key):
                         fixed_doc[key] = value
 
-        return fixed_doc        
+        return fixed_doc
 
     def stop(self):
         """ Stops the instance
