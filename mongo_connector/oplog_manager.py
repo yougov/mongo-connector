@@ -277,6 +277,10 @@ class OplogThread(threading.Thread):
 
             try:
                 for doc in cursor:
+                    # Could spend a long time in this loop
+                    if not self.running:
+                        # Return None so we don't save our progress
+                        return None
                     doc['ns'] = namespace
                     doc['_ts'] = long_ts
                     try:
