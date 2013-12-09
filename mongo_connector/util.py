@@ -57,7 +57,7 @@ def long_to_bson_ts(val):
     return Timestamp(seconds, increment)
 
 
-def retry_until_ok(func, *args, **kwargs):
+def retry_until_ok(func, args=None):
     """Retry code block until it succeeds.
 
     If it does not succeed in 60 attempts, the
@@ -68,8 +68,12 @@ def retry_until_ok(func, *args, **kwargs):
     count = 0
     while True:
         try:
-            result = func(*args, **kwargs)
-            break
+            if args is None:
+                result = func()
+                break
+            else:
+                result = func(args)
+                break
         except:
             count += 1
             if count > 60:

@@ -207,25 +207,18 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             return None
+        cursor = util.retry_until_ok(self.oplog.find,
+                                     {'ts': {'$lte': timestamp}})
+
+        if (util.retry_until_ok(cursor.count)) == 0:
+            return None
 
         # Check to see if cursor is too stale
-        cursor = util.retry_until_ok(self.oplog.find,
-                                     {'ts': {'$lte': timestamp}},
-                                     limit=1)
-        # Applying 8 as the mask to the cursor enables OplogReplay
-        cursor.add_option(8)
-        stale_cursor = True
-        for entry in cursor:
-            stale_cursor = False
-            break
-        if stale_cursor:
-            return None
 
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
-                cursor.add_option(8)
                 cursor = cursor.sort('$natural', pymongo.ASCENDING)
                 cursor_len = cursor.count()
                 break
@@ -367,17 +360,10 @@ class OplogThread(threading.Thread):
             return None
 
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        cursor = self.oplog.find({'ts': {'$lte': target_ts}},
-                                           sort=[('$natural',
-                                                  pymongo.DESCENDING)],
-                                           limit=1)
-        cursor.add_option(8)
-        empty_cursor = True
-        for entry in cursor:
-            last_oplog_entry = entry
-            empty_cursor = False
-            break
-        if empty_cursor:
+        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': target_ts}},
+                                               sort=[('$natural',
+                                               pymongo.DESCENDING)])
+        if last_oplog_entry is None:
             return None
 
         rollback_cutoff_ts = last_oplog_entry['ts']
