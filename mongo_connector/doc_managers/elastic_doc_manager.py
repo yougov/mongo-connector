@@ -115,7 +115,7 @@ class DocManager():
         """For test purposes only. Performs search on Elastic with empty query.
         Does not have to be implemented.
         """
-        results = self.elastic.search(MatchAllQuery())
+        results = self.elastic.search(MatchAllQuery(), indices=("test.test",))
         return results
 
     def commit(self):

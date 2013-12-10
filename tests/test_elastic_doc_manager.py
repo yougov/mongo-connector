@@ -6,6 +6,7 @@ import time
 import sys
 import inspect
 import os
+from pyes.exceptions import ElasticSearchException
 
 sys.path[0:0] = [""]
 
@@ -118,7 +119,7 @@ class elastic_docManagerTester(unittest.TestCase):
         result_names = [result.get("name") for result in search]
         self.assertIn('John', result_names)
         self.assertIn('John Paul', result_names)
-    
+
     def test_elastic_commit(self):
         """Test that documents get properly added to ElasticSearch.
         """
@@ -126,29 +127,36 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         res = self.elastic_doc._search()
-        assert(len(res) == 1)
+        self.assertEqual(len(res), 1)
         for result in res:
-            assert(result['name'] == 'Waldo')
+            self.assertEqual(result['name'], 'Waldo')
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
             the latest timestamp.
         """
-        docc = {'_id': '4', 'name': 'Hare', '_ts': 3, 'ns': 'test.test'}
+        try:
+            ts = self.elastic_doc.get_last_doc()
+            ts = base.get("_ts")
+        except ElasticSearchException:
+            ts = 0
+        docc = {'_id': '4', 'name': 'Hare', '_ts': ts+3, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        docc = {'_id': '5', 'name': 'Tortoise', '_ts': 2, 'ns': 'test.test'}
+        docc = {'_id': '5', 'name': 'Tortoise', '_ts': ts+2, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        docc = {'_id': '6', 'name': 'Mr T.', '_ts': 1, 'ns': 'test.test'}
+        docc = {'_id': '6', 'name': 'Mr T.', '_ts': ts+1, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        self.assertEqual(self.elastic_doc.elastic.count()['count'], 3)
+        self.assertEqual(
+            self.elastic_doc.elastic.count(indices=("test.test",))['count'], 3)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '4')
 
-        docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
+        docc = {'_id': '6', 'name': 'HareTwin', '_ts': ts+4, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '6')
-        self.assertEqual(self.elastic_doc.elastic.count()['count'], 3)
+        self.assertEqual(
+            self.elastic_doc.elastic.count(indices=("test.test",))['count'], 3)
 
 if __name__ == '__main__':
     unittest.main()
