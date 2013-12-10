@@ -25,6 +25,7 @@ import sys
 import time
 import threading
 import util
+from mongo_connector import errors
 
 try:
     from pymongo import MongoClient as Connection
@@ -147,7 +148,7 @@ class OplogThread(threading.Thread):
                                 doc['ns'] = ns
                                 try:
                                     self.doc_manager.upsert(doc)
-                                except SystemError:
+                                except errors.OperationFailed:
                                     logging.error("Unable to insert %s" % (doc))
 
                         last_ts = entry['ts']
@@ -284,7 +285,7 @@ class OplogThread(threading.Thread):
                     doc['_ts'] = long_ts
                     try:
                         self.doc_manager.upsert(doc)
-                    except SystemError:
+                    except errors.OperationFailed:
                         logging.error("Unable to insert %s" % (doc))
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
@@ -419,7 +420,7 @@ class OplogThread(threading.Thread):
                 doc['ns'] = namespace
                 try:
                     self.doc_manager.upsert(doc)
-                except SystemError:
+                except errors.OperationFailed:
                     logging.error("Unable to insert %s" % (doc))
 
         return rollback_cutoff_ts

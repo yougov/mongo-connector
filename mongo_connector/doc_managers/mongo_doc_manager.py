@@ -25,6 +25,7 @@
     """
 
 import pymongo
+from mongo_connector import errors
 from bson.errors import InvalidDocument
 
 class DocManager():
@@ -45,9 +46,9 @@ class DocManager():
         try:
             self.mongo = pymongo.Connection(url)
         except pymongo.errors.InvalidURI:
-            raise SystemError
+            raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:
-            raise SystemError    
+            raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.unique_key = unique_key
 
     def stop(self):
@@ -62,9 +63,9 @@ class DocManager():
         try:
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
-            raise SystemError
+            raise errors.OperationFailed("Could not complete upsert on MongoDB")
         except InvalidDocument:
-            raise SystemError
+            raise errors.OperationFailed("Cannot insert invalid doc to MongoDB")
 
     def remove(self, doc):
         """Removes document from Mongo

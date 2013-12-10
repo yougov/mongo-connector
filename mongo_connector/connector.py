@@ -32,6 +32,7 @@ import util
 import imp
 
 from locking_dict import LockingDict
+import errors
 
 try:
     from pymongo import MongoClient as Connection
@@ -100,8 +101,9 @@ class Connector(threading.Thread):
                 else:
                     self.doc_manager = doc_manager.DocManager(self.target_url,
                                                               unique_key=u_key)
-        except SystemError:
-            logging.critical("MongoConnector: Bad target system URL!")
+        except errors.ConnectionFailed:
+            err_msg = "MongoConnector: Could not connect to target system"
+            logging.critical(err_msg)
             self.can_run = False
             return
 

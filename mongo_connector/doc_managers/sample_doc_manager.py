@@ -49,7 +49,7 @@ class DocManager():
         It requires a url parameter iff connector.py is called with
         the -b parameter. Otherwise, it doesn't require any other parameter
         (e.g. if the target engine doesn't need a URL)
-        It should raise a SystemError exception if the URL is not valid.
+        It should raise ConnectionFailed if the URL is not valid.
         """
         raise exceptions.NotImplementedError
 
