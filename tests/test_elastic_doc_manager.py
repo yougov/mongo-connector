@@ -11,6 +11,7 @@ from pyes.exceptions import ElasticSearchException
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
+from mongo_connector import errors
 from pyes import ES, MatchAllQuery
 from pyes.exceptions import (IndexMissingException,
                             NoServerAvailable,
@@ -41,18 +42,6 @@ class elastic_docManagerTester(unittest.TestCase):
         except (IndexMissingException, TypeMissingException,
                 NoServerAvailable):
             pass
-
-    def test_invalid_url(self):
-        """Ensure DocManager fails for a bad Solr url.
-        """
-        #Invalid URL
-        #Invalid URL
-        count = 0
-        try:
-            DocManager("http://doesntexist.cskjdfhskdjfhdsom")
-        except SystemError:
-            count += 1
-        self.assertTrue(count == 1)
 
     def test_upsert(self):
         """Ensure we can properly insert into ElasticSearch via DocManager.

@@ -48,17 +48,6 @@ class SolrDocManagerTester(unittest.TestCase):
 
         self.solr.delete(q='*:*')
 
-    def test_invalid_url(self):
-        """Ensure DocManager fails for a bad Solr url.
-        """
-        #Invalid URL
-        count = 0
-        try:
-            DocManager("http://doesntexist.cskjdfhskdjfhdsom")
-        except SolrError:
-            count += 1
-        self.assertTrue(count == 1)
-
     def test_upsert(self):
         """Ensure we can properly insert into Solr via DocManager.
         """
