@@ -24,7 +24,7 @@ import inspect
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
-from pysolr import Solr
+from pysolr import Solr, SolrError
 
 class SolrDocManagerTester(unittest.TestCase):
     """Test class for SolrDocManager
@@ -55,7 +55,7 @@ class SolrDocManagerTester(unittest.TestCase):
         count = 0
         try:
             DocManager("http://doesntexist.cskjdfhskdjfhdsom")
-        except SystemError:
+        except SolrError:
             count += 1
         self.assertTrue(count == 1)
 
