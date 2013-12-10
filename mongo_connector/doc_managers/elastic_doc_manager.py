@@ -32,7 +32,7 @@ from pyes.exceptions import (IndexMissingException,
                              NotFoundException,
                              TypeMissingException)
 from threading import Timer
-from mongo_connector.util import verify_url, retry_until_ok
+from mongo_connector.util import retry_until_ok
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -47,11 +47,8 @@ class DocManager():
         """
 
     def __init__(self, url, auto_commit=True, unique_key='_id'):
-        """Verify Elastic URL and establish a connection.
+        """ Establish a connection to Elastic
         """
-
-        if verify_url(url) is False:
-            raise SystemError
         self.elastic = ES(server=url)
         self.auto_commit = auto_commit
         self.doc_type = 'string'  # default type is string, change if needed

@@ -28,17 +28,6 @@ try:
 except ImportError:
     from urllib.request import urlopen, URLError
 
-
-def verify_url(url):
-    """Verifies the validity of a given url.
-    """
-    try:
-        urlopen(url)
-        return True
-    except (ValueError, URLError):
-        return False
-
-
 def bson_ts_to_long(timestamp):
     """Convert BSON timestamp into integer.
 

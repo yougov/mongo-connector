@@ -95,8 +95,7 @@ class OplogThread(threading.Thread):
                 auth_username, auth_key)
         if self.oplog.find().count() == 0:
             err_msg = 'OplogThread: No oplog for thread:'
-            logging.error('%s %s' % (err_msg, self.primary_connection))
-            self.running = False
+            logging.warning('%s %s' % (err_msg, self.primary_connection))
 
     def run(self):
         """Start the oplog worker.

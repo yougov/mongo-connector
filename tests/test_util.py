@@ -26,11 +26,9 @@ sys.path[0:0] = [""]
 
 import unittest
 from bson import timestamp
-from mongo_connector.util import (verify_url,
-                  bson_ts_to_long,
-                  long_to_bson_ts,
-                  retry_until_ok)
-
+from mongo_connector.util import (bson_ts_to_long,
+                                  long_to_bson_ts,
+                                  retry_until_ok)
 
 def err_func():
     """Helper function for retry_until_ok test
@@ -53,21 +51,6 @@ class UtilTester(unittest.TestCase):
         """ Runs the tests
         """
         super(UtilTester, self).__init__()
-
-    def test_verify_url(self):
-        """Test verify_url with good and bad urls
-        """
-
-        bad_url = "weofkej"
-        good_url = "http://www.google.com"
-        no_http_url = "www.google.com"
-        good_host_bad_path = "http://www.google.com/-##4@3weo$%*"
-
-        self.assertTrue(verify_url(good_url))
-
-        self.assertFalse(verify_url(no_http_url))
-        self.assertFalse(verify_url(bad_url))
-        self.assertFalse(verify_url(good_host_bad_path))
 
     def test_bson_ts_to_long(self):
         """Test bson_ts_to_long and long_to_bson_ts
