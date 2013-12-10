@@ -207,25 +207,31 @@ class OplogThread(threading.Thread):
 
         if timestamp is None:
             return None
-        cursor = util.retry_until_ok(self.oplog.find,
-                                     {'ts': {'$lte': timestamp}})
 
-        if (util.retry_until_ok(cursor.count)) == 0:
-            return None
-
-        # Check to see if cursor is too stale
-
+        cursor, cursor_len = None, 0
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
-                cursor = cursor.sort('$natural', pymongo.ASCENDING)
+                # Applying 8 as the mask to the cursor enables OplogReplay
+                cursor.add_option(8)
                 cursor_len = cursor.count()
                 break
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 pass
-        if cursor_len == 1:     # means we are the end of the oplog
+        if cursor_len == 0:
+            #rollback, we are past the last element in the oplog
+            timestamp = self.rollback()
+
+            logging.info('Finished rollback')
+            return self.get_oplog_cursor(timestamp)
+        cursor_ts_long = util.bson_ts_to_long(cursor[0].get("ts"))
+        given_ts_long = util.bson_ts_to_long(timestamp)
+        if cursor_ts_long > given_ts_long:
+            # first entry in oplog is beyond timestamp, we've fallen behind!
+            return None
+        elif cursor_len == 1:     # means we are the end of the oplog
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
@@ -237,12 +243,6 @@ class OplogThread(threading.Thread):
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
                 return None
-        else:
-            #rollback, we are past the last element in the oplog
-            timestamp = self.rollback()
-
-            logging.info('Finished rollback')
-            return self.get_oplog_cursor(timestamp)
 
     def dump_collection(self):
         """Dumps collection into the target system.
