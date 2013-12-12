@@ -6,17 +6,12 @@ import time
 import sys
 import inspect
 import os
-from pyes.exceptions import ElasticSearchException
+from elasticsearch import Elasticsearch, exceptions as es_exceptions
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector import errors
-from pyes import ES, MatchAllQuery
-from pyes.exceptions import (IndexMissingException,
-                            NoServerAvailable,
-                            TypeMissingException)
-
 
 class elastic_docManagerTester(unittest.TestCase):
     """Test class for elastic_docManager
@@ -31,16 +26,17 @@ class elastic_docManagerTester(unittest.TestCase):
     def setUpClass(cls):
         """Initializes ES DocManager and a direct connection to elastic_conn
         """
-        cls.elastic_doc = DocManager("http://localhost:9200", auto_commit=False)
-        cls.elastic_conn = ES(server="http://localhost:9200")
+        cls.elastic_doc = DocManager("localhost:9200", auto_commit=False)
+        cls.elastic_conn = Elasticsearch(server="localhost:9200")
 
     def setUp(self):
         """Empty ElasticSearch at the start of every test
         """
         try:
-            self.elastic_conn.delete('test.test', 'string', '')
-        except (IndexMissingException, TypeMissingException,
-                NoServerAvailable):
+            self.elastic_conn.delete_by_query("test.test", "string",
+                                              {"match_all":{}})
+        except (es_exceptions.ConnectionError,
+                es_exceptions.TransportError):
             pass
 
     def test_upsert(self):
@@ -50,8 +46,12 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
+        res = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}}
+        )["hits"]["hits"]
         for doc in res:
+            doc = doc["_source"]
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
     def test_remove(self):
@@ -61,13 +61,21 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
-        self.assertTrue(len(res) == 1)
+        res = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}}
+        )["hits"]["hits"]
+        res = [x["_source"] for x in res]
+        self.assertEqual(len(res), 1)
 
         self.elastic_doc.remove(docc)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
-        self.assertTrue(len(res) == 0)
+        res = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}}
+        )["hits"]["hits"]
+        res = [x["_source"] for x in res]
+        self.assertEqual(len(res), 0)
 
     def test_full_search(self):
         """Query ElasticSearch for all docs via API and via DocManager's
@@ -79,9 +87,13 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.elastic_doc.commit()
-        search = self.elastic_doc._search()
-        search2 = self.elastic_conn.search(MatchAllQuery(), indices=("test.test",))
-        self.assertTrue(len(search) == len(search2))
+        search = list(self.elastic_doc._search())
+        search2 = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}}
+        )["hits"]["hits"]
+        search2 = [x["_source"] for x in search2]
+        self.assertEqual(len(search), len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
             self.assertTrue(list(search)[i] == list(search2)[i])
@@ -102,8 +114,9 @@ class elastic_docManagerTester(unittest.TestCase):
                  'ns': 'test.test'}
         self.elastic_doc.upsert(docc3)
         self.elastic_doc.commit()
-        search = self.elastic_doc.search(
-            5767301236327972865, 5767301236327972866)
+        result_count = 0
+        search = list(self.elastic_doc.search(5767301236327972865,
+                                              5767301236327972866))
         self.assertEqual(len(search), 2)
         result_names = [result.get("name") for result in search]
         self.assertIn('John', result_names)
@@ -115,7 +128,7 @@ class elastic_docManagerTester(unittest.TestCase):
 
         docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        res = self.elastic_doc._search()
+        res = list(self.elastic_doc._search())
         self.assertEqual(len(res), 1)
         for result in res:
             self.assertEqual(result['name'], 'Waldo')
@@ -124,11 +137,8 @@ class elastic_docManagerTester(unittest.TestCase):
         """Insert documents, verify that get_last_doc() returns the one with
             the latest timestamp.
         """
-        try:
-            ts = self.elastic_doc.get_last_doc()
-            ts = base.get("_ts")
-        except ElasticSearchException:
-            ts = 0
+        base = self.elastic_doc.get_last_doc()
+        ts = base.get("_ts", 0) if base else 0
         docc = {'_id': '4', 'name': 'Hare', '_ts': ts+3, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         docc = {'_id': '5', 'name': 'Tortoise', '_ts': ts+2, 'ns': 'test.test'}
@@ -136,7 +146,7 @@ class elastic_docManagerTester(unittest.TestCase):
         docc = {'_id': '6', 'name': 'Mr T.', '_ts': ts+1, 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         self.assertEqual(
-            self.elastic_doc.elastic.count(indices=("test.test",))['count'], 3)
+            self.elastic_doc.elastic.count(index="test.test")['count'], 3)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '4')
 
@@ -145,7 +155,7 @@ class elastic_docManagerTester(unittest.TestCase):
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '6')
         self.assertEqual(
-            self.elastic_doc.elastic.count(indices=("test.test",))['count'], 3)
+            self.elastic_doc.elastic.count(index="test.test")['count'], 3)
 
 if __name__ == '__main__':
     unittest.main()
