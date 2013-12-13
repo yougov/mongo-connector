@@ -72,8 +72,8 @@ class DocManager():
         doc[self.unique_key] = str(doc[self.unique_key])
         doc_id = doc[self.unique_key]
         try:
-            self.elastic.index(index, doc_type, bsjson.dumps(doc),
-                               id=doc_id, refresh=True)
+            self.elastic.index(index=index, doc_type=doc_type,
+                               body=bsjson.dumps(doc), id=doc_id, refresh=True)
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
@@ -86,8 +86,8 @@ class DocManager():
         The input is a python dictionary that represents a mongo document.
         """
         try:
-            self.elastic.delete(doc['ns'], self.doc_type,
-                                str(doc[self.unique_key]), refresh=True)
+            self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
+                                id=str(doc[self.unique_key]), refresh=True)
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
@@ -98,8 +98,9 @@ class DocManager():
         """For test purposes only. Removes all documents in test.test
         """
         try:
-            self.elastic.delete_by_query("test.test", self.doc_type,
-                                         {"match_all":{}})
+            self.elastic.delete_by_query(index="test.test",
+                                         doc_type=self.doc_type,
+                                         body={"match_all":{}})
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
@@ -131,7 +132,7 @@ class DocManager():
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
         """
-        return self._stream_search("_all",
+        return self._stream_search(index="_all",
                                    body={"query": {"range": {"_ts": {
                                        "gte":start_ts,
                                        "lte":end_ts
@@ -141,7 +142,7 @@ class DocManager():
         """For test purposes only. Performs search on Elastic with empty query.
         Does not have to be implemented.
         """
-        return self._stream_search("test.test",
+        return self._stream_search(index="test.test",
                                    body={"query": {"match_all": {}}})
 
     def commit(self):
@@ -162,7 +163,7 @@ class DocManager():
         """
         try:
             result = self.elastic.search(
-                "_all",
+                index="_all",
                 body={
                     "query": {"match_all": {}},
                     "sort": [{"_ts":"desc"}]

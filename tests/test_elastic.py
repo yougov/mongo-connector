@@ -67,7 +67,7 @@ class TestElastic(unittest.TestCase):
         """ Starts the cluster
         """
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        cls.elastic_doc = DocManager('http://localhost:9200', 
+        cls.elastic_doc = DocManager('localhost:9200', 
             auto_commit=False)
         cls.elastic_doc._remove()
         cls.flag = start_cluster()
