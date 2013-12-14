@@ -44,7 +44,7 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, auto_commit=True, unique_key='_id'):
+    def __init__(self, url, auto_commit=False, unique_key='_id'):
         """ Establish a connection to Elastic
         """
         self.elastic = Elasticsearch(hosts=[url])
@@ -91,7 +91,7 @@ class DocManager():
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not index document: %s"%(
+            raise errors.OperationFailed("Could not remove document: %s"%(
                 bsjson.dumps(doc)))
 
     def _remove(self):
@@ -108,34 +108,35 @@ class DocManager():
         self.commit()
 
     def _stream_search(self, *args, **kwargs):
-        """Helper method for streaming results from Elastic"""
-        start = 0
-        step = 10
-        while True:
-            try:
-                response = self.elastic.search(*args, from_=start,
-                                               size=step, **kwargs)
-            except (es_exceptions.ConnectionError):
-                raise errors.ConnectionFailed(
-                    "Could not connect to Elastic Search")
-            except es_exceptions.TransportError:
-                raise errors.OperationFailed(
-                    "Could not retrieve documents from Elastic Search")
-            hitcount = response.get("hits",{}).get("total",0)
-            if start < hitcount:
-                for doc in response["hits"].get("hits",[]):
+        """Helper method for iterating over ES search results"""
+        try:
+            first_response = self.elastic.search(*args, search_type="scan",
+                                                 scroll="10m", size=100,
+                                                 **kwargs)
+            scroll_id = first_response.get("_scroll_id")
+            expected_count = first_response.get("hits", {}).get("total", 0)
+            results_returned = 0
+            while results_returned < expected_count:
+                next_response = self.elastic.scroll(scroll_id=scroll_id,
+                                                    scroll="10m")
+                results_returned += len(next_response["hits"]["hits"])
+                for doc in next_response["hits"]["hits"]:
                     yield doc["_source"]
-            else:
-                raise StopIteration
-            start += step
+        except (es_exceptions.ConnectionError):
+            raise errors.ConnectionFailed(
+                "Could not connect to Elastic Search")
+        except es_exceptions.TransportError:
+            raise errors.OperationFailed(
+                "Could not retrieve documents from Elastic Search")
+
 
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
         """
         return self._stream_search(index="_all",
                                    body={"query": {"range": {"_ts": {
-                                       "gte":start_ts,
-                                       "lte":end_ts
+                                       "gte": start_ts,
+                                       "lte": end_ts
                                    }}}})
 
     def _search(self):

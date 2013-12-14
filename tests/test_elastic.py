@@ -99,7 +99,7 @@ class TestElastic(unittest.TestCase):
             self.fail("Shards cannot be added to mongos")
         self.connector = Connector(
             '%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
-            CONFIG, 'http://localhost:9200',
+            CONFIG, 'localhost:9200',
             ['test.test'],
             '_id', None,
             'mongo_connector/doc_managers/elastic_doc_manager.py')
@@ -107,8 +107,15 @@ class TestElastic(unittest.TestCase):
         while len(self.connector.shard_set) == 0:
             pass
         self.conn['test']['test'].remove(safe=True)
-        while(len(list(self.elastic_doc._search())) != 0):
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 0)
+
+    def wait_for(self, condition, max_tries=60):
+        """Wait for a condition to be true up to a maximum number of tries
+        """
+        while not condition() and max_tries > 1:
             time.sleep(1)
+            max_tries -= 1
+        return condition()
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
@@ -123,15 +130,14 @@ class TestElastic(unittest.TestCase):
 
         self.conn['test']['test'].remove(safe=True)
         self.assertEqual(self.conn['test']['test'].find().count(), 0)
-        self.assertEqual(len(list(self.elastic_doc._search())), 0)
+        self.assertEqual(sum(1 for _ in self.elastic_doc._search()), 0)
 
     def test_insert(self):
         """Tests insert
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        while(len(list(self.elastic_doc._search())) == 0):
-            time.sleep(1)
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) > 0)
         result_set_1 = list(self.elastic_doc._search())
         self.assertEqual(len(result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
@@ -144,14 +150,10 @@ class TestElastic(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        while(len(list(self.elastic_doc._search())) != 1):
-            time.sleep(1)
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
-
-        while(len(list(self.elastic_doc._search())) == 1):
-            time.sleep(1)
-        result_set_1 = list(self.elastic_doc._search())
-        self.assertEqual(len(result_set_1), 0)
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) != 1)
+        self.assertEqual(sum(1 for _ in self.elastic_doc._search()), 0)
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
@@ -162,19 +164,20 @@ class TestElastic(unittest.TestCase):
         primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
 
         self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
-        while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
-            time.sleep(1)
-        while len(list(self.elastic_doc._search())) != 1:
-            time.sleep(1)
+        condition1 = lambda : self.conn['test']['test'].find(
+            {'name': 'paul'}).count() == 1
+        condition2 = lambda : sum(1 for _ in self.elastic_doc._search()) == 1
+        self.wait_for(condition1)
+        self.wait_for(condition2)
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        while admin.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
+        self.wait_for(lambda : admin.command("isMaster")['ismaster'])
         time.sleep(5)
+
         count = 0
         while True:
             try:
@@ -187,12 +190,11 @@ class TestElastic(unittest.TestCase):
                 if count >= 60:
                     sys.exit(1)
                 continue
-        while(len(list(self.elastic_doc._search())) != 2):
-            time.sleep(1)
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 2)
         result_set_1 = list(self.elastic_doc._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
-                #make sure pauling is there
+        #make sure pauline is there
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
@@ -223,8 +225,9 @@ class TestElastic(unittest.TestCase):
         for i in range(0, NUMBER_OF_DOC_DIRS):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while len(list(self.elastic_doc._search())) != NUMBER_OF_DOC_DIRS:
-            time.sleep(5)
+        search = self.elastic_doc._search
+        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        self.wait_for(condition)
         for i in range(0, NUMBER_OF_DOC_DIRS):
             result_set_1 = self.elastic_doc._search()
             for item in result_set_1:
@@ -236,22 +239,21 @@ class TestElastic(unittest.TestCase):
             in global variable. Strategy for rollback is the same as before.
         """
 
-        while len(list(self.elastic_doc._search())) != 0:
-            time.sleep(1)
         for i in range(0, NUMBER_OF_DOC_DIRS):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)}, 
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)},
                 safe=True)
 
-        while len(list(self.elastic_doc._search())) != NUMBER_OF_DOC_DIRS:
-            time.sleep(1)
+        search = self.elastic_doc._search
+        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        self.wait_for(condition)
         primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        while admin.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
+        self.wait_for(lambda : admin.command("isMaster")['ismaster'])
+
         time.sleep(5)
         count = -1
         while count + 1 < NUMBER_OF_DOC_DIRS:
@@ -261,9 +263,8 @@ class TestElastic(unittest.TestCase):
                     {'name': 'Pauline ' + str(count)}, safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(list(self.elastic_doc._search()))
-                != self.conn['test']['test'].find().count()):
-            time.sleep(1)
+        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search())
+                      == self.conn['test']['test'].find().count())
         result_set_1 = self.elastic_doc._search()
         for item in result_set_1:
             if 'Pauline' in item['name']:
@@ -275,14 +276,14 @@ class TestElastic(unittest.TestCase):
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(1)
+        db_admin = primary_conn["admin"]
+        self.wait_for(lambda : db_admin.command("isMaster")['ismaster'])
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
-        while(len(list(self.elastic_doc._search())) != NUMBER_OF_DOC_DIRS):
-            time.sleep(5)
+        search = self.elastic_doc._search
+        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        self.wait_for(condition)
 
         result_set_1 = list(self.elastic_doc._search())
         self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
@@ -310,13 +311,9 @@ class TestElastic(unittest.TestCase):
         except OperationFailure:
             self.fail("Cannot insert documents into Elastic!")
 
-        for _ in range(1, 60): 
-            if (len(list(self.elastic_doc._search())) == len(docs)):
-                break
-            time.sleep(1)
-        else:
+        search = self.elastic_doc._search
+        if not self.wait_for(lambda : sum(1 for _ in search()) == len(docs)):
             self.fail("Did not get all expected documents")
-
         self.assertIn("dbref", self.elastic_doc.get_last_doc())
 
 def abort_test():
