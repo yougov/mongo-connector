@@ -43,8 +43,9 @@ setup(name='mongo-connector',
       license="http://www.apache.org/licenses/LICENSE-2.0.html",
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
-      install_requires=['pymongo', 'pyes', 'pysolr >= 3.1.0', 'simplejson'],
-      packages=["mongo_connector"],
+      install_requires=['pymongo', 'pysolr >= 3.1.0',
+                        'simplejson', 'elasticsearch'],
+      packages=["mongo_connector", "mongo_connector.doc_managers"],
       test_suite="tests",
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']

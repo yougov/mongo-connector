@@ -24,7 +24,7 @@ import pymongo
 import sys
 import time
 import threading
-import util
+from mongo_connector import util
 from mongo_connector import errors
 
 try:
