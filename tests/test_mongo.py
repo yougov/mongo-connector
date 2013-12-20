@@ -64,7 +64,7 @@ class TestSynchronizer(unittest.TestCase):
     def setUpClass(cls):
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         start_single_mongod_instance("30000", "/MC", "MC_log")
-        cls.mongo_doc = DocManager("%s:30000" % (HOSTNAME))
+        cls.mongo_doc = DocManager("localhost:30000")
         cls.mongo_doc._remove()
         cls.flag = start_cluster()
         if cls.flag:

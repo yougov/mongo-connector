@@ -96,11 +96,10 @@ class DocManager():
         for namespace in search_set:
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
-            res.extend(list(target_coll.find({'_ts': {'$lte': end_ts,
-                                                      '$gte': start_ts}})))
+            for document in target_coll.find({'_ts': {'$lte': end_ts,
+                                                      '$gte': start_ts}}):
+                yield document
 
-        return res
-        
     def commit(self):
         """ Performs a commit
         """
@@ -145,4 +144,4 @@ class DocManager():
         """For test purposes only. Performs search on Elastic with empty query.
         Does not have to be implemented.
         """
-        return list(self.mongo['test']['test'].find())
+        return self.mongo['test']['test'].find()
