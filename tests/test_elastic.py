@@ -44,7 +44,7 @@ from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
-
+from tests.util import wait_for
 
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
              "CONFIG": "27220", "MONGOS": "27217"}
@@ -107,15 +107,7 @@ class TestElastic(unittest.TestCase):
         while len(self.connector.shard_set) == 0:
             pass
         self.conn['test']['test'].remove(safe=True)
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 0)
-
-    def wait_for(self, condition, max_tries=60):
-        """Wait for a condition to be true up to a maximum number of tries
-        """
-        while not condition() and max_tries > 1:
-            time.sleep(1)
-            max_tries -= 1
-        return condition()
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 0)
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
@@ -137,7 +129,7 @@ class TestElastic(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) > 0)
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) > 0)
         result_set_1 = list(self.elastic_doc._search())
         self.assertEqual(len(result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
@@ -150,9 +142,9 @@ class TestElastic(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 1)
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) != 1)
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) != 1)
         self.assertEqual(sum(1 for _ in self.elastic_doc._search()), 0)
 
     def test_rollback(self):
@@ -167,15 +159,15 @@ class TestElastic(unittest.TestCase):
         condition1 = lambda : self.conn['test']['test'].find(
             {'name': 'paul'}).count() == 1
         condition2 = lambda : sum(1 for _ in self.elastic_doc._search()) == 1
-        self.wait_for(condition1)
-        self.wait_for(condition2)
+        wait_for(condition1)
+        wait_for(condition2)
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        self.wait_for(lambda : admin.command("isMaster")['ismaster'])
+        wait_for(lambda : admin.command("isMaster")['ismaster'])
         time.sleep(5)
 
         count = 0
@@ -190,7 +182,7 @@ class TestElastic(unittest.TestCase):
                 if count >= 60:
                     sys.exit(1)
                 continue
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 2)
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search()) == 2)
         result_set_1 = list(self.elastic_doc._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
@@ -227,7 +219,7 @@ class TestElastic(unittest.TestCase):
         time.sleep(5)
         search = self.elastic_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        self.wait_for(condition)
+        wait_for(condition)
         for i in range(0, NUMBER_OF_DOC_DIRS):
             result_set_1 = self.elastic_doc._search()
             for item in result_set_1:
@@ -245,14 +237,14 @@ class TestElastic(unittest.TestCase):
 
         search = self.elastic_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        self.wait_for(condition)
+        wait_for(condition)
         primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        self.wait_for(lambda : admin.command("isMaster")['ismaster'])
+        wait_for(lambda : admin.command("isMaster")['ismaster'])
 
         time.sleep(5)
         count = -1
@@ -263,7 +255,7 @@ class TestElastic(unittest.TestCase):
                     {'name': 'Pauline ' + str(count)}, safe=True)
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        self.wait_for(lambda : sum(1 for _ in self.elastic_doc._search())
+        wait_for(lambda : sum(1 for _ in self.elastic_doc._search())
                       == self.conn['test']['test'].find().count())
         result_set_1 = self.elastic_doc._search()
         for item in result_set_1:
@@ -277,13 +269,13 @@ class TestElastic(unittest.TestCase):
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
                        "/replset1a.log", None)
         db_admin = primary_conn["admin"]
-        self.wait_for(lambda : db_admin.command("isMaster")['ismaster'])
+        wait_for(lambda : db_admin.command("isMaster")['ismaster'])
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
                        "/replset1b.log", None)
 
         search = self.elastic_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        self.wait_for(condition)
+        wait_for(condition)
 
         result_set_1 = list(self.elastic_doc._search())
         self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
@@ -312,7 +304,7 @@ class TestElastic(unittest.TestCase):
             self.fail("Cannot insert documents into Elastic!")
 
         search = self.elastic_doc._search
-        if not self.wait_for(lambda : sum(1 for _ in search()) == len(docs)):
+        if not wait_for(lambda : sum(1 for _ in search()) == len(docs)):
             self.fail("Did not get all expected documents")
         self.assertIn("dbref", self.elastic_doc.get_last_doc())
 

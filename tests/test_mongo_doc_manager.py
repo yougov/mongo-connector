@@ -87,12 +87,12 @@ class MongoDocManagerTester(unittest.TestCase):
         docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
         self.MongoDoc.upsert(docc)
         self.MongoDoc.commit()
-        search = self.MongoDoc._search()
+        search = list(self.MongoDoc._search())
         search2 = list(self.mongo.find())
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+            self.assertTrue(search[i] == search2[i])
 
     def test_search(self):
         """Query Mongo for docs in a timestamp range.
@@ -109,10 +109,11 @@ class MongoDocManagerTester(unittest.TestCase):
         docc3 = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870,
                  'ns': 'test.test'}
         self.MongoDoc.upsert(docc3)
-        search = self.MongoDoc.search(5767301236327972865, 5767301236327972866)
+        search = list(self.MongoDoc.search(5767301236327972865,
+                                           5767301236327972866))
         self.assertTrue(len(search) == 2)
-        self.assertTrue(list(search)[0]['name'] == 'John')
-        self.assertTrue(list(search)[1]['name'] == 'John Paul')
+        self.assertTrue(search[0]['name'] == 'John')
+        self.assertTrue(search[1]['name'] == 'John Paul')
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
