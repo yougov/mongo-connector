@@ -92,7 +92,6 @@ class DocManager():
                 namespace = str(database) + "." + str(coll)
                 search_set.append(namespace)
 
-        res = []
         for namespace in search_set:
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
@@ -120,20 +119,14 @@ class DocManager():
                 namespace = str(database) + "." + str(coll)
                 search_set.append(namespace)
 
-        res = []
-        for namespace in search_set:
-            database, coll = namespace.split('.', 1)
-            target_coll = self.mongo[database][coll]
-            res.extend(list(target_coll.find().sort('_ts', -1)))
+        def docs_by_ts():
+            for namespace in search_set:
+                database, coll = namespace.split('.', 1)
+                target_coll = self.mongo[database][coll]
+                for doc in target_coll.find(limit=1).sort('_ts', -1):
+                    yield doc
 
-        max_ts = 0
-        max_doc = None
-        for item in res:
-            if item['_ts'] > max_ts:
-                max_ts = item['_ts']
-                max_doc = item
-
-        return max_doc
+        return max(docs_by_ts(), key=lambda x:x["_ts"])
 
     def _remove(self):
         """For test purposes only. Removes all documents in test.test
@@ -141,7 +134,7 @@ class DocManager():
         self.mongo['test']['test'].remove()
 
     def _search(self):
-        """For test purposes only. Performs search on Elastic with empty query.
+        """For test purposes only. Performs search on MongoDB with empty query.
         Does not have to be implemented.
         """
         return self.mongo['test']['test'].find()
