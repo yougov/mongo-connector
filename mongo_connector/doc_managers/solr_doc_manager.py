@@ -115,6 +115,17 @@ class DocManager():
         except SolrError:
             logging.error("Could not insert %r into Solr" % (doc,))
 
+    def bulk_upsert(self, docs):
+        """Update or insert multiple documents into Elastic
+
+        docs may be any iterable
+        """
+        try:
+            cleaned = (self.clean_doc(d) for d in docs)
+            self.solr.add(cleaned, commit=True)
+        except SolrError:
+            logging.error("Could not bulk-insert documents into Solr")
+
     def remove(self, doc):
         """Removes documents from Solr
 
