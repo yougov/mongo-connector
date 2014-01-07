@@ -66,6 +66,37 @@ class SolrDocManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
 
+    def test_bulk_upsert(self):
+        """Ensure we can properly insert many documents at once into
+        Solr via DocManager
+
+        """
+        empty_works = True
+        try:
+            self.SolrDoc.bulk_upsert([])
+        except:
+            empty_works = False
+        self.assertTrue(empty_works)
+
+        docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
+        self.SolrDoc.bulk_upsert(docs)
+        self.SolrDoc.commit()
+
+        res = sorted(int(x["_id"]) for x in self.solr.search("*:*", rows=1001))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r, i)
+
+        docs = ({"_id": i, "weight": 2*i,
+                 "ns": "test.test"} for i in range(1000))
+        self.SolrDoc.bulk_upsert(docs)
+        self.SolrDoc.commit()
+
+        res = sorted(int(x["weight"]) for x in self.solr.search("*:*", rows=1001))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r, 2*i)
+
     def test_remove(self):
         """Ensure we can properly delete from Solr via DocManager.
         """

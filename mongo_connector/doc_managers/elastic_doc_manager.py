@@ -26,7 +26,7 @@
     """
 import logging
 import bson.json_util as bsjson
-
+import itertools
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from mongo_connector import errors
 from threading import Timer
@@ -79,6 +79,34 @@ class DocManager():
         except es_exceptions.TransportError:
             raise errors.OperationFailed("Could not index document: %s"%(
                 bsjson.dumps(doc)))
+
+    def bulk_upsert(self, docs):
+        # elasticsearch can't handle upserting an empty sequence
+        first_doc = None
+        for d in docs:
+            first_doc = d
+            break
+        if not first_doc:
+            return
+
+        docs = itertools.chain([first_doc], docs)
+        def docs_to_upsert():
+            for doc in docs:
+                index = doc["ns"]
+                doc[self.unique_key] = str(doc[self.unique_key])
+                doc_id = doc[self.unique_key]
+                yield { "index": {"_index": index, "_type": self.doc_type,
+                                  "_id": doc_id} }
+                yield doc
+
+        try:
+            self.elastic.bulk(doc_type=self.doc_type,
+                              body=docs_to_upsert(), refresh=True)
+        except (es_exceptions.ConnectionError):
+            raise errors.ConnectionFailed("Could not connect to Elastic Search")
+        except es_exceptions.TransportError:
+            raise errors.OperationFailed(
+                "Could not bulk-insert documents into Elastic")
 
     def remove(self, doc):
         """Removes documents from Elastic
