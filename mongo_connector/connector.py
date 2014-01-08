@@ -92,14 +92,23 @@ class Connector(threading.Thread):
                 if doc_manager is None:  # imported using from... import
                     self.doc_manager = DocManager(unique_key=u_key)
                 else:  # imported using load source
-                    self.doc_manager = doc_manager.DocManager(unique_key=u_key)
+                    self.doc_manager = doc_manager.DocManager(
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
             else:
                 if doc_manager is None:
-                    self.doc_manager = DocManager(self.target_url,
-                                                  unique_key=u_key)
+                    self.doc_manager = DocManager(
+                        self.target_url,
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
                 else:
-                    self.doc_manager = doc_manager.DocManager(self.target_url,
-                                                              unique_key=u_key)
+                    self.doc_manager = doc_manager.DocManager(
+                        self.target_url,
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
         except errors.ConnectionFailed:
             err_msg = "MongoConnector: Could not connect to target system"
             logging.critical(err_msg)

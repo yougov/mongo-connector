@@ -43,7 +43,7 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url, auto_commit=False, unique_key='_id'):
+    def __init__(self, url, auto_commit=False, unique_key='_id', **kwargs):
         """Verify Solr URL and establish a connection.
         """
         self.solr = Solr(url)
