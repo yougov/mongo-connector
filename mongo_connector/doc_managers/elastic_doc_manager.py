@@ -44,7 +44,7 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, auto_commit=False, unique_key='_id'):
+    def __init__(self, url, auto_commit=False, unique_key='_id', **kwargs):
         """ Establish a connection to Elastic
         """
         self.elastic = Elasticsearch(hosts=[url])

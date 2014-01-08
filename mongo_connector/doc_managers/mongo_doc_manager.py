@@ -40,7 +40,7 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, unique_key='_id'):
+    def __init__(self, url, unique_key='_id', **kwargs):
         """ Verify URL and establish a connection.
         """
         try:
@@ -50,6 +50,26 @@ class DocManager():
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.unique_key = unique_key
+        self.namespace_set = kwargs.get("namespace_set")
+
+    def _namespaces(self):
+        """Provides the list of namespaces being replicated to MongoDB
+        """
+        if self.namespace_set:
+            return self.namespace_set
+
+        user_namespaces = []
+        db_list = self.mongo.database_names()
+        for database in db_list:
+            if database == "config" or database == "local":
+                continue
+            coll_list = self.mongo[database].collection_names()
+            for coll in coll_list:
+                if coll.startswith("system"):
+                    continue
+                namespace = str(database) + "." + str(coll)
+                user_namespaces.append(namespace)
+        return user_namespaces
 
     def stop(self):
         """Stops any running threads
@@ -80,19 +100,7 @@ class DocManager():
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
         """
-        search_set = []
-        db_list = self.mongo.database_names()
-        for database in db_list:
-            if database == "config" or database == "local":
-                continue
-            coll_list = self.mongo[database].collection_names()
-            for coll in coll_list:
-                if coll.startswith("system"):
-                    continue
-                namespace = str(database) + "." + str(coll)
-                search_set.append(namespace)
-
-        for namespace in search_set:
+        for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
             for document in target_coll.find({'_ts': {'$lte': end_ts,
@@ -107,20 +115,8 @@ class DocManager():
     def get_last_doc(self):
         """Returns the last document stored in Mongo.
         """
-        search_set = []
-        db_list = self.mongo.database_names()
-        for database in db_list:
-            if database == "config" or database == "local":
-                continue
-            coll_list = self.mongo[database].collection_names()
-            for coll in coll_list:
-                if coll.startswith("system"):
-                    continue
-                namespace = str(database) + "." + str(coll)
-                search_set.append(namespace)
-
         def docs_by_ts():
-            for namespace in search_set:
+            for namespace in self._namespaces():
                 database, coll = namespace.split('.', 1)
                 target_coll = self.mongo[database][coll]
                 for doc in target_coll.find(limit=1).sort('_ts', -1):
