@@ -36,7 +36,7 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, unique_key='_id'):
+    def __init__(self, url=None, unique_key='_id', **kwargs):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
         """

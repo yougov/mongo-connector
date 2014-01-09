@@ -28,19 +28,40 @@ class MongoDocManagerTester(unittest.TestCase):
         unittest.TestCase.__init__(self)
 
     @classmethod
-    def setUpClass(cls):    
+    def setUpClass(cls):
         start_single_mongod_instance("30000", "/MC", "MC_log")
         cls.MongoDoc = DocManager("localhost:30000")
         cls.mongo = Connection("localhost:30000")['test']['test']
 
+        cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
+        cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
+        cls.choosy_docman = DocManager(
+            "localhost:30000",
+            namespace_set=MongoDocManagerTester.namespaces_inc
+        )
+
     @classmethod
-    def tearDownClass(cls):        
+    def tearDownClass(cls):
         kill_mongo_proc('localhost', 30000)
 
     def setUp(self):
         """Empty Mongo at the start of every test
         """
+
         self.mongo.remove()
+
+        conn = Connection("localhost:30000")
+        for ns in self.namespaces_inc + self.namespaces_exc:
+            db, coll = ns.split('.', 1)
+            conn[db][coll].remove()
+
+    def test_namespaces(self):
+        """Ensure that a DocManager instantiated with a namespace set
+        has the correct namespaces
+        """
+
+        self.assertEqual(set(self.namespaces_inc),
+                         set(self.choosy_docman._namespaces()))
 
     def test_upsert(self):
         """Ensure we can properly insert into Mongo via DocManager.
@@ -115,6 +136,19 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertTrue(search[0]['name'] == 'John')
         self.assertTrue(search[1]['name'] == 'John Paul')
 
+    def test_search_namespaces(self):
+        """Test search within timestamp range with a given namespace set
+        """
+
+        for ns in self.namespaces_inc + self.namespaces_exc:
+            for i in range(100):
+                self.choosy_docman.upsert({"_id":i, "ns":ns, "_ts":i})
+
+        results = list(self.choosy_docman.search(0, 49))
+        self.assertEqual(len(results), 100)
+        for r in results:
+            self.assertIn(r["ns"], self.namespaces_inc)
+
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
             the latest timestamp.
@@ -133,6 +167,31 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(3)
         doc = self.MongoDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '6')
+
+    def test_get_last_doc_namespaces(self):
+        """Ensure that get_last_doc returns the latest document in one of
+        the given namespaces
+        """
+
+        # latest document is not in included namespace
+        for i in range(100):
+            ns = self.namespaces_inc[0] if i%2 == 0 else self.namespaces_exc[0]
+            self.choosy_docman.upsert({
+                "_id": i,
+                "ns": ns,
+                "_ts": i
+            })
+        last_doc = self.choosy_docman.get_last_doc()
+        self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
+        self.assertEqual(last_doc["_id"], 98)
+
+        # remove latest document so last doc is in included namespace,
+        # shouldn't change result
+        db, coll = self.namespaces_inc[0].split(".", 1)
+        Connection("localhost:30000")[db][coll].remove({"_id": 99})
+        last_doc = self.choosy_docman.get_last_doc()
+        self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
+        self.assertEqual(last_doc["_id"], 98)
 
 if __name__ == '__main__':
     unittest.main()
