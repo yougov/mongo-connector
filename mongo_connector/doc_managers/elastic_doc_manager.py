@@ -81,6 +81,11 @@ class DocManager():
                 bsjson.dumps(doc)))
 
     def bulk_upsert(self, docs):
+        """Update or insert multiple documents into Elastic
+
+        docs may be any iterable
+        """
+
         # elasticsearch can't handle upserting an empty sequence
         first_doc = None
         for d in docs:

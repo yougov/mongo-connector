@@ -116,7 +116,7 @@ class DocManager():
             logging.error("Could not insert %r into Solr" % (doc,))
 
     def bulk_upsert(self, docs):
-        """Update or insert multiple documents into Elastic
+        """Update or insert multiple documents into Solr
 
         docs may be any iterable
         """
