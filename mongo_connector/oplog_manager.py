@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,13 +37,19 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username, repl_set=None):
+                 auth_username, no_dump, batch_size, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
 
+        self.batch_size = batch_size
+
         #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
+
+        #Boolean chooses whether to dump the entire collection if no timestamp
+        # is present in the config file
+        self._no_dump = no_dump
 
         #The mongos for sharded setups
         #Otherwise the same as primary_connection.
@@ -102,7 +108,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         while self.running is True:
-            cursor = self.init_cursor()
+            cursor, cursor_len = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -113,7 +119,7 @@ class OplogThread(threading.Thread):
                 continue
 
             #The only entry is the last one we processed
-            if cursor is None or util.retry_until_ok(cursor.count) == 1:
+            if cursor is None or cursor_len == 1:
                 time.sleep(1)
                 continue
 
@@ -121,7 +127,7 @@ class OplogThread(threading.Thread):
             err = False
             try:
                 while cursor.alive and self.running:
-                    for entry in cursor:
+                    for n, entry in enumerate(cursor):
                         # Break out if this thread should stop
                         if not self.running:
                             break
@@ -132,26 +138,33 @@ class OplogThread(threading.Thread):
 
                         #check if ns is excluded or not.
                         #also ensure non-empty namespace set.
-                        if ns not in self.namespace_set and self.namespace_set:
+                        if (entry['ns'] not in self.namespace_set
+                                and self.namespace_set):
                             continue
 
                         #delete
                         if operation == 'd':
                             entry['_id'] = entry['o']['_id']
                             self.doc_manager.remove(entry)
-                        #insert/update. They are equal because of lack of support
-                        #for partial update
+                        #insert/update. They are equal because of lack
+                        #of support for partial update
                         elif operation == 'i' or operation == 'u':
                             doc = self.retrieve_doc(entry)
                             if doc is not None:
                                 doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                                doc['ns'] = ns
+                                doc['ns'] = entry['ns']
                                 try:
                                     self.doc_manager.upsert(doc)
-                                except errors.OperationFailed:
+                                except SystemError:
                                     logging.error("Unable to insert %s" % (doc))
 
                         last_ts = entry['ts']
+
+                        # update timestamp per batch size
+                        if n % self.batch_size == 1:
+                            self.checkpoint = last_ts
+                            self.update_checkpoint()
+
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
@@ -210,6 +223,7 @@ class OplogThread(threading.Thread):
 
         cursor, cursor_len = None, 0
         while (True):
+            spec = {'ts': {'$gte': timestamp}}
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
@@ -235,11 +249,11 @@ class OplogThread(threading.Thread):
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
-            return cursor
+            return cursor, cursor_len
         elif cursor_len > 1:
             doc = next(cursor)
             if timestamp == doc['ts']:
-                return cursor
+                return cursor, cursor_len
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
                 return None
@@ -315,15 +329,17 @@ class OplogThread(threading.Thread):
         """
         timestamp = self.read_last_checkpoint()
 
-        if timestamp is None:
+        if timestamp is None and self._no_dump:
+            # set timestamp to top of oplog
+            timestamp = self.get_last_oplog_timestamp()
+        elif not self._no_dump:
             timestamp = self.dump_collection()
-            if timestamp:
-                msg = "Dumped collection into target system"
-                logging.info('OplogManager: %s %s'
-                             % (self.oplog, msg))
+            msg = "Dumped collection into target system"
+            logging.info('OplogManager: %s %s'
+                         % (self.oplog, msg))
 
         self.checkpoint = timestamp
-        cursor = self.get_oplog_cursor(timestamp)
+        cursor, cursor_len = self.get_oplog_cursor(timestamp)
         if cursor is not None:
             self.update_checkpoint()
 
