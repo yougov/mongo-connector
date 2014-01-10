@@ -102,7 +102,8 @@ class TestElastic(unittest.TestCase):
             CONFIG, 'localhost:9200',
             ['test.test'],
             '_id', None,
-            'mongo_connector/doc_managers/elastic_doc_manager.py')
+            doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py'
+        )
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             pass

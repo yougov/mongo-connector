@@ -24,8 +24,8 @@ import pymongo
 import sys
 import time
 import threading
-from mongo_connector import util
-from mongo_connector import errors
+from mongo_connector import errors, util
+from mongo_connector.constants import DEFAULT_BATCH_SIZE
 
 try:
     from pymongo import MongoClient as Connection
@@ -37,7 +37,8 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username, no_dump, batch_size, repl_set=None):
+                 auth_username, collection_dump=True,
+                 batch_size=DEFAULT_BATCH_SIZE, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -49,7 +50,7 @@ class OplogThread(threading.Thread):
 
         #Boolean chooses whether to dump the entire collection if no timestamp
         # is present in the config file
-        self._no_dump = no_dump
+        self.collection_dump = collection_dump
 
         #The mongos for sharded setups
         #Otherwise the same as primary_connection.
@@ -100,7 +101,7 @@ class OplogThread(threading.Thread):
                 auth_username, auth_key)
             self.main_connection['admin'].authenticate(
                 auth_username, auth_key)
-        if self.oplog.find().count() == 0:
+        if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             logging.warning('%s %s' % (err_msg, self.primary_connection))
 
@@ -108,7 +109,7 @@ class OplogThread(threading.Thread):
         """Start the oplog worker.
         """
         while self.running is True:
-            cursor, cursor_len = self.init_cursor()
+            cursor = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -119,7 +120,7 @@ class OplogThread(threading.Thread):
                 continue
 
             #The only entry is the last one we processed
-            if cursor is None or cursor_len == 1:
+            if cursor is None or util.retry_until_ok(cursor.count) == 1:
                 time.sleep(1)
                 continue
 
@@ -138,7 +139,7 @@ class OplogThread(threading.Thread):
 
                         #check if ns is excluded or not.
                         #also ensure non-empty namespace set.
-                        if (entry['ns'] not in self.namespace_set
+                        if (ns not in self.namespace_set
                                 and self.namespace_set):
                             continue
 
@@ -152,18 +153,24 @@ class OplogThread(threading.Thread):
                             doc = self.retrieve_doc(entry)
                             if doc is not None:
                                 doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                                doc['ns'] = entry['ns']
+                                doc['ns'] = ns
                                 try:
                                     self.doc_manager.upsert(doc)
-                                except SystemError:
+                                except errors.OperationFailed:
                                     logging.error("Unable to insert %s" % (doc))
 
                         last_ts = entry['ts']
 
                         # update timestamp per batch size
-                        if n % self.batch_size == 1:
+                        # n % -1 (default for self.batch_size) == 0 for all n
+                        if n % self.batch_size == 1 and last_ts is not None:
                             self.checkpoint = last_ts
                             self.update_checkpoint()
+
+                    # update timestamp after running through oplog
+                    if last_ts is not None:
+                        self.checkpoint = last_ts
+                        self.update_checkpoint()
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
@@ -176,6 +183,8 @@ class OplogThread(threading.Thread):
                     self.auth_username, self.auth_key)
                 err = False
 
+            # update timestamp before attempting to reconnect to MongoDB,
+            # after being join()'ed, or if the cursor closes
             if last_ts is not None:
                 self.checkpoint = last_ts
                 self.update_checkpoint()
@@ -223,7 +232,6 @@ class OplogThread(threading.Thread):
 
         cursor, cursor_len = None, 0
         while (True):
-            spec = {'ts': {'$gte': timestamp}}
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
@@ -249,11 +257,11 @@ class OplogThread(threading.Thread):
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
-            return cursor, cursor_len
+            return cursor
         elif cursor_len > 1:
             doc = next(cursor)
             if timestamp == doc['ts']:
-                return cursor, cursor_len
+                return cursor
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
                 return None
@@ -329,17 +337,18 @@ class OplogThread(threading.Thread):
         """
         timestamp = self.read_last_checkpoint()
 
-        if timestamp is None and self._no_dump:
+        if timestamp is None and self.collection_dump:
+            timestamp = self.dump_collection()
+            if timestamp:
+                msg = "Dumped collection into target system"
+                logging.info('OplogManager: %s %s'
+                             % (self.oplog, msg))
+        elif timestamp is None:
             # set timestamp to top of oplog
             timestamp = self.get_last_oplog_timestamp()
-        elif not self._no_dump:
-            timestamp = self.dump_collection()
-            msg = "Dumped collection into target system"
-            logging.info('OplogManager: %s %s'
-                         % (self.oplog, msg))
 
         self.checkpoint = timestamp
-        cursor, cursor_len = self.get_oplog_cursor(timestamp)
+        cursor = self.get_oplog_cursor(timestamp)
         if cursor is not None:
             self.update_checkpoint()
 

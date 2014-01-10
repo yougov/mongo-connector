@@ -28,10 +28,10 @@ import sys
 import threading
 import time
 import imp
-from mongo_connector import oplog_manager
+from mongo_connector import errors, util
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector import errors
-from mongo_connector import util
+from mongo_connector.constants import DEFAULT_BATCH_SIZE
+from mongo_connector.oplog_manager import OplogThread
 
 try:
     from pymongo import MongoClient as Connection
@@ -43,13 +43,14 @@ try:
 except ImportError:
     import json
 
-
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
-                 u_key, auth_key, no_dump, batch_size,
-                 doc_manager=None, auth_username=None):
+                 u_key, auth_key, collection_dump=True,
+                 batch_size=DEFAULT_BATCH_SIZE, doc_manager=None,
+                 auth_username=None):
+
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -87,10 +88,10 @@ class Connector(threading.Thread):
 
         #Boolean chooses whether to dump the entire collection if no timestamp
         # is present in the config file
-        self._no_dump = no_dump
+        self.collection_dump = collection_dump
 
         #Num entries to process before updating config file with current pos
-        self._batch_size = batch_size
+        self.batch_size = batch_size
 
         #Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
@@ -239,16 +240,18 @@ class Connector(threading.Thread):
             prim_admin = main_conn.admin
             repl_set = prim_admin.command("replSetGetStatus")['set']
 
-            oplog = oplog_manager.OplogThread(main_conn,
+            oplog = OplogThread(
+                main_conn,
                 (main_conn.host + ":" + str(main_conn.port)),
                 oplog_coll,
                 False, self.doc_manager,
                 self.oplog_progress,
                 self.ns_set, self.auth_key,
                 self.auth_username,
-                self._no_dump,
-                self._batch_size,
-                repl_set=repl_set)
+                collection_dump=self.collection_dump,
+                batch_size=self.batch_size,
+                repl_set=repl_set
+            )
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)
@@ -294,15 +297,17 @@ class Connector(threading.Thread):
 
                     shard_conn = Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
-                    oplog = oplog_manager.OplogThread(shard_conn, self.address,
-                                                      oplog_coll, True,
-                                                      self.doc_manager,
-                                                      self.oplog_progress,
-                                                      self.ns_set,
-                                                      self.auth_key,
-                                                      self.auth_username,
-                                                      self._no_dump,
-                                                      self._batch_size)
+                    oplog = OplogThread(
+                        shard_conn, self.address,
+                        oplog_coll, True,
+                        self.doc_manager,
+                        self.oplog_progress,
+                        self.ns_set,
+                        self.auth_key,
+                        self.auth_username,
+                        collection_dump=self.collection_dump,
+                        batch_size=self.batch_size
+                    )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     logging.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -362,7 +367,8 @@ def main():
 
     #--batch-size specifies num docs to read from oplog before updating the
     #--oplog-ts config file with current oplog position
-    parser.add_option("--batch-size", action="store", default=-1, type="int",
+    parser.add_option("--batch-size", action="store",
+                      default=DEFAULT_BATCH_SIZE, type="int",
                       help="Specify an int to update the --oplog-ts "
                       "config file with latest position of oplog every "
                       "N documents.  By default, the oplog config isn't "
@@ -510,8 +516,10 @@ def main():
 
     connector = Connector(
         options.main_addr, options.oplog_config, options.url,
-        ns_set, options.u_key, key, options.no_dump, options.batch_size,
-        options.doc_manager,
+        ns_set, options.u_key, key,
+        collection_dump=(not options.no_dump),
+        batch_size=options.batch_size,
+        doc_manager=options.doc_manager,
         auth_username=options.admin_name)
 
     connector.start()
