@@ -59,12 +59,7 @@ class elastic_docManagerTester(unittest.TestCase):
         ElasticSearch via DocManager.
 
         """
-        empty_works = True
-        try:
-            self.elastic_doc.bulk_upsert([])
-        except:
-            empty_works = False
-        self.assertTrue(empty_works)
+        self.elastic_doc.bulk_upsert([])
 
         docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
         self.elastic_doc.bulk_upsert(docs)

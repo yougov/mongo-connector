@@ -282,34 +282,30 @@ class OplogThread(threading.Thread):
                 database, coll = namespace.split('.', 1)
                 target_coll = self.main_connection[database][coll]
                 cursor = util.retry_until_ok(target_coll.find)
+                for doc in cursor:
+                    if not self.running:
+                        raise StopIteration
+                    doc["ns"] = namespace
+                    doc["_ts"] = long_ts
+                    yield doc
 
-                try:
-                    for doc in cursor:
-                        if not self.running:
-                            raise StopIteration
-                        doc["ns"] = namespace
-                        doc["_ts"] = long_ts
-                        yield doc
-                except (pymongo.errors.AutoReconnect,
-                        pymongo.errors.OperationFailure):
-
-                    err_msg = "OplogManager: Failed during dump collection"
-                    effect = "cannot recover!"
-                    logging.error('%s %s %s' % (err_msg, effect, self.oplog))
-                    self.running = False
-                    # Means that an error occurred during collection dump
-                    timestamp = None
-                    raise StopIteration
-
-        # Bulk upsert if possible
-        if self.can_bulk:
-            self.doc_manager.bulk_upsert(docs_to_dump())
-        else:
-            for doc in docs_to_dump():
-                try:
-                    self.doc_manager.upsert(doc)
-                except errors.OperationFailed:
-                    logging.error("Unable to insert %s" % doc)
+        try:
+            # Bulk upsert if possible
+            if self.can_bulk:
+                self.doc_manager.bulk_upsert(docs_to_dump())
+            else:
+                for doc in docs_to_dump():
+                    try:
+                        self.doc_manager.upsert(doc)
+                    except errors.OperationFailed:
+                        logging.error("Unable to insert %s" % doc)
+        except (pymongo.errors.AutoReconnect,
+                pymongo.errors.OperationFailure):
+            err_msg = "OplogManager: Failed during dump collection"
+            effect = "cannot recover!"
+            logging.error('%s %s %s' % (err_msg, effect, self.oplog))
+            self.running = False
+            return None
 
         return timestamp
 

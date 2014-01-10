@@ -24,12 +24,14 @@
     same class and replace the method definitions with API calls for the
     desired backend.
     """
-import logging
-import bson.json_util as bsjson
 import itertools
-from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from mongo_connector import errors
+import logging
 from threading import Timer
+
+import bson.json_util as bsjson
+from elasticsearch import Elasticsearch, exceptions as es_exceptions
+
+from mongo_connector import errors
 from mongo_connector.util import retry_until_ok
 
 class DocManager():
@@ -86,16 +88,8 @@ class DocManager():
         docs may be any iterable
         """
 
-        # elasticsearch can't handle upserting an empty sequence
-        first_doc = None
-        for d in docs:
-            first_doc = d
-            break
-        if not first_doc:
-            return
-
-        docs = itertools.chain([first_doc], docs)
         def docs_to_upsert():
+            doc = None
             for doc in docs:
                 index = doc["ns"]
                 doc[self.unique_key] = str(doc[self.unique_key])
@@ -103,7 +97,10 @@ class DocManager():
                 yield { "index": {"_index": index, "_type": self.doc_type,
                                   "_id": doc_id} }
                 yield doc
-
+            if not doc:
+                raise errors.EmptyDocsError(
+                    "Cannot upsert an empty sequence of "
+                    "documents into Elastic Search")
         try:
             self.elastic.bulk(doc_type=self.doc_type,
                               body=docs_to_upsert(), refresh=True)
@@ -112,6 +109,10 @@ class DocManager():
         except es_exceptions.TransportError:
             raise errors.OperationFailed(
                 "Could not bulk-insert documents into Elastic")
+        except errors.EmptyDocsError:
+            # This can happen when mongo-connector starts up, there is no
+            # config file, but nothing to dump
+            pass
 
     def remove(self, doc):
         """Removes documents from Elastic

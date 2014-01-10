@@ -29,6 +29,7 @@ import logging
 
 from pysolr import Solr, SolrError
 from threading import Timer
+from mongo_connector import errors
 from mongo_connector.util import retry_until_ok
 ADMIN_URL = 'admin/luke?show=Schema&wt=json'
 
@@ -113,7 +114,8 @@ class DocManager():
         try:
             self.solr.add([self.clean_doc(doc)], commit=True)
         except SolrError:
-            logging.error("Could not insert %r into Solr" % (doc,))
+            raise errors.OperationFailed(
+                "Could not insert %r into Solr" % bsjson.dumps(doc))
 
     def bulk_upsert(self, docs):
         """Update or insert multiple documents into Solr
@@ -124,7 +126,8 @@ class DocManager():
             cleaned = (self.clean_doc(d) for d in docs)
             self.solr.add(cleaned, commit=True)
         except SolrError:
-            logging.error("Could not bulk-insert documents into Solr")
+            raise errors.OperationFailed(
+                "Could not bulk-insert documents into Solr")
 
     def remove(self, doc):
         """Removes documents from Solr

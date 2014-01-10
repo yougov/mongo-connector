@@ -71,12 +71,7 @@ class SolrDocManagerTester(unittest.TestCase):
         Solr via DocManager
 
         """
-        empty_works = True
-        try:
-            self.SolrDoc.bulk_upsert([])
-        except:
-            empty_works = False
-        self.assertTrue(empty_works)
+        self.SolrDoc.bulk_upsert([])
 
         docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
         self.SolrDoc.bulk_upsert(docs)
