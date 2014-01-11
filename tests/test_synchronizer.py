@@ -70,8 +70,14 @@ class TestSynchronizer(unittest.TestCase):
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
                               replicaSet="demo-repl")
             timer = Timer(60, abort_test)
-            cls.connector = Connector("%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
-                CONFIG, None, ['test.test'], '_id', None, None)
+            cls.connector = Connector(
+                address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
+                oplog_checkpoint=CONFIG,
+                target_url=None,
+                ns_set=['test.test'],
+                u_key='_id',
+                auth_key=None
+            )
             cls.synchronizer = cls.connector.doc_manager
             timer.start()
             cls.connector.start()

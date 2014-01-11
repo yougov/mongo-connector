@@ -89,10 +89,15 @@ class TestSynchronizer(unittest.TestCase):
         if not self.flag:
             self.fail(self.err_msg)
 
-        self.connector = Connector(('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
-            CONFIG, 'http://localhost:8983/solr', ['test.test'], '_id',
-            None, 
-            'mongo_connector/doc_managers/solr_doc_manager.py')
+        self.connector = Connector(
+            address=('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
+            oplog_checkpoint=CONFIG,
+            target_url='http://localhost:8983/solr',
+            ns_set=['test.test'],
+            u_key='_id',
+            auth_key=None,
+            doc_manager='mongo_connector/doc_managers/solr_doc_manager.py'
+        )
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             time.sleep(1)

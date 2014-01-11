@@ -38,6 +38,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                           start_mongo_proc,
                                           start_cluster,
                                           kill_all)
+from tests.util import wait_for
 from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import(long_to_bson_ts,
@@ -396,6 +397,33 @@ class TestOplogManager(unittest.TestCase):
         self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
 
         #test_oplog.join()
+
+    def test_filter_fields(self):
+        opman, _, _ = self.get_oplog_thread()
+        docman = opman.doc_manager
+        conn = opman.main_connection
+
+        include_fields = ["a", "b", "c"]
+        exclude_fields = ["d", "e", "f"]
+
+        # Set fields to care about
+        opman.fields = include_fields
+        # Documents have more than just these fields
+        doc = {
+            "a": 1, "b": 2, "c": 3,
+            "d": 4, "e": 5, "f": 6,
+            "_id": 1
+        }
+        db = conn['test']['test']
+        db.insert(doc)
+        wait_for(lambda: db.count() == 1)
+        opman.dump_collection()
+
+        result = docman._search()[0]
+        keys = result.keys()
+        for inc, exc in zip(include_fields, exclude_fields):
+            self.assertIn(inc, keys)
+            self.assertNotIn(exc, keys)
 
 if __name__ == '__main__':
     unittest.main()

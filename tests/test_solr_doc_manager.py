@@ -94,8 +94,8 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = self.solr.search('*:*')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+        self.assertTrue(all(x in search for x in search2) and
+                        all(y in search2 for y in search))
 
     def test_search(self):
         """Query Solr for docs in a timestamp range.
@@ -114,8 +114,10 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = self.solr.search('John')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+
+        result_names = [result.get("name") for result in search]
+        self.assertIn('John', result_names)
+        self.assertIn('John Paul', result_names)
 
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.
