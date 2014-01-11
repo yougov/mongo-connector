@@ -56,6 +56,10 @@ databases, and also ignoring the "system.indexes" collection in any database.
 as the unique key for the target system.  The default is "_id",
 which can be noted by "-u _id"
 
+`-i` or `--fields` is used to specify the list of fields to export. Use a comma separated list
+of fields to specify multiple fields. The '_id', 'ns' and '_ts' fields are always exported.
+
+
 `-f` is to specify a file which contains the password for authentication.
 This file is used by mongos to authenticate connections to the shards,
 and we'll use it in the oplog threads. The main use of this option is to specify a

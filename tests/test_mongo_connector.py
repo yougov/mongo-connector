@@ -74,7 +74,7 @@ class MongoInternalTester(unittest.TestCase):
             self.fail("Shards cannot be added to mongos")
 
         conn = Connector(MAIN_ADDRESS, CONFIG, None, ['test.test'],
-                      '_id', None, None)
+                      '_id', None, None, None)
         conn.start()
 
         while len(conn.shard_set) != 1:
@@ -92,7 +92,7 @@ class MongoInternalTester(unittest.TestCase):
         os.system('touch %s' % (TEMP_CONFIG))
         config_file_path = TEMP_CONFIG
         conn = Connector(MAIN_ADDRESS, config_file_path, None, ['test.test'],
-                      '_id', None, None)
+                      '_id', None, None, None)
 
         #test that None is returned if there is no config file specified.
         self.assertEqual(conn.write_oplog_progress(), None)
@@ -125,7 +125,7 @@ class MongoInternalTester(unittest.TestCase):
         """
 
         conn = Connector(MAIN_ADDRESS, None, None, ['test.test'], '_id',
-                      None, None)
+                      None, None, None)
 
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)
