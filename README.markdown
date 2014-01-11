@@ -83,7 +83,7 @@ For more information about making your own doc manager, see Doc Manager section.
 
 An example of combining all of these is:
 
-     mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
+     mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -f auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
 ## Usage With Solr
 
