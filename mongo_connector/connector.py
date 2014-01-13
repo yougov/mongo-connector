@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,12 +11,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Discovers the mongo cluster and starts the connector.
 """
 
+import json
 import logging
 import logging.handlers
 import optparse
@@ -37,12 +35,6 @@ try:
     from pymongo import MongoClient as Connection
 except ImportError:
     from pymongo import Connection
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
-
 
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
