@@ -229,8 +229,7 @@ class Connector(threading.Thread):
             is_master = main_conn.admin.command("isMaster")
             if not "setVersion" in is_master:
                 logging.error(
-                    "MongoConnector is not connected to a replica set! "
-                    "Shutting down..."
+                    'No replica set at "%s"! Shutting down...' % self.address
                 )
                 return
 
