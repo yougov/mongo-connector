@@ -229,7 +229,8 @@ class Connector(threading.Thread):
             is_master = main_conn.admin.command("isMaster")
             if not "setVersion" in is_master:
                 logging.error(
-                    'No replica set at "%s"! Shutting down...' % self.address
+                    'No replica set at "%s"! A replica set is required '
+                    'to run mongo-connector. Shutting down...' % self.address
                 )
                 return
 

@@ -31,7 +31,7 @@ that this is **not** recommended for production):
 
      mongod --replSet myDevReplSet
 
-To initialize your miniature replica set, fire up a mongo shell pointed at this mongod and run:
+To initialize your server as a replica set, run the following command in the mongo shell:
 
      rs.initiate()
 
