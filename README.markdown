@@ -25,8 +25,15 @@ mongo-connector and what privileges you have.
 ### Using mongo-connector
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations. It requires a replica set
-setup.
+connector will work with both sharded and non sharded configurations. **It requires a replica set
+setup.** For development purposes, you may find it convenient to run a one-node replica set (note
+that this is **not** recommended for production):
+
+     mongod --replSet myDevReplSet
+
+To initialize your server as a replica set, run the following command in the mongo shell:
+
+     rs.initiate()
 
 To start the system, simply run "mongo-connector". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:

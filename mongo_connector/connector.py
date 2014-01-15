@@ -225,6 +225,15 @@ class Connector(threading.Thread):
             conn_type = "REPLSET"
 
         if conn_type == "REPLSET":
+            # Make sure we are connected to a replica set
+            is_master = main_conn.admin.command("isMaster")
+            if not "setName" in is_master:
+                logging.error(
+                    'No replica set at "%s"! A replica set is required '
+                    'to run mongo-connector. Shutting down...' % self.address
+                )
+                return
+
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
 
