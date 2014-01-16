@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 import os
-import unittest
 import time
 import sys
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import inspect
 
 sys.path[0:0] = [""]

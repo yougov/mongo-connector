@@ -2,7 +2,7 @@
 
 The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
-in sync while the connector is running. It has been tested with python 2.7 and python 3.
+in sync while the connector is running. It has been tested with python 2.6 and python 3.
 
 ## Getting Started
 
@@ -233,14 +233,9 @@ syncing.
 ## Testing scripts
 
 Tests are stored in the tests folder which is not in the general distribution (they can be found on github).
-The tests should be run with unittests, so to run them properly, navigate to the general "mongo-connector" folder and run:
+You can run the tests with the following command:
 
-    python -m unittest discover
-
-This should run all of the tests in the folder.
-To specify a specific test, run
-
-    python -m unittest tests.<name_of_module>
+    python setup.py test
 
 The tests use environment variables for certain parameters.
 The variables in question are MAIN_ADDR, CONFIG, and TEMP_CONFIG.

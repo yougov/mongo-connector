@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# This file will be used with PyPi in order to package and distribute the final
-# product.
 
 """Test synchronizer using DocManagerSimulator
 """
@@ -30,7 +27,10 @@ except ImportError:
     from pymongo import Connection    
 
 import time
-import unittest
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 from tests.setup_cluster import (kill_mongo_proc,
                                 start_mongo_proc,
                                 start_cluster,
