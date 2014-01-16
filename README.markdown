@@ -146,12 +146,20 @@ contents if there is considerable delay in trailing the oplog.
 We have only one function for update and insert because incremental
 updates are not supported, so there is no update option.
 
-__4) remove(self, doc)__
+__4) bulk_upsert(self, docs)__
+
+Update or insert documents in-bulk to your engine. Many engines have some way of doing
+bulk operations that is more efficient than doing inserts or updates serially. The input
+is an iterable of documents represented as Python dictionaries. This method is used
+during collection dumps for improved speed. This method is optional, and if left undefined
+mongo-connector will fall back to using the `upsert` method on each document to be upserted.
+
+__5) remove(self, doc)__
 
 Removes document from engine
 The input is a python dictionary that represents a mongo document.
 
-__5) search(self, start_ts, end_ts)__
+__6) search(self, start_ts, end_ts)__
 
 Called to query engine for documents in a time range, including start_ts and end_ts
 This method is only used by rollbacks to query all the documents in
@@ -162,7 +170,7 @@ the function should just do a simple search for timestamps between these values
 treating them as simple longs.
 The return value should be an iterable set of documents.
 
-__6) commit(self)__
+__7) commit(self)__
 
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
@@ -172,7 +180,7 @@ any timers or run itself again (unlike auto_commit).  In the event of
 too many engine searchers, the commit can be wrapped in a
 retry_until_ok to keep trying until the commit goes through.
 
-__7) get_last_doc(self)__
+__8) get_last_doc(self)__
 
 Returns the last document stored in the target engine.
 This method is used for rollbacks to establish the rollback window,

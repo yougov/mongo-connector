@@ -60,6 +60,11 @@ class OplogThread(threading.Thread):
         #This is the same for all threads.
         self.doc_manager = doc_manager
 
+        # Determine if the doc manager supports bulk upserts
+        # If so, we can be more efficient with the way we pass along
+        # updates to the doc manager.
+        self.can_bulk = hasattr(self.doc_manager, "bulk_upsert")
+
         #Boolean describing whether or not the thread is running.
         self.running = True
 
@@ -269,32 +274,38 @@ class OplogThread(threading.Thread):
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
-        for namespace in dump_set:
-            database, coll = namespace.split('.', 1)
-            target_coll = self.main_connection[database][coll]
-            cursor = util.retry_until_ok(target_coll.find)
-            long_ts = util.bson_ts_to_long(timestamp)
+        long_ts = util.bson_ts_to_long(timestamp)
 
-            try:
+        def docs_to_dump():
+            for namespace in dump_set:
+                logging.info("dumping collection %s" % namespace)
+                database, coll = namespace.split('.', 1)
+                target_coll = self.main_connection[database][coll]
+                cursor = util.retry_until_ok(target_coll.find)
                 for doc in cursor:
-                    # Could spend a long time in this loop
                     if not self.running:
-                        # Return None so we don't save our progress
-                        return None
-                    doc['ns'] = namespace
-                    doc['_ts'] = long_ts
+                        raise StopIteration
+                    doc["ns"] = namespace
+                    doc["_ts"] = long_ts
+                    yield doc
+
+        try:
+            # Bulk upsert if possible
+            if self.can_bulk:
+                self.doc_manager.bulk_upsert(docs_to_dump())
+            else:
+                for doc in docs_to_dump():
                     try:
                         self.doc_manager.upsert(doc)
                     except errors.OperationFailed:
-                        logging.error("Unable to insert %s" % (doc))
-            except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
-
-                err_msg = "OplogManager: Failed during dump collection"
-                effect = "cannot recover!"
-                logging.error('%s %s %s' % (err_msg, effect, self.oplog))
-                self.running = False
-                return
+                        logging.error("Unable to insert %s" % doc)
+        except (pymongo.errors.AutoReconnect,
+                pymongo.errors.OperationFailure):
+            err_msg = "OplogManager: Failed during dump collection"
+            effect = "cannot recover!"
+            logging.error('%s %s %s' % (err_msg, effect, self.oplog))
+            self.running = False
+            return None
 
         return timestamp
 

@@ -54,6 +54,42 @@ class elastic_docManagerTester(unittest.TestCase):
             doc = doc["_source"]
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
+    def test_bulk_upsert(self):
+        """Ensure we can properly insert many documents at once into
+        ElasticSearch via DocManager.
+
+        """
+        self.elastic_doc.bulk_upsert([])
+
+        docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
+        self.elastic_doc.bulk_upsert(docs)
+        self.elastic_doc.commit()
+
+        res = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}},
+            size=1001
+        )["hits"]["hits"]
+        returned_ids = sorted(int(doc["_source"]["_id"]) for doc in res)
+        self.assertEqual(len(returned_ids), 1000)
+        for i, r in enumerate(returned_ids):
+            self.assertEqual(r, i)
+
+        docs = ({"_id": i, "weight": 2*i,
+                 "ns": "test.test"} for i in range(1000))
+        self.elastic_doc.bulk_upsert(docs)
+        self.elastic_doc.commit()
+
+        res = self.elastic_conn.search(
+            index="test.test",
+            body={"query":{"match_all":{}}},
+            size=1001
+        )["hits"]["hits"]
+        returned_ids = sorted(int(doc["_source"]["weight"]) for doc in res)
+        self.assertEqual(len(returned_ids), 1000)
+        for i, r in enumerate(returned_ids):
+            self.assertEqual(r, 2*i)
+
     def test_remove(self):
         """Ensure we can properly delete from ElasticSearch via DocManager.
         """

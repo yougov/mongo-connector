@@ -26,3 +26,7 @@ class ConnectionFailed(MongoConnectorError):
 class OperationFailed(MongoConnectorError):
     """Raised for failed commands on the destination database
     """
+
+class EmptyDocsError(MongoConnectorError):
+    """Raised on attempts to upsert empty sequences of documents
+    """
