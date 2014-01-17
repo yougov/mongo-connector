@@ -91,7 +91,7 @@ class TestSynchronizer(unittest.TestCase):
 
         self.connector = Connector(('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
             CONFIG, 'http://localhost:8983/solr', ['test.test'], '_id',
-            None, 
+            None, None,
             'mongo_connector/doc_managers/solr_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:

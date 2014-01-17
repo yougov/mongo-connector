@@ -34,7 +34,7 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 auth_username, repl_set=None):
+                 auth_username, fields, repl_set=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -80,6 +80,9 @@ class OplogThread(threading.Thread):
 
         #This is the username used for authentication.
         self.auth_username = auth_username
+
+        # List of fields to export
+        self.fields = fields
 
         logging.info('OplogManager: Initializing oplog thread')
 
@@ -149,7 +152,7 @@ class OplogThread(threading.Thread):
                                 doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                                 doc['ns'] = ns
                                 try:
-                                    self.doc_manager.upsert(doc)
+                                    self.doc_manager.upsert(self.filter_fields(doc))
                                 except errors.OperationFailed:
                                     logging.error("Unable to insert %s" % (doc))
 
@@ -201,6 +204,11 @@ class OplogThread(threading.Thread):
         coll = self.main_connection[db_name][coll_name]
         doc = util.retry_until_ok(coll.find_one, {'_id': doc_id})
 
+        return doc
+
+    def filter_fields(self, doc):
+        if self.fields is not None and len(self.fields) > 0:
+            doc = {k: v for k, v in doc.iteritems() if k == '_id' or k == 'ns' or k == '_ts' or k in self.fields}
         return doc
 
     def get_oplog_cursor(self, timestamp):
@@ -293,7 +301,7 @@ class OplogThread(threading.Thread):
             else:
                 for doc in docs_to_dump():
                     try:
-                        self.doc_manager.upsert(doc)
+                        self.doc_manager.upsert(self.filter_fields(doc))
                     except errors.OperationFailed:
                         logging.error("Unable to insert %s" % doc)
         except (pymongo.errors.AutoReconnect,
@@ -427,7 +435,7 @@ class OplogThread(threading.Thread):
                 doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
                 doc['ns'] = namespace
                 try:
-                    self.doc_manager.upsert(doc)
+                    self.doc_manager.upsert(self.filter_fields(doc))
                 except errors.OperationFailed:
                     logging.error("Unable to insert %s" % (doc))
 

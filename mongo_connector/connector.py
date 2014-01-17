@@ -40,7 +40,7 @@ class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
-                 u_key, auth_key, doc_manager=None, auth_username=None):
+                 u_key, auth_key, fields, doc_manager=None, auth_username=None):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -78,6 +78,9 @@ class Connector(threading.Thread):
 
         #Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
+
+        # List of fields to export
+        self.fields = fields
 
         try:
             if target_url is None:
@@ -239,6 +242,7 @@ class Connector(threading.Thread):
                 self.oplog_progress,
                 self.ns_set, self.auth_key,
                 self.auth_username,
+                self.fields,
                 repl_set=repl_set)
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
@@ -291,7 +295,8 @@ class Connector(threading.Thread):
                                                       self.oplog_progress,
                                                       self.ns_set,
                                                       self.auth_key,
-                                                      self.auth_username)
+                                                      self.auth_username,
+                                                      self.fields)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     logging.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -435,6 +440,14 @@ def main():
                       """Used to specify the syslog facility."""
                       """ The default is 'user'""")
 
+    #-i to specify the list of fields to export
+    parser.add_option("-i", "--fields", action="store", type="string",
+                      dest="fields", default=None, help=
+                      """Used to specify the list of fields to export."""
+                      """ Specify a field or fields to include in the export."""
+                      """ Use a comma separated list of fields to specify multiple fields."""
+                      """ The '_id', 'ns' and '_ts' fields are always exported.""")
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
@@ -464,6 +477,11 @@ def main():
     else:
         ns_set = options.ns_set.split(',')
 
+    if options.fields is None:
+        fields = []
+    else:
+        fields = options.fields.split(',')
+
     key = None
     if options.auth_file is not None:
         try:
@@ -481,7 +499,7 @@ def main():
         sys.exit(1)
 
     connector = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, options.u_key, key, options.doc_manager,
+                   ns_set, options.u_key, key, fields, options.doc_manager,
                    auth_username=options.admin_name)
 
     connector.start()

@@ -101,7 +101,7 @@ class TestElastic(unittest.TestCase):
             '%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
             CONFIG, 'localhost:9200',
             ['test.test'],
-            '_id', None,
+            '_id', None, None,
             'mongo_connector/doc_managers/elastic_doc_manager.py')
         self.connector.start()
         while len(self.connector.shard_set) == 0:

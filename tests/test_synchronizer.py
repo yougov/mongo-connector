@@ -71,7 +71,7 @@ class TestSynchronizer(unittest.TestCase):
                               replicaSet="demo-repl")
             timer = Timer(60, abort_test)
             cls.connector = Connector("%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
-                CONFIG, None, ['test.test'], '_id', None, None)
+                CONFIG, None, ['test.test'], '_id', None, None, None)
             cls.synchronizer = cls.connector.doc_manager
             timer.start()
             cls.connector.start()
