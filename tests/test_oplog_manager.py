@@ -270,8 +270,6 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(solr_doc['name'], 'paulie')
         self.assertEqual(solr_doc['ns'], 'test.test')
 
-        #test_oplog.join()
-
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it
             doesn't pass
@@ -302,6 +300,28 @@ class TestOplogManager(unittest.TestCase):
                         test_oplog.checkpoint)
 
         os.system('rm temp_config.txt')
+
+        # test init_cursor when OplogThread created with/without no-dump option
+        # insert some documents (will need to be dumped)
+        primary_conn['test']['test'].remove()
+        primary_conn['test']['test'].insert(({"_id":i} for i in range(100)))
+
+        # test no-dump option
+        docman = DocManager()
+        docman._delete()
+        test_oplog.doc_manager = docman
+        test_oplog.collection_dump = False
+        test_oplog.oplog_progress = LockingDict()
+        # init_cursor has the side-effect of causing a collection dump
+        test_oplog.init_cursor()
+        self.assertEqual(len(docman._search()), 0)
+
+        # test w/o no-dump option
+        docman._delete()
+        test_oplog.collection_dump = True
+        test_oplog.oplog_progress = LockingDict()
+        test_oplog.init_cursor()
+        self.assertEqual(len(docman._search()), 100)
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
