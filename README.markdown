@@ -54,6 +54,15 @@ file causes the system to go through all the mongo oplog and sync all the docume
 cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise
 the connector will miss some documents and behave incorrectly.
 
+`--no-dump` disables the collection dump that mongo connector normally does for namespaces for
+which it has no timestamp in the oplog progress file. Collection dumps move data already stored in
+MongoDB to the target system and may take awhile to complete. Use this option if you don't care
+about what's already stored in MongoDB and want to start replicating current activity immediately.
+
+`--batch-size` lets you choose how many oplog documents to iterate through before updating the oplog
+timestamp file (pointed to by --oplog-ts) with the latest position read from the oplog. By default,
+the oplog config isn't updated until we've read through the entire oplog.
+
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
