@@ -68,7 +68,7 @@ class DocManager():
         """
         doc_type = self.doc_type
         index = doc['ns']
-        doc[self.unique_key] = str(doc[self.unique_key])
+        doc[self.unique_key] = str(doc["_id"])
         doc_id = doc[self.unique_key]
         try:
             self.elastic.index(index=index, doc_type=doc_type,

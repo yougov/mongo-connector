@@ -24,6 +24,7 @@ import re
 import json
 import logging
 
+import bson.json_util as bsjson
 from pysolr import Solr, SolrError
 from threading import Timer
 from mongo_connector import errors
@@ -80,6 +81,7 @@ class DocManager():
             return doc
 
         fixed_doc = {}
+        doc[self.unique_key] = doc["_id"]
         for key, value in doc.items():
             if key in self.field_list[0]:
                 fixed_doc[key] = value
