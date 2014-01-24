@@ -247,7 +247,7 @@ class Connector(threading.Thread):
             oplog = OplogThread(
                 primary_conn=main_conn,
                 main_address=(main_conn.host + ":" + str(main_conn.port)),
-                oploc_coll=oplog_coll,
+                oplog_coll=oplog_coll,
                 is_sharded=False,
                 doc_manager=self.doc_manager,
                 oplog_progress_dict=self.oplog_progress,
