@@ -84,10 +84,12 @@ class TestSynchronizer(unittest.TestCase):
         if not self.flag:
             self.fail("Shards cannot be added to mongos")
         self.connector = Connector(
-            "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
-            CONFIG, '%s:30000' % (HOSTNAME),
-            ['test.test'],
-            '_id', None,
+            address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
+            oplog_checkpoint=CONFIG,
+            target_url='%s:30000' % (HOSTNAME),
+            ns_set=['test.test'],
+            u_key='_id',
+            auth_key=None,
             doc_manager='mongo_connector/doc_managers/mongo_doc_manager.py'
         )
         self.connector.start()

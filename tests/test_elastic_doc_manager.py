@@ -148,8 +148,8 @@ class elastic_docManagerTester(unittest.TestCase):
         search2 = [x["_source"] for x in search2]
         self.assertEqual(len(search), len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+        self.assertTrue(all(x in search for x in search2) and
+                        all(y in search2 for y in search))
 
     def test_search(self):
         """Query ElasticSearch for docs in a timestamp range.

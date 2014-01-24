@@ -40,10 +40,9 @@ class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
-                 u_key, auth_key, collection_dump=True,
-                 batch_size=DEFAULT_BATCH_SIZE, doc_manager=None,
-                 auth_username=None):
-
+                 u_key, auth_key, doc_manager=None, auth_username=None,
+                 collection_dump=True, batch_size=DEFAULT_BATCH_SIZE,
+                 fields=None):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -88,6 +87,9 @@ class Connector(threading.Thread):
 
         #Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
+
+        # List of fields to export
+        self.fields = fields
 
         try:
             if target_url is None:
@@ -243,16 +245,19 @@ class Connector(threading.Thread):
             repl_set = prim_admin.command("replSetGetStatus")['set']
 
             oplog = OplogThread(
-                main_conn,
-                (main_conn.host + ":" + str(main_conn.port)),
-                oplog_coll,
-                False, self.doc_manager,
-                self.oplog_progress,
-                self.ns_set, self.auth_key,
-                self.auth_username,
+                primary_conn=main_conn,
+                main_address=(main_conn.host + ":" + str(main_conn.port)),
+                oploc_coll=oplog_coll,
+                is_sharded=False,
+                doc_manager=self.doc_manager,
+                oplog_progress_dict=self.oplog_progress,
+                namespace_set=self.ns_set,
+                auth_key=self.auth_key,
+                auth_username=self.auth_username,
+                repl_set=repl_set,
                 collection_dump=self.collection_dump,
                 batch_size=self.batch_size,
-                repl_set=repl_set
+                fields=self.fields
             )
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
@@ -300,15 +305,18 @@ class Connector(threading.Thread):
                     shard_conn = Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
                     oplog = OplogThread(
-                        shard_conn, self.address,
-                        oplog_coll, True,
-                        self.doc_manager,
-                        self.oplog_progress,
-                        self.ns_set,
-                        self.auth_key,
-                        self.auth_username,
+                        primary_conn=shard_conn,
+                        main_address=self.address,
+                        oplog_coll=oplog_coll,
+                        is_sharded=True,
+                        doc_manager=self.doc_manager,
+                        oplog_progress_dict=self.oplog_progress,
+                        namespace_set=self.ns_set,
+                        auth_key=self.auth_key,
+                        auth_username=self.auth_username,
                         collection_dump=self.collection_dump,
-                        batch_size=self.batch_size
+                        batch_size=self.batch_size,
+                        fields=self.fields
                     )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
@@ -471,6 +479,14 @@ def main():
                       """Used to specify the syslog facility."""
                       """ The default is 'user'""")
 
+    #-i to specify the list of fields to export
+    parser.add_option("-i", "--fields", action="store", type="string",
+                      dest="fields", default=None, help=
+                      """Used to specify the list of fields to export."""
+                      """ Specify a field or fields to include in the export."""
+                      """ Use a comma separated list of fields to specify multiple fields."""
+                      """ The '_id', 'ns' and '_ts' fields are always exported.""")
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
@@ -500,6 +516,11 @@ def main():
     else:
         ns_set = options.ns_set.split(',')
 
+    if options.fields is None:
+        fields = []
+    else:
+        fields = options.fields.split(',')
+
     key = None
     if options.auth_file is not None:
         try:
@@ -517,13 +538,18 @@ def main():
         sys.exit(1)
 
     connector = Connector(
-        options.main_addr, options.oplog_config, options.url,
-        ns_set, options.u_key, key,
+        address=options.main_addr,
+        oplog_checkpoint=options.oplog_config,
+        target_url=options.url,
+        ns_set=ns_set,
+        u_key=options.u_key,
+        auth_key=key,
+        doc_manager=options.doc_manager,
+        auth_username=options.admin_name,
         collection_dump=(not options.no_dump),
         batch_size=options.batch_size,
-        doc_manager=options.doc_manager,
-        auth_username=options.admin_name)
-
+        fields=fields
+    )
     connector.start()
 
     while True:
