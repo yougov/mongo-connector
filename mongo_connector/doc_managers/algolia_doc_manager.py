@@ -18,6 +18,7 @@
     This file is a document manager for the Algolia search engine.
     """
 import logging
+import re
 import json
 import bson.json_util as bsjson
 
@@ -50,13 +51,14 @@ class DocManager():
         self.auto_commit = True
         self.run_auto_commit()
         try:
-            json = open("algolia_fields.json", 'r')
-            self.attributes_to_copy = decoder.decode(json.read())
-            if self.attributes_to_copy:
-                self.attributes_to_copy += [ '_id', '_ts']
+            json = open("algolia_fields_" + index + ".json", 'r')
+            self.attributes_filter = decoder.decode(json.read())
+            if self.attributes_filter:
+                self.attributes_filter['_id'] = ""
+                self.attributes_filter['_ts'] = ""
             logging.info("Algolia Connector: Start with filter.")
         except IOError: # No filter file
-            self.attributes_to_copy = None
+            self.attributes_filter = None
             logging.info("Algolia Connector: Start without filter.")
 
     def stop(self):
@@ -64,15 +66,28 @@ class DocManager():
         """
         self.auto_commit = False
 
-    def filter(self, doc):
-        if not self.attributes_to_copy:
+    def apply_filter(self, doc, filter):
+        if not filter:
             return doc
 
         filtered_doc = {}
         for key, value in doc.items():
-            if key in self.attributes_to_copy:
-                filtered_doc[key] = value
-        return filtered_doc
+            if key in filter:
+                if type(value) == dict:
+                    filtered_doc[key], state = self.apply_filter(value, filter[key])
+                    if not state:
+                        return ({}, state)
+                else:
+                    try:
+                        if filter[key] == "" or eval(re.sub(r"_\$", "value", filter[key])):
+                            filtered_doc[key] = value
+                        else:
+                            return ({}, False)
+                    except Exception, e:
+                        logging.warn("Unable to compare " + filter[key])
+                        logging.warn(e)
+                
+        return (filtered_doc, True)
 
 
     def upsert(self, doc):
@@ -80,7 +95,9 @@ class DocManager():
         """
         with self.mutex:
             self.last_object_id = str(doc[self.unique_key]) # mongodb ObjectID is not serializable
-            doc = self.filter(doc)
+            doc, state = self.apply_filter(doc, self.attributes_filter)
+            if not state:
+                return
             doc[self.unique_key] = doc['objectID'] = self.last_object_id
             self.batch.append({ 'action': 'addObject', 'body': doc })
             if len(self.batch) >= DocManager.BATCH_SIZE:
