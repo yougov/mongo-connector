@@ -57,7 +57,7 @@ class DocManager():
         """
         with self.mutex:
             self.last_object_id = doc['objectID'] = str(doc[self.unique_key])
-            doc['_id'] = str(doc['_id']) # ObjectID is not serializable
+            doc[self.unique_key] = str(doc[self.unique_key]) # mongodb ObjectID is not serializable
             self.batch.append({ 'action': 'addObject', 'body': doc })
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
@@ -66,7 +66,7 @@ class DocManager():
         """ Removes documents from Algolia
         """
         with self.mutex:
-            self.batch.append({ 'action': 'deleteObject', 'body': doc[self.unique_key] })
+            self.batch.append({ 'action': 'deleteObject', 'body': {"objectID" : str(doc[self.unique_key])} })
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
 
