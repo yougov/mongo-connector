@@ -86,18 +86,21 @@ class DocManager():
 
         for key, value in doc.items():
             if key in filter:
-                if type(value) == dict:
-                    exec('filtered_doc' + self.remap(tree + '["' + key + '"]') + ', state = self.apply_filter(value, tree + \'["\' + key + \'"]\', filtered_doc)')
-                    if not state:
-                        return ({}, state)
-                else: #todo tab
-                    try:
-                        if filter[key] == "" or eval(re.sub(r"_\$", "value", filter[key])):
-                            exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = value")
-                        else:
-                            return ({}, False)
-                    except Exception, e:
-                        logging.warn("Unable to compare \"" + filter[key] + "\"")
+                if type(value) != list:
+                    values = [value]
+                for value in values:
+                    if type(value) == dict:
+                        exec('filtered_doc' + self.remap(tree + '["' + key + '"]') + ', state = self.apply_filter(value, tree + \'["\' + key + \'"]\', filtered_doc)')
+                        if not state:
+                            return ({}, state)
+                    else:
+                        try:
+                            if filter[key] == "" or eval(re.sub(r"_\$", "value", filter[key])):
+                                exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = value")
+                            else:
+                                return ({}, False)
+                        except Exception, e:
+                            logging.warn("Unable to compare \"" + filter[key] + "\"")
                 
         return (filtered_doc, True)
 
