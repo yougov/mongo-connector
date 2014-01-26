@@ -60,32 +60,44 @@ class DocManager():
         except IOError: # No filter file
             self.attributes_filter = None
             logging.info("Algolia Connector: Start without filter.")
+        try:
+            json = open("algolia_remap_" + index + ".json", 'r')
+            self.attributes_remap = decoder.decode(json.read())
+            logging.info("Algolia Connector: Start with remapper.")
+        except IOError: # No filter file
+            self.attributes_remap = None
+            logging.info("Algolia Connector: Start without remapper.")
+
 
     def stop(self):
         """ Stops the instance
         """
         self.auto_commit = False
 
-    def apply_filter(self, doc, filter):
-        if not filter:
-            return doc
+    def remap(self, tree):
+        if self.attributes_remap is None or not tree in self.attributes_remap:
+            return tree
+        return  self.attributes_remap[tree]
 
-        filtered_doc = {}
+    def apply_filter(self, doc, tree = '', filtered_doc = {}):
+        exec("filter = self.attributes_filter" + tree )
+        if not filter: #todo Remap
+            return doc, True
+
         for key, value in doc.items():
             if key in filter:
                 if type(value) == dict:
-                    filtered_doc[key], state = self.apply_filter(value, filter[key])
+                    exec('filtered_doc' + self.remap(tree + '["' + key + '"]') + ', state = self.apply_filter(value, tree + \'["\' + key + \'"]\', filtered_doc)')
                     if not state:
                         return ({}, state)
-                else:
+                else: #todo tab
                     try:
                         if filter[key] == "" or eval(re.sub(r"_\$", "value", filter[key])):
-                            filtered_doc[key] = value
+                            exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = value")
                         else:
                             return ({}, False)
                     except Exception, e:
-                        logging.warn("Unable to compare " + filter[key])
-                        logging.warn(e)
+                        logging.warn("Unable to compare \"" + filter[key] + "\"")
                 
         return (filtered_doc, True)
 
@@ -95,7 +107,7 @@ class DocManager():
         """
         with self.mutex:
             self.last_object_id = str(doc[self.unique_key]) # mongodb ObjectID is not serializable
-            doc, state = self.apply_filter(doc, self.attributes_filter)
+            doc, state = self.apply_filter(doc)
             if not state:
                 return
             doc[self.unique_key] = doc['objectID'] = self.last_object_id
