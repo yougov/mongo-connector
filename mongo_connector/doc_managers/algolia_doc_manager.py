@@ -77,55 +77,73 @@ class DocManager():
             return tree
         return  self.attributes_remap[tree]
 
-    def apply_filter(self, doc, tree, filtered_doc):
-        exec("filter = self.attributes_filter" + tree )
-        if not filter: #todo Remap
+    def apply_filter(self, doc, filter):
+        if not filter:
             return doc, True
-
+        filtered_doc = {}
+        _all_ = False
         for key, value in doc.items():
             if key in filter:
                 if type(value) != list:
-                    value = [value]
-                
+                    append = False
+                    tabvalue = [value]
+                    filtered_doc[key] = {}
+                else:
+                    tabvalue = value
+                    filtered_doc[key] = []
+                    append = True
                 _all_ = True if not "_all_" in filter[key] or filter[key]['_all_'] == "and" else False
                 _all_op_ = "and" if not "_all_" in filter[key] or filter[key]['_all_'] == "and" else "or"
-                for elt in value:
+                for elt in tabvalue:
                     if type(elt) == dict:
-                        exec('filtered_doc' + tree + '[key] = {}')
-                        exec('filtered_doc, state = self.apply_filter(elt, tree + \'["\' + key + \'"]\', filtered_doc)')
-                        if not state and _all_op_ == "and":
-                            return (filtered_doc, state)
+                        part, state = self.apply_filter(elt, filter[key])
+                        if state:
+                            if append:
+                                filtered_doc[key].append(part)
+                            else:
+                                filtered_doc[key] = part
+                        elif _all_op_ == "and":
+                            return ({}, state)
                     else:
                         try:
                             if filter[key] == "" or eval(re.sub(r"_\$", "elt", filter[key])):
                                 state = True
-                                exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = elt")
+                                if append:
+                                    filtered_doc[key].append(elt)
+                                else:
+                                    filtered_doc[key] = elt
                             elif _all_op_ == "and":
-                                return (filtered_doc, False)
+                                return ({}, False)
                             else:
                                 state = False
                         except Exception, e:
-                            logging.warn("Unable to compare during : " + tree + " with : " + key)
-                            logging.warn(filter[key])
-                            logging.warn(elt)
-                            logging.warn(type(elt))
+                            state = True
+                            logging.warn("Unable to compare during : " + key)
                             logging.warn(e)
                     exec("_all_ = _all_ " + _all_op_ + " state")
         return (filtered_doc, _all_)
 
-
+    def apply_remap(self, doc):
+        if not self.attributes_remap:
+            return doc
+        remapped_doc = doc 
+        for key, value in self.attributes_remap.items():
+            exec("remapped_doc" + value + " = " + "doc" + key)
+            exec('del remapped_doc' + key) 
+        return remapped_doc
+                
     def upsert(self, doc):
         """ Update or insert a document into Algolia
         """
         with self.mutex:
             self.last_object_id = str(doc[self.unique_key]) # mongodb ObjectID is not serializable
             last_update = str(date.today) if not "_ts" in doc else doc['_ts']
-            doc, state = self.apply_filter(doc, '', {})
+            doc, state = self.apply_filter(doc, self.attributes_filter)
             if not state:
                 return
+            doc = self.apply_remap(doc)
             doc['_ts'] = last_update
             doc[self.unique_key] = doc['objectID'] = self.last_object_id
-            print doc
             self.batch.append({ 'action': 'addObject', 'body': doc })
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
@@ -155,7 +173,6 @@ class DocManager():
         """ Send the current batch of updates
         """
         try:
-            logging.info("nb : " + str(len(self.batch)))
             request = {}
             with self.mutex:
                 if len(self.batch) == 0:
