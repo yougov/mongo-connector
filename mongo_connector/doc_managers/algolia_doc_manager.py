@@ -20,6 +20,7 @@
 import logging
 import re
 import json
+from datetime import date
 import bson.json_util as bsjson
 
 from algoliasearch import algoliasearch
@@ -53,9 +54,6 @@ class DocManager():
         try:
             json = open("algolia_fields_" + index + ".json", 'r')
             self.attributes_filter = decoder.decode(json.read())
-            if self.attributes_filter:
-                self.attributes_filter['_id'] = ""
-                self.attributes_filter['_ts'] = ""
             logging.info("Algolia Connector: Start with filter.")
         except IOError: # No filter file
             self.attributes_filter = None
@@ -79,7 +77,7 @@ class DocManager():
             return tree
         return  self.attributes_remap[tree]
 
-    def apply_filter(self, doc, tree = '', filtered_doc = {}):
+    def apply_filter(self, doc, tree, filtered_doc):
         exec("filter = self.attributes_filter" + tree )
         if not filter: #todo Remap
             return doc, True
@@ -87,22 +85,33 @@ class DocManager():
         for key, value in doc.items():
             if key in filter:
                 if type(value) != list:
-                    values = [value]
-                for value in values:
-                    if type(value) == dict:
-                        exec('filtered_doc' + self.remap(tree + '["' + key + '"]') + ', state = self.apply_filter(value, tree + \'["\' + key + \'"]\', filtered_doc)')
-                        if not state:
-                            return ({}, state)
+                    value = [value]
+                
+                _all_ = True if not "_all_" in filter[key] or filter[key]['_all_'] == "and" else False
+                _all_op_ = "and" if not "_all_" in filter[key] or filter[key]['_all_'] == "and" else "or"
+                for elt in value:
+                    if type(elt) == dict:
+                        exec('filtered_doc' + tree + '[key] = {}')
+                        exec('filtered_doc, state = self.apply_filter(elt, tree + \'["\' + key + \'"]\', filtered_doc)')
+                        if not state and _all_op_ == "and":
+                            return (filtered_doc, state)
                     else:
                         try:
-                            if filter[key] == "" or eval(re.sub(r"_\$", "value", filter[key])):
-                                exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = value")
+                            if filter[key] == "" or eval(re.sub(r"_\$", "elt", filter[key])):
+                                state = True
+                                exec("filtered_doc" + self.remap(tree + '["' + key + '"]') + " = elt")
+                            elif _all_op_ == "and":
+                                return (filtered_doc, False)
                             else:
-                                return ({}, False)
+                                state = False
                         except Exception, e:
-                            logging.warn("Unable to compare \"" + filter[key] + "\"")
-                
-        return (filtered_doc, True)
+                            logging.warn("Unable to compare during : " + tree + " with : " + key)
+                            logging.warn(filter[key])
+                            logging.warn(elt)
+                            logging.warn(type(elt))
+                            logging.warn(e)
+                    exec("_all_ = _all_ " + _all_op_ + " state")
+        return (filtered_doc, _all_)
 
 
     def upsert(self, doc):
@@ -110,10 +119,13 @@ class DocManager():
         """
         with self.mutex:
             self.last_object_id = str(doc[self.unique_key]) # mongodb ObjectID is not serializable
-            doc, state = self.apply_filter(doc)
+            last_update = str(date.today) if not "_ts" in doc else doc['_ts']
+            doc, state = self.apply_filter(doc, '', {})
             if not state:
                 return
+            doc['_ts'] = last_update
             doc[self.unique_key] = doc['objectID'] = self.last_object_id
+            print doc
             self.batch.append({ 'action': 'addObject', 'body': doc })
             if len(self.batch) >= DocManager.BATCH_SIZE:
                 self.commit()
@@ -143,6 +155,7 @@ class DocManager():
         """ Send the current batch of updates
         """
         try:
+            logging.info("nb : " + str(len(self.batch)))
             request = {}
             with self.mutex:
                 if len(self.batch) == 0:
