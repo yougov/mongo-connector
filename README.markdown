@@ -105,6 +105,101 @@ An example of combining all of these is:
 
      mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -f auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
+## Usage With Algolia
+
+Simplest way to connect a collection `myData` in the db `myDb` to fill in the index `myIndex`:
+
+      python pathTo/connector.py -m mongoDBAddr:27017 -n myDb.myData -d pathTo/doc_managers/algolia_doc_manager.py \
+      -t myAPPID:MyAPPKEY:MyIndex -o config_myIndex.txt
+
+**Note**: Take care to specify different connector configuration file for different index.
+
+### Filter the data sent
+
+We have provided a feature to filter the attributes of mongoDB docs:
+
+      {
+        "myAttrNeg":"_$ < 0",
+        "myAttrWithoutCheck": ""
+      }
+
+This connector sends the attributes described in the json file named `algolia_fileds_myIndex.json` if every conditions are true.
+
+**Note**: 
+- `_$` represents the value of the field.
+- An empty value for the check of a field is `True`.
+- You can put any line of python in the value of a field.
+
+##### Filter an array
+
+To filter an array the filter doesn't have the array:
+
+    {
+      "myTab": "re.match(r'algolia', _$, re.I)"
+    }
+
+Consider the following object:
+
+    {
+      "myTab" : ["algolia", "AlGoLiA", "alogia"]
+    }
+
+The filter will send
+
+    {
+      "myTab": ["algolia", "AlGoLia"]
+    }
+
+The filter iterates on elements with the same condition.
+
+#### Change the behavior
+
+If you want to keep only the fields that respect the condition:
+
+      {
+        "myAttr": { "_all_" : "or", "neg": "_$ < 0", "pos": "_$ > 0"}
+      }
+
+##### Example
+
+Consider the following object:
+
+      {
+        "myAttr": { "neg": 42, "pos": 42}
+      }
+
+The connector will send the following object:
+
+      {
+        "myAttr": { "pos": 42}
+      }
+
+### Rename the attributes
+
+If you want to change the mapping of the document:
+
+      {
+        "['user']['email']": "[email]"
+      }
+
+The connector change the json following the configuration file `algolia_remap_myIndex.json`.
+
+##### Example
+
+Consider the following object: 
+
+      {
+        "user": { "email": "my@algolia.com" }
+      }
+The remapper will output this json:
+
+      {
+        "email": "my@algolia.com"
+      }
+
+**Note**: Rename the attribute to itself removes this attribute. It's the method to check a field without sends it.
+
+
 ## Usage With Solr
 
 We have provided an example Solr schema called `schema.xml`, which provides field definitions for the 'name', '_ts', `ns`, and `_id` fields. The schema also sets the `_id` field to be the unique key by adding this line:
