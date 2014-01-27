@@ -21,15 +21,15 @@
     same class and replace the method definitions with API calls for the
     desired backend.
     """
-import itertools
-import logging
 from threading import Timer
 
 import bson.json_util as bsjson
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 
 from mongo_connector import errors
+from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
 from mongo_connector.util import retry_until_ok
+
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -43,20 +43,21 @@ class DocManager():
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, auto_commit=False, unique_key='_id', **kwargs):
+    def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
+                 unique_key='_id', **kwargs):
         """ Establish a connection to Elastic
         """
         self.elastic = Elasticsearch(hosts=[url])
-        self.auto_commit = auto_commit
+        self.auto_commit_interval = auto_commit_interval
         self.doc_type = 'string'  # default type is string, change if needed
         self.unique_key = unique_key
-        if auto_commit:
+        if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
 
     def stop(self):
         """ Stops the instance
         """
-        self.auto_commit = False
+        self.auto_commit_interval = None
 
     def upsert(self, doc):
         """Update or insert a document into Elastic
@@ -72,11 +73,12 @@ class DocManager():
         doc_id = doc[self.unique_key]
         try:
             self.elastic.index(index=index, doc_type=doc_type,
-                               body=bsjson.dumps(doc), id=doc_id, refresh=True)
+                               body=bsjson.dumps(doc), id=doc_id,
+                               refresh=(self.auto_commit_interval == 0))
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not index document: %s"%(
+            raise errors.OperationFailed("Could not index document: %s" % (
                 bsjson.dumps(doc)))
 
     def bulk_upsert(self, docs):
@@ -84,15 +86,14 @@ class DocManager():
 
         docs may be any iterable
         """
-
         def docs_to_upsert():
             doc = None
             for doc in docs:
                 index = doc["ns"]
                 doc[self.unique_key] = str(doc[self.unique_key])
                 doc_id = doc[self.unique_key]
-                yield { "index": {"_index": index, "_type": self.doc_type,
-                                  "_id": doc_id} }
+                yield {"index": {"_index": index, "_type": self.doc_type,
+                                 "_id": doc_id}}
                 yield doc
             if not doc:
                 raise errors.EmptyDocsError(
@@ -100,7 +101,8 @@ class DocManager():
                     "documents into Elastic Search")
         try:
             self.elastic.bulk(doc_type=self.doc_type,
-                              body=docs_to_upsert(), refresh=True)
+                              body=docs_to_upsert(),
+                              refresh=(self.auto_commit_interval == 0))
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
@@ -118,11 +120,12 @@ class DocManager():
         """
         try:
             self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
-                                id=str(doc[self.unique_key]), refresh=True)
+                                id=str(doc[self.unique_key]),
+                                refresh=(self.auto_commit_interval == 0))
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not remove document: %s"%(
+            raise errors.OperationFailed("Could not remove document: %s" % (
                 bsjson.dumps(doc)))
 
     def _remove(self):
@@ -131,7 +134,7 @@ class DocManager():
         try:
             self.elastic.delete_by_query(index="test.test",
                                          doc_type=self.doc_type,
-                                         body={"match_all":{}})
+                                         body={"match_all": {}})
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:
@@ -160,7 +163,6 @@ class DocManager():
             raise errors.OperationFailed(
                 "Could not retrieve documents from Elastic Search")
 
-
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
         """
@@ -186,9 +188,8 @@ class DocManager():
         """Periodically commits to the Elastic server.
         """
         self.elastic.indices.refresh()
-
-        if self.auto_commit:
-            Timer(1, self.run_auto_commit).start()
+        if self.auto_commit_interval not in [None, 0]:
+            Timer(self.auto_commit_interval, self.run_auto_commit).start()
 
     def get_last_doc(self):
         """Returns the last document stored in the Elastic engine.
@@ -198,7 +199,7 @@ class DocManager():
                 index="_all",
                 body={
                     "query": {"match_all": {}},
-                    "sort": [{"_ts":"desc"}]
+                    "sort": [{"_ts": "desc"}]
                 },
                 size=1
             )["hits"]["hits"]

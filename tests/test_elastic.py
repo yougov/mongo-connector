@@ -22,7 +22,6 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import inspect
 import socket
 
 sys.path[0:0] = [""]
@@ -30,7 +29,7 @@ sys.path[0:0] = [""]
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
 
 from tests.setup_cluster import (kill_mongo_proc,
                                  start_mongo_proc,
@@ -39,7 +38,6 @@ from tests.setup_cluster import (kill_mongo_proc,
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from bson.code import Code
-from bson.binary import Binary
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -53,6 +51,7 @@ HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
 CONFIG = os.environ.get('CONFIG', "config.txt")
 
+
 class TestElastic(unittest.TestCase):
     """ Tests the Elastic instance
     """
@@ -63,22 +62,22 @@ class TestElastic(unittest.TestCase):
         unittest.TestCase.__init__(self)
 
     @classmethod
-    def setUpClass(cls):    
+    def setUpClass(cls):
         """ Starts the cluster
         """
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        cls.elastic_doc = DocManager('localhost:9200', 
-            auto_commit=False)
+        cls.elastic_doc = DocManager('localhost:9200')
         cls.elastic_doc._remove()
         cls.flag = start_cluster()
         if cls.flag:
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
-                        replicaSet="demo-repl")
+                                  replicaSet="demo-repl")
 
-        import logging        
+        import logging
         logger = logging.getLogger()
         loglevel = logging.INFO
         logger.setLevel(loglevel)
+
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
@@ -88,7 +87,7 @@ class TestElastic(unittest.TestCase):
     def tearDown(self):
         """ Ends the connector
         """
-        self.connector.doc_manager.auto_commit = False
+        self.connector.doc_manager.auto_commit_interval = None
         time.sleep(2)
         self.connector.join()
 
@@ -310,6 +309,7 @@ class TestElastic(unittest.TestCase):
         if not wait_for(lambda : sum(1 for _ in search()) == len(docs)):
             self.fail("Did not get all expected documents")
         self.assertIn("dbref", self.elastic_doc.get_last_doc())
+
 
 def abort_test():
     """Aborts the test

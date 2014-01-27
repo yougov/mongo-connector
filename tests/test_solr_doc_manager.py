@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import time
 import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import inspect
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
-from pysolr import Solr, SolrError
+from pysolr import Solr
+
 
 class SolrDocManagerTester(unittest.TestCase):
     """Test class for SolrDocManager
@@ -34,7 +33,8 @@ class SolrDocManagerTester(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the DocManager and a direct connection
         """
-        cls.SolrDoc = DocManager("http://localhost:8983/solr/")
+        cls.SolrDoc = DocManager("http://localhost:8983/solr/",
+                                 auto_commit_interval=0)
         cls.solr = Solr("http://localhost:8983/solr/")
 
     def runTest(self):
@@ -54,14 +54,12 @@ class SolrDocManagerTester(unittest.TestCase):
         #test upsert
         docc = {'_id': '1', 'name': 'John'}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         res = self.solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
         docc = {'_id': '1', 'name': 'Paul'}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         res = self.solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
@@ -75,7 +73,6 @@ class SolrDocManagerTester(unittest.TestCase):
 
         docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
         self.SolrDoc.bulk_upsert(docs)
-        self.SolrDoc.commit()
 
         res = sorted(int(x["_id"]) for x in self.solr.search("*:*", rows=1001))
         self.assertEqual(len(res), 1000)
@@ -85,7 +82,6 @@ class SolrDocManagerTester(unittest.TestCase):
         docs = ({"_id": i, "weight": 2*i,
                  "ns": "test.test"} for i in range(1000))
         self.SolrDoc.bulk_upsert(docs)
-        self.SolrDoc.commit()
 
         res = sorted(int(x["weight"]) for x in self.solr.search("*:*", rows=1001))
         self.assertEqual(len(res), 1000)
@@ -98,12 +94,10 @@ class SolrDocManagerTester(unittest.TestCase):
         #test remove
         docc = {'_id': '1', 'name': 'John'}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         res = self.solr.search('*:*')
         self.assertTrue(len(res) == 1)
 
         self.SolrDoc.remove(docc)
-        self.solr.commit()
         res = self.solr.search('*:*')
         self.assertTrue(len(res) == 0)
 
@@ -115,7 +109,6 @@ class SolrDocManagerTester(unittest.TestCase):
         self.SolrDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'Paul'}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         search = self.SolrDoc._search('*:*')
         search2 = self.solr.search('*:*')
         self.assertTrue(len(search) == len(search2))
@@ -135,7 +128,6 @@ class SolrDocManagerTester(unittest.TestCase):
         self.SolrDoc.upsert(docc)
         docc = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         search = self.SolrDoc.search(5767301236327972865, 5767301236327972866)
         search2 = self.solr.search('John')
         self.assertTrue(len(search) == len(search2))
@@ -148,15 +140,28 @@ class SolrDocManagerTester(unittest.TestCase):
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.
         """
-        #test solr commit
-        docc = {'_id': '3', 'name': 'Waldo'}
-        self.SolrDoc.upsert(docc)
-        res = self.SolrDoc._search('Waldo')
-        assert(len(res) == 1)
-        time.sleep(2)
-        res = self.SolrDoc._search('Waldo')
-        assert(len(res) != 0)
-        self.SolrDoc.auto_commit = False
+        docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
+        docman = DocManager("http://localhost:8983/solr")
+        # test cases:
+        # -1 = no autocommit
+        # 0 = commit immediately
+        # x > 0 = commit within x seconds
+        for autocommit_interval in [None, 0, 1, 2]:
+            docman.auto_commit_interval = autocommit_interval
+            docman.upsert(docc)
+            if autocommit_interval is None:
+                docman.commit()
+            else:
+                # Allow just a little extra time
+                time.sleep(autocommit_interval + 1)
+            results = list(docman._search("Waldo"))
+            self.assertEqual(len(results), 1,
+                             "should commit document with "
+                             "auto_commit_interval = %s" % str(
+                                 autocommit_interval))
+            self.assertEqual(results[0]["name"], "Waldo")
+            docman._remove()
+            docman.commit()
 
     def test_get_last_doc(self):
         """Insert documents, Verify the doc with the latest timestamp.
@@ -166,12 +171,10 @@ class SolrDocManagerTester(unittest.TestCase):
         self.SolrDoc.upsert(docc)
         docc = {'_id': '5', 'name': 'Tortoise', '_ts': '1'}
         self.SolrDoc.upsert(docc)
-        self.solr.commit()
         doc = self.SolrDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4')
 
         docc = {'_id': '6', 'name': 'HareTwin', 'ts': '2'}
-        self.solr.commit()
         doc = self.SolrDoc.get_last_doc()
         self.assertTrue(doc['_id'] == '4' or doc['_id'] == '6')
 

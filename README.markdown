@@ -188,8 +188,7 @@ __7) commit(self)__
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
 not meant to be called in other circumstances. The body should commit
-all documents to the target system (like auto_commit), but not have
-any timers or run itself again (unlike auto_commit).  In the event of
+all documents to the target system (like auto_commit). In the event of
 too many engine searchers, the commit can be wrapped in a
 retry_until_ok to keep trying until the commit goes through.
 
