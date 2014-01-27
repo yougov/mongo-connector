@@ -81,7 +81,8 @@ class DocManager():
         if not filter:
             return doc, True
         filtered_doc = {}
-        _all_ = False
+        _all_root_ = True if not "_all_" in filter or filter['_all_'] == "and" else False
+        _all_root_op_ = "and" if not "_all_" in filter or filter['_all_'] == "and" else "or"
         for key, value in doc.items():
             if key in filter:
                 if type(value) != list:
@@ -103,7 +104,9 @@ class DocManager():
                             else:
                                 filtered_doc[key] = part
                         elif _all_op_ == "and":
-                            return ({}, state)
+                            del filtered_doc[key]
+                            _all_ = False;
+                            break;
                     else:
                         try:
                             if filter[key] == "" or eval(re.sub(r"_\$", "elt", filter[key])):
@@ -113,7 +116,9 @@ class DocManager():
                                 else:
                                     filtered_doc[key] = elt
                             elif _all_op_ == "and":
-                                return ({}, False)
+                                del filtered_doc[key]
+                                _all_ = False
+                                break;
                             else:
                                 state = False
                         except Exception, e:
@@ -121,7 +126,8 @@ class DocManager():
                             logging.warn("Unable to compare during : " + key)
                             logging.warn(e)
                     exec("_all_ = _all_ " + _all_op_ + " state")
-        return (filtered_doc, _all_)
+                exec("_all_root_ = _all_ " + _all_root_op_ + " _all_root_")
+        return (filtered_doc, _all_root_)
 
     def apply_remap(self, doc):
         if not self.attributes_remap:
