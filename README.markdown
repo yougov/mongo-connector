@@ -99,7 +99,7 @@ The simplest way to synchronize a collection `myData` from db `myDb` to index `M
 If you want to map an attribute to a specific index field, you can configure it creating a `algolia_remap_<INDEXNAME>.json` JSON configuration file:
 
       {
-        "['user']['email']": "[email]"
+        "['user']['email']": "['email']"
       }
 
 ##### Example
@@ -203,7 +203,7 @@ The sample XML schema is designed to work with the tests. For a more complete gu
 ## DocManager
 
 This is the only file that is engine specific. In the current version, we have provided sample
-implementations for ElasticSearch, Solr and Mongo, which are in the docmanagers folder.
+implementations for ElasticSearch, Solr, Mongo and Algolia, which are in the docmanagers folder.
 If you would like to integrate MongoDB with some other engine, then you need to write a
 doc manager file for that target system. The sample_doc_manager.py file gives a
 detailed description of the functions used by the Doc Manager; the following functions must be
@@ -304,7 +304,7 @@ adding to/removing from the target system.
 
 Mongo-Connector imports a DocManager from the specified file in connector.py, preferably
 from the doc_managers folder. We have provided sample implementations for a Solr search DocManager
-and an ElasticSearch DocManager. Note that upon execution, connector.py will copy the file
+, an ElasticSearch DocManager and AlgoliaSearch DocManager. Note that upon execution, connector.py will copy the file
 to the main folder as doc_manager.py.
 
 The documents stored in the target system are equivalent to what is stored in mongo, except every
