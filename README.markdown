@@ -87,82 +87,20 @@ An example of combining all of these is:
 
 ## Usage With Algolia
 
-Simplest way to connect a collection `myData` in the db `myDb` to fill in the index `myIndex`:
+The simplest way to synchronize a collection `myData` from db `myDb` to index `MyIndex` is:
 
-      python pathTo/connector.py -m mongoDBAddr:27017 -n myDb.myData -d pathTo/doc_managers/algolia_doc_manager.py \
-      -t myAPPID:MyAPPKEY:MyIndex -o config_myIndex.txt
+      python /path/to/connector.py -m mongoDBAddr:27017 -n myDb.myCollection -d /path/to/doc_managers/algolia_doc_manager.py \
+      -t MyApplicationID:MyApiKey:MyIndex
 
-**Note**: Take care to specify different connector configuration file for different index.
+**Note**: If you synchronize multiple collections with multiple indexes, do not forget to specify a specific connector configuration file for each index using the `-o config.txt` option (a config.txt file is created by default).
 
-### Filter the data sent
+### Attributes remapping
 
-We have provided a feature to filter the attributes of mongoDB docs:
-
-      {
-        "myAttrNeg":"_$ < 0",
-        "myAttrWithoutCheck": ""
-      }
-
-This connector sends the attributes described in the json file named `algolia_fileds_myIndex.json` if every conditions are true.
-
-**Note**: 
-- `_$` represents the value of the field.
-- An empty value for the check of a field is `True`.
-- You can put any line of python in the value of a field.
-
-##### Filter an array
-
-To filter an array the filter doesn't have the array:
-
-    {
-      "myTab": "re.match(r'algolia', _$, re.I)"
-    }
-
-Consider the following object:
-
-    {
-      "myTab" : ["algolia", "AlGoLiA", "alogia"]
-    }
-
-The filter will send
-
-    {
-      "myTab": ["algolia", "AlGoLia"]
-    }
-
-The filter iterates on elements with the same condition.
-
-#### Change the behavior
-
-If you want to keep only the fields that respect the condition:
-
-      {
-        "myAttr": { "_all_" : "or", "neg": "_$ < 0", "pos": "_$ > 0"}
-      }
-
-##### Example
-
-Consider the following object:
-
-      {
-        "myAttr": { "neg": 42, "pos": 42}
-      }
-
-The connector will send the following object:
-
-      {
-        "myAttr": { "pos": 42}
-      }
-
-### Rename the attributes
-
-If you want to change the mapping of the document:
+If you want to map an attribute to a specific index field, you can configure it creating a `algolia_remap_<INDEXNAME>.json` JSON configuration file:
 
       {
         "['user']['email']": "[email]"
       }
-
-The connector change the json following the configuration file `algolia_remap_myIndex.json`.
 
 ##### Example
 
@@ -171,14 +109,69 @@ Consider the following object:
       {
         "user": { "email": "my@algolia.com" }
       }
-The remapper will output this json:
+
+The connector will send:
 
       {
         "email": "my@algolia.com"
       }
 
-**Note**: Rename the attribute to itself removes this attribute. It's the method to check a field without sends it.
+**Note**: Renaming an attribute to itself removes this attribute. It can be used to check if a field exists without sending it.
 
+
+### Attributes filtering
+
+You can filter the attributes sent to Algolia creating a `algolia_fields_INDEXNAME.json` JSON configuration file:
+
+      {
+        "<ATTRIBUTE_NAME>Neg":"_$ < 0",
+        "<ATTRIBUTE_NAME>WithoutCheck": ""
+      }
+
+**Note**: 
+- `_$` represents the value of the field.
+- An empty value for the check of a field is `True`.
+- You can put any line of python in the value of a field.
+
+##### Filter an array attribute sent to Algolia
+
+To select all elements from an array matching a specific condition:
+
+    {
+      "<ARRAY_ATTRIBUTE_NAME>": "re.match(r'algolia', _$, re.I)"
+    }
+
+Considering the following object:
+
+    {
+      "<ARRAY_ATTRIBUTE_NAME>" : ["algolia", "AlGoLiA", "alogia"]
+    }
+
+The connector will send:
+
+    {
+      "<ARRAY_ATTRIBUTE_NAME>": ["algolia", "AlGoLia"]
+    }
+
+### Advanced nested objects filtering
+
+If you want to send attributes matching advanced filtering conditions, you can use:
+
+      {
+        "<ATTRIBUTE_NAME>": { "_all_" : "or", "neg": "_$ < 0", "pos": "_$ > 0"}
+      }
+
+Considering the following object:
+
+      {
+        "<ATTRIBUTE_NAME>": { "neg": 42, "pos": 42}
+      }
+
+The connector will send:
+
+      {
+        "<ATTRIBUTE_NAME>": { "pos": 42}
+      }
 
 ## Usage With Solr
 
