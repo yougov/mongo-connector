@@ -124,9 +124,23 @@ The connector will send:
 You can filter the attributes sent to Algolia creating a `algolia_fields_INDEXNAME.json` JSON configuration file:
 
       {
-        "<ATTRIBUTE_NAME>Neg":"_$ < 0",
-        "<ATTRIBUTE_NAME>WithoutCheck": ""
+        "<ATTRIBUTE1_NAME>":"_$ < 0",
+        "<ATTRIBUTE2_NAME>": ""
       }
+
+Considering the following object:
+
+    {
+      "<ATTRIBUTE1_NAME>" : 1,
+      "<ATTRIBUTE2_NAME>" : 2
+    }
+
+The connector will send:
+
+    {
+      "<ATTRIBUTE2_NAME>" : 2,
+    }
+
 
 **Note**: 
 - `_$` represents the value of the field.
@@ -135,7 +149,7 @@ You can filter the attributes sent to Algolia creating a `algolia_fields_INDEXNA
 
 ##### Filter an array attribute sent to Algolia
 
-To select all elements from an array matching a specific condition:
+To select all elements from attribute `<ARRARRAY_ATTRIBUTE_NAME>` matching a specific condition:
 
     {
       "<ARRAY_ATTRIBUTE_NAME>": "re.match(r'algolia', _$, re.I)"
@@ -155,7 +169,7 @@ The connector will send:
 
 ### Advanced nested objects filtering
 
-If you want to send attributes matching advanced filtering conditions, you can use:
+If you want to send a `<ATTRIBUTE_NAME>` attribute matching advanced filtering conditions, you can use:
 
       {
         "<ATTRIBUTE_NAME>": { "_all_" : "or", "neg": "_$ < 0", "pos": "_$ > 0"}
