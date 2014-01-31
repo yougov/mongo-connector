@@ -89,8 +89,7 @@ An example of combining all of these is:
 
 The simplest way to synchronize a collection `myData` from db `myDb` to index `MyIndex` is:
 
-      python /path/to/connector.py -m mongoDBAddr:27017 -n myDb.myCollection -d /path/to/doc_managers/algolia_doc_manager.py \
-      -t MyApplicationID:MyApiKey:MyIndex
+      mongo-connector -m localhost:27017 -n myDb.myCollection -d ./doc_managers/algolia_doc_manager.py -t MyApplicationID:MyApiKey:MyIndex
 
 **Note**: If you synchronize multiple collections with multiple indexes, do not forget to specify a specific connector configuration file for each index using the `-o config.txt` option (a config.txt file is created by default).
 
