@@ -17,6 +17,7 @@
 
 import time
 
+
 def wait_for(condition, max_tries=60):
     """Wait for a condition to be true up to a maximum number of tries
     """

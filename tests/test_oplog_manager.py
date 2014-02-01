@@ -35,9 +35,10 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from tests.setup_cluster import (kill_mongo_proc,
-                                          start_mongo_proc,
-                                          start_cluster,
-                                          kill_all)
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all,
+                                 PORTS_ONE)
 from tests.util import wait_for
 from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
@@ -45,9 +46,6 @@ from mongo_connector.util import(long_to_bson_ts,
                                  bson_ts_to_long,
                                  retry_until_ok)
 from bson.objectid import ObjectId
-
-PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
-             "CONFIG":  "27220", "MAIN":  "27217"}
 
 AUTH_FILE = os.environ.get('AUTH_FILE', None)
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
@@ -379,15 +377,15 @@ class TestOplogManager(unittest.TestCase):
         while (mongos['test']['test'].find().count() != 2):
             time.sleep(1)
         kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
 
         #wait for master to be established
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         #wait for secondary to be established
         admin = new_primary_conn['admin']
@@ -401,7 +399,7 @@ class TestOplogManager(unittest.TestCase):
 
         last_ts = test_oplog.get_last_oplog_timestamp()
         second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
-                      'ns': 'test.test', 
+                      'ns': 'test.test',
                       '_id': ObjectId('4ff74db3f646462b38000002')}
 
         test_oplog.doc_manager.upsert(first_doc)

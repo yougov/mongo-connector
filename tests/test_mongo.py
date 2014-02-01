@@ -35,15 +35,14 @@ from tests.setup_cluster import (kill_mongo_proc,
                                  kill_all,
                                  start_mongo_proc, 
                                  start_cluster, 
-                                 start_single_mongod_instance)
+                                 start_single_mongod_instance,
+                                 PORTS_ONE)
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import wait_for
 
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
 NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
@@ -63,7 +62,7 @@ class TestSynchronizer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        start_single_mongod_instance("30000", "/MC", "MC_log")
+        start_single_mongod_instance("30000", "MC", "MC_log")
         cls.mongo_doc = DocManager("localhost:30000")
         cls.mongo_doc._remove()
         cls.flag = start_cluster()
@@ -179,12 +178,12 @@ class TestSynchronizer(unittest.TestCase):
                 self.assertEqual(item['_id'], result_set_2['_id'])
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                       "replset1a.log", None)
         wait_for(lambda : primary_conn['admin'].command("isMaster")['ismaster'])
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                       "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = list(self.mongo_doc._search())
@@ -252,12 +251,12 @@ class TestSynchronizer(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         db_admin = primary_conn['admin']
         wait_for(lambda : db_admin.command("isMaster")['ismaster'])
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         search = self.mongo_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS

@@ -35,7 +35,8 @@ except ImportError:
 from tests.setup_cluster import (kill_mongo_proc,
                                  start_mongo_proc,
                                  start_cluster,
-                                 kill_all)
+                                 kill_all,
+                                 PORTS_ONE)
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from bson.code import Code
@@ -46,8 +47,6 @@ from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import wait_for
 
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
 NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
@@ -195,13 +194,13 @@ class TestElastic(unittest.TestCase):
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                       "replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                       "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = list(self.elastic_doc._search())
@@ -269,12 +268,12 @@ class TestElastic(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                       "replset1a.log", None)
         db_admin = primary_conn["admin"]
         wait_for(lambda : db_admin.command("isMaster")['ismaster'])
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                       "replset1b.log", None)
 
         search = self.elastic_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS

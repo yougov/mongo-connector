@@ -31,17 +31,16 @@ except ImportError:
     from pymongo import Connection    
 
 from tests.setup_cluster import (kill_mongo_proc,
-                                start_mongo_proc,
-                                start_cluster,
-                                kill_all)
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all,
+                                 PORTS_ONE)
 from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
 from pymongo.errors import OperationFailure, AutoReconnect
 from requests.exceptions import MissingSchema
 
 
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MAIN": "27217"}
 NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
@@ -64,7 +63,7 @@ class TestSynchronizer(unittest.TestCase):
         cls.flag = start_cluster()
         if cls.flag:
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN']),
-                replicaSet="demo-repl")
+                                  replicaSet="demo-repl")
             # Creating a Solr object with an invalid URL 
             # doesn't create an exception
             cls.solr_conn = Solr('http://localhost:8983/solr')
@@ -209,14 +208,14 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(item['_id'], str(result_set_2['_id']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = self.solr_conn.search('pauline')
@@ -285,14 +284,14 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(item['_id'], str(result_set_2['_id']))
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         while (len(self.solr_conn.search('Pauline',
                 rows=NUMBER_OF_DOC_DIRS * 2)) != 0):

@@ -45,7 +45,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        start_single_mongod_instance("30000", "/MC", "MC_log")
+        start_single_mongod_instance("30000", "MC", "MC_log")
         cls.MongoDoc = DocManager("localhost:30000")
         cls.mongo = Connection("localhost:30000")['test']['test']
 
