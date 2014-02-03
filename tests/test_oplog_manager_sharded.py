@@ -260,119 +260,100 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.mongos_conn["test"]["mcsharded"].remove()
         self.mongos_conn["test"]["mcunsharded"].remove()
 
-    @classmethod
-    def get_oplog_thread(cls):
-        """ Set up connection with mongo.
-
-        Returns oplog, the connection and oplog collection.
-        This function clears the oplog.
-        """
-        primary_conn = Connection(HOSTNAME,int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
-
-        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
-        mongos = Connection(mongos_addr)
-        mongos['alpha']['foo'].drop()
-
-        oplog_coll = primary_conn['local']['oplog.rs']
-        oplog_coll.drop()           # reset the oplog
-
-        primary_conn['local'].create_collection('oplog.rs', capped=True,
-                                                size=1000000)
-        namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
-
-        return (oplog, primary_conn, oplog_coll, mongos)
-
-    @classmethod
-    def get_new_oplog(cls):
-        """ Set up connection with mongo.
-
-        Returns oplog, the connection and oplog collection
-        This function does not clear the oplog
-        """
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
-
-        mongos = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
-        oplog_coll = primary_conn['local']['oplog.rs']
-
-        namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
-
-        return (oplog, primary_conn, oplog_coll, oplog.main_connection)
-
     def test_retrieve_doc(self):
-        """Test retrieve_doc in oplog_manager.
+        """ Test the retrieve_doc method """
 
-        Assertion failure if it doesn't pass
-        """
+        # Trivial case where the oplog entry is None
+        self.assertEqual(self.opman1.retrieve_doc(None), None)
 
-        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
-        # testing for entry as none type
-        entry = None
-        assert (test_oplog.retrieve_doc(entry) is None)
+        # Retrieve a document from insert operation in oplog
+        doc = {"name": "mango", "type": "fruit",
+               "ns": "test.mcsharded", "weight": 3.24, "i": 1}
+        self.mongos_conn["test"]["mcsharded"].insert(doc)
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        oplog_entry = next(oplog_entries)
+        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), doc)
 
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
+        # Retrieve a document from update operation in oplog
+        self.mongos_conn["test"]["mcsharded"].update(
+            {"i": 1},
+            {"$set": {"sounds-like": "mongo"}}
+        )
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        doc["sounds-like"] = "mongo"
+        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), doc)
 
-        assert (oplog_cursor.count() == 0)
+        # Retrieve a document from remove operation in oplog
+        # (expected: None)
+        self.mongos_conn["test"]["mcsharded"].remove({
+            "i": 1
+        })
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), None)
 
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = mongos['alpha']['foo'].find_one()
-
-        # testing for search after inserting a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
-
-        safe_mongo_op(mongos['alpha']['foo'].update, {'name': 'paulie'},
-                      {"$set": {'name': 'paul'}})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = mongos['alpha']['foo'].find_one()
-
-        # testing for search after updating a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
-
-        safe_mongo_op(mongos['alpha']['foo'].remove, {'name': 'paul'})
-        last_oplog_entry = next(oplog_cursor)
-
-        # testing for search after deleting a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
-
-        last_oplog_entry['o']['_id'] = 'badID'
-
-        # testing for bad doc id as input
-        assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
-
-        # test_oplog.stop()
+        # Retrieve a document with bad _id
+        # (expected: None)
+        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
+        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), None)
 
     def test_get_oplog_cursor(self):
-        """Test get_oplog_cursor in oplog_manager.
+        """Test the get_oplog_cursor method"""
 
-        Assertion failure if it doesn't pass
-        """
-        test_oplog, timestamp, cursor, mongos = self.get_oplog_thread()
-        # test None cursor
-        assert (test_oplog.get_oplog_cursor(None) is None)
+        # Trivial case: timestamp is None
+        self.assertEqual(self.opman1.get_oplog_cursor(None), None)
 
-        # test with one document
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        timestamp = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.get_oplog_cursor(timestamp)
-        assert (cursor.count() == 1)
+        # earliest entry is after given timestamp
+        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
+        self.mongos_conn["test"]["mcsharded"].insert(doc)
+        self.assertEqual(self.opman1.get_oplog_cursor(
+            bson.Timestamp(1, 0)), None)
 
-        # test with two documents, one after the ts
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paul'})
-        cursor = test_oplog.get_oplog_cursor(timestamp)
-        assert (cursor.count() == 2)
+        # earliest entry is the only one at/after timestamp
+        latest_timestamp = self.opman1.get_last_oplog_timestamp()
+        cursor = self.opman1.get_oplog_cursor(latest_timestamp)
+        self.assertNotEqual(cursor, None)
+        self.assertEqual(cursor.count(), 1)
+        self.assertEqual(self.opman1.retrieve_doc(cursor[0]), doc)
 
+        # many entries before and after timestamp
+        for i in range(2, 2002):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i
+            })
+        oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.ASCENDING)]
+        )
+        oplog2 = self.shard2_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.ASCENDING)]
+        )
+
+        # startup message + insert at beginning of tests + many inserts
+        self.assertEqual(oplog1.count(), 1 + 1 + 998)
+        self.assertEqual(oplog2.count(), 1 + 1002)
+        pivot1 = oplog1.skip(400).limit(1)[0]
+        pivot2 = oplog2.skip(400).limit(1)[0]
+
+        cursor1 = self.opman1.get_oplog_cursor(pivot1["ts"])
+        cursor2 = self.opman2.get_oplog_cursor(pivot2["ts"])
+        self.assertEqual(cursor1.count(), 1 + 1 + 998 - 400)
+        self.assertEqual(cursor2.count(), 1 + 1002 - 400)
+
+        # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
+        doc1 = self.mongos_conn["test"]["mcsharded"].find_one(
+            {"_id": next(cursor1)["o"]["_id"]})
+        doc2 = self.mongos_conn["test"]["mcsharded"].find_one(
+            {"_id": next(cursor2)["o"]["_id"]})
+        self.assertEqual(doc1["i"], self.opman1.retrieve_doc(pivot1)["i"] + 1)
+        self.assertEqual(doc2["i"], self.opman2.retrieve_doc(pivot2)["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
         """Test get_last_oplog_timestamp in oplog_manager.
