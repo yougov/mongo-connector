@@ -29,7 +29,7 @@ from pysolr import Solr, SolrError
 from threading import Timer
 from mongo_connector import errors
 from mongo_connector.util import retry_until_ok
-ADMIN_URL = 'admin/luke?show=Schema&wt=json'
+ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
 decoder = json.JSONDecoder()
 
