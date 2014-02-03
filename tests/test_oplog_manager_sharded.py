@@ -51,14 +51,14 @@ class TestOplogManagerSharded(unittest.TestCase):
     cluster
     """
 
-    def runTest(self):
-        """ Runs all tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
-        """ Initializes the cluster
+        """ Initialize the cluster:
+
+        Clean out the databases used by the tests
+        Make connections to mongos, mongods
+        Create and shard test collections
+        Create OplogThreads
         """
         # Create a new oplog progress file
         try:
@@ -70,10 +70,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Start the cluster with a mongos on port 27217
         start_cluster(sharded=True)
 
-        """ Clean out the databases used by the tests, make connections
-        to mongos and the oplogs of each of the shards, create and
-        shard some test collections, create an OplogThread
-        """
         # Connection to mongos
         mongos_address = "localhost:%s" % PORTS_ONE["MONGOS"]
         cls.mongos_conn = Connection(mongos_address)
@@ -170,10 +166,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for things to settle down
         cls.mongos_conn["test"]["mcsharded"].insert({"i": 1})
         cls.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
-        while cls.shard1_conn.test.mcsharded.find_one() is None:
-            time.sleep(1)
-        while cls.shard2_conn.test.mcsharded.find_one() is None:
-            time.sleep(1)
+
+        def chunks_moved():
+            shard1_done = cls.shard1_conn.test.mcsharded.find_one() is not None
+            shard2_done = cls.shard2_conn.test.mcsharded.find_one() is not None
+            return shard1_done and shard2_done
+        assert(wait_for(chunks_moved))
         cls.mongos_conn.test.mcsharded.remove()
 
         # Oplog threads (oplog manager) for each shard
