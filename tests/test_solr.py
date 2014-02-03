@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Test Solr search using the synchronizer, i.e. as it would be used by an user
     """
 import os
 import time
-import unittest
 import sys
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import socket
 
 sys.path[0:0] = [""]
@@ -35,7 +35,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                 start_cluster,
                                 kill_all)
 from pysolr import Solr, SolrError
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from pymongo.errors import OperationFailure, AutoReconnect
 from requests.exceptions import MissingSchema
 
@@ -89,10 +89,15 @@ class TestSynchronizer(unittest.TestCase):
         if not self.flag:
             self.fail(self.err_msg)
 
-        self.connector = Connector(('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
-            CONFIG, 'http://localhost:8983/solr', ['test.test'], '_id',
-            None, 
-            'mongo_connector/doc_managers/solr_doc_manager.py')
+        self.connector = Connector(
+            address=('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN'])),
+            oplog_checkpoint=CONFIG,
+            target_url='http://localhost:8983/solr',
+            ns_set=['test.test'],
+            u_key='_id',
+            auth_key=None,
+            doc_manager='mongo_connector/doc_managers/solr_doc_manager.py'
+        )
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             time.sleep(1)

@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# This file will be used with PyPi in order to package and distribute the final
-# product.
 
 """Test synchronizer using DocManagerSimulator
 """
@@ -30,13 +27,16 @@ except ImportError:
     from pymongo import Connection    
 
 import time
-import unittest
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 from tests.setup_cluster import (kill_mongo_proc,
                                 start_mongo_proc,
                                 start_cluster,
                                 kill_all)
 from threading import Timer
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 
@@ -70,8 +70,15 @@ class TestSynchronizer(unittest.TestCase):
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
                               replicaSet="demo-repl")
             timer = Timer(60, abort_test)
-            cls.connector = Connector("%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
-                CONFIG, None, ['test.test'], '_id', None, None)
+            cls.connector = Connector(
+                address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
+                oplog_checkpoint=CONFIG,
+                target_url=None,
+                ns_set=['test.test'],
+                dest_ns_dict={'test.test': 'test.test'},
+                u_key='_id',
+                auth_key=None
+            )
             cls.synchronizer = cls.connector.doc_manager
             timer.start()
             cls.connector.start()

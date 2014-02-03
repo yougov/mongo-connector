@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 20134-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# This file will be used with PyPi in order to package and distribute the final
-# product.
 
 """
 Module with code to setup cluster and test oplog_manager functions.
@@ -29,7 +26,10 @@ import socket
 sys.path[0:0] = [""]
 
 import time
-import unittest
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import re
 
 try:
@@ -151,10 +151,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
+        dest_ns_dict = {'test.test': 'test.test',
+                        'alpha.foo': 'alpha_foo'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, dest_ns_dict, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -173,10 +175,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test', 'alpha.foo']
+        dest_ns_dict = {'test.test': 'test.test',
+                'alpha.foo': 'alpha_foo'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, dest_ns_dict, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 

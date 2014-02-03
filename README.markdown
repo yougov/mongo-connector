@@ -1,16 +1,41 @@
-## System Overview:
+## System Overview
 
 The mongo-connector system is designed to hook up mongoDB to any target system. This allows all the
 documents in mongoDB to be stored in some other system, and both mongo and the target system will remain
-in sync while the connector is running. It has been tested with python 2.7 and python 3.
+in sync while the connector is running. It has been tested with python 2.6 and python 3.
 
-## Getting Started:
+## Getting Started
+
+### Installation
+
+The easiest way to install mongo-connector is with [pip](https://pypi.python.org/pypi/pip):
+
+    pip install mongo-connector
+
+You can also install the development version of mongo-connector manually:
+
+    cd your/installation/directory
+    git clone https://github.com/10gen-labs/mongo-connector.git
+    cd mongo-connector
+    python setup.py install
+
+You might have to run `python setup.py install` with `sudo`, depending on where you're installing
+mongo-connector and what privileges you have.
+
+### Using mongo-connector
 
 Since the connector does real time syncing, it is necessary to have MongoDB running, although the
-connector will work with both sharded and non sharded configurations. It requires a replica set
-setup.
+connector will work with both sharded and non sharded configurations. **It requires a replica set
+setup.** For development purposes, you may find it convenient to run a one-node replica set (note
+that this is **not** recommended for production):
 
-To start the system, simply run "python mongo_connector.py". It is likely, however, that you will need
+     mongod --replSet myDevReplSet
+
+To initialize your server as a replica set, run the following command in the mongo shell:
+
+     rs.initiate()
+
+To start the system, simply run "mongo-connector". It is likely, however, that you will need
 to specify some command line options to work with your setup. They are described below:
 
 `-m` or `--mongos` is to specify the main address, which is a host:port pair. For sharded clusters,
@@ -29,6 +54,15 @@ file causes the system to go through all the mongo oplog and sync all the docume
 cluster is restarted, it is essential that the oplog-timestamp config file be emptied - otherwise
 the connector will miss some documents and behave incorrectly.
 
+`--no-dump` disables the collection dump that mongo connector normally does for namespaces for
+which it has no timestamp in the oplog progress file. Collection dumps move data already stored in
+MongoDB to the target system and may take awhile to complete. Use this option if you don't care
+about what's already stored in MongoDB and want to start replicating current activity immediately.
+
+`--batch-size` lets you choose how many oplog documents to iterate through before updating the oplog
+timestamp file (pointed to by --oplog-ts) with the latest position read from the oplog. By default,
+the oplog config isn't updated until we've read through the entire oplog.
+
 `-n` or `--namespace-set` is used to specify the namespaces we want to consider. For example, if we
 wished to store all documents from the test.test and alpha.foo namespaces, we could use
 `-n test.test,alpha.foo`. The default is to consider all the namespaces, excluding the system and config
@@ -38,6 +72,10 @@ databases, and also ignoring the "system.indexes" collection in any database.
 as the unique key for the target system.  The default is "_id",
 which can be noted by "-u _id"
 
+`-i` or `--fields` is used to specify the list of fields to export. Use a comma separated list
+of fields to specify multiple fields. The '_id', 'ns' and '_ts' fields are always exported.
+
+
 `-f` is to specify a file which contains the password for authentication.
 This file is used by mongos to authenticate connections to the shards,
 and we'll use it in the oplog threads. The main use of this option is to specify a
@@ -45,17 +83,17 @@ password without entering it as plaintext on the command line.
 
 `-p` is to specify the password used for authentication. If this option is specified along
 with `-f`, then the password specified here will be used regardless of the contents of the
-password file. For sharded clusters, the admin username/password must exist in every shard's 
-admin database, otherwise the system will fail to authenticate. This is because of how the 
+password file. For sharded clusters, the admin username/password must exist in every shard's
+admin database, otherwise the system will fail to authenticate. This is because of how the
 connector authenticates against the shards, which is described in depth in the System Internals
-section below. 
+section below.
 
 `-a' or `--admin-username` is used to specify the username of an admin user to authenticate with.
 To use authentication with the system, the user must specify both this option and the password or password file
 option, which stores the password for the user. The default username is '__system', which is not
 recommended for production use. If using this and one of the password options in a sharded environment,
 it is essential that the username/password exists in the admin database of every shard in the cluster. Otherwise,
-authentication will fail. 
+authentication will fail.
 
 `-d` or `--docManager` is used to specify the doc manager file that is going to be used.
 You should send the path of the file you want to be used. By default, it will use
@@ -65,9 +103,9 @@ For more information about making your own doc manager, see Doc Manager section.
 
 An example of combining all of these is:
 
-	python mongo_connector.py -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -k auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
+     mongo-connector -m localhost:27217 -t http://localhost:8080/solr -o oplog_progress.txt -n alpha.foo,test.test -u _id -f auth.txt -a admin -d ./doc_managers/solr_doc_manager.py
 
-## Usage With Solr:
+## Usage With Solr
 
 We have provided an example Solr schema called `schema.xml`, which provides field definitions for the 'name', '_ts', `ns`, and `_id` fields. The schema also sets the `_id` field to be the unique key by adding this line:
 
@@ -96,9 +134,8 @@ also create the connection to the target system, and start a periodic
 committer if necessary. It can take extra optional parameters for internal use, like
 auto_commit.
 The unique_key should default to '_id' and it is an obligatory parameter.
-It requires a url paramater iff mongo_connector.py is called with the -b paramater.
-Otherwise, it doesn't require any other parameter (e.g. if the target engine doesn't need a URL).
-It should raise a SystemError exception if the URL is not valid.
+The `url` parameter provides the URL to the target engine and needs to be validated before use by the doc manager.
+`__init__` should raise a SystemError exception if the URL is not valid.
 
 __2) stop(self)__
 
@@ -122,12 +159,20 @@ contents if there is considerable delay in trailing the oplog.
 We have only one function for update and insert because incremental
 updates are not supported, so there is no update option.
 
-__4) remove(self, doc)__
+__4) bulk_upsert(self, docs)__
+
+Update or insert documents in-bulk to your engine. Many engines have some way of doing
+bulk operations that is more efficient than doing inserts or updates serially. The input
+is an iterable of documents represented as Python dictionaries. This method is used
+during collection dumps for improved speed. This method is optional, and if left undefined
+mongo-connector will fall back to using the `upsert` method on each document to be upserted.
+
+__5) remove(self, doc)__
 
 Removes document from engine
 The input is a python dictionary that represents a mongo document.
 
-__5) search(self, start_ts, end_ts)__
+__6) search(self, start_ts, end_ts)__
 
 Called to query engine for documents in a time range, including start_ts and end_ts
 This method is only used by rollbacks to query all the documents in
@@ -138,7 +183,7 @@ the function should just do a simple search for timestamps between these values
 treating them as simple longs.
 The return value should be an iterable set of documents.
 
-__6) commit(self)__
+__7) commit(self)__
 
 This function is used to force a refresh/commit.
 It is used only in the beginning of rollbacks and in test cases, and is
@@ -148,7 +193,7 @@ any timers or run itself again (unlike auto_commit).  In the event of
 too many engine searchers, the commit can be wrapped in a
 retry_until_ok to keep trying until the commit goes through.
 
-__7) get_last_doc(self)__
+__8) get_last_doc(self)__
 
 Returns the last document stored in the target engine.
 This method is used for rollbacks to establish the rollback window,
@@ -157,7 +202,7 @@ last document. If there are no documents, this functions
 returns None. Otherwise, it returns the first document.
 
 
-## System Internals:
+## System Internals
 
 The main Connector thread connects to either a mongod or a mongos, depending on cluster setup, and
 spawns an OplogThread for every primary node in the cluster. These OplogThreads continuously poll
@@ -183,10 +228,10 @@ The above three steps essentially loop forever. For usage purposes, the only rel
 DocManager, which will always get the documents from the underlying layer and is responsible for
 adding to/removing from the target system.
 
-Mongo-Connector imports a DocManager from the specified file in mongo_connector.py, preferably
+Mongo-Connector imports a DocManager from the specified file in connector.py, preferably
 from the doc_managers folder. We have provided sample implementations for a Solr search DocManager
- and an ElasticSearch DocManager. Note that upon execution, mongo_connector.py will copy the file
- to the main folder as doc_manager.py.
+and an ElasticSearch DocManager. Note that upon execution, connector.py will copy the file
+to the main folder as doc_manager.py.
 
 The documents stored in the target system are equivalent to what is stored in mongo, except every
 document has two additional fields called `ns` and `_ts`. The `_ts` field stores the latest
@@ -201,14 +246,9 @@ syncing.
 ## Testing scripts
 
 Tests are stored in the tests folder which is not in the general distribution (they can be found on github).
-The tests should be run with unittests, so to run them properly, navigate to the general "mongo-connector" folder and run:
+You can run the tests with the following command:
 
-    python -m unittest discover
-
-This should run all of the tests in the folder. 
-To specify a specific test, run
-
-    python -m unittest tests.<name_of_module>
+    python setup.py test
 
 The tests use environment variables for certain parameters.
 The variables in question are MAIN_ADDR, CONFIG, and TEMP_CONFIG.
@@ -225,7 +265,7 @@ To set these variables, you can simply place them in a shell script like so:
 
 And then correctly set them by sourcing them, ie:
 
-    source <name_of_script>    
+    source <name_of_script>
 
 A word of caution: For some of the tests, specifically test_oplog_manager, the output prints out "ERROR:root:OplogThread:
 No oplog for thread: Connection('localhost', 27117)". This is expected behavior because the tests run some parts in isolation,

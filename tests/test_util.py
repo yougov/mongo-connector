@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Tests methods in util.py
 """
 
@@ -24,13 +21,14 @@ import inspect
 
 sys.path[0:0] = [""]
 
-import unittest
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 from bson import timestamp
-from mongo_connector.util import (verify_url,
-                  bson_ts_to_long,
-                  long_to_bson_ts,
-                  retry_until_ok)
-
+from mongo_connector.util import (bson_ts_to_long,
+                                  long_to_bson_ts,
+                                  retry_until_ok)
 
 def err_func():
     """Helper function for retry_until_ok test
@@ -53,21 +51,6 @@ class UtilTester(unittest.TestCase):
         """ Runs the tests
         """
         super(UtilTester, self).__init__()
-
-    def test_verify_url(self):
-        """Test verify_url with good and bad urls
-        """
-
-        bad_url = "weofkej"
-        good_url = "http://www.google.com"
-        no_http_url = "www.google.com"
-        good_host_bad_path = "http://www.google.com/-##4@3weo$%*"
-
-        self.assertTrue(verify_url(good_url))
-
-        self.assertFalse(verify_url(no_http_url))
-        self.assertFalse(verify_url(bad_url))
-        self.assertFalse(verify_url(good_host_bad_path))
 
     def test_bson_ts_to_long(self):
         """Test bson_ts_to_long and long_to_bson_ts

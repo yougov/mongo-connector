@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Tests methods for mongo_connector
 """
 
@@ -25,10 +22,14 @@ import socket
 
 sys.path[0:0] = [""]
 
-import unittest
+
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import time
 import json
-from mongo_connector.mongo_connector import Connector
+from mongo_connector.connector import Connector
 from tests.setup_cluster import start_cluster, kill_all
 from bson.timestamp import Timestamp
 from mongo_connector.util import long_to_bson_ts
@@ -73,8 +74,15 @@ class MongoInternalTester(unittest.TestCase):
         if not self.flag:
             self.fail("Shards cannot be added to mongos")
 
-        conn = Connector(MAIN_ADDRESS, CONFIG, None, ['test.test'],
-                      '_id', None, None)
+        conn = Connector(
+            address=MAIN_ADDRESS,
+            oplog_checkpoint=CONFIG,
+            target_url=None,
+            ns_set=['test.test'],
+            dest_ns_dict={'test.test': 'test.test'},
+            u_key='_id',
+            auth_key=None
+        )
         conn.start()
 
         while len(conn.shard_set) != 1:
@@ -91,8 +99,15 @@ class MongoInternalTester(unittest.TestCase):
         """
         os.system('touch %s' % (TEMP_CONFIG))
         config_file_path = TEMP_CONFIG
-        conn = Connector(MAIN_ADDRESS, config_file_path, None, ['test.test'],
-                      '_id', None, None)
+        conn = Connector(
+            address=MAIN_ADDRESS,
+            oplog_checkpoint=config_file_path,
+            target_url=None,
+            dest_ns_dict={'test.test': 'test.test'},
+            ns_set=['test.test'],
+            u_key='_id',
+            auth_key=None
+        )
 
         #test that None is returned if there is no config file specified.
         self.assertEqual(conn.write_oplog_progress(), None)
@@ -124,8 +139,15 @@ class MongoInternalTester(unittest.TestCase):
         """Test read_oplog_progress
         """
 
-        conn = Connector(MAIN_ADDRESS, None, None, ['test.test'], '_id',
-                      None, None)
+        conn = Connector(
+            address=MAIN_ADDRESS,
+            oplog_checkpoint=None,
+            target_url=None,
+            ns_set=['test.test'],
+            dest_ns_dict={'test.test': 'test.test'},
+            u_key='_id',
+            auth_key=None
+        )
 
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)

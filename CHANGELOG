@@ -1,0 +1,13 @@
+Changelog
+=========
+
+Changes in Version 1.1.1+
+-------------------------
+
+Version 1.1.1+ fixes many installation problems and introduces
+installation instructions to the REAMDE.
+
+.. Warning:: RENAME of ``mongo_connector.py`` module to
+             ``connector.py``. Thus, if you should need to import the
+             ``Connector`` object, you now should do
+             ``from mongo_connector.connector import Connector``

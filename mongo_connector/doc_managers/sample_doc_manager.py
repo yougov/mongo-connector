@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# This file will be used with PyPi in order to package and distribute the final
-# product.
 
 """Receives documents from the oplog worker threads and indexes them
     into the backend.
@@ -37,7 +34,7 @@ class DocManager():
     opposed to multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, auto_commit=True, unique_key='_id'):
+    def __init__(self, url=None, auto_commit=True, unique_key='_id', **kwargs):
         """Verify URL and establish a connection.
 
         This method should, if necessarity, verify the url to the backend
@@ -46,10 +43,10 @@ class DocManager():
         periodic committer if necessary.
         The unique_key should default to '_id' and it is an obligatory
         parameter.
-        It requires a url parameter iff mongo_connector.py is called with
+        It requires a url parameter iff connector.py is called with
         the -b parameter. Otherwise, it doesn't require any other parameter
         (e.g. if the target engine doesn't need a URL)
-        It should raise a SystemError exception if the URL is not valid.
+        It should raise ConnectionFailed if the URL is not valid.
         """
         raise exceptions.NotImplementedError
 

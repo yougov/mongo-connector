@@ -11,3 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# Maximumum # of documents to process before recording timestamp
+# default = -1 (no maximum)
+DEFAULT_BATCH_SIZE = -1

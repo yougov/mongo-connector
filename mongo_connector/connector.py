@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +11,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Discovers the mongo cluster and starts the connector.
 """
 
+import json
 import logging
 import logging.handlers
-import oplog_manager
 import optparse
 import os
 import pymongo
@@ -28,31 +25,30 @@ import shutil
 import sys
 import threading
 import time
-import util
 import imp
-
-from locking_dict import LockingDict
+from mongo_connector import errors, util
+from mongo_connector.locking_dict import LockingDict
+from mongo_connector.constants import DEFAULT_BATCH_SIZE
+from mongo_connector.oplog_manager import OplogThread
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
+    from pymongo import Connection
 
 
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
-    def __init__(self, address, oplog_checkpoint, target_url, ns_set, dest_ns_set,
-                 u_key, auth_key, doc_manager=None, auth_username=None):
+    def __init__(self, address, oplog_checkpoint, target_url, ns_set,
+                 dest_ns_dict,
+                 u_key, auth_key, doc_manager=None, auth_username=None,
+                 collection_dump=True, batch_size=DEFAULT_BATCH_SIZE,
+                 fields=None):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
-            from doc_manager import DocManager
+            from mongo_connector.doc_manager import DocManager
         time.sleep(1)
         super(Connector, self).__init__()
 
@@ -71,8 +67,8 @@ class Connector(threading.Thread):
         #The set of relevant namespaces to consider
         self.ns_set = ns_set
 
-        #The set of destination namespaces to consider
-        self.dest_ns_set = dest_ns_set
+        #The dict of source namespace to destination namespace
+        self.dest_ns_dict = dest_ns_dict
 
         #The key that is a unique document identifier for the target system.
         #Not necessarily the mongo unique key.
@@ -87,38 +83,66 @@ class Connector(threading.Thread):
         #The set of OplogThreads created
         self.shard_set = {}
 
+        #Boolean chooses whether to dump the entire collection if no timestamp
+        # is present in the config file
+        self.collection_dump = collection_dump
+
+        #Num entries to process before updating config file with current pos
+        self.batch_size = batch_size
+
         #Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
+
+        # List of fields to export
+        self.fields = fields
 
         try:
             if target_url is None:
                 if doc_manager is None:  # imported using from... import
                     self.doc_manager = DocManager(unique_key=u_key)
                 else:  # imported using load source
-                    self.doc_manager = doc_manager.DocManager(unique_key=u_key)
+                    self.doc_manager = doc_manager.DocManager(
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
             else:
                 if doc_manager is None:
-                    self.doc_manager = DocManager(self.target_url,
-                                                  unique_key=u_key)
+                    self.doc_manager = DocManager(
+                        self.target_url,
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
                 else:
-                    self.doc_manager = doc_manager.DocManager(self.target_url,
-                                                              unique_key=u_key)
-        except SystemError:
-            logging.critical("MongoConnector: Bad target system URL!")
+                    self.doc_manager = doc_manager.DocManager(
+                        self.target_url,
+                        unique_key=u_key,
+                        namespace_set=ns_set
+                    )
+        except errors.ConnectionFailed:
+            err_msg = "MongoConnector: Could not connect to target system"
+            logging.critical(err_msg)
             self.can_run = False
             return
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):
-                info_str = "MongoConnector: Can't find OplogProgress file!"
-                logging.critical(info_str)
-                self.doc_manager.stop()
-                self.can_run = False
-            else:    
-                if (not os.access(self.oplog_checkpoint, os.W_OK) 
-                        and not os.access(self.oplog_checkpoint, os.R_OK )):
+                info_str = ("MongoConnector: Can't find %s, "
+                            "attempting to create an empty progress log" %
+                            self.oplog_checkpoint)
+                logging.info(info_str)
+                try:
+                    # Create oplog progress file
+                    open(self.oplog_checkpoint, "w").close()
+                except IOError as e:
+                    logging.critical("MongoConnector: Could not "
+                                     "create a progress log: %s" %
+                                     str(e))
+                    sys.exit(1)
+            else:
+                if (not os.access(self.oplog_checkpoint, os.W_OK)
+                        and not os.access(self.oplog_checkpoint, os.R_OK)):
                     logging.critical("Invalid permissions on %s! Exiting" %
-                        (self.oplog_checkpoint))
+                                     (self.oplog_checkpoint))
                     sys.exit(1)
 
     def join(self):
@@ -181,7 +205,7 @@ class Connector(threading.Thread):
         except ValueError:       # empty file
             reason = "It may be empty or corrupt."
             logging.info("MongoConnector: Can't read oplog progress file. %s" %
-                (reason))
+                         (reason))
             source.close()
             return None
 
@@ -200,7 +224,7 @@ class Connector(threading.Thread):
         """
         main_conn = Connection(self.address)
         if self.auth_key is not None:
-            main_conn['admin'].authenticate(self.auth_username, self.auth_key) 
+            main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
         conn_type = None
 
@@ -210,20 +234,37 @@ class Connector(threading.Thread):
             conn_type = "REPLSET"
 
         if conn_type == "REPLSET":
+            # Make sure we are connected to a replica set
+            is_master = main_conn.admin.command("isMaster")
+            if not "setName" in is_master:
+                logging.error(
+                    'No replica set at "%s"! A replica set is required '
+                    'to run mongo-connector. Shutting down...' % self.address
+                )
+                return
+
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
 
             prim_admin = main_conn.admin
             repl_set = prim_admin.command("replSetGetStatus")['set']
-            
-            oplog = oplog_manager.OplogThread(main_conn, 
-                (main_conn.host + ":" + str(main_conn.port)),
-                oplog_coll,
-                False, self.doc_manager,
-                self.oplog_progress,
-                self.ns_set, self.dest_ns_set, self.auth_key,
-                self.auth_username,
-                repl_set=repl_set)
+
+            oplog = OplogThread(
+                dest_namespace_dict=self.dest_ns_dict,
+                primary_conn=main_conn,
+                main_address=(main_conn.host + ":" + str(main_conn.port)),
+                oplog_coll=oplog_coll,
+                is_sharded=False,
+                doc_manager=self.doc_manager,
+                oplog_progress_dict=self.oplog_progress,
+                namespace_set=self.ns_set,
+                auth_key=self.auth_key,
+                auth_username=self.auth_username,
+                repl_set=repl_set,
+                collection_dump=self.collection_dump,
+                batch_size=self.batch_size,
+                fields=self.fields
+            )
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
                          main_conn)
@@ -232,8 +273,8 @@ class Connector(threading.Thread):
             while self.can_run:
                 if not self.shard_set[0].running:
                     logging.error("MongoConnector: OplogThread"
-                        " %s unexpectedly stopped! Shutting down" %
-                        (str(self.shard_set[0])))
+                                  " %s unexpectedly stopped! Shutting down" %
+                                  (str(self.shard_set[0])))
                     self.oplog_thread_join()
                     self.doc_manager.stop()
                     return
@@ -248,9 +289,10 @@ class Connector(threading.Thread):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
-                            logging.error("MongoConnector: OplogThread"
-                                " %s unexpectedly stopped! Shutting down" %
-                                (str(self.shard_set[shard_id])))
+                            logging.error("""MongoConnector: OplogThread
+                                          %s unexpectedly stopped! Shutting
+                                          down""" %
+                                          (str(self.shard_set[shard_id])))
                             self.oplog_thread_join()
                             self.doc_manager.stop()
                             return
@@ -269,19 +311,29 @@ class Connector(threading.Thread):
 
                     shard_conn = Connection(hosts, replicaset=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
-                    oplog = oplog_manager.OplogThread(shard_conn, self.address,
-                                                      oplog_coll, True,
-                                                      self.doc_manager,
-                                                      self.oplog_progress,
-                                                      self.ns_set,self.dest_ns_set,
-                                                      self.auth_key,
-                                                      self.auth_username)
+
+                    oplog = OplogThread(
+                        dest_namespace_dict=self.dest_ns_dict,
+                        primary_conn=shard_conn,
+                        main_address=self.address,
+                        oplog_coll=oplog_coll,
+                        is_sharded=True,
+                        doc_manager=self.doc_manager,
+                        oplog_progress_dict=self.oplog_progress,
+                        namespace_set=self.ns_set,
+                        auth_key=self.auth_key,
+                        auth_username=self.auth_username,
+                        collection_dump=self.collection_dump,
+                        batch_size=self.batch_size,
+                        fields=self.fields
+                    )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     logging.info("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
         self.oplog_thread_join()
+        self.write_oplog_progress()
 
     def oplog_thread_join(self):
         """Stops all the OplogThreads
@@ -289,6 +341,7 @@ class Connector(threading.Thread):
         logging.info('MongoConnector: Stopping all OplogThreads')
         for thread in self.shard_set.values():
             thread.join()
+
 
 def main():
     """ Starts the mongo connector (assuming CLI)
@@ -324,6 +377,24 @@ def main():
                       """oplog-timestamp config file be emptied - otherwise"""
                       """ the connector will miss some documents and behave"""
                       """incorrectly.""")
+
+    #--no-dump specifies whether we should read an entire collection from
+    #scratch if no timestamp is found in the oplog_config.
+    parser.add_option("--no-dump", action="store_true", default=False, help=
+                      "If specified, this flag will ensure that "
+                      "mongo_connector won't read the entire contents of a "
+                      "namespace iff --oplog-ts points to an empty file.")
+
+    #--batch-size specifies num docs to read from oplog before updating the
+    #--oplog-ts config file with current oplog position
+    parser.add_option("--batch-size", action="store",
+                      default=DEFAULT_BATCH_SIZE, type="int",
+                      help="Specify an int to update the --oplog-ts "
+                      "config file with latest position of oplog every "
+                      "N documents.  By default, the oplog config isn't "
+                      "updated until we've read through the entire oplog.  "
+                      "You may want more frequent updates if you are at risk "
+                      "of falling behind the earliest timestamp in the oplog")
 
     #-t is to specify the URL to the target system being used.
     parser.add_option("-t", "--target-url", action="store", type="string",
@@ -401,17 +472,17 @@ def main():
                       """ see Doc Manager section.""")
 
     #-g is the destination namespace
-    parser.add_option("-g", "--dest-namespace-set", action="store", type="string",
-                      dest="dest_ns_set", default=None, help=
-                      """Used to specify the destination namespaces we want to """
-                      """ consider. For example, if we wished to store all """
-                      """ documents from the test.test and alpha.foo """
-                      """ namespaces, we could use `-n test.test,alpha.foo`."""
-                      """ You must have equal number of destination """
-                      """ namespaces to origin namespaces if you are """
-                      """ defining.  The default is to use the origin namespace."""
-                      """ This is currently only implemented for mongo-to-mongo """
-                      """ connections. """)
+    parser.add_option("-g", "--dest-namespace-set", action="store",
+                      type="string", dest="dest_ns_set", default=None, help=
+                      """Used to specify the destination namespaces we want to
+                      consider. For example, if we wished to store all
+                      documents from the test.test and alpha.foo
+                      namespaces, we could use `-n test.test,alpha.foo`.
+                      You must have equal number of destination
+                      namespaces to origin namespaces if you are
+                      defining.  The default is to use the origin namespace.
+                      This is currently only implemented for mongo-to-mongo
+                      connections. """)
 
     #-s is to enable syslog logging.
     parser.add_option("-s", "--enable-syslog", action="store_true",
@@ -431,16 +502,27 @@ def main():
                       """Used to specify the syslog facility."""
                       """ The default is 'user'""")
 
+    #-i to specify the list of fields to export
+    parser.add_option("-i", "--fields", action="store", type="string",
+                      dest="fields", default=None, help=
+                      """Used to specify the list of fields to export.
+                      Specify a field or fields to include in the export.
+                      Use a comma separated list of fields to specify multiple
+                      fields.  The '_id', 'ns' and '_ts' fields are always
+                      exported.""")
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
     loglevel = logging.INFO
     logger.setLevel(loglevel)
-    
+
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
-        syslog_host = logging.handlers.SysLogHandler(address=(syslog_info[0], 
-            int(syslog_info[1])),facility=options.syslog_facility)
+        syslog_host = logging.handlers.SysLogHandler(
+            address=(syslog_info[0], int(syslog_info[1])),
+            facility=options.syslog_facility
+        )
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
     else:
@@ -466,8 +548,21 @@ def main():
         dest_ns_set = options.dest_ns_set.split(',')
 
     if len(dest_ns_set) != len(ns_set):
-        logger.error("Destination namespace must be the same length as the origin namespace!")
+        logger.error("Destination namespace must be the same length as the "
+                     "origin namespace!")
         sys.exit(1)
+    else:
+        ## Create a mapping of source ns to dest ns as a dict
+        dest_ns_dict = {}
+        i = 0
+        for dest_ns in dest_ns_set:
+            dest_ns_dict[ns_set[i]] = dest_ns
+            i += 1
+
+    if options.fields is None:
+        fields = []
+    else:
+        fields = options.fields.split(',')
 
     key = None
     if options.auth_file is not None:
@@ -485,10 +580,20 @@ def main():
         logger.error("Admin username specified without password!")
         sys.exit(1)
 
-    connector = Connector(options.main_addr, options.oplog_config, options.url,
-                   ns_set, dest_ns_set, options.u_key, key, options.doc_manager,
-                   auth_username=options.admin_name)
-
+    connector = Connector(
+        dest_ns_dict=dest_ns_dict,
+        address=options.main_addr,
+        oplog_checkpoint=options.oplog_config,
+        target_url=options.url,
+        ns_set=ns_set,
+        u_key=options.u_key,
+        auth_key=key,
+        doc_manager=options.doc_manager,
+        auth_username=options.admin_name,
+        collection_dump=(not options.no_dump),
+        batch_size=options.batch_size,
+        fields=fields
+    )
     connector.start()
 
     while True:

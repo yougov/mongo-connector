@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Receives documents from the oplog worker threads and indexes them
 into the backend.
 
@@ -27,9 +24,11 @@ import re
 import json
 import logging
 
+import bson.json_util as bsjson
 from pysolr import Solr, SolrError
 from threading import Timer
-from mongo_connector.util import verify_url, retry_until_ok
+from mongo_connector import errors
+from mongo_connector.util import retry_until_ok
 ADMIN_URL = 'admin/luke?show=Schema&wt=json'
 
 decoder = json.JSONDecoder()
@@ -43,12 +42,9 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url, auto_commit=False, unique_key='_id'):
+    def __init__(self, url, auto_commit=False, unique_key='_id', **kwargs):
         """Verify Solr URL and establish a connection.
         """
-        if verify_url(url) is False:
-            raise SystemError
-
         self.solr = Solr(url)
         self.unique_key = unique_key
         self.auto_commit = auto_commit
@@ -66,15 +62,12 @@ class DocManager():
         for key, value in result.get('schema', {}).get(field_name, {}).items():
             if key not in field_list:
                 field_list.append(key)
-        return field_list    
+        return field_list
 
     def build_fields(self):
         """ Builds a list of valid fields
         """
-        try:
-            declared_fields = self.solr._send_request('get', ADMIN_URL)
-        except SolrError:
-           pass 
+        declared_fields = self.solr._send_request('get', ADMIN_URL)
         result = decoder.decode(declared_fields)
         self.field_list = self._parse_fields(result, 'fields'),
         self.dynamic_field_list = self._parse_fields(result, 'dynamicFields')
@@ -88,6 +81,7 @@ class DocManager():
             return doc
 
         fixed_doc = {}
+        doc[self.unique_key] = doc["_id"]
         for key, value in doc.items():
             if key in self.field_list[0]:
                 fixed_doc[key] = value
@@ -102,7 +96,7 @@ class DocManager():
                     if regex.match(key):
                         fixed_doc[key] = value
 
-        return fixed_doc        
+        return fixed_doc
 
     def stop(self):
         """ Stops the instance
@@ -119,7 +113,20 @@ class DocManager():
         try:
             self.solr.add([self.clean_doc(doc)], commit=True)
         except SolrError:
-            logging.error("Could not insert %r into Solr" % (doc,))
+            raise errors.OperationFailed(
+                "Could not insert %r into Solr" % bsjson.dumps(doc))
+
+    def bulk_upsert(self, docs):
+        """Update or insert multiple documents into Solr
+
+        docs may be any iterable
+        """
+        try:
+            cleaned = (self.clean_doc(d) for d in docs)
+            self.solr.add(cleaned, commit=True)
+        except SolrError:
+            raise errors.OperationFailed(
+                "Could not bulk-insert documents into Solr")
 
     def remove(self, doc):
         """Removes documents from Solr

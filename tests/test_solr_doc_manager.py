@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 import os
-import unittest
 import time
 import sys
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import inspect
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
-from pysolr import Solr
+from pysolr import Solr, SolrError
 
 class SolrDocManagerTester(unittest.TestCase):
     """Test class for SolrDocManager
@@ -48,17 +48,6 @@ class SolrDocManagerTester(unittest.TestCase):
 
         self.solr.delete(q='*:*')
 
-    def test_invalid_url(self):
-        """Ensure DocManager fails for a bad Solr url.
-        """
-        #Invalid URL
-        count = 0
-        try:
-            DocManager("http://doesntexist.cskjdfhskdjfhdsom")
-        except SystemError:
-            count += 1
-        self.assertTrue(count == 1)
-
     def test_upsert(self):
         """Ensure we can properly insert into Solr via DocManager.
         """
@@ -76,6 +65,32 @@ class SolrDocManagerTester(unittest.TestCase):
         res = self.solr.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
+
+    def test_bulk_upsert(self):
+        """Ensure we can properly insert many documents at once into
+        Solr via DocManager
+
+        """
+        self.SolrDoc.bulk_upsert([])
+
+        docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
+        self.SolrDoc.bulk_upsert(docs)
+        self.SolrDoc.commit()
+
+        res = sorted(int(x["_id"]) for x in self.solr.search("*:*", rows=1001))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r, i)
+
+        docs = ({"_id": i, "weight": 2*i,
+                 "ns": "test.test"} for i in range(1000))
+        self.SolrDoc.bulk_upsert(docs)
+        self.SolrDoc.commit()
+
+        res = sorted(int(x["weight"]) for x in self.solr.search("*:*", rows=1001))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r, 2*i)
 
     def test_remove(self):
         """Ensure we can properly delete from Solr via DocManager.
@@ -105,8 +120,8 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = self.solr.search('*:*')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+        self.assertTrue(all(x in search for x in search2) and
+                        all(y in search2 for y in search))
 
     def test_search(self):
         """Query Solr for docs in a timestamp range.
@@ -125,8 +140,10 @@ class SolrDocManagerTester(unittest.TestCase):
         search2 = self.solr.search('John')
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
-        for i in range(0, len(search)):
-            self.assertTrue(list(search)[i] == list(search2)[i])
+
+        result_names = [result.get("name") for result in search]
+        self.assertIn('John', result_names)
+        self.assertIn('John Paul', result_names)
 
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.

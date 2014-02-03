@@ -11,3 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Utilities for mongo-connector tests. There are no actual tests in here.
+"""
+
+import time
+
+def wait_for(condition, max_tries=60):
+    """Wait for a condition to be true up to a maximum number of tries
+    """
+    while not condition() and max_tries > 1:
+        time.sleep(1)
+        max_tries -= 1
+    return condition()

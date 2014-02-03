@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Test oplog manager methods
 """
 
@@ -22,7 +19,10 @@ import os
 import sys
 import inspect
 import time
-import unittest
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+else:
+    import unittest
 import re
 import socket
 try:
@@ -38,6 +38,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                           start_mongo_proc,
                                           start_cluster,
                                           kill_all)
+from tests.util import wait_for
 from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import(long_to_bson_ts,
@@ -122,15 +123,23 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test']
+        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, LockingDict(),
-                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
+        oplog = OplogThread(primary_conn=primary_conn,
+                            main_address=mongos_addr,
+                            oplog_coll=oplog_coll,
+                            is_sharded=is_sharded,
+                            doc_manager=doc_manager,
+                            oplog_progress_dict=LockingDict(),
+                            namespace_set=namespace_set,
+                            auth_key=cls.AUTH_KEY,
+                            dest_namespace_dict=dest_ns_dict,
+                            auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
 
         return(oplog, primary_conn, oplog_coll)
-    
-    @classmethod    
+
+    @classmethod
     def get_new_oplog(cls):
         """ Set up connection with mongo. Returns oplog, the connection and
             oplog collection
@@ -149,10 +158,18 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
+        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, LockingDict(),
-                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
+        oplog = OplogThread(primary_conn=primary_conn,
+                            main_address=mongos_addr,
+                            oplog_coll=oplog_coll,
+                            is_sharded=is_sharded,
+                            doc_manager=doc_manager,
+                            oplog_progress_dict=LockingDict(),
+                            namespace_set=namespace_set,
+                            auth_key=cls.AUTH_KEY,
+                            dest_namespace_dict=dest_ns_dict,
+                            auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
@@ -270,8 +287,6 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(solr_doc['name'], 'paulie')
         self.assertEqual(solr_doc['ns'], 'test.test')
 
-        #test_oplog.join()
-
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it
             doesn't pass
@@ -302,6 +317,28 @@ class TestOplogManager(unittest.TestCase):
                         test_oplog.checkpoint)
 
         os.system('rm temp_config.txt')
+
+        # test init_cursor when OplogThread created with/without no-dump option
+        # insert some documents (will need to be dumped)
+        primary_conn['test']['test'].remove()
+        primary_conn['test']['test'].insert(({"_id":i} for i in range(100)))
+
+        # test no-dump option
+        docman = DocManager()
+        docman._delete()
+        test_oplog.doc_manager = docman
+        test_oplog.collection_dump = False
+        test_oplog.oplog_progress = LockingDict()
+        # init_cursor has the side-effect of causing a collection dump
+        test_oplog.init_cursor()
+        self.assertEqual(len(docman._search()), 0)
+
+        # test w/o no-dump option
+        docman._delete()
+        test_oplog.collection_dump = True
+        test_oplog.oplog_progress = LockingDict()
+        test_oplog.init_cursor()
+        self.assertEqual(len(docman._search()), 100)
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
@@ -396,6 +433,33 @@ class TestOplogManager(unittest.TestCase):
         self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
 
         #test_oplog.join()
+
+    def test_filter_fields(self):
+        opman, _, _ = self.get_oplog_thread()
+        docman = opman.doc_manager
+        conn = opman.main_connection
+
+        include_fields = ["a", "b", "c"]
+        exclude_fields = ["d", "e", "f"]
+
+        # Set fields to care about
+        opman.fields = include_fields
+        # Documents have more than just these fields
+        doc = {
+            "a": 1, "b": 2, "c": 3,
+            "d": 4, "e": 5, "f": 6,
+            "_id": 1
+        }
+        db = conn['test']['test']
+        db.insert(doc)
+        wait_for(lambda: db.count() == 1)
+        opman.dump_collection()
+
+        result = docman._search()[0]
+        keys = result.keys()
+        for inc, exc in zip(include_fields, exclude_fields):
+            self.assertIn(inc, keys)
+            self.assertNotIn(exc, keys)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-# Copyright 2012 10gen, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will be used with PyPi in order to package and distribute the final
-# product.
-
 """Tails the oplog of a shard and returns entries
 """
 
@@ -24,25 +21,35 @@ import pymongo
 import sys
 import time
 import threading
-import util
+from mongo_connector import errors, util
+from mongo_connector.constants import DEFAULT_BATCH_SIZE
 
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
+
 
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
-                 doc_manager, oplog_progress_dict, namespace_set, dest_namespace_set, auth_key,
-                 auth_username, repl_set=None):
+                 doc_manager, oplog_progress_dict, namespace_set, auth_key,
+                 dest_namespace_dict,
+                 auth_username, repl_set=None, collection_dump=True,
+                 batch_size=DEFAULT_BATCH_SIZE, fields=None):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
 
+        self.batch_size = batch_size
+
         #The connection to the primary for this replicaSet.
         self.primary_connection = primary_conn
+
+        #Boolean chooses whether to dump the entire collection if no timestamp
+        # is present in the config file
+        self.collection_dump = collection_dump
 
         #The mongos for sharded setups
         #Otherwise the same as primary_connection.
@@ -59,6 +66,11 @@ class OplogThread(threading.Thread):
         #This is the same for all threads.
         self.doc_manager = doc_manager
 
+        # Determine if the doc manager supports bulk upserts
+        # If so, we can be more efficient with the way we pass along
+        # updates to the doc manager.
+        self.can_bulk = hasattr(self.doc_manager, "bulk_upsert")
+
         #Boolean describing whether or not the thread is running.
         self.running = True
 
@@ -72,8 +84,8 @@ class OplogThread(threading.Thread):
         #The set of namespaces to process from the mongo cluster.
         self.namespace_set = namespace_set
 
-        #The set of destination namespaces
-        self.dest_namespace_set = dest_namespace_set
+        #The dict of source namespaces to destination namespaces
+        self.dest_namespace_dict = dest_namespace_dict
 
         #If authentication is used, this is an admin password.
         self.auth_key = auth_key
@@ -81,13 +93,16 @@ class OplogThread(threading.Thread):
         #This is the username used for authentication.
         self.auth_username = auth_username
 
+        # List of fields to export
+        self.fields = fields
+
         logging.info('OplogManager: Initializing oplog thread')
 
         if is_sharded:
             self.main_connection = Connection(main_address)
         else:
             self.main_connection = Connection(main_address,
-                                                      replicaSet=repl_set)
+                                              replicaSet=repl_set)
             self.oplog = self.main_connection['local']['oplog.rs']
 
         if auth_key is not None:
@@ -96,10 +111,9 @@ class OplogThread(threading.Thread):
                 auth_username, auth_key)
             self.main_connection['admin'].authenticate(
                 auth_username, auth_key)
-        if self.oplog.find().count() == 0:
+        if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
-            logging.error('%s %s' % (err_msg, self.primary_connection))
-            self.running = False
+            logging.warning('%s %s' % (err_msg, self.primary_connection))
 
     def run(self):
         """Start the oplog worker.
@@ -123,21 +137,59 @@ class OplogThread(threading.Thread):
             last_ts = None
             err = False
             try:
-                for entry in cursor:
-                    #sync the current oplog operation
-                    operation = entry['op']
+                while cursor.alive and self.running:
+                    for n, entry in enumerate(cursor):
+                        # Break out if this thread should stop
+                        if not self.running:
+                            break
 
-                    #check if ns is excluded or not.
-                    #also ensure non-empty namespace set.
-                    if (entry['ns'] not in self.namespace_set 
-                            and self.namespace_set):
-                        continue
+                        #sync the current oplog operation
+                        operation = entry['op']
+                        ns = entry['ns']
+
+                        #check if ns is excluded or not.
+                        #also ensure non-empty namespace set.
+                        if (ns not in self.namespace_set
+                                and self.namespace_set):
+                            continue
+
+                        #delete
+                        if operation == 'd':
+                            entry['_id'] = entry['o']['_id']
+                            self.doc_manager.remove(entry)
+                        #insert/update. They are equal because of lack
+                        #of support for partial update
+                        elif operation == 'i' or operation == 'u':
+                            doc = self.retrieve_doc(entry)
+                            if doc is not None:
+                                doc['_ts'] = util.bson_ts_to_long(entry['ts'])
+                                doc['ns'] = ns
+                                try:
+                                    self.doc_manager.upsert(
+                                        self.filter_fields(doc)
+                                    )
+                                except errors.OperationFailed:
+                                    logging.error(
+                                        "Unable to insert %s" % (doc)
+                                    )
+
+                        last_ts = entry['ts']
+
+                        # update timestamp per batch size
+                        # n % -1 (default for self.batch_size) == 0 for all n
+                        if n % self.batch_size == 1 and last_ts is not None:
+                            self.checkpoint = last_ts
+                            self.update_checkpoint()
+
+                    # update timestamp after running through oplog
+                    if last_ts is not None:
+                        self.checkpoint = last_ts
+                        self.update_checkpoint()
 
                     #delete
                     if operation == 'd':
                         entry['_id'] = entry['o']['_id']
-                        ind = self.namespace_set.index(entry['ns'])
-                        entry['ns'] = self.dest_namespace_set[ind]
+                        entry['ns'] = self.dest_namespace_dict[entry['ns']]
                         self.doc_manager.remove(entry)
                     #insert/update. They are equal because of lack of support
                     #for partial update
@@ -146,14 +198,14 @@ class OplogThread(threading.Thread):
                         if doc is not None:
                             doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                             doc['ns'] = entry['ns']
-                            ind = self.namespace_set.index(doc['ns'])
-                            doc['ns'] = self.dest_namespace_set[ind]
+                            doc['ns'] = self.dest_namespace_dict[doc['ns']]
                             try:
                                 self.doc_manager.upsert(doc)
                             except SystemError:
                                 logging.error("Unable to insert %s" % (doc))
 
                     last_ts = entry['ts']
+
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 err = True
@@ -165,6 +217,8 @@ class OplogThread(threading.Thread):
                     self.auth_username, self.auth_key)
                 err = False
 
+            # update timestamp before attempting to reconnect to MongoDB,
+            # after being join()'ed, or if the cursor closes
             if last_ts is not None:
                 self.checkpoint = last_ts
                 self.update_checkpoint()
@@ -203,31 +257,43 @@ class OplogThread(threading.Thread):
 
         return doc
 
+    def filter_fields(self, doc):
+        if self.fields is not None and len(self.fields) > 0:
+            keepers = ["_id", "ns", "_ts"] + self.fields
+            doc = dict((k, v) for k, v in doc.items() if k in keepers)
+        return doc
+
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog.
         """
 
         if timestamp is None:
             return None
-        cursor = util.retry_until_ok(self.oplog.find,
-                                     {'ts': {'$lte': timestamp}})
 
-        if (util.retry_until_ok(cursor.count)) == 0:
-            return None
-
-        # Check to see if cursor is too stale
-
+        cursor, cursor_len = None, 0
         while (True):
             try:
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
-                cursor = cursor.sort('$natural', pymongo.ASCENDING)
+                # Applying 8 as the mask to the cursor enables OplogReplay
+                cursor.add_option(8)
                 cursor_len = cursor.count()
                 break
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 pass
-        if cursor_len == 1:     # means we are the end of the oplog
+        if cursor_len == 0:
+            #rollback, we are past the last element in the oplog
+            timestamp = self.rollback()
+
+            logging.info('Finished rollback')
+            return self.get_oplog_cursor(timestamp)
+        cursor_ts_long = util.bson_ts_to_long(cursor[0].get("ts"))
+        given_ts_long = util.bson_ts_to_long(timestamp)
+        if cursor_ts_long > given_ts_long:
+            # first entry in oplog is beyond timestamp, we've fallen behind!
+            return None
+        elif cursor_len == 1:     # means we are the end of the oplog
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
 
@@ -239,12 +305,6 @@ class OplogThread(threading.Thread):
             else:               # error condition
                 logging.error('%s Bad timestamp in config file' % self.oplog)
                 return None
-        else:
-            #rollback, we are past the last element in the oplog
-            timestamp = self.rollback()
-
-            logging.info('Finished rollback')
-            return self.get_oplog_cursor(timestamp)
 
     def dump_collection(self):
         """Dumps collection into the target system.
@@ -254,8 +314,6 @@ class OplogThread(threading.Thread):
         """
 
         dump_set = self.namespace_set
-
-        dest_dump_set = self.dest_namespace_set
 
         #no namespaces specified
         if not self.namespace_set:
@@ -269,35 +327,42 @@ class OplogThread(threading.Thread):
                         continue
                     namespace = str(database) + "." + str(coll)
                     dump_set.append(namespace)
-            dest_dump_set = dump_set[:]
 
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
-        for namespace in dump_set:
-            database, coll = namespace.split('.', 1)
-            target_coll = self.main_connection[database][coll]
-            cursor = util.retry_until_ok(target_coll.find)
-            long_ts = util.bson_ts_to_long(timestamp)
+        long_ts = util.bson_ts_to_long(timestamp)
 
-            try:
+        def docs_to_dump():
+            for namespace in dump_set:
+                logging.info("dumping collection %s" % namespace)
+                database, coll = namespace.split('.', 1)
+                target_coll = self.main_connection[database][coll]
+                cursor = util.retry_until_ok(target_coll.find)
                 for doc in cursor:
-                    doc['ns'] = namespace
-                    ind = self.namespace_set.index(doc['ns'])
-                    doc['ns'] = self.dest_namespace_set[ind]
-                    doc['_ts'] = long_ts
-                    try:
-                        self.doc_manager.upsert(doc)
-                    except SystemError:
-                        logging.error("Unable to insert %s" % (doc))
-            except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
+                    if not self.running:
+                        raise StopIteration
+                    doc["ns"] = self.dest_namespace_dict[namespace]
+                    doc["_ts"] = long_ts
+                    yield doc
 
-                err_msg = "OplogManager: Failed during dump collection"
-                effect = "cannot recover!"
-                logging.error('%s %s %s' % (err_msg, effect, self.oplog))
-                self.running = False
-                return
+        try:
+            # Bulk upsert if possible
+            if self.can_bulk:
+                self.doc_manager.bulk_upsert(docs_to_dump())
+            else:
+                for doc in docs_to_dump():
+                    try:
+                        self.doc_manager.upsert(self.filter_fields(doc))
+                    except errors.OperationFailed:
+                        logging.error("Unable to insert %s" % doc)
+        except (pymongo.errors.AutoReconnect,
+                pymongo.errors.OperationFailure):
+            err_msg = "OplogManager: Failed during dump collection"
+            effect = "cannot recover!"
+            logging.error('%s %s %s' % (err_msg, effect, self.oplog))
+            self.running = False
+            return None
 
         return timestamp
 
@@ -318,11 +383,15 @@ class OplogThread(threading.Thread):
         """
         timestamp = self.read_last_checkpoint()
 
-        if timestamp is None:
+        if timestamp is None and self.collection_dump:
             timestamp = self.dump_collection()
-            msg = "Dumped collection into target system"
-            logging.info('OplogManager: %s %s'
-                         % (self.oplog, msg))
+            if timestamp:
+                msg = "Dumped collection into target system"
+                logging.info('OplogManager: %s %s'
+                             % (self.oplog, msg))
+        elif timestamp is None:
+            # set timestamp to top of oplog
+            timestamp = self.get_last_oplog_timestamp()
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
@@ -366,9 +435,10 @@ class OplogThread(threading.Thread):
             return None
 
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': target_ts}},
-                                               sort=[('$natural',
-                                               pymongo.DESCENDING)])
+        last_oplog_entry = self.oplog.find_one(
+            {'ts': {'$lte': target_ts}},
+            sort=[('$natural', pymongo.DESCENDING)]
+        )
         if last_oplog_entry is None:
             return None
 
@@ -419,10 +489,10 @@ class OplogThread(threading.Thread):
             #insert the ones from mongo
             for doc in to_index:
                 doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
-                doc['ns'] = dest_namespace
+                doc['ns'] = self.dest_namespace
                 try:
-                    self.doc_manager.upsert(doc)
-                except SystemError:
+                    self.doc_manager.upsert(self.filter_fields(doc))
+                except errors.OperationFailed:
                     logging.error("Unable to insert %s" % (doc))
 
         return rollback_cutoff_ts
