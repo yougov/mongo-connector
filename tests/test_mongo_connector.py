@@ -79,6 +79,7 @@ class MongoInternalTester(unittest.TestCase):
             oplog_checkpoint=CONFIG,
             target_url=None,
             ns_set=['test.test'],
+            dest_ns_dict={'test.test': 'test.test'},
             u_key='_id',
             auth_key=None
         )
@@ -102,6 +103,7 @@ class MongoInternalTester(unittest.TestCase):
             address=MAIN_ADDRESS,
             oplog_checkpoint=config_file_path,
             target_url=None,
+            dest_ns_dict={'test.test': 'test.test'},
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None
@@ -142,6 +144,7 @@ class MongoInternalTester(unittest.TestCase):
             oplog_checkpoint=None,
             target_url=None,
             ns_set=['test.test'],
+            dest_ns_dict={'test.test': 'test.test'},
             u_key='_id',
             auth_key=None
         )

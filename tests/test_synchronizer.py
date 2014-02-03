@@ -75,6 +75,7 @@ class TestSynchronizer(unittest.TestCase):
                 oplog_checkpoint=CONFIG,
                 target_url=None,
                 ns_set=['test.test'],
+                dest_ns_dict={'test.test': 'test.test'},
                 u_key='_id',
                 auth_key=None
             )

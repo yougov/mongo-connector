@@ -151,10 +151,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test', 'alpha.foo']
+        dest_ns_dict = {'test.test': 'test.test',
+                        'alpha.foo': 'alpha_foo'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, dest_ns_dict, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, mongos)
 
@@ -173,10 +175,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test', 'alpha.foo']
+        dest_ns_dict = {'test.test': 'test.test',
+                'alpha.foo': 'alpha_foo'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
                             doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
+                            cls.AUTH_KEY, dest_ns_dict, AUTH_USERNAME)
 
         return (oplog, primary_conn, oplog_coll, oplog.main_connection)
 

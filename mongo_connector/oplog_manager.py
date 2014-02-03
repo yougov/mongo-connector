@@ -29,11 +29,13 @@ try:
 except ImportError:
     from pymongo import Connection
 
+
 class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
+                 dest_namespace_dict,
                  auth_username, repl_set=None, collection_dump=True,
                  batch_size=DEFAULT_BATCH_SIZE, fields=None):
         """Initialize the oplog thread.
@@ -81,6 +83,9 @@ class OplogThread(threading.Thread):
 
         #The set of namespaces to process from the mongo cluster.
         self.namespace_set = namespace_set
+
+        #The dict of source namespaces to destination namespaces
+        self.dest_namespace_dict = dest_namespace_dict
 
         #If authentication is used, this is an admin password.
         self.auth_key = auth_key
@@ -160,9 +165,13 @@ class OplogThread(threading.Thread):
                                 doc['_ts'] = util.bson_ts_to_long(entry['ts'])
                                 doc['ns'] = ns
                                 try:
-                                    self.doc_manager.upsert(self.filter_fields(doc))
+                                    self.doc_manager.upsert(
+                                        self.filter_fields(doc)
+                                    )
                                 except errors.OperationFailed:
-                                    logging.error("Unable to insert %s" % (doc))
+                                    logging.error(
+                                        "Unable to insert %s" % (doc)
+                                    )
 
                         last_ts = entry['ts']
 
@@ -176,6 +185,26 @@ class OplogThread(threading.Thread):
                     if last_ts is not None:
                         self.checkpoint = last_ts
                         self.update_checkpoint()
+
+                    #delete
+                    if operation == 'd':
+                        entry['_id'] = entry['o']['_id']
+                        entry['ns'] = self.dest_namespace_dict[entry['ns']]
+                        self.doc_manager.remove(entry)
+                    #insert/update. They are equal because of lack of support
+                    #for partial update
+                    elif operation == 'i' or operation == 'u':
+                        doc = self.retrieve_doc(entry)
+                        if doc is not None:
+                            doc['_ts'] = util.bson_ts_to_long(entry['ts'])
+                            doc['ns'] = entry['ns']
+                            doc['ns'] = self.dest_namespace_dict[doc['ns']]
+                            try:
+                                self.doc_manager.upsert(doc)
+                            except SystemError:
+                                logging.error("Unable to insert %s" % (doc))
+
+                    last_ts = entry['ts']
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
@@ -231,7 +260,7 @@ class OplogThread(threading.Thread):
     def filter_fields(self, doc):
         if self.fields is not None and len(self.fields) > 0:
             keepers = ["_id", "ns", "_ts"] + self.fields
-            doc = dict( (k,v) for k, v in doc.items() if k in keepers )
+            doc = dict((k, v) for k, v in doc.items() if k in keepers)
         return doc
 
     def get_oplog_cursor(self, timestamp):
@@ -313,7 +342,7 @@ class OplogThread(threading.Thread):
                 for doc in cursor:
                     if not self.running:
                         raise StopIteration
-                    doc["ns"] = namespace
+                    doc["ns"] = self.dest_namespace_dict[namespace]
                     doc["_ts"] = long_ts
                     yield doc
 
@@ -406,9 +435,10 @@ class OplogThread(threading.Thread):
             return None
 
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': target_ts}},
-                                               sort=[('$natural',
-                                               pymongo.DESCENDING)])
+        last_oplog_entry = self.oplog.find_one(
+            {'ts': {'$lte': target_ts}},
+            sort=[('$natural', pymongo.DESCENDING)]
+        )
         if last_oplog_entry is None:
             return None
 
@@ -459,7 +489,7 @@ class OplogThread(threading.Thread):
             #insert the ones from mongo
             for doc in to_index:
                 doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
-                doc['ns'] = namespace
+                doc['ns'] = self.dest_namespace
                 try:
                     self.doc_manager.upsert(self.filter_fields(doc))
                 except errors.OperationFailed:

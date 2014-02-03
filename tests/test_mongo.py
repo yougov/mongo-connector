@@ -88,6 +88,7 @@ class TestSynchronizer(unittest.TestCase):
             oplog_checkpoint=CONFIG,
             target_url='%s:30000' % (HOSTNAME),
             ns_set=['test.test'],
+            dest_ns_dict={'test.test': 'test.test'},
             u_key='_id',
             auth_key=None,
             doc_manager='mongo_connector/doc_managers/mongo_doc_manager.py'

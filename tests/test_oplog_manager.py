@@ -123,15 +123,23 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test']
+        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, LockingDict(),
-                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
+        oplog = OplogThread(primary_conn=primary_conn,
+                            main_address=mongos_addr,
+                            oplog_coll=oplog_coll,
+                            is_sharded=is_sharded,
+                            doc_manager=doc_manager,
+                            oplog_progress_dict=LockingDict(),
+                            namespace_set=namespace_set,
+                            auth_key=cls.AUTH_KEY,
+                            dest_namespace_dict=dest_ns_dict,
+                            auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
 
         return(oplog, primary_conn, oplog_coll)
-    
-    @classmethod    
+
+    @classmethod
     def get_new_oplog(cls):
         """ Set up connection with mongo. Returns oplog, the connection and
             oplog collection
@@ -150,10 +158,18 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
+        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, is_sharded,
-                            doc_manager, LockingDict(),
-                            namespace_set, cls.AUTH_KEY, AUTH_USERNAME,
+        oplog = OplogThread(primary_conn=primary_conn,
+                            main_address=mongos_addr,
+                            oplog_coll=oplog_coll,
+                            is_sharded=is_sharded,
+                            doc_manager=doc_manager,
+                            oplog_progress_dict=LockingDict(),
+                            namespace_set=namespace_set,
+                            auth_key=cls.AUTH_KEY,
+                            dest_namespace_dict=dest_ns_dict,
+                            auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
 
