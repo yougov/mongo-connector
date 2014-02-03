@@ -1,4 +1,4 @@
-# Copyright 20134-2014 MongoDB, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,86 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Module with code to setup cluster and test oplog_manager functions.
-
-This is the main tester method. All the functions can be called by
-finaltests.py
-"""
-import os
-import sys
-import inspect
-import socket
-
-sys.path[0:0] = [""]
-
 import time
+import os
+import shutil
+import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import re
 
+import bson
+import pymongo
+from pymongo.read_preferences import ReadPreference
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
+    from pymongo import Connection
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from tests.setup_cluster import (kill_mongo_proc,
-                                 start_mongo_proc,
-                                 start_cluster,
-                                 kill_all)
-from pymongo.errors import OperationFailure
-from os import path
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import (long_to_bson_ts,
-                  bson_ts_to_long,
-                  retry_until_ok)
-from bson.objectid import ObjectId
-
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
-PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
-             "CONFIG": "27220", "MONGOS": "27217"}
-SETUP_DIR = path.expanduser("~/mongo_connector")
-DEMO_SERVER_DATA = SETUP_DIR + "/data"
-DEMO_SERVER_LOG = SETUP_DIR + "/logs"
-MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
-AUTH_FILE = os.environ.get('AUTH_FILE', None)
-AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
-CONFIG = os.environ.get('CONFIG', "config.txt")
-
-
-def safe_mongo_op(func, arg1, arg2=None):
-    """Performs the given operation with the safe argument
-    """
-    count = 0
-    while True:
-        time.sleep(1)
-        count += 1
-        if (count > 60):
-            self.fail('Call %s failed too many times in safe_mongo_op' % (func))
-        try:
-            if arg2:
-                func(arg1, arg2, safe=True)
-            else:
-                func(arg1, safe=True)
-            break
-        except OperationFailure:
-            pass
+from mongo_connector.util import (bson_ts_to_long,
+                                  retry_until_ok)
+from tests.setup_cluster import (
+    kill_mongo_proc,
+    start_mongo_proc,
+    start_cluster,
+    kill_all,
+    DEMO_SERVER_DATA,
+    PORTS_ONE,
+    PORTS_TWO
+)
+from tests.util import wait_for
 
 
 class TestOplogManagerSharded(unittest.TestCase):
-    """Defines all the testing methods for a sharded cluster
+    """Defines all test cases for OplogThreads running on a sharded
+    cluster
     """
 
     def runTest(self):
-        """ Runs the tests
+        """ Runs all tests
         """
         unittest.TestCase.__init__(self)
 
@@ -99,36 +60,207 @@ class TestOplogManagerSharded(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        cls.AUTH_KEY = None
-        cls.flag = True
-        if AUTH_FILE:
-            # We want to get the credentials from this file
-            try:
-                key = (open(AUTH_FILE)).read()
-                re.sub(r'\s', '', key)
-                cls.AUTH_KEY = key
-            except IOError:
-                print('Could not parse authentication file!')
-                cls.flag = False
-                cls.err_msg = "Could not read key file!"
+        # Create a new oplog progress file
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
 
-        if not start_cluster(sharded=True, key_file=cls.AUTH_KEY):
-            cls.flag = False
-            cls.err_msg = "Shards cannot be added to mongos"
-    
-    def setUp(self):
-        """ Fails if we can't read the key file or if the
-        cluster cannot be created.
+        # Start the cluster with a mongos on port 27217
+        start_cluster(sharded=True)
+
+        """ Clean out the databases used by the tests, make connections
+        to mongos and the oplogs of each of the shards, create and
+        shard some test collections, create an OplogThread
         """
-        if not self.flag:
-            self.fail(self.err_msg)
-    
+        # Connection to mongos
+        mongos_address = "localhost:%s" % PORTS_ONE["MONGOS"]
+        cls.mongos_conn = Connection(mongos_address)
+
+        # Connections to the shards
+        cls.shard1_conn = Connection("localhost:%s" % PORTS_ONE["PRIMARY"])
+        cls.shard2_conn = Connection("localhost:%s" % PORTS_TWO["PRIMARY"])
+        cls.shard1_secondary_conn = Connection(
+            "localhost:%s" % PORTS_ONE["SECONDARY"],
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+        cls.shard2_secondary_conn = Connection(
+            "localhost:%s" % PORTS_TWO["SECONDARY"],
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+
+        # Wipe any test data
+        cls.mongos_conn["test"]["mcsharded"].drop()
+
+        # Create and shard the collection test.mcsharded on the "i" field
+        cls.mongos_conn["test"]["mcsharded"].ensure_index("i")
+        cls.mongos_conn.admin.command("enableSharding", "test")
+        cls.mongos_conn.admin.command("shardCollection",
+                                      "test.mcsharded",
+                                      key={"i": 1})
+        # Pre-split the collection so that:
+        # i < 1000            lives on shard1
+        # i >= 1000           lives on shard2
+        cls.mongos_conn.admin.command(bson.SON([
+            ("split", "test.mcsharded"),
+            ("middle", {"i": 1000})
+        ]))
+        # Tag shards/ranges to enforce chunk split rules
+        cls.mongos_conn.config.shards.update(
+            {"_id": "demo-repl"},
+            {"$addToSet": {"tags": "small-i"}}
+        )
+        cls.mongos_conn.config.shards.update(
+            {"_id": "demo-repl-2"},
+            {"$addToSet": {"tags": "large-i"}}
+        )
+        cls.mongos_conn.config.tags.update(
+            {"_id": bson.son.SON([("ns", "test.mcsharded"),
+                                  ("min", {"i": bson.min_key.MinKey()})])},
+            bson.son.SON([
+                ("_id", bson.son.SON([
+                        ("ns", "test.mcsharded"),
+                        ("min", {"i": bson.min_key.MinKey()})
+                    ])),
+                ("ns", "test.mcsharded"),
+                ("min", {"i": bson.min_key.MinKey()}),
+                ("max", {"i": 1000}),
+                ("tag", "small-i")
+            ]),
+            upsert=True
+        )
+        cls.mongos_conn.config.tags.update(
+            {"_id": bson.son.SON([("ns", "test.mcsharded"),
+                                  ("min", {"i": 1000})])},
+            bson.son.SON([
+                ("_id", bson.son.SON([
+                        ("ns", "test.mcsharded"),
+                        ("min", {"i": 1000})
+                    ])),
+                ("ns", "test.mcsharded"),
+                ("min", {"i": 1000}),
+                ("max", {"i": bson.max_key.MaxKey()}),
+                ("tag", "large-i")
+            ]),
+            upsert=True
+        )
+        # Move chunks to their proper places
+        try:
+            cls.mongos_conn["admin"].command(
+                bson.son.SON([
+                    ("moveChunk", "test.mcsharded"),
+                    ("find", {"i": 1}),
+                    ("to", "demo-repl")
+                ])
+            )
+        except pymongo.errors.OperationFailure:
+            pass        # chunk may already be on the correct shard
+        try:
+            cls.mongos_conn["admin"].command(
+                bson.son.SON([
+                    ("moveChunk", "test.mcsharded"),
+                    ("find", {"i": 1000}),
+                    ("to", "demo-repl-2")
+                ])
+            )
+        except pymongo.errors.OperationFailure:
+            pass        # chunk may already be on the correct shard
+
+        # Wait for things to settle down
+        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1})
+        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
+        while cls.shard1_conn.test.mcsharded.find_one() is None:
+            time.sleep(1)
+        while cls.shard2_conn.test.mcsharded.find_one() is None:
+            time.sleep(1)
+        cls.mongos_conn.test.mcsharded.remove()
+
+        # Oplog threads (oplog manager) for each shard
+        doc_manager = DocManager()
+        oplog_progress = LockingDict()
+        cls.opman1 = OplogThread(
+            primary_conn=cls.shard1_conn,
+            main_address=mongos_address,
+            oplog_coll=cls.shard1_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
+        cls.opman2 = OplogThread(
+            primary_conn=cls.shard2_conn,
+            main_address=mongos_address,
+            oplog_coll=cls.shard2_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
+
     @classmethod
     def tearDownClass(cls):
-        """ Kills cluster instance
+        """ Kill the cluster
         """
         kill_all()
+
+    def setUp(self):
+        # clear oplog
+        self.shard1_conn["local"]["oplog.rs"].drop()
+        self.shard2_conn["local"]["oplog.rs"].drop()
+        self.shard1_conn["local"].create_collection(
+            "oplog.rs",
+            size=1024 * 1024 * 100,       # 100MB
+            capped=True
+        )
+        self.shard2_conn["local"].create_collection(
+            "oplog.rs",
+            size=1024 * 1024 * 100,       # 100MB
+            capped=True
+        )
+        # re-sync secondaries
+        try:
+            self.shard1_secondary_conn["admin"].command("shutdown")
+        except pymongo.errors.AutoReconnect:
+            pass
+        try:
+            self.shard2_secondary_conn["admin"].command("shutdown")
+        except pymongo.errors.AutoReconnect:
+            pass
+        data1 = os.path.join(DEMO_SERVER_DATA, "replset1b")
+        data2 = os.path.join(DEMO_SERVER_DATA, "replset2b")
+        shutil.rmtree(data1)
+        shutil.rmtree(data2)
+        os.mkdir(data1)
+        os.mkdir(data2)
+        conf1 = self.shard1_conn["local"]["system.replset"].find_one()
+        conf2 = self.shard2_conn["local"]["system.replset"].find_one()
+        conf1["version"] += 1
+        conf2["version"] += 1
+        self.shard1_conn["admin"].command({"replSetReconfig": conf1})
+        self.shard2_conn["admin"].command({"replSetReconfig": conf2})
+        start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl", "replset1b",
+                         "replset1b.log", None)
+        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2", "replset2b",
+                         "replset2b.log", None)
+
+        def secondary_up(connection):
+            def wrap():
+                return retry_until_ok(
+                    connection["admin"].command,
+                    "replSetGetStatus"
+                )["myState"] == 2
+            return wrap
+        wait_for(secondary_up(self.shard1_secondary_conn))
+        wait_for(secondary_up(self.shard2_secondary_conn))
+
+    def tearDown(self):
+        self.mongos_conn["test"]["mcsharded"].remove()
+        self.mongos_conn["test"]["mcunsharded"].remove()
 
     @classmethod
     def get_oplog_thread(cls):
