@@ -35,9 +35,9 @@ class OplogThread(threading.Thread):
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
                  doc_manager, oplog_progress_dict, namespace_set, auth_key,
-                 dest_namespace_dict,
                  auth_username, repl_set=None, collection_dump=True,
-                 batch_size=DEFAULT_BATCH_SIZE, fields=None):
+                 batch_size=DEFAULT_BATCH_SIZE, fields=None,
+                 dest_mapping={}):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -85,7 +85,7 @@ class OplogThread(threading.Thread):
         self.namespace_set = namespace_set
 
         #The dict of source namespaces to destination namespaces
-        self.dest_namespace_dict = dest_namespace_dict
+        self.dest_mapping = dest_mapping
 
         #If authentication is used, this is an admin password.
         self.auth_key = auth_key
@@ -153,6 +153,9 @@ class OplogThread(threading.Thread):
                                 and self.namespace_set):
                             continue
 
+                        # use namespace mapping if one exists
+                        ns = self.dest_mapping.get(entry['ns'], ns)
+
                         #delete
                         if operation == 'd':
                             entry['_id'] = entry['o']['_id']
@@ -185,26 +188,6 @@ class OplogThread(threading.Thread):
                     if last_ts is not None:
                         self.checkpoint = last_ts
                         self.update_checkpoint()
-
-                    #delete
-                    if operation == 'd':
-                        entry['_id'] = entry['o']['_id']
-                        entry['ns'] = self.dest_namespace_dict[entry['ns']]
-                        self.doc_manager.remove(entry)
-                    #insert/update. They are equal because of lack of support
-                    #for partial update
-                    elif operation == 'i' or operation == 'u':
-                        doc = self.retrieve_doc(entry)
-                        if doc is not None:
-                            doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                            doc['ns'] = entry['ns']
-                            doc['ns'] = self.dest_namespace_dict[doc['ns']]
-                            try:
-                                self.doc_manager.upsert(doc)
-                            except SystemError:
-                                logging.error("Unable to insert %s" % (doc))
-
-                    last_ts = entry['ts']
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
@@ -342,7 +325,7 @@ class OplogThread(threading.Thread):
                 for doc in cursor:
                     if not self.running:
                         raise StopIteration
-                    doc["ns"] = self.dest_namespace_dict[namespace]
+                    doc["ns"] = self.dest_mapping.get(namespace, namespace)
                     doc["_ts"] = long_ts
                     yield doc
 
@@ -454,7 +437,13 @@ class OplogThread(threading.Thread):
                 rollback_set[doc['ns']] = [doc]
 
         for namespace, doc_list in rollback_set.items():
-            database, coll = namespace.split('.', 1)
+            # Get the original namespace
+            original_namespace = namespace
+            for source_name, dest_name in self.dest_mapping.items():
+                if dest_name == namespace:
+                    original_namespace = source_name
+
+            database, coll = original_namespace.split('.', 1)
             obj_id = bson.objectid.ObjectId
             bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
 
@@ -489,7 +478,7 @@ class OplogThread(threading.Thread):
             #insert the ones from mongo
             for doc in to_index:
                 doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
-                doc['ns'] = self.dest_namespace
+                doc['ns'] = self.dest_mapping.get(namespace, namespace)
                 try:
                     self.doc_manager.upsert(self.filter_fields(doc))
                 except errors.OperationFailed:

@@ -51,10 +51,11 @@ PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
 
 AUTH_FILE = os.environ.get('AUTH_FILE', None)
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
+HOSTNAME = os.environ.get('HOSTNAME', "localhost")
 PORTS_ONE['MAIN'] = os.environ.get('MAIN_ADDR', "27217")
 CONFIG = os.environ.get('CONFIG', "config.txt")
 TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
+
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
@@ -123,7 +124,6 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['local'].create_collection('oplog.rs', capped=True,
                                                 size=1000000)
         namespace_set = ['test.test']
-        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn=primary_conn,
                             main_address=mongos_addr,
@@ -133,7 +133,6 @@ class TestOplogManager(unittest.TestCase):
                             oplog_progress_dict=LockingDict(),
                             namespace_set=namespace_set,
                             auth_key=cls.AUTH_KEY,
-                            dest_namespace_dict=dest_ns_dict,
                             auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
 
@@ -158,7 +157,6 @@ class TestOplogManager(unittest.TestCase):
         oplog_coll = primary_conn['local']['oplog.rs']
 
         namespace_set = ['test.test']
-        dest_ns_dict = {'test.test': 'test.test'}
         doc_manager = DocManager()
         oplog = OplogThread(primary_conn=primary_conn,
                             main_address=mongos_addr,
@@ -168,7 +166,6 @@ class TestOplogManager(unittest.TestCase):
                             oplog_progress_dict=LockingDict(),
                             namespace_set=namespace_set,
                             auth_key=cls.AUTH_KEY,
-                            dest_namespace_dict=dest_ns_dict,
                             auth_username=AUTH_USERNAME,
                             repl_set="demo-repl")
         return(oplog, primary_conn, oplog.main_connection, oplog_coll)
@@ -321,7 +318,7 @@ class TestOplogManager(unittest.TestCase):
         # test init_cursor when OplogThread created with/without no-dump option
         # insert some documents (will need to be dumped)
         primary_conn['test']['test'].remove()
-        primary_conn['test']['test'].insert(({"_id":i} for i in range(100)))
+        primary_conn['test']['test'].insert(({"_id": i} for i in range(100)))
 
         # test no-dump option
         docman = DocManager()
@@ -349,6 +346,11 @@ class TestOplogManager(unittest.TestCase):
         os.system('rm config.txt; touch config.txt')
         test_oplog, primary_conn, mongos, solr = self.get_new_oplog()
 
+        # add a namespace mapping to the oplog manager
+        test_oplog.dest_mapping = {
+            "test.test": "foo.bar"
+        }
+
         if not start_cluster():
             self.fail('Cluster could not be started successfully!')
 
@@ -357,11 +359,11 @@ class TestOplogManager(unittest.TestCase):
         solr._delete()          # equivalent to solr.delete(q='*: *')
 
         mongos['test']['test'].remove({})
-        mongos['test']['test'].insert( 
-             {'_id': ObjectId('4ff74db3f646462b38000001'),
+        mongos['test']['test'].insert(
+            {'_id': ObjectId('4ff74db3f646462b38000001'),
              'name': 'paulie'},
-             safe=True
-             )
+            safe=True
+        )
         while (mongos['test']['test'].find().count() != 1):
             time.sleep(1)
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
@@ -427,7 +429,8 @@ class TestOplogManager(unittest.TestCase):
         test_oplog.doc_manager.commit()
         results = solr._search()
 
-        assert(len(results) == 1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["ns"], "foo.bar")
 
         self.assertEqual(results[0]['name'], 'paulie')
         self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
@@ -460,6 +463,87 @@ class TestOplogManager(unittest.TestCase):
         for inc, exc in zip(include_fields, exclude_fields):
             self.assertIn(inc, keys)
             self.assertNotIn(exc, keys)
+
+    def test_namespace_mapping(self):
+        """Test mapping of namespaces
+        Cases:
+
+        upsert/delete/update of documents:
+        1. in namespace set, mapping provided
+        2. outside of namespace set, mapping provided
+        """
+
+        source_ns = ["test.test1", "test.test2"]
+        phony_ns = ["test.phony1", "test.phony2"]
+        dest_mapping = {"test.test1": "test.test1_dest",
+                        "test.test2": "test.test2_dest"}
+        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        docman = test_oplog.doc_manager
+        test_oplog.dest_mapping = dest_mapping
+        test_oplog.namespace_set = source_ns
+        # start replicating
+        test_oplog.start()
+
+        base_doc = {"_id": 1, "name": "superman"}
+
+        # doc in namespace set
+        for ns in source_ns:
+            db, coll = ns.split(".", 1)
+
+            # test insert
+            primary_conn[db][coll].insert(base_doc)
+
+            wait_for(lambda: len(docman._search()) == 1)
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
+            self.assertEqual(len(bad), 0)
+
+            # test update
+            primary_conn[db][coll].update(
+                {"_id": 1},
+                {"$set": {"weakness": "kryptonite"}}
+            )
+
+            def update_complete():
+                docs = docman._search()
+                for d in docs:
+                    if d.get("weakness") == "kryptonite":
+                        return True
+                    return False
+            wait_for(update_complete)
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
+            self.assertEqual(len(bad), 0)
+
+            # test delete
+            primary_conn[db][coll].remove({"_id": 1})
+            wait_for(lambda: len(docman._search()) == 0)
+            bad = [d for d in docman._search() if d["ns"] == dest_mapping[ns]]
+            self.assertEqual(len(bad), 0)
+
+            # cleanup
+            primary_conn[db][coll].remove()
+            test_oplog.doc_manager._delete()
+
+        # doc not in namespace set
+        for ns in phony_ns:
+            db, coll = ns.split(".", 1)
+
+            # test insert
+            primary_conn[db][coll].insert(base_doc)
+            time.sleep(1)
+            self.assertEqual(len(docman._search()), 0)
+            # test update
+            primary_conn[db][coll].update(
+                {"_id": 1},
+                {"$set": {"weakness": "kryptonite"}}
+            )
+            time.sleep(1)
+            self.assertEqual(len(docman._search()), 0)
+            # note: nothing to test for delete
+
+        # cleanup
+        test_oplog.join()
 
 if __name__ == '__main__':
     unittest.main()

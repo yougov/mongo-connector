@@ -41,10 +41,9 @@ class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
-                 dest_ns_dict,
                  u_key, auth_key, doc_manager=None, auth_username=None,
                  collection_dump=True, batch_size=DEFAULT_BATCH_SIZE,
-                 fields=None):
+                 fields=None, dest_mapping={}):
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -68,7 +67,7 @@ class Connector(threading.Thread):
         self.ns_set = ns_set
 
         #The dict of source namespace to destination namespace
-        self.dest_ns_dict = dest_ns_dict
+        self.dest_mapping = dest_mapping
 
         #The key that is a unique document identifier for the target system.
         #Not necessarily the mongo unique key.
@@ -250,7 +249,6 @@ class Connector(threading.Thread):
             repl_set = prim_admin.command("replSetGetStatus")['set']
 
             oplog = OplogThread(
-                dest_namespace_dict=self.dest_ns_dict,
                 primary_conn=main_conn,
                 main_address=(main_conn.host + ":" + str(main_conn.port)),
                 oplog_coll=oplog_coll,
@@ -263,7 +261,8 @@ class Connector(threading.Thread):
                 repl_set=repl_set,
                 collection_dump=self.collection_dump,
                 batch_size=self.batch_size,
-                fields=self.fields
+                fields=self.fields,
+                dest_mapping=self.dest_mapping
             )
             self.shard_set[0] = oplog
             logging.info('MongoConnector: Starting connection thread %s' %
@@ -289,9 +288,9 @@ class Connector(threading.Thread):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
-                            logging.error("""MongoConnector: OplogThread
-                                          %s unexpectedly stopped! Shutting
-                                          down""" %
+                            logging.error("MongoConnector: OplogThread "
+                                          "%s unexpectedly stopped! Shutting "
+                                          "down" %
                                           (str(self.shard_set[shard_id])))
                             self.oplog_thread_join()
                             self.doc_manager.stop()
@@ -313,7 +312,6 @@ class Connector(threading.Thread):
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
-                        dest_namespace_dict=self.dest_ns_dict,
                         primary_conn=shard_conn,
                         main_address=self.address,
                         oplog_coll=oplog_coll,
@@ -325,7 +323,8 @@ class Connector(threading.Thread):
                         auth_username=self.auth_username,
                         collection_dump=self.collection_dump,
                         batch_size=self.batch_size,
-                        fields=self.fields
+                        fields=self.fields,
+                        dest_mapping=self.dest_mapping
                     )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
@@ -353,7 +352,7 @@ def main():
     parser.add_option("-m", "--main", action="store", type="string",
                       dest="main_addr", default="localhost:27217",
                       help="""Specify the main address, which is a"""
-                      """ host:port pair. For sharded clusters,  this"""
+                      """ host:port pair. For sharded clusters, this"""
                       """ should be the mongos address. For individual"""
                       """ replica sets, supply the address of the"""
                       """ primary. For example, `-m localhost:27217`"""
@@ -365,17 +364,17 @@ def main():
     #quick recovery from failure.
     parser.add_option("-o", "--oplog-ts", action="store", type="string",
                       dest="oplog_config", default="config.txt",
-                      help="""Specify the name of the file that stores the"""
+                      help="""Specify the name of the file that stores the """
                       """oplog progress timestamps. """
-                      """This file is used by the system to store the last"""
-                      """timestamp read on a specific oplog. This allows"""
-                      """ for quick recovery from failure. By default this"""
-                      """ is `config.txt`, which starts off empty. An empty"""
-                      """ file causes the system to go through all the mongo"""
-                      """ oplog and sync all the documents. Whenever the """
+                      """This file is used by the system to store the last """
+                      """timestamp read on a specific oplog. This allows """
+                      """for quick recovery from failure. By default this """
+                      """is `config.txt`, which starts off empty. An empty """
+                      """file causes the system to go through all the mongo """
+                      """oplog and sync all the documents. Whenever the """
                       """cluster is restarted, it is essential that the """
-                      """oplog-timestamp config file be emptied - otherwise"""
-                      """ the connector will miss some documents and behave"""
+                      """oplog-timestamp config file be emptied - otherwise """
+                      """the connector will miss some documents and behave """
                       """incorrectly.""")
 
     #--no-dump specifies whether we should read an entire collection from
@@ -391,8 +390,8 @@ def main():
                       default=DEFAULT_BATCH_SIZE, type="int",
                       help="Specify an int to update the --oplog-ts "
                       "config file with latest position of oplog every "
-                      "N documents.  By default, the oplog config isn't "
-                      "updated until we've read through the entire oplog.  "
+                      "N documents. By default, the oplog config isn't "
+                      "updated until we've read through the entire oplog. "
                       "You may want more frequent updates if you are at risk "
                       "of falling behind the earliest timestamp in the oplog")
 
@@ -401,7 +400,7 @@ def main():
                       dest="url", default=None,
                       help="""Specify the URL to the target system being """
                       """used. For example, if you were using Solr out of """
-                      """the box, you could use '-t """
+                      """the box, you could use '-t"""
                       """ http://localhost:8080/solr' with the """
                       """ SolrDocManager to establish a proper connection."""
                       """ Don't use quotes around address."""
@@ -412,29 +411,29 @@ def main():
     parser.add_option("-n", "--namespace-set", action="store", type="string",
                       dest="ns_set", default=None, help=
                       """Used to specify the namespaces we want to """
-                      """ consider. For example, if we wished to store all """
-                      """ documents from the test.test and alpha.foo """
-                      """ namespaces, we could use `-n test.test,alpha.foo`."""
-                      """ The default is to consider all the namespaces, """
-                      """ excluding the system and config databases, and """
-                      """ also ignoring the "system.indexes" collection in """
+                      """consider. For example, if we wished to store all """
+                      """documents from the test.test and alpha.foo """
+                      """namespaces, we could use `-n test.test,alpha.foo`. """
+                      """The default is to consider all the namespaces, """
+                      """excluding the system and config databases, and """
+                      """also ignoring the "system.indexes" collection in """
                       """any database.""")
 
     #-u is to specify the mongoDB field that will serve as the unique key
     #for the target system,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id", help=
-                      """Used to specify the mongoDB field that will serve"""
-                      """as the unique key for the target system"""
+                      """Used to specify the mongoDB field that will serve """
+                      """as the unique key for the target system. """
                       """The default is "_id", which can be noted by """
-                      """  '-u _id'""")
+                      """'-u _id'""")
 
     #-f is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog
     #threads.
     parser.add_option("-f", "--password-file", action="store", type="string",
                       dest="auth_file", default=None, help=
-                      """ Used to store the password for authentication."""
+                      """Used to store the password for authentication."""
                       """ Use this option if you wish to specify a"""
                       """ username and password but don't want to"""
                       """ type in the password. The contents of this"""
@@ -443,7 +442,7 @@ def main():
     #-p is to specify the password used for authentication.
     parser.add_option("-p", "--password", action="store", type="string",
                       dest="password", default=None, help=
-                      """ Used to specify the password."""
+                      """Used to specify the password."""
                       """ This is used by mongos to authenticate"""
                       """ connections to the shards, and in the"""
                       """ oplog threads. If authentication is not used, then"""
@@ -452,9 +451,9 @@ def main():
     #-a is to specify the username for authentication.
     parser.add_option("-a", "--admin-username", action="store", type="string",
                       dest="admin_name", default="__system", help=
-                      """Used to specify the username of an admin user to"""
-                      """authenticate with. To use authentication, the user"""
-                      """must specify both an admin username and a keyFile."""
+                      """Used to specify the username of an admin user to """
+                      """authenticate with. To use authentication, the user """
+                      """must specify both an admin username and a keyFile. """
                       """The default username is '__system'""")
 
     #-d is to specify the doc manager file.
@@ -474,15 +473,13 @@ def main():
     #-g is the destination namespace
     parser.add_option("-g", "--dest-namespace-set", action="store",
                       type="string", dest="dest_ns_set", default=None, help=
-                      """Used to specify the destination namespaces we want to
-                      consider. For example, if we wished to store all
-                      documents from the test.test and alpha.foo
-                      namespaces, we could use `-n test.test,alpha.foo`.
-                      You must have equal number of destination
-                      namespaces to origin namespaces if you are
-                      defining.  The default is to use the origin namespace.
-                      This is currently only implemented for mongo-to-mongo
-                      connections. """)
+                      """Specify a destination namespace mapping. Each """
+                      """namespace provided in the --namespace-set option """
+                      """will be mapped respectively according to this """
+                      """comma-separated list. These lists must have """
+                      """equal length. The default is to use the identity """
+                      """mapping. This is currently only implemented """
+                      """for mongo-to-mongo connections.""")
 
     #-s is to enable syslog logging.
     parser.add_option("-s", "--enable-syslog", action="store_true",
@@ -505,11 +502,11 @@ def main():
     #-i to specify the list of fields to export
     parser.add_option("-i", "--fields", action="store", type="string",
                       dest="fields", default=None, help=
-                      """Used to specify the list of fields to export.
-                      Specify a field or fields to include in the export.
-                      Use a comma separated list of fields to specify multiple
-                      fields.  The '_id', 'ns' and '_ts' fields are always
-                      exported.""")
+                      """Used to specify the list of fields to export. """
+                      """Specify a field or fields to include in the export. """
+                      """Use a comma separated list of fields to specify multiple """
+                      """fields. The '_id', 'ns' and '_ts' fields are always """
+                      """exported.""")
 
     (options, args) = parser.parse_args()
 
@@ -551,13 +548,13 @@ def main():
         logger.error("Destination namespace must be the same length as the "
                      "origin namespace!")
         sys.exit(1)
+    elif len(set(ns_set)) + len(set(dest_ns_set)) != 2 * len(ns_set):
+        logger.error("Namespace set and destination namespace set should not "
+                     "contain any duplicates!")
+        sys.exit(1)
     else:
         ## Create a mapping of source ns to dest ns as a dict
-        dest_ns_dict = {}
-        i = 0
-        for dest_ns in dest_ns_set:
-            dest_ns_dict[ns_set[i]] = dest_ns
-            i += 1
+        dest_mapping = dict(zip(ns_set, dest_ns_set))
 
     if options.fields is None:
         fields = []
@@ -581,7 +578,6 @@ def main():
         sys.exit(1)
 
     connector = Connector(
-        dest_ns_dict=dest_ns_dict,
         address=options.main_addr,
         oplog_checkpoint=options.oplog_config,
         target_url=options.url,
@@ -592,7 +588,8 @@ def main():
         auth_username=options.admin_name,
         collection_dump=(not options.no_dump),
         batch_size=options.batch_size,
-        fields=fields
+        fields=fields,
+        dest_mapping=dest_mapping,
     )
     connector.start()
 
