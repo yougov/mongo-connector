@@ -356,82 +356,159 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(doc2["i"], self.opman2.retrieve_doc(pivot2)["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
-        """Test get_last_oplog_timestamp in oplog_manager.
+        """Test the get_last_oplog_timestamp method"""
 
-        Assertion failure if it doesn't pass
-        """
+        # "empty" the oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        self.assertEqual(self.opman1.get_last_oplog_timestamp(), None)
+        self.assertEqual(self.opman2.get_last_oplog_timestamp(), None)
 
-        # test empty oplog
-        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
-
-        assert (test_oplog.get_last_oplog_timestamp() is None)
-
-        # test non-empty oplog
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        last_ts = last_oplog_entry['ts']
-        assert (test_oplog.get_last_oplog_timestamp() == last_ts)
-
-        # test_oplog.stop()
-
+        # Test non-empty oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i + 500
+            })
+        oplog1 = self.shard1_conn["local"]["oplog.rs"]
+        oplog1 = oplog1.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
+        oplog2 = self.shard2_conn["local"]["oplog.rs"]
+        oplog2 = oplog2.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
+        self.assertEqual(self.opman1.get_last_oplog_timestamp(),
+                         oplog1["ts"])
+        self.assertEqual(self.opman2.get_last_oplog_timestamp(),
+                         oplog2["ts"])
 
     def test_dump_collection(self):
-        """Test dump_collection in oplog_manager.
+        """Test the dump_collection method
 
-        Assertion failure if it doesn't pass
+        Cases:
+
+        1. empty oplog
+        2. non-empty oplog
         """
 
-        test_oplog, search_ts, solr, mongos = self.get_oplog_thread()
-        solr = DocManager()
-        test_oplog.doc_manager = solr
+        # Test with empty oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        last_ts1 = self.opman1.dump_collection()
+        last_ts2 = self.opman2.dump_collection()
+        self.assertEqual(last_ts1, None)
+        self.assertEqual(last_ts2, None)
 
-        # with documents
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.dump_collection()
-
-        test_oplog.doc_manager.commit()
-        solr_results = solr._search()
-        assert (len(solr_results) == 1)
-        solr_doc = solr_results[0]
-        assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
-        assert (solr_doc['name'] == 'paulie')
-        assert (solr_doc['ns'] == 'alpha.foo')
-
+        # Test with non-empty oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard1_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i + 500
+            })
+        last_ts1 = self.opman1.get_last_oplog_timestamp()
+        last_ts2 = self.opman2.get_last_oplog_timestamp()
+        self.assertEqual(last_ts1, self.opman1.dump_collection())
+        self.assertEqual(last_ts2, self.opman2.dump_collection())
+        self.assertEqual(len(self.opman1.doc_manager._search()),
+                         len(self.opman2.doc_manager._search()))
+        self.assertEqual(len(self.opman1.doc_manager._search()), 1000)
 
     def test_init_cursor(self):
-        """Test init_cursor in oplog_manager.
+        """Test the init_cursor method
 
-        Assertion failure if it doesn't pass
+        Cases:
+
+        1. no last checkpoint, no collection dump
+        2. no last checkpoint, collection dump ok and stuff to dump
+        3. no last checkpoint, nothing to dump, stuff in oplog
+        4. no last checkpoint, nothing to dump, nothing in oplog
+        5. last checkpoint exists
         """
 
-        test_oplog, search_ts, cursor, mongos = self.get_oplog_thread()
-        test_oplog.checkpoint = None           # needed for these tests
+        # N.B. these sub-cases build off of each other and cannot be re-ordered
+        # without side-effects
 
-        # initial tests with no config file and empty oplog
-        assert (test_oplog.init_cursor() is None)
+        # No last checkpoint, no collection dump, nothing in oplog
+        # "change oplog collection" to put nothing in oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        self.opman1.collection_dump = False
+        self.opman2.collection_dump = False
+        self.assertEqual(self.opman1.init_cursor(), None)
+        self.assertEqual(self.opman1.checkpoint, None)
+        self.assertEqual(self.opman2.init_cursor(), None)
+        self.assertEqual(self.opman2.checkpoint, None)
 
-        # no config, single oplog entry
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.init_cursor()
+        # No last checkpoint, empty collections, nothing in oplog
+        self.opman1.collection_dump = True
+        self.opman2.collection_dump = True
+        self.assertEqual(self.opman1.init_cursor(), None)
+        self.assertEqual(self.opman1.checkpoint, None)
+        self.assertEqual(self.opman2.init_cursor(), None)
+        self.assertEqual(self.opman2.checkpoint, None)
 
-        assert (cursor.count() == 1)
-        assert (test_oplog.checkpoint == search_ts)
+        # No last checkpoint, empty collections, something in oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
+        oplog_startup_ts = self.opman2.get_last_oplog_timestamp()
+        collection = self.mongos_conn["test"]["mcsharded"]
+        collection.insert({"i": 1})
+        collection.remove({"i": 1})
+        time.sleep(3)
+        last_ts1 = self.opman1.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        self.assertEqual(self.opman1.checkpoint, last_ts1)
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+        # init_cursor should point to startup message in shard2 oplog
+        cursor = self.opman2.init_cursor()
+        self.assertEqual(next(cursor)["ts"], oplog_startup_ts)
+        self.assertEqual(self.opman2.checkpoint, oplog_startup_ts)
 
-        # with config file, assert that size != 0
-        os.system('touch %s' % (TEMP_CONFIG))
+        # No last checkpoint, non-empty collections, stuff in oplog
+        progress = LockingDict()
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        collection.insert({"i": 1200})
+        last_ts2 = self.opman2.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        self.assertEqual(self.opman1.checkpoint, last_ts1)
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+        return
+        self.assertEqual(next(self.opman2.init_cursor())["ts"], last_ts2)
+        self.assertEqual(self.opman2.checkpoint, last_ts2)
+        with self.opman2.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)], last_ts2)
 
-        cursor = test_oplog.init_cursor()
-        oplog_dict = test_oplog.oplog_progress.get_dict()
+        # Last checkpoint exists
+        progress = LockingDict()
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        entry1 = list(
+            self.shard1_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        entry2 = list(
+            self.shard2_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        progress.get_dict()[str(self.opman1.oplog)] = entry1[0]["ts"]
+        progress.get_dict()[str(self.opman2.oplog)] = entry2[0]["ts"]
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        self.opman1.checkpoint = self.opman2.checkpoint = None
+        cursor1 = self.opman1.init_cursor()
+        cursor2 = self.opman2.init_cursor()
+        self.assertEqual(entry1[1]["ts"], next(cursor1)["ts"])
+        self.assertEqual(entry2[1]["ts"], next(cursor2)["ts"])
+        self.assertEqual(self.opman1.checkpoint, entry1[0]["ts"])
+        self.assertEqual(self.opman2.checkpoint, entry2[0]["ts"])
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)],
+                             entry1[0]["ts"])
+        with self.opman2.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)],
+                             entry2[0]["ts"])
 
-        assert(cursor.count() == 1)
-        self.assertTrue(str(test_oplog.oplog) in oplog_dict)
-        commit_ts = test_oplog.checkpoint
-        self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
-
-        os.system('rm %s' % (TEMP_CONFIG))
+        # Some cleanup
+        progress = LockingDict()
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        self.opman1.checkpoint = self.opman2.checkpoint = None
 
     def test_rollback(self):
         """Test rollback in oplog_manager. Assertion failure if it doesn't pass
