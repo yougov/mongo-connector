@@ -473,7 +473,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         with self.opman1.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
-        return
         self.assertEqual(next(self.opman2.init_cursor())["ts"], last_ts2)
         self.assertEqual(self.opman2.checkpoint, last_ts2)
         with self.opman2.oplog_progress as prog:
