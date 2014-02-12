@@ -159,7 +159,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         for ns in self.namespaces_inc + self.namespaces_exc:
             for i in range(100):
-                self.choosy_docman.upsert({"_id":i, "ns":ns, "_ts":i})
+                self.choosy_docman.upsert({"_id": i, "ns": ns, "_ts": i})
 
         results = list(self.choosy_docman.search(0, 49))
         self.assertEqual(len(results), 100)
