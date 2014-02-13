@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Maximumum # of documents to process before recording timestamp
+# Maximum # of documents to process before recording timestamp
 # default = -1 (no maximum)
 DEFAULT_BATCH_SIZE = -1
+# Interval in seconds between doc manager flushes (i.e. auto commit)
+# default = None (never auto commit)
+DEFAULT_COMMIT_INTERVAL = None

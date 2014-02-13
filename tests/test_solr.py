@@ -116,7 +116,7 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
 
     def tearDown(self):
-        self.connector.doc_manager.auto_commit = False
+        self.connector.doc_manager.auto_commit_interval = None
         time.sleep(2)
         self.connector.join()
 

@@ -22,16 +22,16 @@ replace the method definitions with API calls for the desired backend.
 """
 import re
 import json
-import logging
 
 import bson.json_util as bsjson
 from pysolr import Solr, SolrError
-from threading import Timer
 from mongo_connector import errors
+from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
 from mongo_connector.util import retry_until_ok
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
 decoder = json.JSONDecoder()
+
 
 class DocManager():
     """The DocManager class creates a connection to the backend engine and
@@ -42,18 +42,20 @@ class DocManager():
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url, auto_commit=False, unique_key='_id', **kwargs):
+    def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
+                 unique_key='_id', **kwargs):
         """Verify Solr URL and establish a connection.
         """
         self.solr = Solr(url)
         self.unique_key = unique_key
-        self.auto_commit = auto_commit
+        # pysolr does things in milliseconds
+        if auto_commit_interval is not None:
+            self.auto_commit_interval = auto_commit_interval * 1000
+        else:
+            self.auto_commit_interval = None
         self.field_list = []
         self.dynamic_field_list = []
         self.build_fields()
-
-        if auto_commit:
-            self.run_auto_commit()
 
     def _parse_fields(self, result, field_name):
         """ If Schema access, parse fields and build respective lists
@@ -101,7 +103,7 @@ class DocManager():
     def stop(self):
         """ Stops the instance
         """
-        self.auto_commit = False
+        pass
 
     def upsert(self, doc):
         """Update or insert a document into Solr
@@ -111,7 +113,12 @@ class DocManager():
         always be one mongo document, represented as a Python dictionary.
         """
         try:
-            self.solr.add([self.clean_doc(doc)], commit=True)
+            if self.auto_commit_interval is not None:
+                self.solr.add([self.clean_doc(doc)],
+                              commit=(self.auto_commit_interval == 0),
+                              commitWithin=str(self.auto_commit_interval))
+            else:
+                self.solr.add([self.clean_doc(doc)], commit=False)
         except SolrError:
             raise errors.OperationFailed(
                 "Could not insert %r into Solr" % bsjson.dumps(doc))
@@ -123,7 +130,11 @@ class DocManager():
         """
         try:
             cleaned = (self.clean_doc(d) for d in docs)
-            self.solr.add(cleaned, commit=True)
+            if self.auto_commit_interval is not None:
+                self.solr.add(cleaned, commit=(self.auto_commit_interval == 0),
+                              commitWithin=str(self.auto_commit_interval))
+            else:
+                self.solr.add(cleaned, commit=False)
         except SolrError:
             raise errors.OperationFailed(
                 "Could not bulk-insert documents into Solr")
@@ -133,12 +144,13 @@ class DocManager():
 
         The input is a python dictionary that represents a mongo document.
         """
-        self.solr.delete(id=str(doc[self.unique_key]), commit=True)
+        self.solr.delete(id=str(doc[self.unique_key]),
+                         commit=(self.auto_commit_interval == 0))
 
     def _remove(self):
         """Removes everything
         """
-        self.solr.delete(q='*:*')
+        self.solr.delete(q='*:*', commit=(self.auto_commit_interval == 0))
 
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range.
@@ -156,13 +168,6 @@ class DocManager():
         """This function is used to force a commit.
         """
         retry_until_ok(self.solr.commit)
-
-    def run_auto_commit(self):
-        """Periodically commits to the Solr server.
-        """
-        self.solr.commit()
-        if self.auto_commit:
-            Timer(1, self.run_auto_commit).start()
 
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.

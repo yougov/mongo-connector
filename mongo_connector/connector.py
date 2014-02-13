@@ -26,9 +26,8 @@ import sys
 import threading
 import time
 import imp
-from mongo_connector import errors, util
+from mongo_connector import constants, errors, util
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.oplog_manager import OplogThread
 
 try:
@@ -42,8 +41,10 @@ class Connector(threading.Thread):
     """
     def __init__(self, address, oplog_checkpoint, target_url, ns_set,
                  u_key, auth_key, doc_manager=None, auth_username=None,
-                 collection_dump=True, batch_size=DEFAULT_BATCH_SIZE,
-                 fields=None, dest_mapping={}):
+                 collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
+                 fields=None, dest_mapping={},
+                 auto_commit_interval=constants.DEFAULT_COMMIT_INTERVAL):
+
         if doc_manager is not None:
             doc_manager = imp.load_source('DocManager', doc_manager)
         else:
@@ -102,20 +103,23 @@ class Connector(threading.Thread):
                 else:  # imported using load source
                     self.doc_manager = doc_manager.DocManager(
                         unique_key=u_key,
-                        namespace_set=ns_set
+                        namespace_set=ns_set,
+                        auto_commit_interval=auto_commit_interval
                     )
             else:
                 if doc_manager is None:
                     self.doc_manager = DocManager(
                         self.target_url,
                         unique_key=u_key,
-                        namespace_set=ns_set
+                        namespace_set=ns_set,
+                        auto_commit_interval=auto_commit_interval
                     )
                 else:
                     self.doc_manager = doc_manager.DocManager(
                         self.target_url,
                         unique_key=u_key,
-                        namespace_set=ns_set
+                        namespace_set=ns_set,
+                        auto_commit_interval=auto_commit_interval
                     )
         except errors.ConnectionFailed:
             err_msg = "MongoConnector: Could not connect to target system"
@@ -387,7 +391,7 @@ def main():
     #--batch-size specifies num docs to read from oplog before updating the
     #--oplog-ts config file with current oplog position
     parser.add_option("--batch-size", action="store",
-                      default=DEFAULT_BATCH_SIZE, type="int",
+                      default=constants.DEFAULT_BATCH_SIZE, type="int",
                       help="Specify an int to update the --oplog-ts "
                       "config file with latest position of oplog every "
                       "N documents. By default, the oplog config isn't "
@@ -508,6 +512,19 @@ def main():
                       """fields. The '_id', 'ns' and '_ts' fields are always """
                       """exported.""")
 
+    #--auto-commit-interval to specify auto commit time interval
+    parser.add_option("--auto-commit-interval", action="store",
+                      dest="commit_interval", type="int",
+                      default=constants.DEFAULT_COMMIT_INTERVAL,
+                      help="""Seconds in-between calls for the Doc Manager"""
+                      """ to commit changes to the target system. A value of"""
+                      """ 0 means to commit after every write operation."""
+                      """ When left unset, Mongo Connector will not make"""
+                      """ explicit commits. Some systems have"""
+                      """ their own mechanism for adjusting a commit"""
+                      """ interval, which should be preferred to this"""
+                      """ option.""")
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
@@ -577,6 +594,9 @@ def main():
         logger.error("Admin username specified without password!")
         sys.exit(1)
 
+    if options.commit_interval is not None and options.commit_interval < 0:
+        raise ValueError("--auto-commit-interval must be non-negative")
+
     connector = Connector(
         address=options.main_addr,
         oplog_checkpoint=options.oplog_config,
@@ -590,6 +610,7 @@ def main():
         batch_size=options.batch_size,
         fields=fields,
         dest_mapping=dest_mapping,
+        auto_commit_interval=options.commit_interval
     )
     connector.start()
 
