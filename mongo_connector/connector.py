@@ -302,7 +302,7 @@ class Connector(threading.Thread):
                         self.doc_manager.stop()
                         return
 
-                    shard_conn = Connection(hosts, replicaset=repl_set)
+                    shard_conn = Connection(hosts, replicaSet=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
                     oplog = OplogThread(
                         primary_conn=shard_conn,
