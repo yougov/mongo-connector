@@ -517,7 +517,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Cases:
         1. Documents on both shards, rollback on one shard
         2. Documents on both shards, rollback on both shards
-        Not worth testing docs on one shard, same as unsharded
+
         """
 
         self.opman1.start()
@@ -554,8 +554,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Note that both OplogThreads share the same doc manager
         c = lambda: len(self.opman1.doc_manager._search()) == 3
         self.assertTrue(wait_for(c),
-                        "not all writes were replicated to doc manager"
-                        "contents: %s" % str(self.opman1.doc_manager._search()))
+                        "not all writes were replicated to doc manager")
 
         # Kill the new primary
         kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
@@ -596,8 +595,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(len(docman_docs), 1)
         self.assertEqual(docman_docs[0]["i"], 0)
 
-        ##############################
-
         # Wait for previous rollback to complete
         def rollback_done():
             secondary1_count = retry_until_ok(db_secondary1.count)
@@ -605,6 +602,8 @@ class TestOplogManagerSharded(unittest.TestCase):
             return (1, 1) == (secondary1_count, secondary2_count)
         self.assertTrue(wait_for(rollback_done),
                         "rollback never replicated to one or more secondaries")
+
+        ##############################
 
         # Case 2: Primaries on both shards go down
         kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
