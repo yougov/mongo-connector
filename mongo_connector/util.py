@@ -62,7 +62,7 @@ def retry_until_ok(func, *args, **kwargs):
                 string = 'Call to %s failed too many times' % func
                 string += ' in retry_until_ok'
                 logging.error(string)
-                sys.exit(1)
+                raise
             time.sleep(1)
 
     return result

@@ -56,8 +56,9 @@ class DocManager():
     def remove(self, doc):
         """Removes the document from the doc dict.
         """
+        doc_id = doc[self.unique_key]
         try:
-            del self.doc_dict[doc[self.unique_key]]
+            del self.doc_dict[doc_id]
         except KeyError:
             raise OperationFailed("Document does not exist: %s" % str(doc))
 

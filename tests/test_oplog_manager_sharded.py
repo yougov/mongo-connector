@@ -525,29 +525,22 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Insert first documents while primaries are up
         db_main = self.mongos_conn["test"]["mcsharded"]
-        db_main.insert({"i": 0})
-        db_main.insert({"i": 1000})
+        db_main.insert({"i": 0}, w=2)
+        db_main.insert({"i": 1000}, w=2)
         self.assertEqual(self.shard1_conn["test"]["mcsharded"].count(), 1)
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
-
-        # Make sure insert is replicated
-        db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
-        db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
-        self.assertTrue(wait_for(lambda: db_secondary1.count() == 1),
-                        "write to shard1 didn't replicate")
-        self.assertTrue(wait_for(lambda: db_secondary2.count() == 1),
-                        "write to shard2 didn't replicate")
 
         # Case 1: only one primary goes down, shard1 in this case
         kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
-        while not shard1_secondary_admin.command("isMaster")["ismaster"]:
-            time.sleep(1)
+        wait_for(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
+        db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
+        db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
         self.assertEqual(db_secondary1.count(), 2)
 
         # Wait for replication on the doc manager
@@ -569,8 +562,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
-        while not retry_until_ok(c):
-            time.sleep(1)
+        wait_for(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
@@ -579,11 +571,11 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
-        while not secondary_admin.command("replSetGetStatus")["myState"] != 2:
-            time.sleep(1)
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        wait_for(c)
         query = {"i": {"$lt": 1000}}
-        while retry_until_ok(lambda: db_main.find(query).count) == 0:
-            time.sleep(1)
+        c = lambda: retry_until_ok(db_main.find(query).count) > 0
+        wait_for(c)
 
         # Only first document should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
@@ -612,10 +604,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
         shard2_secondary_admin = self.shard2_secondary_conn["admin"]
-        while not shard1_secondary_admin.command("isMaster")["ismaster"]:
-            time.sleep(1)
-        while not shard2_secondary_admin.command("isMaster")["ismaster"]:
-            time.sleep(1)
+        wait_for(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        wait_for(lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document on each shard. These will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
@@ -642,8 +632,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
-        while not retry_until_ok(c):
-            time.sleep(1)
+        assert wait_for(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
@@ -652,10 +641,8 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
-        while not secondary_admin.command("replSetGetStatus")["myState"] != 2:
-            time.sleep(1)
-        while retry_until_ok(lambda: db_main.find(query).count) == 0:
-            time.sleep(1)
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert wait_for(c)
         # Shard 2
         start_mongo_proc(
             port=PORTS_TWO["PRIMARY"],
@@ -665,8 +652,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
-        while not retry_until_ok(c):
-            time.sleep(1)
+        wait_for(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_TWO["SECONDARY"],
             repl_set_name="demo-repl-2",
@@ -675,11 +661,14 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         secondary_admin = self.shard2_secondary_conn["admin"]
-        while not secondary_admin.command("replSetGetStatus")["myState"] != 2:
-            time.sleep(1)
+
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        wait_for(c)
+
+        # Wait for the shards to come online
+        wait_for(lambda: retry_until_ok(db_main.find(query).count) > 0)
         query2 = {"i": {"$gte": 1000}}
-        while retry_until_ok(lambda: db_main.find(query).count) == 0:
-            time.sleep(1)
+        wait_for(lambda: retry_until_ok(db_main.find(query2).count) > 0)
 
         # Only first documents should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
