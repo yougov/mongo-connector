@@ -14,6 +14,7 @@
 
 """Test Solr search using the synchronizer, i.e. as it would be used by an user
     """
+import logging
 import os
 import time
 import sys
@@ -34,6 +35,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                 start_mongo_proc,
                                 start_cluster,
                                 kill_all)
+from tests.util import wait_for
 from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
 from pymongo.errors import OperationFailure, AutoReconnect
@@ -346,30 +348,94 @@ class TestSynchronizer(unittest.TestCase):
 
     def test_dynamic_fields(self):
         """ Tests dynamic field definitions
-        The following field in the supplied schema.xml:
+
+        The following fields are supplied in the provided schema.xml:
         <dynamicField name="*_i" type="int" indexed="true" stored="true"/>
         <dynamicField name="i_*" type="int" indexed="true" stored="true"/>
+
+        Cases:
+        1. Match on first definition
+        2. Match on second definition
+        3. No match
         """
-        inserted_obj = self.conn['test']['test'].insert({
-            'name':'test_dynamic',
-            'foo_i':1,
-            'i_foo':1})
-        self.assertEqual(self.conn['test']['test'].find().count(), 1)
+        self.solr_conn.delete(q='*:*')
 
-        for _ in range(60):
-            if len(self.connector.doc_manager._search("*:*")) != 0:
-                break
-            time.sleep(1)
-        else:
-            self.fail("Timeout when removing docs from Solr")
+        match_first = {"_id": 0, "foo_i": 100}
+        match_second = {"_id": 1, "i_foo": 200}
+        match_none = {"_id": 2, "foo": 300}
 
-        result = self.connector.doc_manager.get_last_doc()
-        self.assertIn('i_foo', result)
-        self.assertIn('foo_i', result)
-        self.assertEqual(len(self.connector.doc_manager._search(
-            "i_foo:1")), 1)
-        self.assertEqual(len(self.connector.doc_manager._search(
-            "foo_i:1")), 1)
+        # Connector is already running
+        self.conn["test"]["test"].insert(match_first)
+        self.conn["test"]["test"].insert(match_second)
+        self.conn["test"]["test"].insert(match_none)
+
+        # Should have documents in Solr now
+        self.assertTrue(wait_for(lambda: len(self.solr_conn.search("*:*")) > 0),
+                        "Solr doc manager should allow dynamic fields")
+
+        # foo_i and i_foo should be indexed, foo field should not exist
+        self.assertEqual(len(self.solr_conn.search("foo_i:100")), 1)
+        self.assertEqual(len(self.solr_conn.search("i_foo:200")), 1)
+
+        # SolrError: "undefined field foo"
+        logger = logging.getLogger("pysolr")
+        logger.error("You should see an ERROR log message from pysolr here. "
+                     "This indicates success, not an error in the test.")
+        with self.assertRaises(SolrError):
+            self.solr_conn.search("foo:300")
+
+    def test_nested_fields(self):
+        """Test indexing fields that are sub-documents in MongoDB
+
+        The following fields are defined in the provided schema.xml:
+
+        <field name="person.address.street" type="string" ... />
+        <field name="person.address.state" type="string" ... />
+        <dynamicField name="numbers.*" type="string" ... />
+        <dynamicField name="characters.*" type="string" ... />
+
+        """
+
+        self.solr_conn.delete(q='*:*')
+
+        # Connector is already running
+        self.conn["test"]["test"].insert({
+            "name": "Jeb",
+            "billing": {
+                "address": {
+                    "street": "12345 Mariposa Street",
+                    "state": "California"
+                }
+            }
+        })
+        self.conn["test"]["test"].insert({
+            "numbers": ["one", "two", "three"],
+            "characters": [
+                {"name": "Big Bird",
+                 "color": "yellow"},
+                {"name": "Elmo",
+                 "color": "red"},
+                "Cookie Monster"
+            ]
+        })
+
+        self.assertTrue(wait_for(lambda: len(self.solr_conn.search("*:*")) > 0),
+                        "documents should have been replicated to Solr")
+
+        # Search for first document
+        results = self.solr_conn.search(
+            "billing.address.street:12345\ Mariposa\ Street")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(next(iter(results))["billing.address.state"],
+                         "California")
+
+        # Search for second document
+        results = self.solr_conn.search(
+            "characters.1.color:red")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(next(iter(results))["numbers.2"], "three")
+        results = self.solr_conn.search("characters.2:Cookie\ Monster")
+        self.assertEqual(len(results), 1)
 
 if __name__ == '__main__':
     unittest.main()
