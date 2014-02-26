@@ -32,8 +32,7 @@ except ImportError:
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import (bson_ts_to_long,
-                                  retry_until_ok)
+from mongo_connector.util import (retry_until_ok)
 from tests.setup_cluster import (
     kill_mongo_proc,
     start_mongo_proc,
@@ -685,6 +684,88 @@ class TestOplogManagerSharded(unittest.TestCase):
         # cleanup
         self.opman1.join()
         self.opman2.join()
+
+    def test_with_chunk_migration(self):
+        """Test that DocManagers have proper state after both a successful
+        and an unsuccessful chunk migration
+        """
+
+        # Start replicating to dummy doc managers
+        self.opman1.start()
+        self.opman2.start()
+
+        collection = self.mongos_conn["test"]["mcsharded"]
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        # Assert current state of the mongoverse
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
+                         500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
+                         500)
+        self.assertTrue(
+            wait_for(lambda: len(self.opman1.doc_manager._search()) == 1000))
+
+        # Test successful chunk move from shard 1 to shard 2
+        self.mongos_conn["admin"].command(
+            bson.son.SON([
+                ("moveChunk", "test.mcsharded"),
+                ("find", {"i": 1}),
+                ("to", "demo-repl-2")
+            ])
+        )
+
+        # Wait for the balancer to kick-in
+        def balancer_running():
+            balancer_lock = self.mongos_conn["config"]["locks"].find_one(
+                {"_id": "balancer"})
+            return balancer_lock["state"] > 0 if balancer_lock else False
+        wait_for(balancer_running)
+        # doc manager should have all docs
+        all_docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(all_docs), 1000)
+        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
+            self.assertEqual(doc["i"], i + 500)
+
+        # Wait for migration to finish
+        def migration_done():
+            chunks = self.mongos_conn["config"]["chunks"]
+            return chunks.find({"shard": "replset-test-2"}).count() == 2
+        wait_for(migration_done)
+        # doc manager should still have all docs
+        all_docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(all_docs), 1000)
+        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
+            self.assertEqual(doc["i"], i + 500)
+
+        # Mark the collection as "dropped". This will cause migration to fail.
+        self.mongos_conn["config"]["collections"].update(
+            {"_id": "test.mcsharded"},
+            {"$set": {"dropped": True}}
+        )
+
+        # Test unsuccessful chunk move from shard 2 to shard 1
+        def fail_to_move_chunk():
+            self.mongos_conn["admin"].command(
+                bson.son.SON([
+                    ("moveChunk", "test.mcsharded"),
+                    ("find", {"i": 1}),
+                    ("to", "demo-repl")
+                ])
+            )
+        self.assertRaises(pymongo.errors.OperationFailure, fail_to_move_chunk)
+        # doc manager should still have all docs
+        all_docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(all_docs), 1000)
+        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
+            self.assertEqual(doc["i"], i + 500)
+
+        # Cleanup
+        self.opman1.join()
+        self.opman2.join()
+        progress = LockingDict()
+        self.opman1.oplog_progress = progress
+        self.opman2.oplog_progress = progress
+        self.opman1.checkpoint = self.opman2.checkpoint = None
 
 if __name__ == '__main__':
     unittest.main()

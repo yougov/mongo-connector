@@ -138,6 +138,10 @@ class OplogThread(threading.Thread):
                         if not self.running:
                             break
 
+                        # Don't replicate entries resulting from chunk moves
+                        if entry.get("fromMigrate"):
+                            continue
+
                         #sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
