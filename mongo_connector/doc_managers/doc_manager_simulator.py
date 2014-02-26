@@ -39,6 +39,7 @@ class DocManager():
         """
         self.unique_key = unique_key
         self.doc_dict = {}
+        self.url = url
 
     def stop(self):
         """Stops any running threads in the DocManager.

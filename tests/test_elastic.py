@@ -87,8 +87,6 @@ class TestElastic(unittest.TestCase):
     def tearDown(self):
         """ Ends the connector
         """
-        self.connector.doc_manager.auto_commit_interval = None
-        time.sleep(2)
         self.connector.join()
 
     def setUp(self):
