@@ -78,7 +78,7 @@ class TestSynchronizer(unittest.TestCase):
                 u_key='_id',
                 auth_key=None
             )
-            cls.synchronizer = cls.connector.doc_manager
+            cls.synchronizer = cls.connector.doc_managers[0]
             timer.start()
             cls.connector.start()
             while len(cls.connector.shard_set) == 0:

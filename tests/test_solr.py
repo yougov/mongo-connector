@@ -118,8 +118,6 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
 
     def tearDown(self):
-        self.connector.doc_manager.auto_commit_interval = None
-        time.sleep(2)
         self.connector.join()
 
     def test_shard_length(self):
@@ -314,16 +312,17 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test'].update({'_id' : inserted_obj},
             {'$set':{'popularity' : 1 }})
 
+        docman = self.connector.doc_managers[0]
         for _ in range(60):
-            if len(self.connector.doc_manager._search("*:*")) != 0:
+            if len(docman._search("*:*")) != 0:
                 break
             time.sleep(1)
         else:
             self.fail("Timeout when removing docs from Solr")
 
-        result = self.connector.doc_manager.get_last_doc()
+        result = docman.get_last_doc()
         self.assertIn('popularity', result)
-        self.assertEqual(len(self.connector.doc_manager._search(
+        self.assertEqual(len(docman._search(
             "name=test_valid")), 1)
 
     def test_invalid_fields(self):
@@ -334,16 +333,17 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test'].update({'_id' : inserted_obj},
             {'$set':{'break_this_test' : 1 }})
 
+        docman = self.connector.doc_managers[0]
         for _ in range(60):
-            if len(self.connector.doc_manager._search("*:*")) != 0:
+            if len(docman._search("*:*")) != 0:
                 break
             time.sleep(1)
         else:
             self.fail("Timeout when removing docs from Solr")
 
-        result = self.connector.doc_manager.get_last_doc()
+        result = docman.get_last_doc()
         self.assertNotIn('break_this_test', result)
-        self.assertEqual(len(self.connector.doc_manager._search(
+        self.assertEqual(len(docman._search(
             "name=test_invalid")), 1)
 
     def test_dynamic_fields(self):

@@ -264,7 +264,6 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # test_oplog.stop()
 
-
     def test_dump_collection(self):
         """Test dump_collection in oplog_manager.
 
@@ -272,22 +271,20 @@ class TestOplogManagerSharded(unittest.TestCase):
         """
 
         test_oplog, search_ts, solr, mongos = self.get_oplog_thread()
-        solr = DocManager()
-        test_oplog.doc_manager = solr
 
         # with documents
         safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection()
 
-        test_oplog.doc_manager.commit()
-        solr_results = solr._search()
+        docman = test_oplog.doc_managers[0]
+        docman.commit()
+        solr_results = docman._search()
         assert (len(solr_results) == 1)
         solr_doc = solr_results[0]
         assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
         assert (solr_doc['name'] == 'paulie')
         assert (solr_doc['ns'] == 'alpha.foo')
-
 
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager.
@@ -335,8 +332,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         test_oplog, primary_conn, solr, mongos = self.get_new_oplog()
 
-        solr = DocManager()
-        test_oplog.doc_manager = solr
+        solr = test_oplog.doc_managers[0]
         solr._delete()          # equivalent to solr.delete(q='*:*')
 
         safe_mongo_op(mongos['alpha']['foo'].remove, {})
@@ -397,10 +393,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
                       'ns': 'alpha.foo', '_id': obj2}
 
-        test_oplog.doc_manager.upsert(first_doc)
-        test_oplog.doc_manager.upsert(second_doc)
+        solr.upsert(first_doc)
+        solr.upsert(second_doc)
         test_oplog.rollback()
-        test_oplog.doc_manager.commit()
+        solr.commit()
         results = solr._search()
 
         self.assertEqual(len(results), 1)

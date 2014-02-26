@@ -15,36 +15,26 @@
 """Test oplog manager methods
 """
 
+import time
 import os
 import sys
-import inspect
-import time
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
 import re
-import socket
 try:
     from pymongo import MongoClient as Connection
 except ImportError:
-    from pymongo import Connection    
-
-sys.path[0:0] = [""]
+    from pymongo import Connection
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from tests.setup_cluster import (kill_mongo_proc,
-                                          start_mongo_proc,
-                                          start_cluster,
-                                          kill_all)
+from mongo_connector.util import long_to_bson_ts
+from tests.setup_cluster import (start_cluster,
+                                 kill_all)
 from tests.util import wait_for
-from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import(long_to_bson_ts,
-                                 bson_ts_to_long,
-                                 retry_until_ok)
-from bson.objectid import ObjectId
 
 PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
              "CONFIG":  "27220", "MAIN":  "27217"}
@@ -61,10 +51,6 @@ class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
         cluster
     """
-    def runTest(self):
-        """Runs all Tests
-        """
-        unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
@@ -268,21 +254,30 @@ class TestOplogManager(unittest.TestCase):
         """
 
         test_oplog, primary_conn, search_ts = self.get_oplog_thread()
-        solr = DocManager()
-        test_oplog.doc_manager = solr
 
         #with documents
         primary_conn['test']['test'].insert({'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection()
 
-        test_oplog.doc_manager.commit()
-        solr_results = solr._search()
+        doc_manager = test_oplog.doc_managers[0]
+        doc_manager.commit()
+        solr_results = doc_manager._search()
         self.assertEqual(len(solr_results), 1)
         solr_doc = solr_results[0]
         self.assertEqual(long_to_bson_ts(solr_doc['_ts']), search_ts)
         self.assertEqual(solr_doc['name'], 'paulie')
         self.assertEqual(solr_doc['ns'], 'test.test')
+
+        # test multiple targets
+        doc_managers = [DocManager(), DocManager(), DocManager()]
+        test_oplog.doc_managers = doc_managers
+        primary_conn["test"]["test"].remove()
+        for i in range(1000):
+            primary_conn["test"]["test"].insert({"i": i})
+        test_oplog.dump_collection()
+        for dm in doc_managers:
+            self.assertEqual(len(dm._search()), 1000)
 
     def test_init_cursor(self):
         """Test init_cursor in oplog_manager. Assertion failure if it
@@ -321,9 +316,8 @@ class TestOplogManager(unittest.TestCase):
         primary_conn['test']['test'].insert(({"_id": i} for i in range(100)))
 
         # test no-dump option
-        docman = DocManager()
+        docman = test_oplog.doc_managers[0]
         docman._delete()
-        test_oplog.doc_manager = docman
         test_oplog.collection_dump = False
         test_oplog.oplog_progress = LockingDict()
         # init_cursor has the side-effect of causing a collection dump
@@ -337,109 +331,9 @@ class TestOplogManager(unittest.TestCase):
         test_oplog.init_cursor()
         self.assertEqual(len(docman._search()), 100)
 
-    def test_rollback(self):
-        """Test rollback in oplog_manager. Assertion failure if it doesn't pass
-            We force a rollback by inserting a doc, killing the primary,
-            inserting another doc, killing the new primary, and then restarting
-            both.
-        """
-        os.system('rm config.txt; touch config.txt')
-        test_oplog, primary_conn, mongos, solr = self.get_new_oplog()
-
-        # add a namespace mapping to the oplog manager
-        test_oplog.dest_mapping = {
-            "test.test": "foo.bar"
-        }
-
-        if not start_cluster():
-            self.fail('Cluster could not be started successfully!')
-
-        solr = DocManager()
-        test_oplog.doc_manager = solr
-        solr._delete()          # equivalent to solr.delete(q='*: *')
-
-        mongos['test']['test'].remove({})
-        mongos['test']['test'].insert(
-            {'_id': ObjectId('4ff74db3f646462b38000001'),
-             'name': 'paulie'},
-            safe=True
-        )
-        while (mongos['test']['test'].find().count() != 1):
-            time.sleep(1)
-        cutoff_ts = test_oplog.get_last_oplog_timestamp()
-
-        first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
-                     'ns': 'test.test',
-                     '_id':  ObjectId('4ff74db3f646462b38000001')}
-
-        #try kill one, try restarting
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
-
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
-        admin = new_primary_conn['admin']
-        while admin.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        count = 0
-        while True:
-            try:
-                mongos['test']['test'].insert({
-                    '_id': ObjectId('4ff74db3f646462b38000002'),
-                    'name': 'paul'}, 
-                    safe=True)
-                break
-            except OperationFailure:
-                count += 1
-                if count > 60:
-                    self.fail('Call to insert doc failed too many times')
-                time.sleep(1)
-                continue
-        while (mongos['test']['test'].find().count() != 2):
-            time.sleep(1)
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
-
-        #wait for master to be established
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
-
-        #wait for secondary to be established
-        admin = new_primary_conn['admin']
-        while admin.command("replSetGetStatus")['myState'] != 2:
-            time.sleep(1)
-        while retry_until_ok(mongos['test']['test'].find().count) != 1:
-            time.sleep(1)
-
-        self.assertEqual(str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
-        self.assertEqual(str(primary_conn.port), PORTS_ONE['PRIMARY'])
-
-        last_ts = test_oplog.get_last_oplog_timestamp()
-        second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
-                      'ns': 'test.test', 
-                      '_id': ObjectId('4ff74db3f646462b38000002')}
-
-        test_oplog.doc_manager.upsert(first_doc)
-        test_oplog.doc_manager.upsert(second_doc)
-
-        test_oplog.rollback()
-        test_oplog.doc_manager.commit()
-        results = solr._search()
-
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["ns"], "foo.bar")
-
-        self.assertEqual(results[0]['name'], 'paulie')
-        self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
-
-        #test_oplog.join()
-
     def test_filter_fields(self):
         opman, _, _ = self.get_oplog_thread()
-        docman = opman.doc_manager
+        docman = opman.doc_managers[0]
         conn = opman.main_connection
 
         include_fields = ["a", "b", "c"]
@@ -478,7 +372,7 @@ class TestOplogManager(unittest.TestCase):
         dest_mapping = {"test.test1": "test.test1_dest",
                         "test.test2": "test.test2_dest"}
         test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        docman = test_oplog.doc_manager
+        docman = test_oplog.doc_managers[0]
         test_oplog.dest_mapping = dest_mapping
         test_oplog.namespace_set = source_ns
         # start replicating
@@ -523,7 +417,7 @@ class TestOplogManager(unittest.TestCase):
 
             # cleanup
             primary_conn[db][coll].remove()
-            test_oplog.doc_manager._delete()
+            test_oplog.doc_managers[0]._delete()
 
         # doc not in namespace set
         for ns in phony_ns:
@@ -544,6 +438,43 @@ class TestOplogManager(unittest.TestCase):
 
         # cleanup
         test_oplog.join()
+
+    def test_many_targets(self):
+        """Test that one OplogThread is capable of replicating to more than
+        one target.
+        """
+
+        opman, primary_conn, oplog_coll = self.get_oplog_thread()
+        doc_managers = [DocManager(), DocManager(), DocManager()]
+        opman.doc_managers = doc_managers
+
+        # start replicating
+        opman.start()
+        primary_conn["test"]["test"].insert({
+            "name": "kermit",
+            "color": "green"
+        })
+        primary_conn["test"]["test"].insert({
+            "name": "elmo",
+            "color": "firetruck red"
+        })
+
+        self.assertTrue(
+            wait_for(lambda: sum(len(d._search()) for d in doc_managers) == 6),
+            "OplogThread should be able to replicate to multiple targets"
+        )
+
+        primary_conn["test"]["test"].remove({"name": "elmo"})
+
+        self.assertTrue(
+            wait_for(lambda: sum(len(d._search()) for d in doc_managers) == 3),
+            "OplogThread should be able to replicate to multiple targets"
+        )
+        for d in doc_managers:
+            self.assertEqual(d._search()[0]["name"], "kermit")
+
+        # cleanup
+        opman.join()
 
 if __name__ == '__main__':
     unittest.main()

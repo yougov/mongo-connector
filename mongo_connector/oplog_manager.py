@@ -17,12 +17,18 @@
 
 import bson
 import logging
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 import pymongo
 import sys
 import time
 import threading
+import traceback
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
+from mongo_connector.util import retry_until_ok
 
 try:
     from pymongo import MongoClient as Connection
@@ -62,14 +68,12 @@ class OplogThread(threading.Thread):
         #Boolean describing whether the cluster is sharded or not
         self.is_sharded = is_sharded
 
-        #The document manager for the target system.
-        #This is the same for all threads.
-        self.doc_manager = doc_manager
-
-        # Determine if the doc manager supports bulk upserts
-        # If so, we can be more efficient with the way we pass along
-        # updates to the doc manager.
-        self.can_bulk = hasattr(self.doc_manager, "bulk_upsert")
+        #A document manager for each target system.
+        #These are the same for all threads.
+        if type(doc_manager) == list:
+            self.doc_managers = doc_manager
+        else:
+            self.doc_managers = [doc_manager]
 
         #Boolean describing whether or not the thread is running.
         self.running = True
@@ -157,24 +161,33 @@ class OplogThread(threading.Thread):
                         ns = self.dest_mapping.get(entry['ns'], ns)
 
                         #delete
-                        if operation == 'd':
-                            entry['_id'] = entry['o']['_id']
-                            self.doc_manager.remove(entry)
-                        #insert/update. They are equal because of lack
-                        #of support for partial update
-                        elif operation == 'i' or operation == 'u':
-                            doc = self.retrieve_doc(entry)
-                            if doc is not None:
-                                doc['_ts'] = util.bson_ts_to_long(entry['ts'])
-                                doc['ns'] = ns
-                                try:
-                                    self.doc_manager.upsert(
-                                        self.filter_fields(doc)
-                                    )
-                                except errors.OperationFailed:
-                                    logging.error(
-                                        "Unable to insert %s" % (doc)
-                                    )
+                        try:
+                            if operation == 'd':
+                                entry['_id'] = entry['o']['_id']
+                                for dm in self.doc_managers:
+                                    dm.remove(entry)
+                            #insert/update. They are equal because of lack
+                            #of support for partial update
+                            elif operation == 'i' or operation == 'u':
+                                doc = self.retrieve_doc(entry)
+                                if doc is not None:
+                                    doc['_ts'] = util.bson_ts_to_long(
+                                        entry['ts'])
+                                    doc['ns'] = ns
+                                    for dm in self.doc_managers:
+                                        dm.upsert(self.filter_fields(doc))
+                        except errors.OperationFailed:
+                            logging.error(
+                                "Unable to %s doc with id %s" % (
+                                    "delete" if operation == "d" else "upsert",
+                                    str(entry['_id'])
+                                ))
+                        except errors.ConnectionFailed:
+                            logging.error(
+                                "Network error while trying to %s %s" % (
+                                    "delete" if operation == "d" else "upsert",
+                                    str(entry['_id'])
+                                ))
 
                         last_ts = entry['ts']
 
@@ -320,27 +333,88 @@ class OplogThread(threading.Thread):
             for namespace in dump_set:
                 logging.info("dumping collection %s" % namespace)
                 database, coll = namespace.split('.', 1)
-                target_coll = self.main_connection[database][coll]
-                cursor = util.retry_until_ok(target_coll.find)
-                for doc in cursor:
-                    if not self.running:
-                        raise StopIteration
-                    doc["ns"] = self.dest_mapping.get(namespace, namespace)
-                    doc["_ts"] = long_ts
-                    yield doc
+                last_id = None
+                attempts = 0
 
-        try:
-            # Bulk upsert if possible
-            if self.can_bulk:
-                self.doc_manager.bulk_upsert(docs_to_dump())
-            else:
-                for doc in docs_to_dump():
+                # Loop to handle possible AutoReconnect
+                while attempts < 60:
+                    target_coll = self.main_connection[database][coll]
+                    if not last_id:
+                        cursor = util.retry_until_ok(
+                            target_coll.find,
+                            sort=[("_id", pymongo.ASCENDING)]
+                        )
+                    else:
+                        cursor = util.retry_until_ok(
+                            target_coll.find,
+                            {"_id": {"$gt": last_id}},
+                            sort=[("_id", pymongo.ASCENDING)]
+                        )
                     try:
-                        self.doc_manager.upsert(self.filter_fields(doc))
-                    except errors.OperationFailed:
-                        logging.error("Unable to insert %s" % doc)
-        except (pymongo.errors.AutoReconnect,
-                pymongo.errors.OperationFailure):
+                        for doc in cursor:
+                            if not self.running:
+                                raise StopIteration
+                            doc["ns"] = self.dest_mapping.get(
+                                namespace, namespace)
+                            doc["_ts"] = long_ts
+                            last_id = doc["_id"]
+                            yield doc
+                        break
+                    except pymongo.errors.AutoReconnect:
+                        attempts += 1
+                        time.sleep(1)
+
+        # Extra threads (if any) that assist with collection dumps
+        dumping_threads = []
+        # Did the dump succeed for all target systems?
+        dump_success = True
+        # Holds any exceptions we can't recover from
+        errors = queue.Queue()
+        try:
+            for dm in self.doc_managers:
+                # Bulk upsert if possible
+                if hasattr(dm, "bulk_upsert"):
+                    # Slight performance gain breaking dump into separate
+                    # threads, only if > 1 replication target
+                    if len(self.doc_managers) == 1:
+                        dm.bulk_upsert(docs_to_dump())
+                    else:
+                        def do_dump(error_queue):
+                            all_docs = docs_to_dump()
+                            try:
+                                dm.bulk_upsert(all_docs)
+                            except Exception:
+                                # Likely exceptions:
+                                # pymongo.errors.OperationFailure,
+                                # mongo_connector.errors.ConnectionFailed
+                                # mongo_connector.errors.OperationFailed
+                                error_queue.put(sys.exc_info())
+
+                        t = threading.Thread(target=do_dump, args=(errors,))
+                        dumping_threads.append(t)
+                        t.start()
+                else:
+                    for doc in docs_to_dump():
+                        dm.upsert(self.filter_fields(doc))
+
+            # cleanup
+            for t in dumping_threads:
+                t.join()
+
+        except Exception:
+            # See "likely exceptions" comment above
+            errors.put(sys.exc_info())
+
+        # Print caught exceptions
+        try:
+            while True:
+                klass, value, trace = errors.get_nowait()
+                dump_success = False
+                traceback.print_exception(klass, value, trace)
+        except queue.Empty:
+            pass
+
+        if not dump_success:
             err_msg = "OplogManager: Failed during dump collection"
             effect = "cannot recover!"
             logging.error('%s %s %s' % (err_msg, effect, self.oplog))
@@ -411,77 +485,91 @@ class OplogThread(threading.Thread):
         timestamp. This defines the rollback window and we just roll these
         back until the oplog and target system are in consistent states.
         """
-        self.doc_manager.commit()
-        last_inserted_doc = self.doc_manager.get_last_doc()
+        # Find the most recently inserted document in each target system
+        last_docs = []
+        for dm in self.doc_managers:
+            dm.commit()
+            last_docs.append(dm.get_last_doc())
 
+        # Of these documents, which is the most recent?
+        last_inserted_doc = max(last_docs,
+                                key=lambda x: x["_ts"] if x else float("-inf"))
+
+        # Nothing has been replicated. No need to rollback target systems
         if last_inserted_doc is None:
             return None
 
+        # Find the oplog entry that touched the most recent document.
+        # We'll use this to figure where to pick up the oplog later.
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = self.oplog.find_one(
             {'ts': {'$lte': target_ts}},
             sort=[('$natural', pymongo.DESCENDING)]
         )
+
+        # The oplog entry for the most recent document doesn't exist anymore.
+        # If we've fallen behind in the oplog, this will be caught later
         if last_oplog_entry is None:
             return None
 
+        # rollback_cutoff_ts happened *before* the rollback
         rollback_cutoff_ts = last_oplog_entry['ts']
         start_ts = util.bson_ts_to_long(rollback_cutoff_ts)
+        # timestamp of the most recent document on any target system
         end_ts = last_inserted_doc['_ts']
 
-        rollback_set = {}   # this is a dictionary of ns:list of docs
-        for doc in self.doc_manager.search(start_ts, end_ts):
-            if doc['ns'] in rollback_set:
-                rollback_set[doc['ns']].append(doc)
-            else:
-                rollback_set[doc['ns']] = [doc]
+        for dm in self.doc_managers:
+            rollback_set = {}   # this is a dictionary of ns:list of docs
 
-        for namespace, doc_list in rollback_set.items():
-            # Get the original namespace
-            original_namespace = namespace
-            for source_name, dest_name in self.dest_mapping.items():
-                if dest_name == namespace:
-                    original_namespace = source_name
+            # group potentially conflicted documents by namespace
+            for doc in dm.search(start_ts, end_ts):
+                if doc['ns'] in rollback_set:
+                    rollback_set[doc['ns']].append(doc)
+                else:
+                    rollback_set[doc['ns']] = [doc]
 
-            database, coll = original_namespace.split('.', 1)
-            obj_id = bson.objectid.ObjectId
-            bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
+            # retrieve these documents from MongoDB, either updating
+            # or removing them in each target system
+            for namespace, doc_list in rollback_set.items():
+                # Get the original namespace
+                original_namespace = namespace
+                for source_name, dest_name in self.dest_mapping.items():
+                    if dest_name == namespace:
+                        original_namespace = source_name
 
-            to_update = util.retry_until_ok(
-                self.main_connection[database][coll].find,
-                {'_id': {'$in': bson_obj_id_list}})
-            #doc list are docs in  target system, to_update are docs in mongo
-            doc_hash = {}  # hash by _id
-            for doc in doc_list:
-                doc_hash[bson.objectid.ObjectId(doc['_id'])] = doc
+                database, coll = original_namespace.split('.', 1)
+                obj_id = bson.objectid.ObjectId
+                bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
 
-            to_index = []
-            count = 0
-            while True:
-                try:
+                to_update = util.retry_until_ok(
+                    self.main_connection[database][coll].find,
+                    {'_id': {'$in': bson_obj_id_list}})
+                #doc list are docs in target system, to_update are
+                #docs in mongo
+                doc_hash = {}  # hash by _id
+                for doc in doc_list:
+                    doc_hash[bson.objectid.ObjectId(doc['_id'])] = doc
+
+                to_index = []
+
+                def collect_existing_docs():
                     for doc in to_update:
                         if doc['_id'] in doc_hash:
                             del doc_hash[doc['_id']]
                             to_index.append(doc)
-                    break
-                except (pymongo.errors.OperationFailure,
-                        pymongo.errors.AutoReconnect):
-                    count += 1
-                    if count > 60:
-                        sys.exit(1)
-                    time.sleep(1)
+                retry_until_ok(collect_existing_docs)
 
-            #delete the inconsistent documents
-            for doc in doc_hash.values():
-                self.doc_manager.remove(doc)
+                #delete the inconsistent documents
+                for doc in doc_hash.values():
+                    dm.remove(doc)
 
-            #insert the ones from mongo
-            for doc in to_index:
-                doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
-                doc['ns'] = self.dest_mapping.get(namespace, namespace)
-                try:
-                    self.doc_manager.upsert(self.filter_fields(doc))
-                except errors.OperationFailed:
-                    logging.error("Unable to insert %s" % (doc))
+                #insert the ones from mongo
+                for doc in to_index:
+                    doc['_ts'] = util.bson_ts_to_long(rollback_cutoff_ts)
+                    doc['ns'] = self.dest_mapping.get(namespace, namespace)
+                    try:
+                        dm.upsert(self.filter_fields(doc))
+                    except errors.OperationFailed:
+                        logging.error("Unable to insert %s" % (doc))
 
         return rollback_cutoff_ts
