@@ -32,7 +32,7 @@ except ImportError:
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import (retry_until_ok)
+from mongo_connector.util import retry_until_ok
 from tests.setup_cluster import (
     kill_mongo_proc,
     start_mongo_proc,
