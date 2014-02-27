@@ -719,7 +719,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             balancer_lock = self.mongos_conn["config"]["locks"].find_one(
                 {"_id": "balancer"})
             return balancer_lock["state"] > 0 if balancer_lock else False
-        wait_for(balancer_running)
+        self.assertTrue(wait_for(balancer_running), "balancer should run")
         # doc manager should have all docs
         all_docs = self.opman1.doc_manager._search()
         self.assertEqual(len(all_docs), 1000)
