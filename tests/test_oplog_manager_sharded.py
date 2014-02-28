@@ -42,7 +42,7 @@ from tests.setup_cluster import (
     PORTS_ONE,
     PORTS_TWO
 )
-from tests.util import wait_for
+from tests.util import assert_soon
 
 
 class TestOplogManagerSharded(unittest.TestCase):
@@ -172,7 +172,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             shard1_done = cls.shard1_conn.test.mcsharded.find_one() is not None
             shard2_done = cls.shard2_conn.test.mcsharded.find_one() is not None
             return shard1_done and shard2_done
-        assert(wait_for(chunks_moved))
+        assert_soon(chunks_moved)
         cls.mongos_conn.test.mcsharded.remove()
 
         # Oplog threads (oplog manager) for each shard
@@ -205,7 +205,7 @@ class TestOplogManagerSharded(unittest.TestCase):
     def tearDownClass(cls):
         """ Kill the cluster
         """
-        kill_all()
+        # kill_all()
 
     def setUp(self):
         # clear oplog
@@ -254,8 +254,8 @@ class TestOplogManagerSharded(unittest.TestCase):
                     "replSetGetStatus"
                 )["myState"] == 2
             return wrap
-        wait_for(secondary_up(self.shard1_secondary_conn))
-        wait_for(secondary_up(self.shard2_secondary_conn))
+        assert_soon(secondary_up(self.shard1_secondary_conn))
+        assert_soon(secondary_up(self.shard2_secondary_conn))
 
     def tearDown(self):
         self.mongos_conn["test"]["mcsharded"].remove()
@@ -534,7 +534,8 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
-        wait_for(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
@@ -545,8 +546,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
         c = lambda: len(self.opman1.doc_manager._search()) == 3
-        self.assertTrue(wait_for(c),
-                        "not all writes were replicated to doc manager")
+        assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primary
         kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
@@ -561,7 +561,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
-        wait_for(lambda: retry_until_ok(c))
+        assert_soon(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
@@ -571,10 +571,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        wait_for(c)
+        assert_soon(c)
         query = {"i": {"$lt": 1000}}
-        c = lambda: retry_until_ok(db_main.find(query).count) > 0
-        wait_for(c)
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
 
         # Only first document should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
@@ -591,8 +590,8 @@ class TestOplogManagerSharded(unittest.TestCase):
             secondary1_count = retry_until_ok(db_secondary1.count)
             secondary2_count = retry_until_ok(db_secondary2.count)
             return (1, 1) == (secondary1_count, secondary2_count)
-        self.assertTrue(wait_for(rollback_done),
-                        "rollback never replicated to one or more secondaries")
+        assert_soon(rollback_done,
+                    "rollback never replicated to one or more secondaries")
 
         ##############################
 
@@ -603,8 +602,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
         shard2_secondary_admin = self.shard2_secondary_conn["admin"]
-        wait_for(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
-        wait_for(lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(
+            lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document on each shard. These will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
@@ -614,8 +615,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Wait for replication on the doc manager
         c = lambda: len(self.opman1.doc_manager._search()) == 4
-        self.assertTrue(wait_for(c),
-                        "not all writes were replicated to doc manager")
+        assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
         kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
@@ -631,7 +631,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
-        assert wait_for(lambda: retry_until_ok(c))
+        assert_soon(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
@@ -641,7 +641,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        assert wait_for(c)
+        assert_soon(c)
         # Shard 2
         start_mongo_proc(
             port=PORTS_TWO["PRIMARY"],
@@ -651,7 +651,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             key_file=None
         )
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
-        wait_for(lambda: retry_until_ok(c))
+        assert_soon(lambda: retry_until_ok(c))
         start_mongo_proc(
             port=PORTS_TWO["SECONDARY"],
             repl_set_name="demo-repl-2",
@@ -662,12 +662,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         secondary_admin = self.shard2_secondary_conn["admin"]
 
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        wait_for(c)
+        assert_soon(c)
 
         # Wait for the shards to come online
-        wait_for(lambda: retry_until_ok(db_main.find(query).count) > 0)
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
         query2 = {"i": {"$gte": 1000}}
-        wait_for(lambda: retry_until_ok(db_main.find(query2).count) > 0)
+        assert_soon(lambda: retry_until_ok(db_main.find(query2).count) > 0)
 
         # Only first documents should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
@@ -702,8 +702,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                          500)
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
                          500)
-        self.assertTrue(
-            wait_for(lambda: len(self.opman1.doc_manager._search()) == 1000))
+        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
 
         # Test successful chunk move from shard 1 to shard 2
         self.mongos_conn["admin"].command(
@@ -719,7 +718,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             balancer_lock = self.mongos_conn["config"]["locks"].find_one(
                 {"_id": "balancer"})
             return balancer_lock["state"] > 0 if balancer_lock else False
-        self.assertTrue(wait_for(balancer_running), "balancer should run")
+        assert_soon(balancer_running, "balancer should run")
         # doc manager should have all docs
         all_docs = self.opman1.doc_manager._search()
         self.assertEqual(len(all_docs), 1000)
@@ -729,8 +728,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for migration to finish
         def migration_done():
             chunks = self.mongos_conn["config"]["chunks"]
-            return chunks.find({"shard": "replset-test-2"}).count() == 2
-        wait_for(migration_done)
+            return chunks.find({"shard": "replset-test-2"}).count() >= 2
+        assert_soon(migration_done, "migration never finished", max_tries=300)
         # doc manager should still have all docs
         all_docs = self.opman1.doc_manager._search()
         self.assertEqual(len(all_docs), 1000)
