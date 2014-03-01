@@ -410,9 +410,12 @@ class OplogThread(threading.Thread):
             return None
 
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one({'ts': {'$lte': target_ts}},
-                                               sort=[('$natural',
-                                               pymongo.DESCENDING)])
+        last_oplog_entry = util.retry_until_ok(
+            self.oplog.find_one,
+            {'ts': {'$lte': target_ts}},
+            sort=[('$natural', pymongo.DESCENDING)]
+        )
+
         if last_oplog_entry is None:
             return None
 

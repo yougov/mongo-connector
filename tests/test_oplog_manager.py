@@ -39,7 +39,7 @@ from tests.setup_cluster import (kill_mongo_proc,
                                  start_cluster,
                                  kill_all,
                                  PORTS_ONE)
-from tests.util import wait_for
+from tests.util import assert_soon
 from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import(long_to_bson_ts,
@@ -434,7 +434,7 @@ class TestOplogManager(unittest.TestCase):
         }
         db = conn['test']['test']
         db.insert(doc)
-        wait_for(lambda: db.count() == 1)
+        assert_soon(lambda: db.count() == 1)
         opman.dump_collection()
 
         result = docman._search()[0]

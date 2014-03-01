@@ -33,7 +33,7 @@ except ImportError:
 
 from pymongo.errors import ConnectionFailure, AutoReconnect
 from mongo_connector.util import retry_until_ok
-from tests.util import wait_for
+from tests.util import assert_soon
 
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
                         "CONFIG": "27220", "MONGOS": "27217"}
@@ -251,7 +251,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
     def primary_up():
         return retry_until_ok(primary.admin.command,
                               "isMaster")['ismaster']
-    wait_for(primary_up)
+    assert_soon(primary_up)
 
     if use_mongos:
         retry_until_ok(
@@ -268,7 +268,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
         def primary_up():
             return retry_until_ok(primary2.admin.command,
                                   "isMaster")['ismaster']
-        wait_for(primary_up)
+        assert_soon(primary_up)
 
         retry_until_ok(
             mongos.admin.command,
@@ -279,9 +279,9 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
 
     primary = Connection('localhost:27117')
     admin = primary['admin']
-    wait_for(lambda: admin.command("isMaster")['ismaster'])
+    assert_soon(lambda: admin.command("isMaster")['ismaster'])
     secondary = Connection('localhost:%s' % PORTS_ONE["SECONDARY"])
     c = lambda: secondary.admin.command("replSetGetStatus")["myState"] == 2
-    wait_for(c)
+    assert_soon(c)
 
     return True

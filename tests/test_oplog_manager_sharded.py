@@ -59,13 +59,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         Create and shard test collections
         Create OplogThreads
         """
-        # Create a new oplog progress file
-        try:
-            os.unlink("config.txt")
-        except OSError:
-            pass
-        open("config.txt", "w").close()
-
         # Start the cluster with a mongos on port 27217
         start_cluster(sharded=True)
 
@@ -96,6 +89,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         cls.mongos_conn.admin.command("shardCollection",
                                       "test.mcsharded",
                                       key={"i": 1})
+
         # Pre-split the collection so that:
         # i < 1000            lives on shard1
         # i >= 1000           lives on shard2
@@ -103,45 +97,14 @@ class TestOplogManagerSharded(unittest.TestCase):
             ("split", "test.mcsharded"),
             ("middle", {"i": 1000})
         ]))
-        # Tag shards/ranges to enforce chunk split rules
-        cls.mongos_conn.config.shards.update(
-            {"_id": "demo-repl"},
-            {"$addToSet": {"tags": "small-i"}}
-        )
-        cls.mongos_conn.config.shards.update(
-            {"_id": "demo-repl-2"},
-            {"$addToSet": {"tags": "large-i"}}
-        )
-        cls.mongos_conn.config.tags.update(
-            {"_id": bson.son.SON([("ns", "test.mcsharded"),
-                                  ("min", {"i": bson.min_key.MinKey()})])},
-            bson.son.SON([
-                ("_id", bson.son.SON([
-                        ("ns", "test.mcsharded"),
-                        ("min", {"i": bson.min_key.MinKey()})
-                    ])),
-                ("ns", "test.mcsharded"),
-                ("min", {"i": bson.min_key.MinKey()}),
-                ("max", {"i": 1000}),
-                ("tag", "small-i")
-            ]),
+
+        # disable the balancer
+        cls.mongos_conn.config.settings.update(
+            {"_id": "balancer"},
+            {"$set": {"stopped": True}},
             upsert=True
         )
-        cls.mongos_conn.config.tags.update(
-            {"_id": bson.son.SON([("ns", "test.mcsharded"),
-                                  ("min", {"i": 1000})])},
-            bson.son.SON([
-                ("_id", bson.son.SON([
-                        ("ns", "test.mcsharded"),
-                        ("min", {"i": 1000})
-                    ])),
-                ("ns", "test.mcsharded"),
-                ("min", {"i": 1000}),
-                ("max", {"i": bson.max_key.MaxKey()}),
-                ("tag", "large-i")
-            ]),
-            upsert=True
-        )
+
         # Move chunks to their proper places
         try:
             cls.mongos_conn["admin"].command(
@@ -164,7 +127,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         except pymongo.errors.OperationFailure:
             pass        # chunk may already be on the correct shard
 
-        # Wait for things to settle down
+        # Make sure chunks are distributed correctly
         cls.mongos_conn["test"]["mcsharded"].insert({"i": 1})
         cls.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
 
@@ -175,37 +138,11 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(chunks_moved)
         cls.mongos_conn.test.mcsharded.remove()
 
-        # Oplog threads (oplog manager) for each shard
-        doc_manager = DocManager()
-        oplog_progress = LockingDict()
-        cls.opman1 = OplogThread(
-            primary_conn=cls.shard1_conn,
-            main_address=mongos_address,
-            oplog_coll=cls.shard1_conn["local"]["oplog.rs"],
-            is_sharded=True,
-            doc_manager=doc_manager,
-            oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mcsharded", "test.mcunsharded"],
-            auth_key=None,
-            auth_username=None
-        )
-        cls.opman2 = OplogThread(
-            primary_conn=cls.shard2_conn,
-            main_address=mongos_address,
-            oplog_coll=cls.shard2_conn["local"]["oplog.rs"],
-            is_sharded=True,
-            doc_manager=doc_manager,
-            oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mcsharded", "test.mcunsharded"],
-            auth_key=None,
-            auth_username=None
-        )
-
     @classmethod
     def tearDownClass(cls):
         """ Kill the cluster
         """
-        # kill_all()
+        kill_all()
 
     def setUp(self):
         # clear oplog
@@ -223,11 +160,13 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         # re-sync secondaries
         try:
-            self.shard1_secondary_conn["admin"].command("shutdown")
+            self.shard1_secondary_conn["admin"].command(
+                "shutdown", 1, force=True)
         except pymongo.errors.AutoReconnect:
             pass
         try:
-            self.shard2_secondary_conn["admin"].command("shutdown")
+            self.shard2_secondary_conn["admin"].command(
+                "shutdown", 1, force=True)
         except pymongo.errors.AutoReconnect:
             pass
         data1 = os.path.join(DEMO_SERVER_DATA, "replset1b")
@@ -257,9 +196,50 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(secondary_up(self.shard1_secondary_conn))
         assert_soon(secondary_up(self.shard2_secondary_conn))
 
+        # Create a new oplog progress file
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
+
+        # Oplog threads (oplog manager) for each shard
+        doc_manager = DocManager()
+        oplog_progress = LockingDict()
+        self.opman1 = OplogThread(
+            primary_conn=self.shard1_conn,
+            main_address="localhost:%s" % PORTS_ONE["MONGOS"],
+            oplog_coll=self.shard1_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
+        self.opman2 = OplogThread(
+            primary_conn=self.shard2_conn,
+            main_address="localhost:%s" % PORTS_ONE["MONGOS"],
+            oplog_coll=self.shard2_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
+
     def tearDown(self):
         self.mongos_conn["test"]["mcsharded"].remove()
         self.mongos_conn["test"]["mcunsharded"].remove()
+        try:
+            self.opman1.join()
+        except RuntimeError:
+            pass                # thread may not have been started
+        try:
+            self.opman2.join()
+        except RuntimeError:
+            pass                # thread may not have been started
 
     def test_retrieve_doc(self):
         """ Test the retrieve_doc method """
@@ -409,8 +389,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         last_ts2 = self.opman2.get_last_oplog_timestamp()
         self.assertEqual(last_ts1, self.opman1.dump_collection())
         self.assertEqual(last_ts2, self.opman2.dump_collection())
-        self.assertEqual(len(self.opman1.doc_manager._search()),
-                         len(self.opman2.doc_manager._search()))
         self.assertEqual(len(self.opman1.doc_manager._search()), 1000)
 
     def test_init_cursor(self):
@@ -505,11 +483,6 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.assertEqual(prog.get_dict()[str(self.opman2.oplog)],
                              entry2[0]["ts"])
 
-        # Some cleanup
-        progress = LockingDict()
-        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
-        self.opman1.checkpoint = self.opman2.checkpoint = None
-
     def test_rollback(self):
         """Test the rollback method in a sharded environment
 
@@ -546,7 +519,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
         c = lambda: len(self.opman1.doc_manager._search()) == 3
-        assert_soon(c, "not all writes were replicated to doc manager")
+        assert_soon(c, "not all writes were replicated to doc manager",
+                    max_tries=120)
 
         # Kill the new primary
         kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
@@ -681,10 +655,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertIn(0, i_values)
         self.assertIn(1000, i_values)
 
-        # cleanup
-        self.opman1.join()
-        self.opman2.join()
-
     def test_with_chunk_migration(self):
         """Test that DocManagers have proper state after both a successful
         and an unsuccessful chunk migration
@@ -713,23 +683,6 @@ class TestOplogManagerSharded(unittest.TestCase):
             ])
         )
 
-        # Wait for the balancer to kick-in
-        def balancer_running():
-            balancer_lock = self.mongos_conn["config"]["locks"].find_one(
-                {"_id": "balancer"})
-            return balancer_lock["state"] > 0 if balancer_lock else False
-        assert_soon(balancer_running, "balancer should run")
-        # doc manager should have all docs
-        all_docs = self.opman1.doc_manager._search()
-        self.assertEqual(len(all_docs), 1000)
-        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
-            self.assertEqual(doc["i"], i + 500)
-
-        # Wait for migration to finish
-        def migration_done():
-            chunks = self.mongos_conn["config"]["chunks"]
-            return chunks.find({"shard": "replset-test-2"}).count() >= 2
-        assert_soon(migration_done, "migration never finished", max_tries=300)
         # doc manager should still have all docs
         all_docs = self.opman1.doc_manager._search()
         self.assertEqual(len(all_docs), 1000)
@@ -765,6 +718,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.opman1.oplog_progress = progress
         self.opman2.oplog_progress = progress
         self.opman1.checkpoint = self.opman2.checkpoint = None
+        self.mongos_conn["config"]["collections"].update(
+            {"_id": "test.mcsharded"},
+            {"$set": {"dropped": False}}
+        )
 
 if __name__ == '__main__':
     unittest.main()
