@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
 import time
 import os
 import shutil
@@ -712,8 +713,6 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.assertEqual(doc["i"], i + 500)
 
         # Cleanup
-        self.opman1.join()
-        self.opman2.join()
         progress = LockingDict()
         self.opman1.oplog_progress = progress
         self.opman2.oplog_progress = progress
@@ -722,6 +721,70 @@ class TestOplogManagerSharded(unittest.TestCase):
             {"_id": "test.mcsharded"},
             {"$set": {"dropped": False}}
         )
+
+    def test_with_orphan_documents(self):
+        """Test that DocManagers have proper state after a chunk migration
+        that resuts in orphaned documents.
+        """
+        # Start replicating to dummy doc managers
+        self.opman1.start()
+        self.opman2.start()
+
+        collection = self.mongos_conn["test"]["mcsharded"]
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        # Assert current state of the mongoverse
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
+                         500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
+                         500)
+        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
+
+        # Stop replication using the 'rsSyncApplyStop' failpoint
+        self.shard1_secondary_conn.admin.command(
+            "configureFailPoint", "rsSyncApplyStop",
+            mode="alwaysOn"
+        )
+        
+        # Move a chunk from shard2 to shard1
+        def move_chunk():
+            self.mongos_conn["admin"].command(
+                bson.son.SON([
+                    ("moveChunk", "test.mcsharded"),
+                    ("find", {"i": 1000}),
+                    ("to", "demo-repl")
+                ])
+            )
+        # moveChunk will never complete, so use another thread to continue
+        mover = threading.Thread(target=move_chunk)
+        mover.start()
+
+        # wait for documents to start moving to shard 1
+        assert_soon(lambda: self.shard1_conn.test.mcsharded.count() > 500)
+        
+        # What will happen here?
+        print("shard1: %d\nshard2: %d" % (
+            self.shard1_conn.test.mcsharded.count(),
+            self.shard2_conn.test.mcsharded.count()
+        ))
+        print(self.mongos_conn["test"]["$cmd.sys.inprog"].find_one())
+
+        # Get opid for moveChunk command
+        operations = self.mongos_conn["test"]["$cmd.sys.inprog"].find_one()
+        opid = None
+        for op in operations["inprog"]:
+            if "moveChunk" in op:
+                opid = op["opid"]
+        self.assertNotEqual(opid, None, "could not find moveChunk command")
+        # Kill moveChunk with the opid
+        self.mongos_conn["test"].command("killop", opid)
+
+        # cleanup
+        self.shard1_secondary_conn.admin.command(
+            "configureFailPoint", "rsSyncApplyStop",
+            mode="off"
+        )
+        mover.join()
 
 if __name__ == '__main__':
     unittest.main()
