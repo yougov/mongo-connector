@@ -405,7 +405,7 @@ def main():
                       """ replica sets, supply the address of the"""
                       """ primary. For example, `-m localhost:27217`"""
                       """ would be a valid argument to `-m`. Don't use"""
-                      """ quotes around the address. LOGGING V""")
+                      """ quotes around the address. LOGGING VI""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
