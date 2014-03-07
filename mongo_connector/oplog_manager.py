@@ -317,8 +317,12 @@ class OplogThread(threading.Thread):
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
                 # Applying 8 as the mask to the cursor enables OplogReplay
+                logging.info("OplogManager: Got the cursor, adding option "
+                             "to the cursor.")
                 cursor.add_option(8)
+                logging.info("OplogManager: Option added, getting a count.")
                 cursor_len = cursor.count()
+                logging.info("OplogManager: Count is " + str(cursor_len))
                 break
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
