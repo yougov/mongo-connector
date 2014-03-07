@@ -157,8 +157,7 @@ class OplogThread(threading.Thread):
                     for n, entry in enumerate(cursor):
 
                         logging.info("OplogManager: In the for loop for the "
-                                     "enumerated cursor.  N is " + str(n) +
-                                     " and entry is " + str(entry))
+                                     "enumerated cursor.  N is " + str(n))
                         # Break out if this thread should stop
                         if not self.running:
                             break
@@ -179,8 +178,7 @@ class OplogThread(threading.Thread):
                         #delete
                         try:
                             logging.info("OplogManager: Operation for this "
-                                         "entry is " + str(operation) +
-                                         "with ID " + str(entry['_id']))
+                                         "entry is " + str(operation))
                             if operation == 'd':
                                 entry['_id'] = entry['o']['_id']
                                 for dm in self.doc_managers:
