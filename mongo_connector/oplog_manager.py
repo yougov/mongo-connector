@@ -312,6 +312,8 @@ class OplogThread(threading.Thread):
         cursor, cursor_len = None, 0
         while (True):
             try:
+                logging.info("OplogManager: Getting the oplog cursor "
+                             "in the while true loop for get_oplog_cursor")
                 cursor = self.oplog.find({'ts': {'$gte': timestamp}},
                                          tailable=True, await_data=True)
                 # Applying 8 as the mask to the cursor enables OplogReplay
@@ -322,6 +324,8 @@ class OplogThread(threading.Thread):
                     pymongo.errors.OperationFailure):
                 pass
         if cursor_len == 0:
+            logging.info("OplogManager: Initiating rollback from "
+                         "get_oplog_cursor")
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
 
