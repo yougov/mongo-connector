@@ -352,7 +352,7 @@ class Connector(threading.Thread):
                         cause = "The system only uses replica sets!"
                         logging.error("MongoConnector: %s", cause)
                         self.oplog_thread_join()
-                        for dm in self.doc_managers():
+                        for dm in self.doc_managers:
                             dm.stop()
                         return
 
