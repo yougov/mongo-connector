@@ -405,7 +405,7 @@ def main():
                       """ replica sets, supply the address of the"""
                       """ primary. For example, `-m localhost:27217`"""
                       """ would be a valid argument to `-m`. Don't use"""
-                      """ quotes around the address. LOGGING VI""")
+                      """ quotes around the address.""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
@@ -549,7 +549,7 @@ def main():
                       """ Use -l to specify syslog host.""")
 
     #--syslog-host is to specify the syslog host.
-    parser.add_option("--syslog-host", action="store", type="string",
+    parser.add_option("-l", "--syslog-host", action="store", type="string",
                       dest="syslog_host", default="localhost:514", help=
                       """Used to specify the syslog host."""
                       """ The default is 'localhost:514'""")
@@ -582,10 +582,22 @@ def main():
                       """ interval, which should be preferred to this"""
                       """ option.""")
 
+    #-v enables vebose logging
+    parser.add_option("-v", "--verbose", action="store_true",
+                      dest="verbose", default=False,
+                      help="Sets verbose logging to be on.")
+
+    #-w enable logging to a file
+    parser.add_option("-w", "--logfile", dest="logfile",
+                      help=("Log all output to a file rather than stream to "
+                            "stderr.   Omit to stream to stderr."))
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
     loglevel = logging.INFO
+    if options.verbose:
+        loglevel = logging.DEBUG
     logger.setLevel(loglevel)
 
     if options.enable_syslog:
@@ -596,6 +608,18 @@ def main():
         )
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
+    elif options.logfile is not None:
+        try:
+            log_out = logging.FileHandler(options.logfile)
+        except Exception as e:
+            print ("Fatal error in opening the log file " +
+                   str(options.logfile) + ".  Please check permissions, "
+                   "exception is " + str(e))
+            sys.exit(0)
+        log_out.setLevel(loglevel)
+        log_out.setFormatter(logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(log_out)
     else:
         log_out = logging.StreamHandler()
         log_out.setLevel(loglevel)
