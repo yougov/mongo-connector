@@ -168,9 +168,9 @@ class OplogThread(threading.Thread):
 
                         #check if ns is excluded or not.
                         #also ensure non-empty namespace set.
-                        if (ns not in self.namespace_set
-                                and self.namespace_set):
-                            continue
+                        # if (ns not in self.namespace_set
+                        #         and self.namespace_set):
+                        #     continue
 
                         # use namespace mapping if one exists
                         ns = self.dest_mapping.get(entry['ns'], ns)
@@ -314,8 +314,15 @@ class OplogThread(threading.Thread):
             try:
                 logging.info("OplogManager: Getting the oplog cursor "
                              "in the while true loop for get_oplog_cursor")
-                cursor = self.oplog.find({'ts': {'$gte': timestamp}},
-                                         tailable=True, await_data=True)
+                if self.namespace_set is None:
+                    cursor = self.oplog.find({'ts': {'$gte': timestamp}},
+                                             tailable=True, await_data=True)
+                else:
+                    cursor = self.oplog.find(
+                        {'ts': {'$gte': timestamp},
+                         'ns': {'$in': self.namespace_set}},
+                        tailable=True, await_data=True
+                    )
                 # Applying 8 as the mask to the cursor enables OplogReplay
                 logging.info("OplogManager: Got the cursor, adding option "
                              "to the cursor.")
@@ -491,7 +498,14 @@ class OplogThread(threading.Thread):
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
-        curr = self.oplog.find().sort('$natural', pymongo.DESCENDING).limit(1)
+        if self.namespace_set is None:
+            curr = self.oplog.find(
+            ).sort('$natural', pymongo.DESCENDING).limit(1)
+        else:
+            curr = self.oplog.find(
+                {'ns': {'$in': self.namespace_set}}
+            ).sort('$natural', pymongo.DESCENDING).limit(1)
+
         if curr.count(with_limit_and_skip=True) == 0:
             return None
 
