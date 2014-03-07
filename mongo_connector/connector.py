@@ -680,7 +680,6 @@ def main():
 
     while True:
         try:
-            logging.info("Connector: Main loop, about to sleep for 3 seconds.")
             time.sleep(3)
             if not connector.is_alive():
                 break

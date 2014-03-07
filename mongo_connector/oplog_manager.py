@@ -122,8 +122,11 @@ class OplogThread(threading.Thread):
     def run(self):
         """Start the oplog worker.
         """
+        logging.info("OplogManager: Run thread started")
         while self.running is True:
+            logging.info("OplogManager: Getting cursor")
             cursor = self.init_cursor()
+            logging.info("OplogManager: Got the cursor, go go go!")
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
