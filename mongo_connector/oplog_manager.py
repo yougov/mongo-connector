@@ -145,8 +145,17 @@ class OplogThread(threading.Thread):
             remove_inc = 0
             upsert_inc = 0
             try:
+                logging.info("OplogManager: At the beginning of the try loop "
+                             "in the oplog manager run function.")
                 while cursor.alive and self.running:
+                    logging.info("OplogManager: At the beginning of the while "
+                                 "loop in the run function.  Cursor is still "
+                                 "alive and self is still running.")
                     for n, entry in enumerate(cursor):
+
+                        logging.info("OplogManager: In the for loop for the "
+                                     "enumerated cursor.  N is " + str(n) +
+                                     " and entry is " + str(entry))
                         # Break out if this thread should stop
                         if not self.running:
                             break
@@ -166,6 +175,9 @@ class OplogThread(threading.Thread):
 
                         #delete
                         try:
+                            logging.info("OplogManager: Operation for this "
+                                         "entry is " + str(operation) +
+                                         "with ID " + str(entry['_id']))
                             if operation == 'd':
                                 entry['_id'] = entry['o']['_id']
                                 for dm in self.doc_managers:
@@ -196,9 +208,12 @@ class OplogThread(threading.Thread):
                                 ))
 
                         if (remove_inc + upsert_inc) % 1000 == 0:
-                            logging.info("Removed " + str(remove_inc) +
-                                         "documents and upserted " +
+                            logging.info("OplogManager: Removed " +
+                                         str(remove_inc) +
+                                         " documents and upserted " +
                                          str(upsert_inc) + " documents so far")
+
+                        logging.info("OplogManager: Doc is written.")
 
                         last_ts = entry['ts']
 
@@ -210,6 +225,10 @@ class OplogThread(threading.Thread):
 
                     # update timestamp after running through oplog
                     if last_ts is not None:
+                        logging.info("OplogManager: last timestamp is not none"
+                                     " in the run function while going through"
+                                     " the cursor, updating the "
+                                     "checkpoint.")
                         self.checkpoint = last_ts
                         self.update_checkpoint()
 
@@ -227,6 +246,10 @@ class OplogThread(threading.Thread):
             # update timestamp before attempting to reconnect to MongoDB,
             # after being join()'ed, or if the cursor closes
             if last_ts is not None:
+                logging.info("OplogManager: last timestamp is not none"
+                             " in the run function after going through"
+                             " the cursor, updating the "
+                             "checkpoint.")
                 self.checkpoint = last_ts
                 self.update_checkpoint()
 
