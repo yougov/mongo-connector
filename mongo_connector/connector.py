@@ -157,7 +157,7 @@ class Connector(threading.Thread):
                             d.DocManager(**docman_kwargs))
                 # If more target URLs were given than doc managers, may need
                 # to create additional doc managers
-                for url in self.target_urls[i+1:]:
+                for url in self.target_urls[i + 1:]:
                     self.doc_managers.append(
                         doc_manager_modules[-1].DocManager(url,
                                                            **docman_kwargs))

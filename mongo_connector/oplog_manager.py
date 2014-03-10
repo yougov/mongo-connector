@@ -605,7 +605,7 @@ class OplogThread(threading.Thread):
         )
 
         logging.debug("OplogManager: In Rollback, last oplog entry measured "
-                      "to be " + last_oplog_entry)
+                      "to be " + str(last_oplog_entry))
 
         # The oplog entry for the most recent document doesn't exist anymore.
         # If we've fallen behind in the oplog, this will be caught later
