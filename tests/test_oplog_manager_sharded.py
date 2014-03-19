@@ -231,8 +231,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
 
     def tearDown(self):
-        self.mongos_conn["test"]["mcsharded"].remove()
-        self.mongos_conn["test"]["mcunsharded"].remove()
         try:
             self.opman1.join()
         except RuntimeError:
@@ -241,6 +239,8 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.opman2.join()
         except RuntimeError:
             pass                # thread may not have been started
+        self.mongos_conn["test"]["mcsharded"].remove()
+        self.mongos_conn["test"]["mcunsharded"].remove()
 
     def test_retrieve_doc(self):
         """ Test the retrieve_doc method """
@@ -721,6 +721,14 @@ class TestOplogManagerSharded(unittest.TestCase):
             {"_id": "test.mcsharded"},
             {"$set": {"dropped": False}}
         )
+        retry_until_ok(self.mongos_conn['admin'].command,
+                       bson.son.SON([
+                           ("moveChunk", "test.mcsharded"),
+                           ("find", {"i": 1}),
+                           ("to", "demo-repl")
+                       ]))
+        assert_soon(
+            lambda: self.shard1_conn['test']['mcsharded'].count() == 500)
 
     def test_with_orphan_documents(self):
         """Test that DocManagers have proper state after a chunk migration

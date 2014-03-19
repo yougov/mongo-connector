@@ -465,7 +465,7 @@ class OplogThread(threading.Thread):
                     self.doc_manager.remove(doc)
                 except errors.OperationFailed:
                     logging.warning(
-                        "Could not delete docucument during rollback: %s "
+                        "Could not delete document during rollback: %s "
                         "This can happen if this document was already removed "
                         "by another rollback happening at the same time.",
                         str(doc)
