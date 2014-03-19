@@ -745,39 +745,42 @@ class TestOplogManagerSharded(unittest.TestCase):
             "configureFailPoint", "rsSyncApplyStop",
             mode="alwaysOn"
         )
-        
+
         # Move a chunk from shard2 to shard1
         def move_chunk():
-            self.mongos_conn["admin"].command(
-                bson.son.SON([
-                    ("moveChunk", "test.mcsharded"),
-                    ("find", {"i": 1000}),
-                    ("to", "demo-repl")
-                ])
-            )
+            try:
+                self.mongos_conn["admin"].command(
+                    bson.son.SON([
+                        ("moveChunk", "test.mcsharded"),
+                        ("find", {"i": 1000}),
+                        ("to", "demo-repl")
+                    ])
+                )
+            except pymongo.errors.OperationFailure:
+                pass
+
         # moveChunk will never complete, so use another thread to continue
         mover = threading.Thread(target=move_chunk)
         mover.start()
 
         # wait for documents to start moving to shard 1
         assert_soon(lambda: self.shard1_conn.test.mcsharded.count() > 500)
-        
-        # What will happen here?
-        print("shard1: %d\nshard2: %d" % (
-            self.shard1_conn.test.mcsharded.count(),
-            self.shard2_conn.test.mcsharded.count()
-        ))
-        print(self.mongos_conn["test"]["$cmd.sys.inprog"].find_one())
 
         # Get opid for moveChunk command
         operations = self.mongos_conn["test"]["$cmd.sys.inprog"].find_one()
         opid = None
         for op in operations["inprog"]:
-            if "moveChunk" in op:
+            if op.get("query", {}).get("moveChunk"):
                 opid = op["opid"]
-        self.assertNotEqual(opid, None, "could not find moveChunk command")
+        self.assertNotEqual(opid, None, "could not find moveChunk operation")
         # Kill moveChunk with the opid
-        self.mongos_conn["test"].command("killop", opid)
+        self.mongos_conn["test"]["$cmd.sys.killop"].find_one({"op": opid})
+
+        # Mongo Connector should not become confused by unsuccessful chunk move
+        docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(docs), 1000)
+        self.assertEqual(sorted(d["i"] for d in docs),
+                         list(range(500, 1500)))
 
         # cleanup
         self.shard1_secondary_conn.admin.command(
