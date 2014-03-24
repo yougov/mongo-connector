@@ -100,7 +100,7 @@ class OplogThread(threading.Thread):
         # List of fields to export
         self.fields = fields
 
-        logging.info('OplogManager: Initializing oplog thread')
+        logging.info('OplogThread: Initializing oplog thread')
 
         if is_sharded:
             self.main_connection = Connection(main_address)
@@ -122,15 +122,15 @@ class OplogThread(threading.Thread):
     def run(self):
         """Start the oplog worker.
         """
-        logging.debug("OplogManager: Run thread started")
+        logging.debug("OplogThread: Run thread started")
         while self.running is True:
-            logging.debug("OplogManager: Getting cursor")
+            logging.debug("OplogThread: Getting cursor")
             cursor = self.init_cursor()
-            logging.debug("OplogManager: Got the cursor, go go go!")
+            logging.debug("OplogThread: Got the cursor, go go go!")
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
-                err_msg = "OplogManager: Last entry no longer in oplog"
+                err_msg = "OplogThread: Last entry no longer in oplog"
                 effect = "cannot recover!"
                 logging.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
@@ -138,7 +138,7 @@ class OplogThread(threading.Thread):
 
             #The only entry is the last one we processed
             if cursor is None or util.retry_until_ok(cursor.count) == 1:
-                logging.debug("OplogManager: Last entry is the one we "
+                logging.debug("OplogThread: Last entry is the one we "
                               "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
                 continue
@@ -148,16 +148,16 @@ class OplogThread(threading.Thread):
             remove_inc = 0
             upsert_inc = 0
             try:
-                logging.debug("OplogManager: At the beginning of the try loop "
-                              "in the oplog manager run function.")
+                logging.debug("OplogThread: about to process new oplog "
+                              "entries")
                 while cursor.alive and self.running:
-                    logging.debug("OplogManager: At the beginning of the while"
-                                  " loop in the run function.  Cursor is still"
-                                  " alive and self is still running.")
+                    logging.debug("OplogThread: Cursor is still"
+                                  " alive and thread is still running.")
                     for n, entry in enumerate(cursor):
 
-                        logging.debug("OplogManager: In the for loop for the "
-                                      "enumerated cursor.  N is " + str(n))
+                        logging.debug("OplogThread: Iterating through cursor,"
+                                      " document number in this cursor is %d"
+                                      % n)
                         # Break out if this thread should stop
                         if not self.running:
                             break
@@ -166,23 +166,13 @@ class OplogThread(threading.Thread):
                         operation = entry['op']
                         ns = entry['ns']
 
-                        #check if ns is excluded or not.
-                        #also ensure non-empty namespace set.
-
-                        ## Removed by jeff berger to optimize code, this check
-                        ## is now inherent in the query
-
-                        # if (ns not in self.namespace_set
-                        #         and self.namespace_set):
-                        #     continue
-
                         # use namespace mapping if one exists
                         ns = self.dest_mapping.get(entry['ns'], ns)
 
                         #delete
                         try:
-                            logging.debug("OplogManager: Operation for this "
-                                          "entry is " + str(operation))
+                            logging.debug("OplogThread: Operation for this "
+                                          "entry is %s" % str(operation))
                             if operation == 'd':
                                 entry['_id'] = entry['o']['_id']
                                 for dm in self.doc_managers:
@@ -213,13 +203,12 @@ class OplogThread(threading.Thread):
                                 ))
 
                         if (remove_inc + upsert_inc) % 1000 == 0:
-                            logging.debug("OplogManager: Removed " +
-                                          str(remove_inc) +
-                                          " documents and upserted " +
-                                          str(upsert_inc) +
-                                          " documents so far")
+                            logging.debug("OplogThread: Removed %d "
+                                          " documents and upserted %d "
+                                          " documents so far"
+                                          % (remove_inc, upsert_inc))
 
-                        logging.debug("OplogManager: Doc is written.")
+                        logging.debug("OplogThread: Doc is processed.")
 
                         last_ts = entry['ts']
 
@@ -231,10 +220,8 @@ class OplogThread(threading.Thread):
 
                     # update timestamp after running through oplog
                     if last_ts is not None:
-                        logging.debug("OplogManager: last timestamp is not "
-                                      "none in the run function while going "
-                                      "through the cursor, updating the "
-                                      "checkpoint.")
+                        logging.debug("OplogThread: updating checkpoint after"
+                                      "processing new oplog entries")
                         self.checkpoint = last_ts
                         self.update_checkpoint()
 
@@ -252,23 +239,21 @@ class OplogThread(threading.Thread):
             # update timestamp before attempting to reconnect to MongoDB,
             # after being join()'ed, or if the cursor closes
             if last_ts is not None:
-                logging.debug("OplogManager: last timestamp is not none"
-                              " in the run function after going through"
-                              " the cursor, updating the "
-                              "checkpoint.")
+                logging.debug("OplogThread: updating checkpoint after an "
+                              "Exception, cursor closing, or join() on this"
+                              "thread.")
                 self.checkpoint = last_ts
                 self.update_checkpoint()
 
-            logging.debug("OplogManager: Sleeping.  This batch I removed " +
-                          str(remove_inc) + " documents and I upserted " +
-                          str(upsert_inc) + " documents.")
+            logging.debug("OplogThread: Sleeping.  This batch I removed %d "
+                          " documents and I upserted %d documents."
+                          % (remove_inc, upsert_inc))
             time.sleep(2)
 
     def join(self):
         """Stop this thread from managing the oplog.
         """
-        logging.debug("OplogManager: Stopping this thread from managing the "
-                      "oplog.")
+        logging.debug("OplogThread: exiting due to join call.")
         self.running = False
         threading.Thread.join(self)
 
@@ -308,7 +293,7 @@ class OplogThread(threading.Thread):
         """Move cursor to the proper place in the oplog.
         """
 
-        logging.debug("OplogManager: Getting the oplog cursor and moving it "
+        logging.debug("OplogThread: Getting the oplog cursor and moving it "
                       "to the proper place in the oplog.")
 
         if timestamp is None:
@@ -317,12 +302,11 @@ class OplogThread(threading.Thread):
         cursor, cursor_len = None, 0
         while (True):
             try:
-                logging.debug("OplogManager: Getting the oplog cursor "
+                logging.debug("OplogThread: Getting the oplog cursor "
                               "in the while true loop for get_oplog_cursor")
                 if self.namespace_set is None:
                     cursor = self.oplog.find(
-                        {'ts': {'$gte': timestamp},
-                         'ns': {'$ne': None}},
+                        {'ts': {'$gte': timestamp}},
                         tailable=True, await_data=True
                     )
                 else:
@@ -332,23 +316,21 @@ class OplogThread(threading.Thread):
                         tailable=True, await_data=True
                     )
                 # Applying 8 as the mask to the cursor enables OplogReplay
-                logging.debug("OplogManager: Got the cursor, adding option "
-                              "to the cursor.")
                 cursor.add_option(8)
-                logging.debug("OplogManager: Option added, getting a count.")
+                logging.debug("OplogThread: Cursor created, getting a count.")
                 cursor_len = cursor.count()
-                logging.debug("OplogManager: Count is " + str(cursor_len))
+                logging.debug("OplogThread: Count is %d" % cursor_len)
                 break
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure):
                 pass
         if cursor_len == 0:
-            logging.debug("OplogManager: Initiating rollback from "
+            logging.debug("OplogThread: Initiating rollback from "
                           "get_oplog_cursor")
             #rollback, we are past the last element in the oplog
             timestamp = self.rollback()
 
-            logging.debug('Finished rollback')
+            logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
         cursor_ts_long = util.bson_ts_to_long(cursor[0].get("ts"))
         given_ts_long = util.bson_ts_to_long(timestamp)
@@ -365,7 +347,7 @@ class OplogThread(threading.Thread):
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
-                logging.error('OplogManager: %s Bad timestamp in config file'
+                logging.error('OplogThread: %s Bad timestamp in config file'
                               % self.oplog)
                 return None
 
@@ -377,8 +359,7 @@ class OplogThread(threading.Thread):
         """
 
         dump_set = self.namespace_set
-        logging.debug("OplogManager: Dumping sef of collections "
-                      + str(dump_set))
+        logging.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
         #no namespaces specified
         if not self.namespace_set:
@@ -400,7 +381,7 @@ class OplogThread(threading.Thread):
 
         def docs_to_dump():
             for namespace in dump_set:
-                logging.info("OplogManager: dumping collection %s"
+                logging.info("OplogThread: dumping collection %s"
                              % namespace)
                 database, coll = namespace.split('.', 1)
                 last_id = None
@@ -444,8 +425,8 @@ class OplogThread(threading.Thread):
             for dm in self.doc_managers:
                 # Bulk upsert if possible
                 if hasattr(dm, "bulk_upsert"):
-                    logging.debug("OplogManager: Using bulk upsert function to"
-                                  "upload initial docs")
+                    logging.debug("OplogThread: Using bulk upsert function for"
+                                  "collection dump")
                     # Slight performance gain breaking dump into separate
                     # threads, only if > 1 replication target
                     if len(self.doc_managers) == 1:
@@ -466,16 +447,16 @@ class OplogThread(threading.Thread):
                         dumping_threads.append(t)
                         t.start()
                 else:
-                    logging.debug("OplogManager: Upserting each doc "
-                                  "indivudually due to "
-                                  "no bulk upsert function.")
+                    logging.debug("OplogThread: DocManager %s has not"
+                                  "bulk_upsert method.  Upserting documents "
+                                  "serially for collection dump." % str(dm))
                     num = 0
                     for doc in docs_to_dump():
                         num += 1
                         if num % 10000 == 0:
-                            logging.debug("Loading doc number " + str(num))
+                            logging.debug("Upserted %d docs." % num)
                         dm.upsert(self.filter_fields(doc))
-                    logging.debug("Loaded " + str(num) + " docs")
+                    logging.debug("Upserted %d  docs" % num)
 
             # cleanup
             for t in dumping_threads:
@@ -495,7 +476,7 @@ class OplogThread(threading.Thread):
             pass
 
         if not dump_success:
-            err_msg = "OplogManager: Failed during dump collection"
+            err_msg = "OplogThread: Failed during dump collection"
             effect = "cannot recover!"
             logging.error('%s %s %s' % (err_msg, effect, self.oplog))
             self.running = False
@@ -507,9 +488,9 @@ class OplogThread(threading.Thread):
         """Return the timestamp of the latest entry in the oplog.
         """
         if self.namespace_set is None:
-            curr = self.oplog.find(
-                {'ns': {'$ne': None}}
-            ).sort('$natural', pymongo.DESCENDING).limit(1)
+            curr = self.oplog.find().sort(
+                '$natural', pymongo.DESCENDING
+            ).limit(1)
         else:
             curr = self.oplog.find(
                 {'ns': {'$in': self.namespace_set}}
@@ -518,8 +499,8 @@ class OplogThread(threading.Thread):
         if curr.count(with_limit_and_skip=True) == 0:
             return None
 
-        logging.debug("OplogManager: Last oplog entry recorded as "
-                      + str(curr[0]['ts']))
+        logging.debug("OplogThread: Last oplog entry has timestamp %d."
+                      % curr[0]['ts'].time)
         return curr[0]['ts']
 
     def init_cursor(self):
@@ -528,14 +509,14 @@ class OplogThread(threading.Thread):
         The cursor is set to either the beginning of the oplog, or
         wherever it was last left off.
         """
-        logging.debug("OplogManager: Initializing the oplog cursor.")
+        logging.debug("OplogThread: Initializing the oplog cursor.")
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None and self.collection_dump:
             timestamp = self.dump_collection()
             if timestamp:
                 msg = "Dumped collection into target system"
-                logging.info('OplogManager: %s %s'
+                logging.info('OplogThread: %s %s'
                              % (self.oplog, msg))
         elif timestamp is None:
             # set timestamp to top of oplog
@@ -554,7 +535,7 @@ class OplogThread(threading.Thread):
         with self.oplog_progress as oplog_prog:
             oplog_dict = oplog_prog.get_dict()
             oplog_dict[str(self.oplog)] = self.checkpoint
-            logging.debug("OplogManager: oplog checkpoint updated to " +
+            logging.debug("OplogThread: oplog checkpoint updated to %s" %
                           str(self.checkpoint))
 
     def read_last_checkpoint(self):
@@ -568,7 +549,7 @@ class OplogThread(threading.Thread):
             if oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
-        logging.debug("OplogManager: reading last checkpoint as " +
+        logging.debug("OplogThread: reading last checkpoint as %s " %
                       str(ret_val))
         return ret_val
 
@@ -581,8 +562,8 @@ class OplogThread(threading.Thread):
         back until the oplog and target system are in consistent states.
         """
         # Find the most recently inserted document in each target system
-        logging.debug("OplogManager: Initiating rollback sequence to bring "
-                      "system into a consistant state.")
+        logging.debug("OplogThread: Initiating rollback sequence to bring "
+                      "system into a consistent state.")
         last_docs = []
         for dm in self.doc_managers:
             dm.commit()
@@ -604,8 +585,8 @@ class OplogThread(threading.Thread):
             sort=[('$natural', pymongo.DESCENDING)]
         )
 
-        logging.debug("OplogManager: In Rollback, last oplog entry measured "
-                      "to be " + str(last_oplog_entry))
+        logging.debug("OplogThread: last oplog entry is %s"
+                      % str(last_oplog_entry))
 
         # The oplog entry for the most recent document doesn't exist anymore.
         # If we've fallen behind in the oplog, this will be caught later
@@ -660,20 +641,20 @@ class OplogThread(threading.Thread):
                 retry_until_ok(collect_existing_docs)
 
                 #delete the inconsistent documents
-                logging.debug("OplogManager: Rollback, removing inconsistent "
+                logging.debug("OplogThread: Rollback, removing inconsistent "
                               "docs.")
                 remov_inc = 0
                 for doc in doc_hash.values():
                     remov_inc += 1
                     dm.remove(doc)
-                    logging.debug("OplogManager: Rollback, removing " +
+                    logging.debug("OplogThread: Rollback, removed %s " %
                                   str(doc))
 
-                logging.debug("OplogManager: Rollback, removed " +
-                              str(remov_inc) + " docs.")
+                logging.debug("OplogThread: Rollback, removed %d docs." %
+                              remov_inc)
 
                 #insert the ones from mongo
-                logging.debug("OplogManager: Rollback, inserting documents "
+                logging.debug("OplogThread: Rollback, inserting documents "
                               "from mongo.")
                 insert_inc = 0
                 fail_insert_inc = 0
@@ -685,11 +666,11 @@ class OplogThread(threading.Thread):
                         dm.upsert(self.filter_fields(doc))
                     except errors.OperationFailed as e:
                         fail_insert_inc += 1
-                        logging.error("OplogManager: Rollback, Unable to "
-                                      "insert %s" % (doc) +
-                                      " with exception " + str(e))
+                        logging.error("OplogThread: Rollback, Unable to "
+                                      "insert %s with exception %s"
+                                      % (doc, str(e)))
 
-        logging.debug("OplogManager: Rollback, Successfully inserted " +
+        logging.debug("OplogThread: Rollback, Successfully inserted " +
                       str(insert_inc) + " documents"
                       " and failed to insert " + str(fail_insert_inc) +
                       " documents.  Returning a rollback cutoff time of " +

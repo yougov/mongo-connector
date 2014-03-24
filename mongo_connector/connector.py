@@ -549,7 +549,7 @@ def main():
                       """ Use -l to specify syslog host.""")
 
     #--syslog-host is to specify the syslog host.
-    parser.add_option("-l", "--syslog-host", action="store", type="string",
+    parser.add_option("--syslog-host", action="store", type="string",
                       dest="syslog_host", default="localhost:514", help=
                       """Used to specify the syslog host."""
                       """ The default is 'localhost:514'""")
@@ -600,6 +600,10 @@ def main():
         loglevel = logging.DEBUG
     logger.setLevel(loglevel)
 
+    if options.enable_syslog and options.logfile:
+        print ("You cannot specify syslog and a logfile simulatniously, please"
+               " choose the logging method you would prefer.")
+
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
         syslog_host = logging.handlers.SysLogHandler(
@@ -612,9 +616,7 @@ def main():
         try:
             log_out = logging.FileHandler(options.logfile)
         except Exception as e:
-            print ("Fatal error in opening the log file " +
-                   str(options.logfile) + ".  Please check permissions, "
-                   "exception is " + str(e))
+            raise e
             sys.exit(0)
         log_out.setLevel(loglevel)
         log_out.setFormatter(logging.Formatter(
