@@ -121,7 +121,7 @@ class DocManager():
                                 break;
                             else:
                                 state = False
-                        except Exception, e:
+                        except Exception as e:
                             state = True
                             logging.warn("Unable to compare during : " + key)
                             logging.warn(e)
