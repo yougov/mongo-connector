@@ -79,10 +79,10 @@ class DocManager():
         for wc_pattern in self._parse_fields(result, 'dynamicFields'):
             if wc_pattern[0] == "*":
                 self._dynamic_field_regexes.append(
-                    re.compile("\w%s\Z" % wc_pattern))
+                    re.compile(".*%s\Z" % wc_pattern[1:]))
             elif wc_pattern[-1] == "*":
                 self._dynamic_field_regexes.append(
-                    re.compile("\A%s\w*" % wc_pattern[:-1]))
+                    re.compile("\A%s.*" % wc_pattern[:-1]))
 
     def _clean_doc(self, doc):
         """Reformats the given document before insertion into Solr.
