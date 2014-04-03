@@ -600,7 +600,7 @@ def main():
     logger.setLevel(loglevel)
 
     if options.enable_syslog and options.logfile:
-        print ("You cannot specify syslog and a logfile simulatniously, please"
+        print ("You cannot specify syslog and a logfile simultaneously, please"
                " choose the logging method you would prefer.")
         sys.exit(0)
 
