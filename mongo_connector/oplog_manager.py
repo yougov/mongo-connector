@@ -450,9 +450,7 @@ class OplogThread(threading.Thread):
                     logging.debug("OplogThread: DocManager %s has not"
                                   "bulk_upsert method.  Upserting documents "
                                   "serially for collection dump." % str(dm))
-                    num = 0
-                    for doc in docs_to_dump():
-                        num += 1
+                    for num, doc in enumerate(docs_to_dump()):
                         if num % 10000 == 0:
                             logging.debug("Upserted %d docs." % num)
                         dm.upsert(self.filter_fields(doc))
@@ -670,10 +668,9 @@ class OplogThread(threading.Thread):
                                       "insert %s with exception %s"
                                       % (doc, str(e)))
 
-        logging.debug("OplogThread: Rollback, Successfully inserted " +
-                      str(insert_inc) + " documents"
-                      " and failed to insert " + str(fail_insert_inc) +
-                      " documents.  Returning a rollback cutoff time of " +
-                      str(rollback_cutoff_ts))
+        logging.debug("OplogThread: Rollback, Successfully inserted %d "
+                      " documents and failed to insert %d"
+                      " documents.  Returning a rollback cutoff time of %s "
+                      % (insert_inc, fail_insert_inc, str(rollback_cutoff_ts)))
 
         return rollback_cutoff_ts
