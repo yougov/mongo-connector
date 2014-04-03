@@ -713,10 +713,6 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.assertEqual(doc["i"], i + 500)
 
         # Cleanup
-        progress = LockingDict()
-        self.opman1.oplog_progress = progress
-        self.opman2.oplog_progress = progress
-        self.opman1.checkpoint = self.opman2.checkpoint = None
         self.mongos_conn["config"]["collections"].update(
             {"_id": "test.mcsharded"},
             {"$set": {"dropped": False}}
