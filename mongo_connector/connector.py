@@ -63,7 +63,6 @@ class Connector(threading.Thread):
                 loader = importlib.machinery.SourceFileLoader(name, path)
                 module = loader.load_module(name)
             except ImportError:
-                import imp
                 module = imp.load_source(name, path)
             return module
 
@@ -157,7 +156,7 @@ class Connector(threading.Thread):
                             d.DocManager(**docman_kwargs))
                 # If more target URLs were given than doc managers, may need
                 # to create additional doc managers
-                for url in self.target_urls[i+1:]:
+                for url in self.target_urls[i + 1:]:
                     self.doc_managers.append(
                         doc_manager_modules[-1].DocManager(url,
                                                            **docman_kwargs))
@@ -405,7 +404,7 @@ def main():
                       """ replica sets, supply the address of the"""
                       """ primary. For example, `-m localhost:27217`"""
                       """ would be a valid argument to `-m`. Don't use"""
-                      """ quotes around the address""")
+                      """ quotes around the address.""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
@@ -582,11 +581,28 @@ def main():
                       """ interval, which should be preferred to this"""
                       """ option.""")
 
+    #-v enables vebose logging
+    parser.add_option("-v", "--verbose", action="store_true",
+                      dest="verbose", default=False,
+                      help="Sets verbose logging to be on.")
+
+    #-w enable logging to a file
+    parser.add_option("-w", "--logfile", dest="logfile",
+                      help=("Log all output to a file rather than stream to "
+                            "stderr.   Omit to stream to stderr."))
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
     loglevel = logging.INFO
+    if options.verbose:
+        loglevel = logging.DEBUG
     logger.setLevel(loglevel)
+
+    if options.enable_syslog and options.logfile:
+        print ("You cannot specify syslog and a logfile simultaneously, please"
+               " choose the logging method you would prefer.")
+        sys.exit(0)
 
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
@@ -596,6 +612,16 @@ def main():
         )
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
+    elif options.logfile is not None:
+        try:
+            log_out = logging.FileHandler(options.logfile)
+        except Exception as e:
+            raise e
+            sys.exit(0)
+        log_out.setLevel(loglevel)
+        log_out.setFormatter(logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(log_out)
     else:
         log_out = logging.StreamHandler()
         log_out.setLevel(loglevel)
