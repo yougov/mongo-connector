@@ -63,7 +63,6 @@ class Connector(threading.Thread):
                 loader = importlib.machinery.SourceFileLoader(name, path)
                 module = loader.load_module(name)
             except ImportError:
-                import imp
                 module = imp.load_source(name, path)
             return module
 
@@ -603,6 +602,7 @@ def main():
     if options.enable_syslog and options.logfile:
         print ("You cannot specify syslog and a logfile simulatniously, please"
                " choose the logging method you would prefer.")
+        sys.exit(0)
 
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
