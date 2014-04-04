@@ -24,17 +24,19 @@ else:
     import unittest
 import re
 from pymongo import MongoClient
+from bson import ObjectId
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.util import long_to_bson_ts
-from tests.setup_cluster import (start_cluster,
-                                 kill_all)
-from tests.util import wait_for
 from mongo_connector.oplog_manager import OplogThread
-
-PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
-             "CONFIG":  "27220", "MAIN":  "27217"}
+from mongo_connector.utils import long_to_bson_ts, bson_ts_to_long
+from tests.setup_cluster import (kill_mongo_proc,
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all,
+                                 PORTS_ONE)
+from tests.util import assert_soon, retry_until_ok
+from pymongo.errors import OperationFailure
 
 AUTH_FILE = os.environ.get('AUTH_FILE', None)
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
@@ -75,7 +77,7 @@ class TestOplogManager(unittest.TestCase):
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        # kill_all()
+        kill_all()
 
     def setUp(self):
         """ Fails if we were unable to start the cluster
@@ -326,6 +328,97 @@ class TestOplogManager(unittest.TestCase):
         test_oplog.init_cursor()
         self.assertEqual(len(docman._search()), 100)
 
+    def test_rollback(self):
+        """Test rollback in oplog_manager. Assertion failure if it doesn't pass
+            We force a rollback by inserting a doc, killing the primary,
+            inserting another doc, killing the new primary, and then restarting
+            both.
+        """
+        os.system('rm config.txt; touch config.txt')
+        test_oplog, primary_conn, mongos, solr = self.get_new_oplog()
+
+        if not start_cluster():
+            self.fail('Cluster could not be started successfully!')
+
+        solr = DocManager()
+        test_oplog.doc_manager = solr
+        solr._delete()          # equivalent to solr.delete(q='*: *')
+
+        mongos['test']['test'].remove({})
+        mongos['test']['test'].insert(
+            {'_id': ObjectId('4ff74db3f646462b38000001'), 'name': 'paulie'},
+            safe=True
+        )
+        while (mongos['test']['test'].find().count() != 1):
+            time.sleep(1)
+        cutoff_ts = test_oplog.get_last_oplog_timestamp()
+
+        first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
+                     'ns': 'test.test',
+                     '_id':  ObjectId('4ff74db3f646462b38000001')}
+
+        #try kill one, try restarting
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
+
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        admin = new_primary_conn['admin']
+        while admin.command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+        time.sleep(5)
+        count = 0
+        while True:
+            try:
+                mongos['test']['test'].insert({
+                    '_id': ObjectId('4ff74db3f646462b38000002'),
+                    'name': 'paul'},
+                    safe=True)
+                break
+            except OperationFailure:
+                count += 1
+                if count > 60:
+                    self.fail('Call to insert doc failed too many times')
+                time.sleep(1)
+                continue
+        while (mongos['test']['test'].find().count() != 2):
+            time.sleep(1)
+        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
+
+        #wait for master to be established
+        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
+            time.sleep(1)
+
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
+
+        #wait for secondary to be established
+        admin = new_primary_conn['admin']
+        while admin.command("replSetGetStatus")['myState'] != 2:
+            time.sleep(1)
+        while retry_until_ok(mongos['test']['test'].find().count) != 1:
+            time.sleep(1)
+
+        self.assertEqual(str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
+        self.assertEqual(str(primary_conn.port), PORTS_ONE['PRIMARY'])
+
+        last_ts = test_oplog.get_last_oplog_timestamp()
+        second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
+                      'ns': 'test.test',
+                      '_id': ObjectId('4ff74db3f646462b38000002')}
+
+        test_oplog.doc_manager.upsert(first_doc)
+        test_oplog.doc_manager.upsert(second_doc)
+
+        test_oplog.rollback()
+        test_oplog.doc_manager.commit()
+        results = solr._search()
+
+        assert(len(results) == 1)
+
+        self.assertEqual(results[0]['name'], 'paulie')
+        self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
+
     def test_filter_fields(self):
         opman, _, _ = self.get_oplog_thread()
         docman = opman.doc_managers[0]
@@ -344,7 +437,7 @@ class TestOplogManager(unittest.TestCase):
         }
         db = conn['test']['test']
         db.insert(doc)
-        wait_for(lambda: db.count() == 1)
+        assert_soon(lambda: db.count() == 1)
         opman.dump_collection()
 
         result = docman._search()[0]
@@ -382,7 +475,7 @@ class TestOplogManager(unittest.TestCase):
             # test insert
             primary_conn[db][coll].insert(base_doc)
 
-            wait_for(lambda: len(docman._search()) == 1)
+            assert_soon(lambda: len(docman._search()) == 1)
             self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
@@ -399,14 +492,14 @@ class TestOplogManager(unittest.TestCase):
                     if d.get("weakness") == "kryptonite":
                         return True
                     return False
-            wait_for(update_complete)
+            assert_soon(update_complete)
             self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
             # test delete
             primary_conn[db][coll].remove({"_id": 1})
-            wait_for(lambda: len(docman._search()) == 0)
+            assert_soon(lambda: len(docman._search()) == 0)
             bad = [d for d in docman._search() if d["ns"] == dest_mapping[ns]]
             self.assertEqual(len(bad), 0)
 
@@ -454,15 +547,15 @@ class TestOplogManager(unittest.TestCase):
             "color": "firetruck red"
         })
 
-        self.assertTrue(
-            wait_for(lambda: sum(len(d._search()) for d in doc_managers) == 6),
+        assert_soon(
+            lambda: sum(len(d._search()) for d in doc_managers) == 6,
             "OplogThread should be able to replicate to multiple targets"
         )
 
         primary_conn["test"]["test"].remove({"name": "elmo"})
 
-        self.assertTrue(
-            wait_for(lambda: sum(len(d._search()) for d in doc_managers) == 3),
+        assert_soon(
+            lambda: sum(len(d._search()) for d in doc_managers) == 3,
             "OplogThread should be able to replicate to multiple targets"
         )
         for d in doc_managers:

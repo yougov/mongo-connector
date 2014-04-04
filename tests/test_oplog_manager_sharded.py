@@ -1,4 +1,4 @@
-# Copyright 20134-2014 MongoDB, Inc.
+# Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,376 +12,787 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Module with code to setup cluster and test oplog_manager functions.
-
-This is the main tester method. All the functions can be called by
-finaltests.py
-"""
-import os
-import sys
-import inspect
-import socket
-
-sys.path[0:0] = [""]
-
+import threading
 import time
+import os
+import shutil
+import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import re
 
 from pymongo import MongoClient
+import bson
+import pymongo
+from pymongo.read_preferences import ReadPreference
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from tests.setup_cluster import (kill_mongo_proc,
-                                 start_mongo_proc,
-                                 start_cluster,
-                                 kill_all)
-from pymongo.errors import OperationFailure
-from os import path
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import (long_to_bson_ts,
-                                  bson_ts_to_long,
-                                  retry_until_ok)
-from bson.objectid import ObjectId
-
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
-PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
-             "CONFIG": "27220", "MONGOS": "27217"}
-SETUP_DIR = path.expanduser("~/mongo_connector")
-DEMO_SERVER_DATA = SETUP_DIR + "/data"
-DEMO_SERVER_LOG = SETUP_DIR + "/logs"
-MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
-MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
-AUTH_FILE = os.environ.get('AUTH_FILE', None)
-AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
-CONFIG = os.environ.get('CONFIG', "config.txt")
+from mongo_connector.util import retry_until_ok
+from tests.setup_cluster import (
+    kill_mongo_proc,
+    start_mongo_proc,
+    start_cluster,
+    kill_all,
+    DEMO_SERVER_DATA,
+    PORTS_ONE,
+    PORTS_TWO
+)
+from tests.util import assert_soon
 
 
 class TestOplogManagerSharded(unittest.TestCase):
-    """Defines all the testing methods for a sharded cluster
+    """Defines all test cases for OplogThreads running on a sharded
+    cluster
     """
-
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
-        """ Initializes the cluster
-        """
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        cls.AUTH_KEY = None
-        cls.flag = True
-        if AUTH_FILE:
-            # We want to get the credentials from this file
-            try:
-                key = (open(AUTH_FILE)).read()
-                re.sub(r'\s', '', key)
-                cls.AUTH_KEY = key
-            except IOError:
-                print('Could not parse authentication file!')
-                cls.flag = False
-                cls.err_msg = "Could not read key file!"
+        """ Initialize the cluster:
 
-        if not start_cluster(sharded=True, key_file=cls.AUTH_KEY):
-            cls.flag = False
-            cls.err_msg = "Shards cannot be added to mongos"
-    
-    def setUp(self):
-        """ Fails if we can't read the key file or if the
-        cluster cannot be created.
+        Clean out the databases used by the tests
+        Make connections to mongos, mongods
+        Create and shard test collections
+        Create OplogThreads
         """
-        if not self.flag:
-            self.fail(self.err_msg)
-    
+        # Start the cluster with a mongos on port 27217
+        start_cluster(sharded=True)
+
+        # Connection to mongos
+        mongos_address = "localhost:%s" % PORTS_ONE["MONGOS"]
+        cls.mongos_conn = MongoClient(mongos_address)
+
+        # Connections to the shards
+        cls.shard1_conn = MongoClient("localhost:%s" % PORTS_ONE["PRIMARY"],
+                                      replicaSet="demo-repl")
+        cls.shard2_conn = MongoClient("localhost:%s" % PORTS_TWO["PRIMARY"],
+                                      replicaSet="demo-repl-2")
+        cls.shard1_secondary_conn = MongoClient(
+            "localhost:%s" % PORTS_ONE["SECONDARY"],
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+        cls.shard2_secondary_conn = MongoClient(
+            "localhost:%s" % PORTS_TWO["SECONDARY"],
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+
+        # Wipe any test data
+        cls.mongos_conn["test"]["mcsharded"].drop()
+
+        # Create and shard the collection test.mcsharded on the "i" field
+        cls.mongos_conn["test"]["mcsharded"].ensure_index("i")
+        cls.mongos_conn.admin.command("enableSharding", "test")
+        cls.mongos_conn.admin.command("shardCollection",
+                                      "test.mcsharded",
+                                      key={"i": 1})
+
+        # Pre-split the collection so that:
+        # i < 1000            lives on shard1
+        # i >= 1000           lives on shard2
+        cls.mongos_conn.admin.command(bson.SON([
+            ("split", "test.mcsharded"),
+            ("middle", {"i": 1000})
+        ]))
+
+        # disable the balancer
+        cls.mongos_conn.config.settings.update(
+            {"_id": "balancer"},
+            {"$set": {"stopped": True}},
+            upsert=True
+        )
+
+        # Move chunks to their proper places
+        try:
+            cls.mongos_conn["admin"].command(
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1},
+                to="demo-repl"
+            )
+        except pymongo.errors.OperationFailure:
+            pass        # chunk may already be on the correct shard
+        try:
+            cls.mongos_conn["admin"].command(
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1000},
+                to="demo-repl-2"
+            )
+        except pymongo.errors.OperationFailure:
+            pass        # chunk may already be on the correct shard
+
+        # Make sure chunks are distributed correctly
+        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1})
+        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
+
+        def chunks_moved():
+            shard1_done = cls.shard1_conn.test.mcsharded.find_one() is not None
+            shard2_done = cls.shard2_conn.test.mcsharded.find_one() is not None
+            return shard1_done and shard2_done
+        assert_soon(chunks_moved)
+        cls.mongos_conn.test.mcsharded.remove()
+
     @classmethod
     def tearDownClass(cls):
-        """ Kills cluster instance
+        """ Kill the cluster
         """
         kill_all()
 
-    @classmethod
-    def get_oplog_thread(cls):
-        """ Set up connection with mongo.
+    def setUp(self):
+        # clear oplog
+        self.shard1_conn["local"]["oplog.rs"].drop()
+        self.shard2_conn["local"]["oplog.rs"].drop()
+        self.shard1_conn["local"].create_collection(
+            "oplog.rs",
+            size=1024 * 1024 * 100,       # 100MB
+            capped=True
+        )
+        self.shard2_conn["local"].create_collection(
+            "oplog.rs",
+            size=1024 * 1024 * 100,       # 100MB
+            capped=True
+        )
+        # re-sync secondaries
+        try:
+            self.shard1_secondary_conn["admin"].command(
+                "shutdown", 1, force=True)
+        except pymongo.errors.AutoReconnect:
+            pass
+        try:
+            self.shard2_secondary_conn["admin"].command(
+                "shutdown", 1, force=True)
+        except pymongo.errors.AutoReconnect:
+            pass
+        data1 = os.path.join(DEMO_SERVER_DATA, "replset1b")
+        data2 = os.path.join(DEMO_SERVER_DATA, "replset2b")
+        shutil.rmtree(data1)
+        shutil.rmtree(data2)
+        os.mkdir(data1)
+        os.mkdir(data2)
+        conf1 = self.shard1_conn["local"]["system.replset"].find_one()
+        conf2 = self.shard2_conn["local"]["system.replset"].find_one()
+        conf1["version"] += 1
+        conf2["version"] += 1
+        self.shard1_conn["admin"].command({"replSetReconfig": conf1})
+        self.shard2_conn["admin"].command({"replSetReconfig": conf2})
+        start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl", "replset1b",
+                         "replset1b.log", None)
+        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2", "replset2b",
+                         "replset2b.log", None)
 
-        Returns oplog, the connection and oplog collection.
-        This function clears the oplog.
-        """
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]),
-                                   replicaSet="demo-repl")
+        def secondary_up(connection):
+            def wrap():
+                return retry_until_ok(
+                    connection["admin"].command,
+                    "replSetGetStatus"
+                )["myState"] == 2
+            return wrap
+        assert_soon(secondary_up(self.shard1_secondary_conn))
+        assert_soon(secondary_up(self.shard2_secondary_conn))
 
-        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
-        mongos = MongoClient(mongos_addr)
-        mongos['alpha']['foo'].drop()
+        # Create a new oplog progress file
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
 
-        oplog_coll = primary_conn['local']['oplog.rs']
-        oplog_coll.drop()           # reset the oplog
-
-        primary_conn['local'].create_collection('oplog.rs', capped=True,
-                                                size=1000000)
-        namespace_set = ['test.test', 'alpha.foo']
+        # Oplog threads (oplog manager) for each shard
         doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos_addr, oplog_coll, True,
-                            doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
+        oplog_progress = LockingDict()
+        self.opman1 = OplogThread(
+            primary_conn=self.shard1_conn,
+            main_address="localhost:%s" % PORTS_ONE["MONGOS"],
+            oplog_coll=self.shard1_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
+        self.opman2 = OplogThread(
+            primary_conn=self.shard2_conn,
+            main_address="localhost:%s" % PORTS_ONE["MONGOS"],
+            oplog_coll=self.shard2_conn["local"]["oplog.rs"],
+            is_sharded=True,
+            doc_manager=doc_manager,
+            oplog_progress_dict=oplog_progress,
+            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            auth_key=None,
+            auth_username=None
+        )
 
-        return (oplog, primary_conn, oplog_coll, mongos)
-
-    @classmethod
-    def get_new_oplog(cls):
-        """ Set up connection with mongo.
-
-        Returns oplog, the connection and oplog collection
-        This function does not clear the oplog
-        """
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
-
-        mongos = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
-        oplog_coll = primary_conn['local']['oplog.rs']
-
-        namespace_set = ['test.test', 'alpha.foo']
-        doc_manager = DocManager()
-        oplog = OplogThread(primary_conn, mongos, oplog_coll, True,
-                            doc_manager, LockingDict(), namespace_set,
-                            cls.AUTH_KEY, AUTH_USERNAME)
-
-        return (oplog, primary_conn, oplog_coll, oplog.main_connection)
+    def tearDown(self):
+        try:
+            self.opman1.join()
+        except RuntimeError:
+            pass                # thread may not have been started
+        try:
+            self.opman2.join()
+        except RuntimeError:
+            pass                # thread may not have been started
+        self.mongos_conn["test"]["mcsharded"].remove()
+        self.mongos_conn["test"]["mcunsharded"].remove()
 
     def test_retrieve_doc(self):
-        """Test retrieve_doc in oplog_manager.
+        """ Test the retrieve_doc method """
 
-        Assertion failure if it doesn't pass
-        """
+        # Trivial case where the oplog entry is None
+        self.assertEqual(self.opman1.retrieve_doc(None), None)
 
-        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
-        # testing for entry as none type
-        entry = None
-        assert (test_oplog.retrieve_doc(entry) is None)
+        # Retrieve a document from insert operation in oplog
+        doc = {"name": "mango", "type": "fruit",
+               "ns": "test.mcsharded", "weight": 3.24, "i": 1}
+        self.mongos_conn["test"]["mcsharded"].insert(doc)
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        oplog_entry = next(oplog_entries)
+        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), doc)
 
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
+        # Retrieve a document from update operation in oplog
+        self.mongos_conn["test"]["mcsharded"].update(
+            {"i": 1},
+            {"$set": {"sounds-like": "mongo"}}
+        )
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        doc["sounds-like"] = "mongo"
+        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), doc)
 
-        assert (oplog_cursor.count() == 0)
+        # Retrieve a document from remove operation in oplog
+        # (expected: None)
+        self.mongos_conn["test"]["mcsharded"].remove({
+            "i": 1
+        })
+        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), None)
 
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = mongos['alpha']['foo'].find_one()
-
-        # testing for search after inserting a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
-
-        retry_until_ok(mongos['alpha']['foo'].update, {'name': 'paulie'},
-                       {"$set": {'name': 'paul'}})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = mongos['alpha']['foo'].find_one()
-
-        # testing for search after updating a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
-
-        retry_until_ok(mongos['alpha']['foo'].remove, {'name': 'paul'})
-        last_oplog_entry = next(oplog_cursor)
-
-        # testing for search after deleting a document
-        assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
-
-        last_oplog_entry['o']['_id'] = 'badID'
-
-        # testing for bad doc id as input
-        assert (test_oplog.retrieve_doc(last_oplog_entry) is None)
-
-        # test_oplog.stop()
+        # Retrieve a document with bad _id
+        # (expected: None)
+        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
+        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), None)
 
     def test_get_oplog_cursor(self):
-        """Test get_oplog_cursor in oplog_manager.
+        """Test the get_oplog_cursor method"""
 
-        Assertion failure if it doesn't pass
-        """
-        test_oplog, timestamp, cursor, mongos = self.get_oplog_thread()
-        # test None cursor
-        assert (test_oplog.get_oplog_cursor(None) is None)
+        # Trivial case: timestamp is None
+        self.assertEqual(self.opman1.get_oplog_cursor(None), None)
 
-        # test with one document
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        timestamp = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.get_oplog_cursor(timestamp)
-        assert (cursor.count() == 1)
+        # earliest entry is after given timestamp
+        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
+        self.mongos_conn["test"]["mcsharded"].insert(doc)
+        self.assertEqual(self.opman1.get_oplog_cursor(
+            bson.Timestamp(1, 0)), None)
 
-        # test with two documents, one after the ts
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paul'})
-        cursor = test_oplog.get_oplog_cursor(timestamp)
-        assert (cursor.count() == 2)
+        # earliest entry is the only one at/after timestamp
+        latest_timestamp = self.opman1.get_last_oplog_timestamp()
+        cursor = self.opman1.get_oplog_cursor(latest_timestamp)
+        self.assertNotEqual(cursor, None)
+        self.assertEqual(cursor.count(), 1)
+        self.assertEqual(self.opman1.retrieve_doc(cursor[0]), doc)
 
+        # many entries before and after timestamp
+        for i in range(2, 2002):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i
+            })
+        oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.ASCENDING)]
+        )
+        oplog2 = self.shard2_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.ASCENDING)]
+        )
+
+        # startup message + insert at beginning of tests + many inserts
+        self.assertEqual(oplog1.count(), 1 + 1 + 998)
+        self.assertEqual(oplog2.count(), 1 + 1002)
+        pivot1 = oplog1.skip(400).limit(1)[0]
+        pivot2 = oplog2.skip(400).limit(1)[0]
+
+        cursor1 = self.opman1.get_oplog_cursor(pivot1["ts"])
+        cursor2 = self.opman2.get_oplog_cursor(pivot2["ts"])
+        self.assertEqual(cursor1.count(), 1 + 1 + 998 - 400)
+        self.assertEqual(cursor2.count(), 1 + 1002 - 400)
+
+        # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
+        doc1 = self.mongos_conn["test"]["mcsharded"].find_one(
+            {"_id": next(cursor1)["o"]["_id"]})
+        doc2 = self.mongos_conn["test"]["mcsharded"].find_one(
+            {"_id": next(cursor2)["o"]["_id"]})
+        self.assertEqual(doc1["i"], self.opman1.retrieve_doc(pivot1)["i"] + 1)
+        self.assertEqual(doc2["i"], self.opman2.retrieve_doc(pivot2)["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
-        """Test get_last_oplog_timestamp in oplog_manager.
+        """Test the get_last_oplog_timestamp method"""
 
-        Assertion failure if it doesn't pass
-        """
+        # "empty" the oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        self.assertEqual(self.opman1.get_last_oplog_timestamp(), None)
+        self.assertEqual(self.opman2.get_last_oplog_timestamp(), None)
 
-        # test empty oplog
-        test_oplog, oplog_cursor, oplog_coll, mongos = self.get_oplog_thread()
-
-        assert (test_oplog.get_last_oplog_timestamp() is None)
-
-        # test non-empty oplog
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        last_ts = last_oplog_entry['ts']
-        assert (test_oplog.get_last_oplog_timestamp() == last_ts)
-
-        # test_oplog.stop()
+        # Test non-empty oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i + 500
+            })
+        oplog1 = self.shard1_conn["local"]["oplog.rs"]
+        oplog1 = oplog1.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
+        oplog2 = self.shard2_conn["local"]["oplog.rs"]
+        oplog2 = oplog2.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
+        self.assertEqual(self.opman1.get_last_oplog_timestamp(),
+                         oplog1["ts"])
+        self.assertEqual(self.opman2.get_last_oplog_timestamp(),
+                         oplog2["ts"])
 
     def test_dump_collection(self):
-        """Test dump_collection in oplog_manager.
+        """Test the dump_collection method
+>>>>>>> master
 
-        Assertion failure if it doesn't pass
+        Cases:
+
+        1. empty oplog
+        2. non-empty oplog
         """
 
-        test_oplog, search_ts, solr, mongos = self.get_oplog_thread()
+        # Test with empty oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        last_ts1 = self.opman1.dump_collection()
+        last_ts2 = self.opman2.dump_collection()
+        self.assertEqual(last_ts1, None)
+        self.assertEqual(last_ts2, None)
 
-        # with documents
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.dump_collection()
-
-        docman = test_oplog.doc_managers[0]
-        docman.commit()
-        solr_results = docman._search()
-        assert (len(solr_results) == 1)
-        solr_doc = solr_results[0]
-        assert (long_to_bson_ts(solr_doc['_ts']) == search_ts)
-        assert (solr_doc['name'] == 'paulie')
-        assert (solr_doc['ns'] == 'alpha.foo')
+        # Test with non-empty oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard1_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.mongos_conn["test"]["mcsharded"].insert({
+                "i": i + 500
+            })
+        last_ts1 = self.opman1.get_last_oplog_timestamp()
+        last_ts2 = self.opman2.get_last_oplog_timestamp()
+        self.assertEqual(last_ts1, self.opman1.dump_collection())
+        self.assertEqual(last_ts2, self.opman2.dump_collection())
+        self.assertEqual(len(self.opman1.doc_manager._search()), 1000)
 
     def test_init_cursor(self):
-        """Test init_cursor in oplog_manager.
+        """Test the init_cursor method
 
-        Assertion failure if it doesn't pass
+        Cases:
+
+        1. no last checkpoint, no collection dump
+        2. no last checkpoint, collection dump ok and stuff to dump
+        3. no last checkpoint, nothing to dump, stuff in oplog
+        4. no last checkpoint, nothing to dump, nothing in oplog
+        5. last checkpoint exists
         """
 
-        test_oplog, search_ts, cursor, mongos = self.get_oplog_thread()
-        test_oplog.checkpoint = None           # needed for these tests
+        # N.B. these sub-cases build off of each other and cannot be re-ordered
+        # without side-effects
 
-        # initial tests with no config file and empty oplog
-        assert (test_oplog.init_cursor() is None)
+        # No last checkpoint, no collection dump, nothing in oplog
+        # "change oplog collection" to put nothing in oplog
+        self.opman1.oplog = self.shard1_conn["test"]["emptycollection"]
+        self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
+        self.opman1.collection_dump = False
+        self.opman2.collection_dump = False
+        self.assertEqual(self.opman1.init_cursor(), None)
+        self.assertEqual(self.opman1.checkpoint, None)
+        self.assertEqual(self.opman2.init_cursor(), None)
+        self.assertEqual(self.opman2.checkpoint, None)
 
-        # no config, single oplog entry
-        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.init_cursor()
+        # No last checkpoint, empty collections, nothing in oplog
+        self.opman1.collection_dump = True
+        self.opman2.collection_dump = True
+        self.assertEqual(self.opman1.init_cursor(), None)
+        self.assertEqual(self.opman1.checkpoint, None)
+        self.assertEqual(self.opman2.init_cursor(), None)
+        self.assertEqual(self.opman2.checkpoint, None)
 
-        assert (cursor.count() == 1)
-        assert (test_oplog.checkpoint == search_ts)
+        # No last checkpoint, empty collections, something in oplog
+        self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
+        oplog_startup_ts = self.opman2.get_last_oplog_timestamp()
+        collection = self.mongos_conn["test"]["mcsharded"]
+        collection.insert({"i": 1})
+        collection.remove({"i": 1})
+        time.sleep(3)
+        last_ts1 = self.opman1.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        self.assertEqual(self.opman1.checkpoint, last_ts1)
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+        # init_cursor should point to startup message in shard2 oplog
+        cursor = self.opman2.init_cursor()
+        self.assertEqual(next(cursor)["ts"], oplog_startup_ts)
+        self.assertEqual(self.opman2.checkpoint, oplog_startup_ts)
 
-        # with config file, assert that size != 0
-        os.system('touch %s' % (TEMP_CONFIG))
+        # No last checkpoint, non-empty collections, stuff in oplog
+        progress = LockingDict()
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        collection.insert({"i": 1200})
+        last_ts2 = self.opman2.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        self.assertEqual(self.opman1.checkpoint, last_ts1)
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+        self.assertEqual(next(self.opman2.init_cursor())["ts"], last_ts2)
+        self.assertEqual(self.opman2.checkpoint, last_ts2)
+        with self.opman2.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)], last_ts2)
 
-        cursor = test_oplog.init_cursor()
-        oplog_dict = test_oplog.oplog_progress.get_dict()
-
-        assert(cursor.count() == 1)
-        self.assertTrue(str(test_oplog.oplog) in oplog_dict)
-        commit_ts = test_oplog.checkpoint
-        self.assertTrue(oplog_dict[str(test_oplog.oplog)] == commit_ts)
-
-        os.system('rm %s' % (TEMP_CONFIG))
+        # Last checkpoint exists
+        progress = LockingDict()
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        entry1 = list(
+            self.shard1_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        entry2 = list(
+            self.shard2_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        progress.get_dict()[str(self.opman1.oplog)] = entry1[0]["ts"]
+        progress.get_dict()[str(self.opman2.oplog)] = entry2[0]["ts"]
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        self.opman1.checkpoint = self.opman2.checkpoint = None
+        cursor1 = self.opman1.init_cursor()
+        cursor2 = self.opman2.init_cursor()
+        self.assertEqual(entry1[1]["ts"], next(cursor1)["ts"])
+        self.assertEqual(entry2[1]["ts"], next(cursor2)["ts"])
+        self.assertEqual(self.opman1.checkpoint, entry1[0]["ts"])
+        self.assertEqual(self.opman2.checkpoint, entry2[0]["ts"])
+        with self.opman1.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)],
+                             entry1[0]["ts"])
+        with self.opman2.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)],
+                             entry2[0]["ts"])
 
     def test_rollback(self):
-        """Test rollback in oplog_manager. Assertion failure if it doesn't pass
-            We force a rollback by inserting a doc, killing primary, inserting
-            another doc, killing the new primary, and then restarting both
-            servers.
-        """
+        """Test the rollback method in a sharded environment
 
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        if not start_cluster(sharded=True):
-            self.fail("Shards cannot be added to mongos")
-
-        test_oplog, primary_conn, solr, mongos = self.get_new_oplog()
-
-        solr = test_oplog.doc_managers[0]
-        solr._delete()          # equivalent to solr.delete(q='*:*')
-
+<<<<<<< HEAD
         retry_until_ok(mongos['alpha']['foo'].remove, {})
         retry_until_ok(mongos['alpha']['foo'].insert,
                        {'_id': ObjectId('4ff74db3f646462b38000001'),
                         'name': 'paulie'})
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
+=======
+        Cases:
+        1. Documents on both shards, rollback on one shard
+        2. Documents on both shards, rollback on both shards
+>>>>>>> master
 
-        obj2 = ObjectId('4ff74db3f646462b38000002')
-        first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
-                     'ns': 'alpha.foo', 
-                     '_id': ObjectId('4ff74db3f646462b38000001')}
+        """
 
-        # try kill one, try restarting
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
+        self.opman1.start()
+        self.opman2.start()
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
-        admin_db = new_primary_conn['admin']
-        while admin_db.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        count = 0
-        while True:
+        # Insert first documents while primaries are up
+        db_main = self.mongos_conn["test"]["mcsharded"]
+        db_main.insert({"i": 0}, w=2)
+        db_main.insert({"i": 1000}, w=2)
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].count(), 1)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
+
+        # Case 1: only one primary goes down, shard1 in this case
+        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
+
+        # Wait for the secondary to be promoted
+        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+
+        # Insert another document. This will be rolled back later
+        retry_until_ok(db_main.insert, {"i": 1})
+        db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
+        db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
+        self.assertEqual(db_secondary1.count(), 2)
+
+        # Wait for replication on the doc manager
+        # Note that both OplogThreads share the same doc manager
+        c = lambda: len(self.opman1.doc_manager._search()) == 3
+        assert_soon(c, "not all writes were replicated to doc manager",
+                    max_tries=120)
+
+        # Kill the new primary
+        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
+
+        # Start both servers back up
+        start_mongo_proc(
+            port=PORTS_ONE["PRIMARY"],
+            repl_set_name="demo-repl",
+            data="replset1a",
+            log="replset1a.log",
+            key_file=None
+        )
+        primary_admin = self.shard1_conn["admin"]
+        c = lambda: primary_admin.command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        start_mongo_proc(
+            port=PORTS_ONE["SECONDARY"],
+            repl_set_name="demo-repl",
+            data="replset1b",
+            log="replset1b.log",
+            key_file=None
+        )
+        secondary_admin = self.shard1_secondary_conn["admin"]
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+        query = {"i": {"$lt": 1000}}
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
+
+        # Only first document should exist in MongoDB
+        self.assertEqual(db_main.find(query).count(), 1)
+        self.assertEqual(db_main.find_one(query)["i"], 0)
+
+        # Same should hold for the doc manager
+        docman_docs = [d for d in self.opman1.doc_manager._search()
+                       if d["i"] < 1000]
+        self.assertEqual(len(docman_docs), 1)
+        self.assertEqual(docman_docs[0]["i"], 0)
+
+        # Wait for previous rollback to complete
+        def rollback_done():
+            secondary1_count = retry_until_ok(db_secondary1.count)
+            secondary2_count = retry_until_ok(db_secondary2.count)
+            return (1, 1) == (secondary1_count, secondary2_count)
+        assert_soon(rollback_done,
+                    "rollback never replicated to one or more secondaries")
+
+        ##############################
+
+        # Case 2: Primaries on both shards go down
+        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
+        kill_mongo_proc("localhost", PORTS_TWO["PRIMARY"])
+
+        # Wait for the secondaries to be promoted
+        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
+        shard2_secondary_admin = self.shard2_secondary_conn["admin"]
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(
+            lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
+
+        # Insert another document on each shard. These will be rolled back later
+        retry_until_ok(db_main.insert, {"i": 1})
+        self.assertEqual(db_secondary1.count(), 2)
+        retry_until_ok(db_main.insert, {"i": 1001})
+        self.assertEqual(db_secondary2.count(), 2)
+
+        # Wait for replication on the doc manager
+        c = lambda: len(self.opman1.doc_manager._search()) == 4
+        assert_soon(c, "not all writes were replicated to doc manager")
+
+        # Kill the new primaries
+        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
+        kill_mongo_proc("localhost", PORTS_TWO["SECONDARY"])
+
+        # Start the servers back up...
+        # Shard 1
+        start_mongo_proc(
+            port=PORTS_ONE["PRIMARY"],
+            repl_set_name="demo-repl",
+            data="replset1a",
+            log="replset1a.log",
+            key_file=None
+        )
+        c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        start_mongo_proc(
+            port=PORTS_ONE["SECONDARY"],
+            repl_set_name="demo-repl",
+            data="replset1b",
+            log="replset1b.log",
+            key_file=None
+        )
+        secondary_admin = self.shard1_secondary_conn["admin"]
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+        # Shard 2
+        start_mongo_proc(
+            port=PORTS_TWO["PRIMARY"],
+            repl_set_name="demo-repl-2",
+            data="replset2a",
+            log="replset2a.log",
+            key_file=None
+        )
+        c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        start_mongo_proc(
+            port=PORTS_TWO["SECONDARY"],
+            repl_set_name="demo-repl-2",
+            data="replset2b",
+            log="replset2b.log",
+            key_file=None
+        )
+        secondary_admin = self.shard2_secondary_conn["admin"]
+
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+
+        # Wait for the shards to come online
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
+        query2 = {"i": {"$gte": 1000}}
+        assert_soon(lambda: retry_until_ok(db_main.find(query2).count) > 0)
+
+        # Only first documents should exist in MongoDB
+        self.assertEqual(db_main.find(query).count(), 1)
+        self.assertEqual(db_main.find_one(query)["i"], 0)
+        self.assertEqual(db_main.find(query2).count(), 1)
+        self.assertEqual(db_main.find_one(query2)["i"], 1000)
+
+        # Same should hold for the doc manager
+        i_values = [d["i"] for d in self.opman1.doc_manager._search()]
+        self.assertEqual(len(i_values), 2)
+        self.assertIn(0, i_values)
+        self.assertIn(1000, i_values)
+
+    def test_with_chunk_migration(self):
+        """Test that DocManagers have proper state after both a successful
+        and an unsuccessful chunk migration
+        """
+
+        # Start replicating to dummy doc managers
+        self.opman1.start()
+        self.opman2.start()
+
+        collection = self.mongos_conn["test"]["mcsharded"]
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        # Assert current state of the mongoverse
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
+                         500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
+                         500)
+        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
+
+        # Test successful chunk move from shard 1 to shard 2
+        self.mongos_conn["admin"].command(
+            "moveChunk",
+            "test.mcsharded",
+            find={"i": 1},
+            to="demo-repl-2"
+        )
+
+        # doc manager should still have all docs
+        all_docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(all_docs), 1000)
+        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
+            self.assertEqual(doc["i"], i + 500)
+
+        # Mark the collection as "dropped". This will cause migration to fail.
+        self.mongos_conn["config"]["collections"].update(
+            {"_id": "test.mcsharded"},
+            {"$set": {"dropped": True}}
+        )
+
+        # Test unsuccessful chunk move from shard 2 to shard 1
+        def fail_to_move_chunk():
+            self.mongos_conn["admin"].command(
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1},
+                to="demo-repl"
+            )
+        self.assertRaises(pymongo.errors.OperationFailure, fail_to_move_chunk)
+        # doc manager should still have all docs
+        all_docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(all_docs), 1000)
+        for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
+            self.assertEqual(doc["i"], i + 500)
+
+        # Cleanup
+        self.mongos_conn["config"]["collections"].update(
+            {"_id": "test.mcsharded"},
+            {"$set": {"dropped": False}}
+        )
+        retry_until_ok(
+            self.mongos_conn['admin'].command,
+            "moveChunk",
+            "test.mcsharded",
+            find={"i": 1},
+            to="demo-repl"
+        )
+        assert_soon(
+            lambda: self.shard1_conn['test']['mcsharded'].count() == 500)
+
+    def test_with_orphan_documents(self):
+        """Test that DocManagers have proper state after a chunk migration
+        that resuts in orphaned documents.
+        """
+        # Start replicating to dummy doc managers
+        self.opman1.start()
+        self.opman2.start()
+
+        collection = self.mongos_conn["test"]["mcsharded"]
+        collection.insert({"i": i + 500} for i in range(1000))
+        # Assert current state of the mongoverse
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
+                         500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
+                         500)
+        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
+
+        # Stop replication using the 'rsSyncApplyStop' failpoint
+        self.shard1_secondary_conn.admin.command(
+            "configureFailPoint", "rsSyncApplyStop",
+            mode="alwaysOn"
+        )
+
+        # Move a chunk from shard2 to shard1
+        def move_chunk():
             try:
-                mongos['alpha']['foo'].insert({'_id': obj2, 'name': 'paul'})
-                break
-            except OperationFailure:
-                time.sleep(1)
-                count += 1
-                if count > 60:
-                    self.fail('Insert failed too many times in rollback')
-                continue
+                self.mongos_conn["admin"].command(
+                    "moveChunk",
+                    "test.mcsharded",
+                    find={"i": 1000},
+                    to="demo-repl"
+                )
+            except pymongo.errors.OperationFailure:
+                pass
 
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
+        # moveChunk will never complete, so use another thread to continue
+        mover = threading.Thread(target=move_chunk)
+        mover.start()
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        # wait for documents to start moving to shard 1
+        assert_soon(lambda: self.shard1_conn.test.mcsharded.count() > 500)
 
-        # wait for master to be established
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
+        # Get opid for moveChunk command
+        operations = self.mongos_conn.test.current_op()
+        opid = None
+        for op in operations["inprog"]:
+            if op.get("query", {}).get("moveChunk"):
+                opid = op["opid"]
+        self.assertNotEqual(opid, None, "could not find moveChunk operation")
+        # Kill moveChunk with the opid
+        self.mongos_conn["test"]["$cmd.sys.killop"].find_one({"op": opid})
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        # Mongo Connector should not become confused by unsuccessful chunk move
+        docs = self.opman1.doc_manager._search()
+        self.assertEqual(len(docs), 1000)
+        self.assertEqual(sorted(d["i"] for d in docs),
+                         list(range(500, 1500)))
 
-        # wait for secondary to be established
-        admin_db = new_primary_conn['admin']
-        while admin_db.command("replSetGetStatus")['myState'] != 2:
-            time.sleep(1)
-
-        while retry_until_ok(mongos['alpha']['foo'].find().count) != 1:
-            time.sleep(1)
-
-        self.assertEqual(str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
-        self.assertEqual(str(primary_conn.port), PORTS_ONE['PRIMARY'])
-
-        last_ts = test_oplog.get_last_oplog_timestamp()
-        second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
-                      'ns': 'alpha.foo', '_id': obj2}
-
-        solr.upsert(first_doc)
-        solr.upsert(second_doc)
-        test_oplog.rollback()
-        solr.commit()
-        results = solr._search()
-
-        self.assertEqual(len(results), 1)
-
-        results_doc = results[0]
-        self.assertEqual(results_doc['name'], 'paulie')
-        self.assertTrue(results_doc['_ts'] <= bson_ts_to_long(cutoff_ts))
-
+        # cleanup
+        self.shard1_secondary_conn.admin.command(
+            "configureFailPoint", "rsSyncApplyStop",
+            mode="off"
+        )
+        mover.join()
 
 if __name__ == '__main__':
     unittest.main()

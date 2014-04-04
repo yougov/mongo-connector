@@ -16,7 +16,6 @@
 """
 import os
 import sys
-import inspect
 import socket
 
 sys.path[0:0] = [""]
@@ -29,9 +28,9 @@ if sys.version_info[:2] == (2, 6):
 else:
     import unittest
 from tests.setup_cluster import (kill_mongo_proc,
-                                start_mongo_proc,
-                                start_cluster,
-                                kill_all)
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all)
 from threading import Timer
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -43,6 +42,7 @@ NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
 CONFIG = os.environ.get('CONFIG', "config.txt")
+
 
 class TestSynchronizer(unittest.TestCase):
     """ Tests the synchronizers
@@ -58,11 +58,11 @@ class TestSynchronizer(unittest.TestCase):
         """ Initializes the cluster
         """
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        use_mongos = True    
+        use_mongos = True
         if PORTS_ONE['MONGOS'] != "27217":
             use_mongos = False
 
-        cls.flag =  start_cluster(use_mongos=use_mongos)
+        cls.flag = start_cluster(use_mongos=use_mongos)
         if cls.flag:
             cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']))
             timer = Timer(60, abort_test)
@@ -166,7 +166,7 @@ class TestSynchronizer(unittest.TestCase):
                 count += 1
                 if count > 60:
                     self.fail('Call to insert failed too'
-                    ' many times in test_rollback')
+                              ' many times in test_rollback')
                 time.sleep(1)
                 continue
         while (len(self.synchronizer._search()) != 2):
@@ -179,13 +179,13 @@ class TestSynchronizer(unittest.TestCase):
                 self.assertEqual(item['_id'], result_set_2['_id'])
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = self.synchronizer._search()
@@ -240,7 +240,7 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': 'Pauline ' + str(count)})
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        while (len(self.synchronizer._search()) 
+        while (len(self.synchronizer._search())
                 != self.conn['test']['test'].find().count()):
             time.sleep(1)
         result_set_1 = self.synchronizer._search()
@@ -253,13 +253,13 @@ class TestSynchronizer(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         while (len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS):
             time.sleep(5)

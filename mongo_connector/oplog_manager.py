@@ -159,6 +159,10 @@ class OplogThread(threading.Thread):
                         if not self.running:
                             break
 
+                        # Don't replicate entries resulting from chunk moves
+                        if entry.get("fromMigrate"):
+                            continue
+
                         #sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
@@ -185,7 +189,7 @@ class OplogThread(threading.Thread):
                                     doc['ns'] = ns
                                     for dm in self.doc_managers:
                                         upsert_inc += 1
-                                        dm.upsert(self.filter_fields(doc))
+                                        dm.upsert(doc)
                         except errors.OperationFailed:
                             logging.error(
                                 "Unable to %s doc with id %s" % (
@@ -276,14 +280,13 @@ class OplogThread(threading.Thread):
         db_name, coll_name = namespace.split('.', 1)
 
         coll = self.main_connection[db_name][coll_name]
-        doc = util.retry_until_ok(coll.find_one, {'_id': doc_id})
 
-        return doc
+        doc = util.retry_until_ok(
+            coll.find_one,
+            {'_id': doc_id},
+            fields=self.fields
+        )
 
-    def filter_fields(self, doc):
-        if self.fields is not None and len(self.fields) > 0:
-            keepers = ["_id", "ns", "_ts"] + self.fields
-            doc = dict((k, v) for k, v in doc.items() if k in keepers)
         return doc
 
     def get_oplog_cursor(self, timestamp):
@@ -390,12 +393,14 @@ class OplogThread(threading.Thread):
                     if not last_id:
                         cursor = util.retry_until_ok(
                             target_coll.find,
+                            fields=self.fields,
                             sort=[("_id", pymongo.ASCENDING)]
                         )
                     else:
                         cursor = util.retry_until_ok(
                             target_coll.find,
                             {"_id": {"$gt": last_id}},
+                            fields=self.fields,
                             sort=[("_id", pymongo.ASCENDING)]
                         )
                     try:
@@ -450,7 +455,7 @@ class OplogThread(threading.Thread):
                     for num, doc in enumerate(docs_to_dump()):
                         if num % 10000 == 0:
                             logging.debug("Upserted %d docs." % num)
-                        dm.upsert(self.filter_fields(doc))
+                        dm.upsert(doc)
                     logging.debug("Upserted %d  docs" % num)
 
             # cleanup
@@ -575,7 +580,8 @@ class OplogThread(threading.Thread):
         # Find the oplog entry that touched the most recent document.
         # We'll use this to figure where to pick up the oplog later.
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one(
+        last_oplog_entry = util.retry_until_ok(
+            self.oplog.find_one,
             {'ts': {'$lte': target_ts}},
             sort=[('$natural', pymongo.DESCENDING)]
         )
@@ -619,7 +625,9 @@ class OplogThread(threading.Thread):
 
                 to_update = util.retry_until_ok(
                     self.main_connection[database][coll].find,
-                    {'_id': {'$in': bson_obj_id_list}})
+                    {'_id': {'$in': bson_obj_id_list}},
+                    fields=self.fields
+                )
                 #doc list are docs in target system, to_update are
                 #docs in mongo
                 doc_hash = {}  # hash by _id
@@ -658,7 +666,7 @@ class OplogThread(threading.Thread):
                     doc['ns'] = self.dest_mapping.get(namespace, namespace)
                     try:
                         insert_inc += 1
-                        dm.upsert(self.filter_fields(doc))
+                        dm.upsert(doc)
                     except errors.OperationFailed as e:
                         fail_insert_inc += 1
                         logging.error("OplogThread: Rollback, Unable to "

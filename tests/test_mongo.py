@@ -22,7 +22,6 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import inspect
 import socket
 
 sys.path[0:0] = [""]
@@ -30,17 +29,16 @@ sys.path[0:0] = [""]
 from pymongo import MongoClient
 from tests.setup_cluster import (kill_mongo_proc,
                                  kill_all,
-                                 start_mongo_proc, 
-                                 start_cluster, 
-                                 start_single_mongod_instance)
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 start_single_mongod_instance,
+                                 PORTS_ONE)
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
-from tests.util import wait_for
+from tests.util import assert_soon
 
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27217"}
 NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
@@ -60,7 +58,7 @@ class TestSynchronizer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        start_single_mongod_instance("30000", "/MC", "MC_log")
+        start_single_mongod_instance("30000", "MC", "MC_log")
         cls.mongo_doc = DocManager("localhost:30000")
         cls.mongo_doc._remove()
         cls.flag = start_cluster()
@@ -93,7 +91,7 @@ class TestSynchronizer(unittest.TestCase):
         while len(self.connector.shard_set) == 0:
             pass
         self.conn['test']['test'].remove()
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 0)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
@@ -115,7 +113,7 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
         result_set_1 = self.mongo_doc._search()
         self.assertEqual(sum(1 for _ in result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
@@ -128,9 +126,9 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) != 1)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) != 1)
         self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
 
     def test_rollback(self):
@@ -140,18 +138,18 @@ class TestSynchronizer(unittest.TestCase):
         """
         primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         self.conn['test']['test'].insert({'name': 'paul'})
-        condition = lambda : self.conn['test']['test'].find_one(
+        condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
-        wait_for(condition)
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(condition)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        condition = lambda : admin.command("isMaster")['ismaster']
-        wait_for(condition)
+        condition = lambda: admin.command("isMaster")['ismaster']
+        assert_soon(condition)
 
         time.sleep(5)
         count = 0
@@ -166,7 +164,7 @@ class TestSynchronizer(unittest.TestCase):
                 if count >= 60:
                     sys.exit(1)
                 continue
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 2)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 2)
         result_set_1 = list(self.mongo_doc._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
@@ -176,12 +174,13 @@ class TestSynchronizer(unittest.TestCase):
                 self.assertEqual(item['_id'], result_set_2['_id'])
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
-        wait_for(lambda : primary_conn['admin'].command("isMaster")['ismaster'])
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
+        assert_soon(
+            lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = list(self.mongo_doc._search())
@@ -201,8 +200,8 @@ class TestSynchronizer(unittest.TestCase):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
         search = self.mongo_doc._search
-        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        wait_for(condition)
+        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        assert_soon(condition)
         for i in range(0, NUMBER_OF_DOC_DIRS):
             result_set_1 = self.mongo_doc._search()
             for item in result_set_1:
@@ -218,15 +217,15 @@ class TestSynchronizer(unittest.TestCase):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
         search = self.mongo_doc._search
-        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        wait_for(condition)
+        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        assert_soon(condition)
         primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
-        wait_for(lambda : admin.command("isMaster")['ismaster'])
+        assert_soon(lambda: admin.command("isMaster")['ismaster'])
 
         time.sleep(5)
         count = -1
@@ -237,8 +236,8 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': 'Pauline ' + str(count)})
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        wait_for(lambda : sum(1 for _ in self.mongo_doc._search())
-                 == self.conn['test']['test'].find().count())
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search())
+                    == self.conn['test']['test'].find().count())
         result_set_1 = self.mongo_doc._search()
         for item in result_set_1:
             if 'Pauline' in item['name']:
@@ -248,16 +247,16 @@ class TestSynchronizer(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         db_admin = primary_conn['admin']
-        wait_for(lambda : db_admin.command("isMaster")['ismaster'])
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         search = self.mongo_doc._search
-        condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
-        wait_for(condition)
+        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        assert_soon(condition)
 
         result_set_1 = list(self.mongo_doc._search())
         self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
