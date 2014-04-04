@@ -21,6 +21,8 @@ Please look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
 
+from mongo_connector.errors import OperationFailed
+
 
 class DocManager():
     """BackendSimulator emulates both a target DocManager and a server.
@@ -55,7 +57,11 @@ class DocManager():
     def remove(self, doc):
         """Removes the document from the doc dict.
         """
-        del self.doc_dict[doc[self.unique_key]]
+        doc_id = doc[self.unique_key]
+        try:
+            del self.doc_dict[doc_id]
+        except KeyError:
+            raise OperationFailed("Document does not exist: %s" % str(doc))
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents within the

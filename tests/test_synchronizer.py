@@ -32,9 +32,9 @@ if sys.version_info[:2] == (2, 6):
 else:
     import unittest
 from tests.setup_cluster import (kill_mongo_proc,
-                                start_mongo_proc,
-                                start_cluster,
-                                kill_all)
+                                 start_mongo_proc,
+                                 start_cluster,
+                                 kill_all)
 from threading import Timer
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -68,7 +68,7 @@ class TestSynchronizer(unittest.TestCase):
         cls.flag =  start_cluster(use_mongos=use_mongos)
         if cls.flag:
             cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
-                              replicaSet="demo-repl")
+                                  replicaSet="demo-repl")
             timer = Timer(60, abort_test)
             cls.connector = Connector(
                 address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
@@ -183,13 +183,13 @@ class TestSynchronizer(unittest.TestCase):
                 self.assertEqual(item['_id'], result_set_2['_id'])
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         time.sleep(2)
         result_set_1 = self.synchronizer._search()
@@ -257,13 +257,13 @@ class TestSynchronizer(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
+        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
+                         "replset1a.log", None)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
+        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
+                         "replset1b.log", None)
 
         while (len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS):
             time.sleep(5)

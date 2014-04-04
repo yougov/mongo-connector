@@ -162,6 +162,10 @@ class OplogThread(threading.Thread):
                         if not self.running:
                             break
 
+                        # Don't replicate entries resulting from chunk moves
+                        if entry.get("fromMigrate"):
+                            continue
+
                         #sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
@@ -578,7 +582,8 @@ class OplogThread(threading.Thread):
         # Find the oplog entry that touched the most recent document.
         # We'll use this to figure where to pick up the oplog later.
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one(
+        last_oplog_entry = util.retry_until_ok(
+            self.oplog.find_one,
             {'ts': {'$lte': target_ts}},
             sort=[('$natural', pymongo.DESCENDING)]
         )
