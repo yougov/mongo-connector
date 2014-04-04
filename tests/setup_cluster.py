@@ -42,6 +42,7 @@ DEMO_SERVER_DATA = os.path.join(SETUP_DIR, "data")
 DEMO_SERVER_LOG = os.path.join(SETUP_DIR, "logs")
 MONGOD_KSTR = " --dbpath " + DEMO_SERVER_DATA
 MONGOS_KSTR = "mongos --port " + PORTS_ONE["MONGOS"]
+KEY_FILE = os.environ.get("KEY_FILE")
 
 
 def remove_dir(dir_path):
@@ -111,7 +112,7 @@ def kill_all():
     remove_dir(DEMO_SERVER_DATA)
 
 
-def start_mongo_proc(port, repl_set_name, data, log, key_file):
+def start_mongo_proc(port, repl_set_name, data, log):
     """Create the replica set
     """
     cmd = ("mongod --fork --replSet %s --noprealloc --port %s --dbpath %s"
@@ -121,8 +122,8 @@ def start_mongo_proc(port, repl_set_name, data, log, key_file):
             os.path.join(DEMO_SERVER_DATA, data),
             os.path.join(DEMO_SERVER_LOG, log)))
 
-    if key_file is not None:
-        cmd += " --keyFile " + key_file
+    if KEY_FILE is not None:
+        cmd += " --keyFile " + KEY_FILE
 
     execute_command(cmd)
     assert_soon(MongoClient, 'localhost', int(port))
@@ -139,7 +140,7 @@ def execute_command(command):
 #========================================= #
 
 
-def start_cluster(sharded=False, key_file=None, use_mongos=True):
+def start_cluster(sharded=False, use_mongos=True):
     """Sets up cluster with 1 shard, replica set with 3 members
     """
     # Kill all spawned mongo[ds]
@@ -162,20 +163,20 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
     create_dir(DEMO_SERVER_LOG)
 
     # Create the replica set
-    start_mongo_proc(PORTS_ONE["PRIMARY"], "demo-repl", "replset1a",
-                     "replset1a.log", key_file)
-    start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl", "replset1b",
-                     "replset1b.log", key_file)
-    start_mongo_proc(PORTS_ONE["ARBITER"], "demo-repl", "replset1c",
-                     "replset1c.log", key_file)
+    start_mongo_proc(PORTS_ONE["PRIMARY"], "demo-repl",
+                     "replset1a", "replset1a.log")
+    start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl",
+                     "replset1b", "replset1b.log")
+    start_mongo_proc(PORTS_ONE["ARBITER"], "demo-repl",
+                     "replset1c", "replset1c.log")
 
     if sharded:
-        start_mongo_proc(PORTS_TWO["PRIMARY"], "demo-repl-2", "replset2a",
-                         "replset2a.log", key_file)
-        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2", "replset2b",
-                         "replset2b.log", key_file)
-        start_mongo_proc(PORTS_TWO["ARBITER"], "demo-repl-2", "replset2c",
-                         "replset2c.log", key_file)
+        start_mongo_proc(PORTS_TWO["PRIMARY"], "demo-repl-2",
+                         "replset2a", "replset2a.log")
+        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2",
+                         "replset2b", "replset2b.log")
+        start_mongo_proc(PORTS_TWO["ARBITER"], "demo-repl-2",
+                         "replset2c", "replset2c.log")
 
     # Setup config server
     cmd = ("mongod --oplogSize 500 --fork --configsvr --noprealloc --port %s"
@@ -184,8 +185,8 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                os.path.join(DEMO_SERVER_DATA, "config1"),
                os.path.join(DEMO_SERVER_LOG, "config1.log")))
 
-    if key_file is not None:
-        cmd += " --keyFile " + key_file
+    if KEY_FILE is not None:
+        cmd += " --keyFile " + KEY_FILE
 
     execute_command(cmd)
     assert_soon(MongoClient, 'localhost', int(PORTS_ONE['CONFIG']))
@@ -197,8 +198,8 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                PORTS_ONE["CONFIG"],
                os.path.join(DEMO_SERVER_LOG, "mongos1.log")))
 
-    if key_file is not None:
-        cmd += " --keyFile " + key_file
+    if KEY_FILE is not None:
+        cmd += " --keyFile " + KEY_FILE
 
     if use_mongos:
         execute_command(cmd)

@@ -21,8 +21,6 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import inspect
-import os
 
 sys.path[0:0] = [""]
 
@@ -189,7 +187,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         # latest document is not in included namespace
         for i in range(100):
-            ns = self.namespaces_inc[0] if i%2 == 0 else self.namespaces_exc[0]
+            ns = (self.namespaces_inc, self.namespaces_exc)[i % 2][0]
             self.choosy_docman.upsert({
                 "_id": i,
                 "ns": ns,

@@ -33,8 +33,7 @@ from tests.setup_cluster import start_cluster, kill_all
 from bson.timestamp import Timestamp
 from mongo_connector import errors
 from mongo_connector.doc_managers import (
-    doc_manager_simulator,
-    elastic_doc_manager
+    doc_manager_simulator
 )
 from mongo_connector.util import long_to_bson_ts
 

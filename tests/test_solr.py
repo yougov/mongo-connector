@@ -62,7 +62,7 @@ class TestSynchronizer(unittest.TestCase):
         cls.flag = start_cluster()
         if cls.flag:
             cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN']))
-            # Creating a Solr object with an invalid URL 
+            # Creating a Solr object with an invalid URL
             # doesn't create an exception
             cls.solr_conn = Solr('http://localhost:8983/solr')
             try:
@@ -294,20 +294,26 @@ class TestSynchronizer(unittest.TestCase):
                 'Pauline',
                 rows=NUMBER_OF_DOC_DIRS * 2)) != 0):
             time.sleep(15)
-        result_set_1 = self.solr_conn.search('Pauline',
-                                             rows=NUMBER_OF_DOC_DIRS * 2)
+        result_set_1 = self.solr_conn.search(
+            'Pauline',
+            rows=NUMBER_OF_DOC_DIRS * 2
+        )
         self.assertEqual(len(result_set_1), 0)
-        result_set_2 = self.solr_conn.search('Paul', 
-            rows=NUMBER_OF_DOC_DIRS * 2)
+        result_set_2 = self.solr_conn.search(
+            'Paul',
+            rows=NUMBER_OF_DOC_DIRS * 2
+        )
         self.assertEqual(len(result_set_2), NUMBER_OF_DOC_DIRS)
 
     def test_valid_fields(self):
         """ Tests documents with field definitions
         """
         inserted_obj = self.conn['test']['test'].insert(
-            {'name':'test_valid'})
-        self.conn['test']['test'].update({'_id' : inserted_obj},
-            {'$set':{'popularity' : 1 }})
+            {'name': 'test_valid'})
+        self.conn['test']['test'].update(
+            {'_id': inserted_obj},
+            {'$set': {'popularity': 1}}
+        )
 
         docman = self.connector.doc_managers[0]
         for _ in range(60):
@@ -326,9 +332,11 @@ class TestSynchronizer(unittest.TestCase):
         """ Tests documents without field definitions
         """
         inserted_obj = self.conn['test']['test'].insert(
-            {'name':'test_invalid'})
-        self.conn['test']['test'].update({'_id' : inserted_obj},
-            {'$set':{'break_this_test' : 1 }})
+            {'name': 'test_invalid'})
+        self.conn['test']['test'].update(
+            {'_id': inserted_obj},
+            {'$set': {'break_this_test': 1}}
+        )
 
         docman = self.connector.doc_managers[0]
         for _ in range(60):

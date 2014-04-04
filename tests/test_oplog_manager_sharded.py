@@ -15,7 +15,6 @@
 import threading
 import time
 import os
-import shutil
 import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
@@ -36,7 +35,6 @@ from tests.setup_cluster import (
     start_mongo_proc,
     start_cluster,
     kill_all,
-    DEMO_SERVER_DATA,
     PORTS_ONE,
     PORTS_TWO
 )
@@ -48,8 +46,7 @@ class TestOplogManagerSharded(unittest.TestCase):
     cluster
     """
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         """ Initialize the cluster:
 
         Clean out the databases used by the tests
@@ -62,42 +59,42 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Connection to mongos
         mongos_address = "localhost:%s" % PORTS_ONE["MONGOS"]
-        cls.mongos_conn = MongoClient(mongos_address)
+        self.mongos_conn = MongoClient(mongos_address)
 
         # Connections to the shards
-        cls.shard1_conn = MongoClient("localhost:%s" % PORTS_ONE["PRIMARY"],
-                                      replicaSet="demo-repl")
-        cls.shard2_conn = MongoClient("localhost:%s" % PORTS_TWO["PRIMARY"],
-                                      replicaSet="demo-repl-2")
-        cls.shard1_secondary_conn = MongoClient(
+        self.shard1_conn = MongoClient("localhost:%s" % PORTS_ONE["PRIMARY"],
+                                       replicaSet="demo-repl")
+        self.shard2_conn = MongoClient("localhost:%s" % PORTS_TWO["PRIMARY"],
+                                       replicaSet="demo-repl-2")
+        self.shard1_secondary_conn = MongoClient(
             "localhost:%s" % PORTS_ONE["SECONDARY"],
             read_preference=ReadPreference.SECONDARY_PREFERRED
         )
-        cls.shard2_secondary_conn = MongoClient(
+        self.shard2_secondary_conn = MongoClient(
             "localhost:%s" % PORTS_TWO["SECONDARY"],
             read_preference=ReadPreference.SECONDARY_PREFERRED
         )
 
         # Wipe any test data
-        cls.mongos_conn["test"]["mcsharded"].drop()
+        self.mongos_conn["test"]["mcsharded"].drop()
 
         # Create and shard the collection test.mcsharded on the "i" field
-        cls.mongos_conn["test"]["mcsharded"].ensure_index("i")
-        cls.mongos_conn.admin.command("enableSharding", "test")
-        cls.mongos_conn.admin.command("shardCollection",
-                                      "test.mcsharded",
-                                      key={"i": 1})
+        self.mongos_conn["test"]["mcsharded"].ensure_index("i")
+        self.mongos_conn.admin.command("enableSharding", "test")
+        self.mongos_conn.admin.command("shardCollection",
+                                       "test.mcsharded",
+                                       key={"i": 1})
 
         # Pre-split the collection so that:
         # i < 1000            lives on shard1
         # i >= 1000           lives on shard2
-        cls.mongos_conn.admin.command(bson.SON([
+        self.mongos_conn.admin.command(bson.SON([
             ("split", "test.mcsharded"),
             ("middle", {"i": 1000})
         ]))
 
         # disable the balancer
-        cls.mongos_conn.config.settings.update(
+        self.mongos_conn.config.settings.update(
             {"_id": "balancer"},
             {"$set": {"stopped": True}},
             upsert=True
@@ -105,7 +102,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Move chunks to their proper places
         try:
-            cls.mongos_conn["admin"].command(
+            self.mongos_conn["admin"].command(
                 "moveChunk",
                 "test.mcsharded",
                 find={"i": 1},
@@ -114,7 +111,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         except pymongo.errors.OperationFailure:
             pass        # chunk may already be on the correct shard
         try:
-            cls.mongos_conn["admin"].command(
+            self.mongos_conn["admin"].command(
                 "moveChunk",
                 "test.mcsharded",
                 find={"i": 1000},
@@ -124,73 +121,15 @@ class TestOplogManagerSharded(unittest.TestCase):
             pass        # chunk may already be on the correct shard
 
         # Make sure chunks are distributed correctly
-        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1})
-        cls.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
+        self.mongos_conn["test"]["mcsharded"].insert({"i": 1})
+        self.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
 
         def chunks_moved():
-            shard1_done = cls.shard1_conn.test.mcsharded.find_one() is not None
-            shard2_done = cls.shard2_conn.test.mcsharded.find_one() is not None
+            shard1_done = self.shard1_conn.test.mcsharded.find_one() is not None
+            shard2_done = self.shard2_conn.test.mcsharded.find_one() is not None
             return shard1_done and shard2_done
         assert_soon(chunks_moved)
-        cls.mongos_conn.test.mcsharded.remove()
-
-    @classmethod
-    def tearDownClass(cls):
-        """ Kill the cluster
-        """
-        kill_all()
-
-    def setUp(self):
-        # clear oplog
-        self.shard1_conn["local"]["oplog.rs"].drop()
-        self.shard2_conn["local"]["oplog.rs"].drop()
-        self.shard1_conn["local"].create_collection(
-            "oplog.rs",
-            size=1024 * 1024 * 100,       # 100MB
-            capped=True
-        )
-        self.shard2_conn["local"].create_collection(
-            "oplog.rs",
-            size=1024 * 1024 * 100,       # 100MB
-            capped=True
-        )
-        # re-sync secondaries
-        try:
-            self.shard1_secondary_conn["admin"].command(
-                "shutdown", 1, force=True)
-        except pymongo.errors.AutoReconnect:
-            pass
-        try:
-            self.shard2_secondary_conn["admin"].command(
-                "shutdown", 1, force=True)
-        except pymongo.errors.AutoReconnect:
-            pass
-        data1 = os.path.join(DEMO_SERVER_DATA, "replset1b")
-        data2 = os.path.join(DEMO_SERVER_DATA, "replset2b")
-        shutil.rmtree(data1)
-        shutil.rmtree(data2)
-        os.mkdir(data1)
-        os.mkdir(data2)
-        conf1 = self.shard1_conn["local"]["system.replset"].find_one()
-        conf2 = self.shard2_conn["local"]["system.replset"].find_one()
-        conf1["version"] += 1
-        conf2["version"] += 1
-        self.shard1_conn["admin"].command({"replSetReconfig": conf1})
-        self.shard2_conn["admin"].command({"replSetReconfig": conf2})
-        start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl", "replset1b",
-                         "replset1b.log", None)
-        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2", "replset2b",
-                         "replset2b.log", None)
-
-        def secondary_up(connection):
-            def wrap():
-                return retry_until_ok(
-                    connection["admin"].command,
-                    "replSetGetStatus"
-                )["myState"] == 2
-            return wrap
-        assert_soon(secondary_up(self.shard1_secondary_conn))
-        assert_soon(secondary_up(self.shard2_secondary_conn))
+        self.mongos_conn.test.mcsharded.remove()
 
         # Create a new oplog progress file
         try:
@@ -236,6 +175,12 @@ class TestOplogManagerSharded(unittest.TestCase):
             pass                # thread may not have been started
         self.mongos_conn["test"]["mcsharded"].remove()
         self.mongos_conn["test"]["mcunsharded"].remove()
+        self.mongos_conn.close()
+        self.shard1_conn.close()
+        self.shard2_conn.close()
+        self.shard1_secondary_conn.close()
+        self.shard2_secondary_conn.close()
+        kill_all()
 
     def test_retrieve_doc(self):
         """ Test the retrieve_doc method """
@@ -359,7 +304,6 @@ class TestOplogManagerSharded(unittest.TestCase):
 
     def test_dump_collection(self):
         """Test the dump_collection method
->>>>>>> master
 
         Cases:
 
@@ -483,17 +427,9 @@ class TestOplogManagerSharded(unittest.TestCase):
     def test_rollback(self):
         """Test the rollback method in a sharded environment
 
-<<<<<<< HEAD
-        retry_until_ok(mongos['alpha']['foo'].remove, {})
-        retry_until_ok(mongos['alpha']['foo'].insert,
-                       {'_id': ObjectId('4ff74db3f646462b38000001'),
-                        'name': 'paulie'})
-        cutoff_ts = test_oplog.get_last_oplog_timestamp()
-=======
         Cases:
         1. Documents on both shards, rollback on one shard
         2. Documents on both shards, rollback on both shards
->>>>>>> master
 
         """
 
