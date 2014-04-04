@@ -26,10 +26,7 @@ import socket
 
 sys.path[0:0] = [""]
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
 
 from tests.setup_cluster import (kill_mongo_proc,
                                 start_mongo_proc,
@@ -65,8 +62,7 @@ class TestSynchronizer(unittest.TestCase):
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.flag = start_cluster()
         if cls.flag:
-            cls.conn = Connection('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN']),
-                replicaSet="demo-repl")
+            cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MAIN']))
             # Creating a Solr object with an invalid URL 
             # doesn't create an exception
             cls.solr_conn = Solr('http://localhost:8983/solr')
@@ -106,7 +102,7 @@ class TestSynchronizer(unittest.TestCase):
         count = 0
         while (True):
             try:
-                self.conn['test']['test'].remove(safe=True)
+                self.conn['test']['test'].remove()
                 break
             except (AutoReconnect, OperationFailure):
                 time.sleep(1)
@@ -132,7 +128,7 @@ class TestSynchronizer(unittest.TestCase):
 
         while (True):
             try:
-                self.conn['test']['test'].remove(safe=True)
+                self.conn['test']['test'].remove()
                 break
             except OperationFailure:
                 continue
@@ -145,7 +141,7 @@ class TestSynchronizer(unittest.TestCase):
         """Tests insert
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paulie'})
         while (len(self.solr_conn.search('*:*')) == 0):
             time.sleep(1)
         result_set_1 = self.solr_conn.search('paulie')
@@ -159,7 +155,7 @@ class TestSynchronizer(unittest.TestCase):
         """Tests remove
         """
 
-        self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].remove({'name': 'paulie'})
         while (len(self.solr_conn.search('*:*')) == 1):
             time.sleep(1)
         result_set_1 = self.solr_conn.search('paulie')
@@ -171,16 +167,16 @@ class TestSynchronizer(unittest.TestCase):
             restarting both the servers.
         """
 
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
 
-        self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paul'})
         while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
         while len(self.solr_conn.search('*:*')) != 1:
             time.sleep(1)
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -189,7 +185,7 @@ class TestSynchronizer(unittest.TestCase):
         while True:
             try:
                 self.conn['test']['test'].insert(
-                    {'name': 'pauline'}, safe=True)
+                    {'name': 'pauline'})
                 break
             except OperationFailure:
                 count += 1
@@ -250,15 +246,15 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         for i in range(0, NUMBER_OF_DOC_DIRS):
             self.conn['test']['test'].insert(
-                {'name': 'Paul ' + str(i)}, safe=True)
+                {'name': 'Paul ' + str(i)})
 
         while (len(self.solr_conn.search('*:*', rows=NUMBER_OF_DOC_DIRS)) 
                 != NUMBER_OF_DOC_DIRS):
             time.sleep(1)
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
 
         while admin_db.command("isMaster")['ismaster'] is False:
@@ -269,8 +265,8 @@ class TestSynchronizer(unittest.TestCase):
             try:
                 count += 1
                 self.conn['test']['test'].insert(
-                    {'name': 'Pauline ' + str(count)},
-                                            safe=True)
+                    {'name': 'Pauline ' + str(count)})
+
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
 

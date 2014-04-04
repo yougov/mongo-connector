@@ -27,10 +27,7 @@ import socket
 
 sys.path[0:0] = [""]
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
 from tests.setup_cluster import (kill_mongo_proc,
                                  kill_all,
                                  start_mongo_proc, 
@@ -68,8 +65,8 @@ class TestSynchronizer(unittest.TestCase):
         cls.mongo_doc._remove()
         cls.flag = start_cluster()
         if cls.flag:
-            cls.conn = Connection("%s:%s" % (HOSTNAME,  PORTS_ONE['MONGOS']),
-                          replicaSet="demo-repl")
+            cls.conn = MongoClient("%s:%s" % (HOSTNAME,  PORTS_ONE['MONGOS']))
+
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
@@ -95,7 +92,7 @@ class TestSynchronizer(unittest.TestCase):
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             pass
-        self.conn['test']['test'].remove(safe=True)
+        self.conn['test']['test'].remove()
         wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 0)
 
     def test_shard_length(self):
@@ -109,7 +106,7 @@ class TestSynchronizer(unittest.TestCase):
         """Tests search and assures that the databases are clear.
         """
 
-        self.conn['test']['test'].remove(safe=True)
+        self.conn['test']['test'].remove()
         self.assertEqual(self.conn['test']['test'].find().count(), 0)
         self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
 
@@ -117,7 +114,7 @@ class TestSynchronizer(unittest.TestCase):
         """Tests insert
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paulie'})
         wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 1)
         result_set_1 = self.mongo_doc._search()
         self.assertEqual(sum(1 for _ in result_set_1), 1)
@@ -130,9 +127,9 @@ class TestSynchronizer(unittest.TestCase):
         """Tests remove
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].insert({'name': 'paulie'})
         wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) == 1)
-        self.conn['test']['test'].remove({'name': 'paulie'}, safe=True)
+        self.conn['test']['test'].remove({'name': 'paulie'})
         wait_for(lambda : sum(1 for _ in self.mongo_doc._search()) != 1)
         self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
 
@@ -141,8 +138,8 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
-        self.conn['test']['test'].insert({'name': 'paul'}, safe=True)
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda : self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         wait_for(condition)
@@ -150,7 +147,7 @@ class TestSynchronizer(unittest.TestCase):
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
         condition = lambda : admin.command("isMaster")['ismaster']
@@ -161,7 +158,7 @@ class TestSynchronizer(unittest.TestCase):
         while True:
             try:
                 result_set_1 = self.conn['test']['test'].insert(
-                    {'name': 'pauline'}, safe=True)
+                    {'name': 'pauline'})
                 break
             except OperationFailure:
                 time.sleep(1)
@@ -218,16 +215,15 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         for i in range(0, NUMBER_OF_DOC_DIRS):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)},
-                safe=True)
+            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
         search = self.mongo_doc._search
         condition = lambda : sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
         wait_for(condition)
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
         wait_for(lambda : admin.command("isMaster")['ismaster'])
@@ -237,8 +233,8 @@ class TestSynchronizer(unittest.TestCase):
         while count + 1 < NUMBER_OF_DOC_DIRS:
             try:
                 count += 1
-                self.conn['test']['test'].insert({'name': 'Pauline ' +
-                    str(count)}, safe=True)
+                self.conn['test']['test'].insert(
+                    {'name': 'Pauline ' + str(count)})
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
         wait_for(lambda : sum(1 for _ in self.mongo_doc._search())

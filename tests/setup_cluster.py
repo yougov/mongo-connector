@@ -25,10 +25,8 @@ import time
 import os
 import inspect
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
+
 
 sys.path[0:0] = [""]
 
@@ -69,7 +67,7 @@ def kill_mongo_proc(host, port):
     """
     conn = None
     try:
-        conn = Connection(host, int(port))
+        conn = MongoClient(host, int(port))
     except ConnectionFailure:
         cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]
         execute_command(cmd)
@@ -148,7 +146,7 @@ def check_started(port):
     """
     while True:
         try:
-            Connection('localhost', port)
+            MongoClient('localhost', port)
             break
         except ConnectionFailure:    
             time.sleep(1)
@@ -244,9 +242,9 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
                {'_id': 2, 'host': "localhost:27319",
                 'arbiterOnly': 'true'}]}
 
-    primary = Connection('localhost:27117')
+    primary = MongoClient('localhost:27117')
     if use_mongos:
-        mongos = Connection('localhost:27217')
+        mongos = MongoClient('localhost:27217')
     primary.admin.command("replSetInitiate", config)
 
     # ensure that the replSet is properly configured
@@ -269,7 +267,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
             return False
 
     if sharded:
-        primary2 = Connection('localhost:27317')
+        primary2 = MongoClient('localhost:27317')
         primary2.admin.command("replSetInitiate", config2)
 
         while retry_until_ok(primary2.admin.command,
@@ -295,11 +293,11 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
         admin_db.command("enableSharding", "alpha")
         admin_db.command("shardCollection", "alpha.foo", key={"_id": 1})
 
-    primary = Connection('localhost:27117')
+    primary = MongoClient('localhost:27117')
     admin = primary['admin']
     while admin.command("isMaster")['ismaster'] is False:
         time.sleep(1)
-    secondary = Connection('localhost:27118')
+    secondary = MongoClient('localhost:27118')
     while secondary.admin.command("replSetGetStatus")['myState'] is not 2:
         time.sleep(1)
     return True

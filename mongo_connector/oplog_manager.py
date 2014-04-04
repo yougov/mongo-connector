@@ -30,10 +30,7 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.util import retry_until_ok
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 
 class OplogThread(threading.Thread):
@@ -103,10 +100,10 @@ class OplogThread(threading.Thread):
         logging.info('OplogThread: Initializing oplog thread')
 
         if is_sharded:
-            self.main_connection = Connection(main_address)
+            self.main_connection = MongoClient(main_address)
         else:
-            self.main_connection = Connection(main_address,
-                                              replicaSet=repl_set)
+            self.main_connection = MongoClient(main_address,
+                                               replicaSet=repl_set)
             self.oplog = self.main_connection['local']['oplog.rs']
 
         if auth_key is not None:

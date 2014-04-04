@@ -12,10 +12,7 @@ else:
 import time
 
 from pymongo.read_preferences import ReadPreference
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 from mongo_connector.util import retry_until_ok
 from mongo_connector.locking_dict import LockingDict
@@ -47,12 +44,12 @@ class TestRollbacks(unittest.TestCase):
         # Start a replica set
         start_cluster(sharded=False, use_mongos=False)
         # Connection to the replica set as a whole
-        self.main_conn = Connection("localhost:%s" % PORTS_ONE["PRIMARY"],
-                                    replicaSet="demo-repl")
+        self.main_conn = MongoClient("localhost:%s" % PORTS_ONE["PRIMARY"],
+                                     replicaSet="demo-repl")
         # Connection to the primary specifically
-        self.primary_conn = Connection("localhost:%s" % PORTS_ONE["PRIMARY"])
+        self.primary_conn = MongoClient("localhost:%s" % PORTS_ONE["PRIMARY"])
         # Connection to the secondary specifically
-        self.secondary_conn = Connection(
+        self.secondary_conn = MongoClient(
             "localhost:%s" % PORTS_ONE["SECONDARY"],
             read_preference=ReadPreference.SECONDARY_PREFERRED
         )

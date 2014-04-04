@@ -23,10 +23,7 @@ if sys.version_info[:2] == (2, 6):
 else:
     import unittest
 import re
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
@@ -78,7 +75,7 @@ class TestOplogManager(unittest.TestCase):
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_all()
+        # kill_all()
 
     def setUp(self):
         """ Fails if we were unable to start the cluster
@@ -94,9 +91,7 @@ class TestOplogManager(unittest.TestCase):
             This function clears the oplog
         """
         is_sharded = True
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
 
         primary_conn['test']['test'].drop()
         mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
@@ -132,9 +127,9 @@ class TestOplogManager(unittest.TestCase):
             This function does not clear the oplog
         """
         is_sharded = True
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
+            primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
         mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
         if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:

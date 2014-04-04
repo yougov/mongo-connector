@@ -19,10 +19,8 @@ import time
 import inspect
 from os import path
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
+
 
 """ Global path variables
     """
@@ -43,7 +41,7 @@ def kill_mongo_proc(host, port):
     """ Kill given port
         """
     try:
-        conn = Connection(host, int(port))
+        conn = MongoClient(host, int(port))
         conn['admin'].command('shutdown', 1, force=True)
     except:
         cmd = ["pgrep -f \"" + str(port) + MONGOD_KSTR + "\" | xargs kill -9"]

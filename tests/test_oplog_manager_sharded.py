@@ -32,10 +32,7 @@ else:
     import unittest
 import re
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
@@ -47,8 +44,8 @@ from pymongo.errors import OperationFailure
 from os import path
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import (long_to_bson_ts,
-                  bson_ts_to_long,
-                  retry_until_ok)
+                                  bson_ts_to_long,
+                                  retry_until_ok)
 from bson.objectid import ObjectId
 
 PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
@@ -65,25 +62,6 @@ AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
 TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 CONFIG = os.environ.get('CONFIG', "config.txt")
-
-
-def safe_mongo_op(func, arg1, arg2=None):
-    """Performs the given operation with the safe argument
-    """
-    count = 0
-    while True:
-        time.sleep(1)
-        count += 1
-        if (count > 60):
-            self.fail('Call %s failed too many times in safe_mongo_op' % (func))
-        try:
-            if arg2:
-                func(arg1, arg2, safe=True)
-            else:
-                func(arg1, safe=True)
-            break
-        except OperationFailure:
-            pass
 
 
 class TestOplogManagerSharded(unittest.TestCase):
@@ -137,12 +115,11 @@ class TestOplogManagerSharded(unittest.TestCase):
         Returns oplog, the connection and oplog collection.
         This function clears the oplog.
         """
-        primary_conn = Connection(HOSTNAME,int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]),
+                                   replicaSet="demo-repl")
 
         mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
-        mongos = Connection(mongos_addr)
+        mongos = MongoClient(mongos_addr)
         mongos['alpha']['foo'].drop()
 
         oplog_coll = primary_conn['local']['oplog.rs']
@@ -165,9 +142,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         Returns oplog, the connection and oplog collection
         This function does not clear the oplog
         """
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
+        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
         if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
+            primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
 
         mongos = "%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"])
         oplog_coll = primary_conn['local']['oplog.rs']
@@ -195,22 +172,22 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         assert (oplog_cursor.count() == 0)
 
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         last_oplog_entry = next(oplog_cursor)
         target_entry = mongos['alpha']['foo'].find_one()
 
         # testing for search after inserting a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
 
-        safe_mongo_op(mongos['alpha']['foo'].update, {'name': 'paulie'},
-                      {"$set": {'name': 'paul'}})
+        retry_until_ok(mongos['alpha']['foo'].update, {'name': 'paulie'},
+                       {"$set": {'name': 'paul'}})
         last_oplog_entry = next(oplog_cursor)
         target_entry = mongos['alpha']['foo'].find_one()
 
         # testing for search after updating a document
         assert (test_oplog.retrieve_doc(last_oplog_entry) == target_entry)
 
-        safe_mongo_op(mongos['alpha']['foo'].remove, {'name': 'paul'})
+        retry_until_ok(mongos['alpha']['foo'].remove, {'name': 'paul'})
         last_oplog_entry = next(oplog_cursor)
 
         # testing for search after deleting a document
@@ -233,13 +210,13 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (test_oplog.get_oplog_cursor(None) is None)
 
         # test with one document
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         timestamp = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.get_oplog_cursor(timestamp)
         assert (cursor.count() == 1)
 
         # test with two documents, one after the ts
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paul'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paul'})
         cursor = test_oplog.get_oplog_cursor(timestamp)
         assert (cursor.count() == 2)
 
@@ -257,7 +234,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # test non-empty oplog
         oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         last_oplog_entry = next(oplog_cursor)
         last_ts = last_oplog_entry['ts']
         assert (test_oplog.get_last_oplog_timestamp() == last_ts)
@@ -273,7 +250,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         test_oplog, search_ts, solr, mongos = self.get_oplog_thread()
 
         # with documents
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
         test_oplog.dump_collection()
 
@@ -299,7 +276,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert (test_oplog.init_cursor() is None)
 
         # no config, single oplog entry
-        safe_mongo_op(mongos['alpha']['foo'].insert, {'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].insert, {'name': 'paulie'})
         search_ts = test_oplog.get_last_oplog_timestamp()
         cursor = test_oplog.init_cursor()
 
@@ -335,10 +312,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         solr = test_oplog.doc_managers[0]
         solr._delete()          # equivalent to solr.delete(q='*:*')
 
-        safe_mongo_op(mongos['alpha']['foo'].remove, {})
-        safe_mongo_op(mongos['alpha']['foo'].insert,
-                      {'_id': ObjectId('4ff74db3f646462b38000001'),
-                      'name': 'paulie'})
+        retry_until_ok(mongos['alpha']['foo'].remove, {})
+        retry_until_ok(mongos['alpha']['foo'].insert,
+                       {'_id': ObjectId('4ff74db3f646462b38000001'),
+                        'name': 'paulie'})
         cutoff_ts = test_oplog.get_last_oplog_timestamp()
 
         obj2 = ObjectId('4ff74db3f646462b38000002')
@@ -349,7 +326,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # try kill one, try restarting
         kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)

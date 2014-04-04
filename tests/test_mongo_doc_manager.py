@@ -27,10 +27,7 @@ import os
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
+from pymongo import MongoClient
 from tests.setup_cluster import start_single_mongod_instance, kill_mongo_proc
 
 
@@ -47,7 +44,7 @@ class MongoDocManagerTester(unittest.TestCase):
     def setUpClass(cls):
         start_single_mongod_instance("30000", "/MC", "MC_log")
         cls.MongoDoc = DocManager("localhost:30000")
-        cls.mongo = Connection("localhost:30000")['test']['test']
+        cls.mongo = MongoClient("localhost:30000")['test']['test']
 
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
@@ -66,7 +63,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         self.mongo.remove()
 
-        conn = Connection("localhost:30000")
+        conn = MongoClient("localhost:30000")
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
             conn[db][coll].remove()
@@ -205,7 +202,7 @@ class MongoDocManagerTester(unittest.TestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        Connection("localhost:30000")[db][coll].remove({"_id": 99})
+        MongoClient("localhost:30000")[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
         self.assertEqual(last_doc["_id"], 98)
