@@ -109,21 +109,19 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Move chunks to their proper places
         try:
             cls.mongos_conn["admin"].command(
-                bson.son.SON([
-                    ("moveChunk", "test.mcsharded"),
-                    ("find", {"i": 1}),
-                    ("to", "demo-repl")
-                ])
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1},
+                to="demo-repl"
             )
         except pymongo.errors.OperationFailure:
             pass        # chunk may already be on the correct shard
         try:
             cls.mongos_conn["admin"].command(
-                bson.son.SON([
-                    ("moveChunk", "test.mcsharded"),
-                    ("find", {"i": 1000}),
-                    ("to", "demo-repl-2")
-                ])
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1000},
+                to="demo-repl-2"
             )
         except pymongo.errors.OperationFailure:
             pass        # chunk may already be on the correct shard
@@ -735,8 +733,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.opman2.start()
 
         collection = self.mongos_conn["test"]["mcsharded"]
-        for i in range(1000):
-            collection.insert({"i": i + 500})
+        collection.insert({"i": i + 500} for i in range(1000))
         # Assert current state of the mongoverse
         self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
                          500)
@@ -771,7 +768,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(lambda: self.shard1_conn.test.mcsharded.count() > 500)
 
         # Get opid for moveChunk command
-        operations = self.mongos_conn["test"]["$cmd.sys.inprog"].find_one()
+        operations = self.mongos_conn.test.current_op()
         opid = None
         for op in operations["inprog"]:
             if op.get("query", {}).get("moveChunk"):
