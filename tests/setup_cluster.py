@@ -24,7 +24,6 @@ import os
 import psutil
 import shutil
 import subprocess
-import time
 
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -63,7 +62,6 @@ def create_dir(dir_path):
 def kill_mongo_proc(host, port):
     """ Kill given port
     """
-    conn = None
     try:
         conn = MongoClient(host, int(port))
     except ConnectionFailure:
@@ -75,7 +73,7 @@ def kill_mongo_proc(host, port):
                         break
             except psutil._error.AccessDenied:
                 pass
-    if conn:
+    else:
         try:
             conn['admin'].command('shutdown', 1, force=True)
         except ConnectionFailure:
@@ -101,7 +99,7 @@ def start_single_mongod_instance(port, data, log):
             os.path.join(DEMO_SERVER_DATA, data),
             os.path.join(DEMO_SERVER_LOG, log)))
     execute_command(cmd)
-    check_started(int(port))
+    assert_soon(MongoClient, 'localhost', int(port))
 
 
 def kill_all():
@@ -117,7 +115,7 @@ def start_mongo_proc(port, repl_set_name, data, log, key_file):
     """Create the replica set
     """
     cmd = ("mongod --fork --replSet %s --noprealloc --port %s --dbpath %s"
-           " --shardsvr --nojournal --rest --logpath %s --logappend"
+           " --shardsvr --nojournal --logpath %s --logappend"
            " --setParameter enableTestCommands=1" %
            (repl_set_name, port,
             os.path.join(DEMO_SERVER_DATA, data),
@@ -127,7 +125,7 @@ def start_mongo_proc(port, repl_set_name, data, log, key_file):
         cmd += " --keyFile " + key_file
 
     execute_command(cmd)
-    check_started(int(port))
+    assert_soon(MongoClient, 'localhost', int(port))
 
 
 def execute_command(command):
@@ -135,22 +133,6 @@ def execute_command(command):
     """
     subprocess.Popen(command, shell=True)
 
-
-#========================================= #
-#   Helper functions to make sure we move  #
-#   on only when we're good and ready      #
-#========================================= #
-
-
-def check_started(port):
-    """Checks if our the mongod has started
-    """
-    while True:
-        try:
-            MongoClient('localhost', port)
-            break
-        except ConnectionFailure:
-            time.sleep(1)
 
 #========================================= #
 #   Start Cluster                          #
@@ -197,7 +179,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
 
     # Setup config server
     cmd = ("mongod --oplogSize 500 --fork --configsvr --noprealloc --port %s"
-           " --dbpath %s --rest --logpath %s --logappend" % (
+           " --dbpath %s --logpath %s --logappend" % (
                PORTS_ONE["CONFIG"],
                os.path.join(DEMO_SERVER_DATA, "config1"),
                os.path.join(DEMO_SERVER_LOG, "config1.log")))
@@ -206,7 +188,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
         cmd += " --keyFile " + key_file
 
     execute_command(cmd)
-    check_started(int(PORTS_ONE["CONFIG"]))
+    assert_soon(MongoClient, 'localhost', int(PORTS_ONE['CONFIG']))
 
     # Setup the mongos, same mongos for both shards
     cmd = ("mongos --port %s --fork --configdb localhost:%s"
@@ -220,7 +202,7 @@ def start_cluster(sharded=False, key_file=None, use_mongos=True):
 
     if use_mongos:
         execute_command(cmd)
-        check_started(int(PORTS_ONE["MONGOS"]))
+        assert_soon(MongoClient, 'localhost', int(PORTS_ONE["CONFIG"]))
 
     # configuration for replSet 1
     config = {'_id': "demo-repl", 'members': [
