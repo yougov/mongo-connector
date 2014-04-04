@@ -675,11 +675,10 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Test successful chunk move from shard 1 to shard 2
         self.mongos_conn["admin"].command(
-            bson.son.SON([
-                ("moveChunk", "test.mcsharded"),
-                ("find", {"i": 1}),
-                ("to", "demo-repl-2")
-            ])
+            "moveChunk",
+            "test.mcsharded",
+            find={"i": 1},
+            to="demo-repl-2"
         )
 
         # doc manager should still have all docs
@@ -697,11 +696,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Test unsuccessful chunk move from shard 2 to shard 1
         def fail_to_move_chunk():
             self.mongos_conn["admin"].command(
-                bson.son.SON([
-                    ("moveChunk", "test.mcsharded"),
-                    ("find", {"i": 1}),
-                    ("to", "demo-repl")
-                ])
+                "moveChunk",
+                "test.mcsharded",
+                find={"i": 1},
+                to="demo-repl"
             )
         self.assertRaises(pymongo.errors.OperationFailure, fail_to_move_chunk)
         # doc manager should still have all docs
@@ -715,12 +713,13 @@ class TestOplogManagerSharded(unittest.TestCase):
             {"_id": "test.mcsharded"},
             {"$set": {"dropped": False}}
         )
-        retry_until_ok(self.mongos_conn['admin'].command,
-                       bson.son.SON([
-                           ("moveChunk", "test.mcsharded"),
-                           ("find", {"i": 1}),
-                           ("to", "demo-repl")
-                       ]))
+        retry_until_ok(
+            self.mongos_conn['admin'].command,
+            "moveChunk",
+            "test.mcsharded",
+            find={"i": 1},
+            to="demo-repl"
+        )
         assert_soon(
             lambda: self.shard1_conn['test']['mcsharded'].count() == 500)
 
@@ -751,11 +750,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         def move_chunk():
             try:
                 self.mongos_conn["admin"].command(
-                    bson.son.SON([
-                        ("moveChunk", "test.mcsharded"),
-                        ("find", {"i": 1000}),
-                        ("to", "demo-repl")
-                    ])
+                    "moveChunk",
+                    "test.mcsharded",
+                    find={"i": 1000},
+                    to="demo-repl"
                 )
             except pymongo.errors.OperationFailure:
                 pass
