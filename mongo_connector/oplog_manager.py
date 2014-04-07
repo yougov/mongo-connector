@@ -304,7 +304,7 @@ class OplogThread(threading.Thread):
             try:
                 logging.debug("OplogThread: Getting the oplog cursor "
                               "in the while true loop for get_oplog_cursor")
-                if self.namespace_set is None:
+                if not self.namespace_set:
                     cursor = self.oplog.find(
                         {'ts': {'$gte': timestamp}},
                         tailable=True, await_data=True
@@ -488,7 +488,7 @@ class OplogThread(threading.Thread):
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
-        if self.namespace_set is None:
+        if not self.namespace_set:
             curr = self.oplog.find().sort(
                 '$natural', pymongo.DESCENDING
             ).limit(1)
