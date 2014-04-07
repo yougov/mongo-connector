@@ -175,12 +175,12 @@ class TestSynchronizer(unittest.TestCase):
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log", None)
+                         "replset1a.log")
         assert_soon(
             lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log", None)
+                         "replset1b.log")
 
         time.sleep(2)
         result_set_1 = list(self.mongo_doc._search())
@@ -248,11 +248,11 @@ class TestSynchronizer(unittest.TestCase):
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log", None)
+                         "replset1a.log")
         db_admin = primary_conn['admin']
         assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log", None)
+                         "replset1b.log")
 
         search = self.mongo_doc._search
         condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS

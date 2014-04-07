@@ -180,12 +180,12 @@ class TestSynchronizer(unittest.TestCase):
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log", None)
+                         "replset1a.log")
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log", None)
+                         "replset1b.log")
 
         time.sleep(2)
         result_set_1 = self.synchronizer._search()
@@ -254,12 +254,12 @@ class TestSynchronizer(unittest.TestCase):
         kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log", None)
+                         "replset1a.log")
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log", None)
+                         "replset1b.log")
 
         while (len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS):
             time.sleep(5)

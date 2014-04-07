@@ -110,9 +110,8 @@ class TestRollbacks(unittest.TestCase):
         start_mongo_proc(
             port=PORTS_ONE['PRIMARY'],
             repl_set_name="demo-repl",
-            data="/replset1a",
-            log="/replset1a.log",
-            key_file=None
+            data="replset1a",
+            log="replset1a.log"
         )
         primary_admin = self.primary_conn["admin"]
         while not primary_admin.command("isMaster")["ismaster"]:
@@ -120,9 +119,8 @@ class TestRollbacks(unittest.TestCase):
         start_mongo_proc(
             port=PORTS_ONE['SECONDARY'],
             repl_set_name="demo-repl",
-            data="/replset1b",
-            log="/replset1b.log",
-            key_file=None
+            data="replset1b",
+            log="replset1b.log"
         )
         while secondary["admin"].command("replSetGetStatus")["myState"] != 2:
             time.sleep(1)
@@ -200,9 +198,8 @@ class TestRollbacks(unittest.TestCase):
         start_mongo_proc(
             port=PORTS_ONE['PRIMARY'],
             repl_set_name="demo-repl",
-            data="/replset1a",
-            log="/replset1a.log",
-            key_file=None
+            data="replset1a",
+            log="replset1a.log"
         )
         primary_admin = self.primary_conn["admin"]
         while not primary_admin.command("isMaster")["ismaster"]:
@@ -210,9 +207,8 @@ class TestRollbacks(unittest.TestCase):
         start_mongo_proc(
             port=PORTS_ONE['SECONDARY'],
             repl_set_name="demo-repl",
-            data="/replset1b",
-            log="/replset1b.log",
-            key_file=None
+            data="replset1b",
+            log="replset1b.log"
         )
         while secondary["admin"].command("replSetGetStatus")["myState"] != 2:
             time.sleep(1)

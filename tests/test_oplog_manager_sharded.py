@@ -125,13 +125,15 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.mongos_conn["test"]["mcsharded"].insert({"i": 1000})
 
         def chunks_moved():
-            shard1_done = self.shard1_conn.test.mcsharded.find_one() is not None
-            shard2_done = self.shard2_conn.test.mcsharded.find_one() is not None
-            return shard1_done and shard2_done
+            doc1 = self.shard1_conn.test.mcsharded.find_one()
+            doc2 = self.shard2_conn.test.mcsharded.find_one()
+            if None in (doc1, doc2):
+                return False
+            return doc1['i'] == 1 and doc2['i'] == 1000
         assert_soon(chunks_moved)
         self.mongos_conn.test.mcsharded.remove()
 
-        # Create a new oplog progress file
+        # create a new oplog progress file
         try:
             os.unlink("config.txt")
         except OSError:
@@ -173,8 +175,6 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.opman2.join()
         except RuntimeError:
             pass                # thread may not have been started
-        self.mongos_conn["test"]["mcsharded"].remove()
-        self.mongos_conn["test"]["mcunsharded"].remove()
         self.mongos_conn.close()
         self.shard1_conn.close()
         self.shard2_conn.close()
@@ -258,16 +258,16 @@ class TestOplogManagerSharded(unittest.TestCase):
             sort=[("ts", pymongo.ASCENDING)]
         )
 
-        # startup message + insert at beginning of tests + many inserts
-        self.assertEqual(oplog1.count(), 1 + 1 + 998)
-        self.assertEqual(oplog2.count(), 1 + 1002)
+        # startup + index + insert + delete + insert + 998 inserts
+        self.assertEqual(oplog1.count(), 5 + 998)
+        self.assertEqual(oplog2.count(), 5 + 1002)
         pivot1 = oplog1.skip(400).limit(1)[0]
         pivot2 = oplog2.skip(400).limit(1)[0]
 
         cursor1 = self.opman1.get_oplog_cursor(pivot1["ts"])
         cursor2 = self.opman2.get_oplog_cursor(pivot2["ts"])
-        self.assertEqual(cursor1.count(), 1 + 1 + 998 - 400)
-        self.assertEqual(cursor2.count(), 1 + 1002 - 400)
+        self.assertEqual(cursor1.count(), 5 + 998 - 400)
+        self.assertEqual(cursor2.count(), 5 + 1002 - 400)
 
         # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
         doc1 = self.mongos_conn["test"]["mcsharded"].find_one(
@@ -321,7 +321,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Test with non-empty oplog
         self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
-        self.opman2.oplog = self.shard1_conn["local"]["oplog.rs"]
+        self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
         for i in range(1000):
             self.mongos_conn["test"]["mcsharded"].insert({
                 "i": i + 500
@@ -330,7 +330,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         last_ts2 = self.opman2.get_last_oplog_timestamp()
         self.assertEqual(last_ts1, self.opman1.dump_collection())
         self.assertEqual(last_ts2, self.opman2.dump_collection())
-        self.assertEqual(len(self.opman1.doc_manager._search()), 1000)
+        self.assertEqual(len(self.opman1.doc_managers[0]._search()), 1000)
 
     def test_init_cursor(self):
         """Test the init_cursor method
@@ -459,7 +459,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
-        c = lambda: len(self.opman1.doc_manager._search()) == 3
+        c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
         assert_soon(c, "not all writes were replicated to doc manager",
                     max_tries=120)
 
@@ -471,8 +471,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_ONE["PRIMARY"],
             repl_set_name="demo-repl",
             data="replset1a",
-            log="replset1a.log",
-            key_file=None
+            log="replset1a.log"
         )
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
@@ -481,8 +480,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
             data="replset1b",
-            log="replset1b.log",
-            key_file=None
+            log="replset1b.log"
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
@@ -495,7 +493,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
         # Same should hold for the doc manager
-        docman_docs = [d for d in self.opman1.doc_manager._search()
+        docman_docs = [d for d in self.opman1.doc_managers[0]._search()
                        if d["i"] < 1000]
         self.assertEqual(len(docman_docs), 1)
         self.assertEqual(docman_docs[0]["i"], 0)
@@ -529,7 +527,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_secondary2.count(), 2)
 
         # Wait for replication on the doc manager
-        c = lambda: len(self.opman1.doc_manager._search()) == 4
+        c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
@@ -542,8 +540,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_ONE["PRIMARY"],
             repl_set_name="demo-repl",
             data="replset1a",
-            log="replset1a.log",
-            key_file=None
+            log="replset1a.log"
         )
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
@@ -551,8 +548,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_ONE["SECONDARY"],
             repl_set_name="demo-repl",
             data="replset1b",
-            log="replset1b.log",
-            key_file=None
+            log="replset1b.log"
         )
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
@@ -562,8 +558,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_TWO["PRIMARY"],
             repl_set_name="demo-repl-2",
             data="replset2a",
-            log="replset2a.log",
-            key_file=None
+            log="replset2a.log"
         )
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
@@ -571,8 +566,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             port=PORTS_TWO["SECONDARY"],
             repl_set_name="demo-repl-2",
             data="replset2b",
-            log="replset2b.log",
-            key_file=None
+            log="replset2b.log"
         )
         secondary_admin = self.shard2_secondary_conn["admin"]
 
@@ -591,7 +585,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find_one(query2)["i"], 1000)
 
         # Same should hold for the doc manager
-        i_values = [d["i"] for d in self.opman1.doc_manager._search()]
+        i_values = [d["i"] for d in self.opman1.doc_managers[0]._search()]
         self.assertEqual(len(i_values), 2)
         self.assertIn(0, i_values)
         self.assertIn(1000, i_values)
@@ -613,7 +607,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                          500)
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
                          500)
-        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
+        assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 1000)
 
         # Test successful chunk move from shard 1 to shard 2
         self.mongos_conn["admin"].command(
@@ -624,7 +618,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
 
         # doc manager should still have all docs
-        all_docs = self.opman1.doc_manager._search()
+        all_docs = self.opman1.doc_managers[0]._search()
         self.assertEqual(len(all_docs), 1000)
         for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
             self.assertEqual(doc["i"], i + 500)
@@ -645,25 +639,10 @@ class TestOplogManagerSharded(unittest.TestCase):
             )
         self.assertRaises(pymongo.errors.OperationFailure, fail_to_move_chunk)
         # doc manager should still have all docs
-        all_docs = self.opman1.doc_manager._search()
+        all_docs = self.opman1.doc_managers[0]._search()
         self.assertEqual(len(all_docs), 1000)
         for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
             self.assertEqual(doc["i"], i + 500)
-
-        # Cleanup
-        self.mongos_conn["config"]["collections"].update(
-            {"_id": "test.mcsharded"},
-            {"$set": {"dropped": False}}
-        )
-        retry_until_ok(
-            self.mongos_conn['admin'].command,
-            "moveChunk",
-            "test.mcsharded",
-            find={"i": 1},
-            to="demo-repl"
-        )
-        assert_soon(
-            lambda: self.shard1_conn['test']['mcsharded'].count() == 500)
 
     def test_with_orphan_documents(self):
         """Test that DocManagers have proper state after a chunk migration
@@ -680,10 +659,10 @@ class TestOplogManagerSharded(unittest.TestCase):
                          500)
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
                          500)
-        assert_soon(lambda: len(self.opman1.doc_manager._search()) == 1000)
+        assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 1000)
 
         # Stop replication using the 'rsSyncApplyStop' failpoint
-        self.shard1_secondary_conn.admin.command(
+        self.shard1_conn.admin.command(
             "configureFailPoint", "rsSyncApplyStop",
             mode="alwaysOn"
         )
@@ -718,16 +697,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.mongos_conn["test"]["$cmd.sys.killop"].find_one({"op": opid})
 
         # Mongo Connector should not become confused by unsuccessful chunk move
-        docs = self.opman1.doc_manager._search()
+        docs = self.opman1.doc_managers[0]._search()
         self.assertEqual(len(docs), 1000)
         self.assertEqual(sorted(d["i"] for d in docs),
                          list(range(500, 1500)))
 
         # cleanup
-        self.shard1_secondary_conn.admin.command(
-            "configureFailPoint", "rsSyncApplyStop",
-            mode="off"
-        )
         mover.join()
 
 if __name__ == '__main__':

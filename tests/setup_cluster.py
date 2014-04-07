@@ -88,6 +88,26 @@ def kill_all_mongo_proc(host, ports):
         kill_mongo_proc(host, port)
 
 
+def kill_all():
+    """Kills all running mongod and mongos instances
+    """
+    kill_all_mongo_proc("localhost", PORTS_ONE)
+    kill_all_mongo_proc("localhost", PORTS_TWO)
+    remove_dir(DEMO_SERVER_LOG)
+    remove_dir(DEMO_SERVER_DATA)
+
+
+def clean_mess_on_error(func):
+    def wrap(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            kill_all()
+            raise
+    return wrap
+
+
+@clean_mess_on_error
 def start_single_mongod_instance(port, data, log):
     """ Creates a single mongod instance
     """
@@ -100,18 +120,10 @@ def start_single_mongod_instance(port, data, log):
             os.path.join(DEMO_SERVER_DATA, data),
             os.path.join(DEMO_SERVER_LOG, log)))
     execute_command(cmd)
-    assert_soon(MongoClient, 'localhost', int(port))
+    retry_until_ok(lambda: MongoClient('localhost', int(port)))
 
 
-def kill_all():
-    """Kills all running mongod and mongos instances
-    """
-    kill_all_mongo_proc("localhost", PORTS_ONE)
-    kill_all_mongo_proc("localhost", PORTS_TWO)
-    remove_dir(DEMO_SERVER_LOG)
-    remove_dir(DEMO_SERVER_DATA)
-
-
+@clean_mess_on_error
 def start_mongo_proc(port, repl_set_name, data, log):
     """Create the replica set
     """
@@ -126,7 +138,7 @@ def start_mongo_proc(port, repl_set_name, data, log):
         cmd += " --keyFile " + KEY_FILE
 
     execute_command(cmd)
-    assert_soon(MongoClient, 'localhost', int(port))
+    retry_until_ok(lambda: MongoClient('localhost', int(port)))
 
 
 def execute_command(command):
@@ -140,6 +152,7 @@ def execute_command(command):
 #========================================= #
 
 
+@clean_mess_on_error
 def start_cluster(sharded=False, use_mongos=True):
     """Sets up cluster with 1 shard, replica set with 3 members
     """
@@ -178,32 +191,35 @@ def start_cluster(sharded=False, use_mongos=True):
         start_mongo_proc(PORTS_TWO["ARBITER"], "demo-repl-2",
                          "replset2c", "replset2c.log")
 
-    # Setup config server
-    cmd = ("mongod --oplogSize 500 --fork --configsvr --noprealloc --port %s"
-           " --dbpath %s --logpath %s --logappend" % (
-               PORTS_ONE["CONFIG"],
-               os.path.join(DEMO_SERVER_DATA, "config1"),
-               os.path.join(DEMO_SERVER_LOG, "config1.log")))
-
-    if KEY_FILE is not None:
-        cmd += " --keyFile " + KEY_FILE
-
-    execute_command(cmd)
-    assert_soon(MongoClient, 'localhost', int(PORTS_ONE['CONFIG']))
-
-    # Setup the mongos, same mongos for both shards
-    cmd = ("mongos --port %s --fork --configdb localhost:%s"
-           " --chunkSize 1  --logpath %s --logappend" % (
-               PORTS_ONE["MONGOS"],
-               PORTS_ONE["CONFIG"],
-               os.path.join(DEMO_SERVER_LOG, "mongos1.log")))
-
-    if KEY_FILE is not None:
-        cmd += " --keyFile " + KEY_FILE
-
     if use_mongos:
+        # Setup config server
+        cmd = ("mongod --oplogSize 500 --fork --configsvr "
+               "--noprealloc --port %s "
+               "--dbpath %s --logpath %s --logappend" % (
+                   PORTS_ONE["CONFIG"],
+                   os.path.join(DEMO_SERVER_DATA, "config1"),
+                   os.path.join(DEMO_SERVER_LOG, "config1.log")))
+
+        if KEY_FILE is not None:
+            cmd += " --keyFile " + KEY_FILE
+
         execute_command(cmd)
-        assert_soon(MongoClient, 'localhost', int(PORTS_ONE["CONFIG"]))
+        retry_until_ok(
+            lambda: MongoClient('localhost', int(PORTS_ONE['CONFIG'])))
+
+        # Setup the mongos, same mongos for both shards
+        cmd = ("mongos --port %s --fork --configdb localhost:%s"
+               " --chunkSize 1  --logpath %s --logappend" % (
+                   PORTS_ONE["MONGOS"],
+                   PORTS_ONE["CONFIG"],
+                   os.path.join(DEMO_SERVER_LOG, "mongos1.log")))
+
+        if KEY_FILE is not None:
+            cmd += " --keyFile " + KEY_FILE
+
+        execute_command(cmd)
+        retry_until_ok(
+            lambda: MongoClient('localhost', int(PORTS_ONE["MONGOS"])))
 
     # configuration for replSet 1
     config = {'_id': "demo-repl", 'members': [
@@ -223,7 +239,7 @@ def start_cluster(sharded=False, use_mongos=True):
 
     primary = MongoClient('localhost:%s' % PORTS_ONE["PRIMARY"])
     if use_mongos:
-        mongos = MongoClient('localhost:%s' % PORTS_ONE["PRIMARY"])
+        mongos = MongoClient('localhost:%s' % PORTS_ONE["MONGOS"])
     primary.admin.command("replSetInitiate", config)
 
     # wait for primary to come up

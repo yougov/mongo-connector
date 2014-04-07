@@ -16,7 +16,6 @@
 """
 
 import time
-import os
 import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
@@ -29,7 +28,6 @@ import pymongo
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.utils import long_to_bson_ts
 from tests.setup_cluster import (start_cluster,
                                  kill_all,
                                  PORTS_ONE)
@@ -43,63 +41,74 @@ class TestOplogManager(unittest.TestCase):
 
     def setUp(self):
         self.assertTrue(start_cluster(), "cluster could not start")
-        self.primary_conn = pymongo.MongoClient(PORTS_ONE['PRIMARY'])
+        self.primary_conn = pymongo.MongoClient(
+            "localhost:%s" % PORTS_ONE['PRIMARY'])
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_conn=self.primary_conn,
-            main_address=PORTS_ONE['PRIMARY'],
+            main_address="localhost:%s" % PORTS_ONE['PRIMARY'],
             oplog_coll=self.oplog_coll,
             is_sharded=False,
             doc_manager=DocManager(),
             oplog_progress_dict=LockingDict(),
             namespace_set=None,
             auth_key=None,      # TODO: support auth in this test
-            auth_username=None
+            auth_username=None,
+            repl_set='demo-repl'
         )
 
     def tearDown(self):
-        self.opman.join()
+        try:
+            self.opman.join()
+        except RuntimeError:
+            pass                # OplogThread may not have been started
         self.primary_conn.close()
         kill_all()
 
     def test_retrieve_doc(self):
-        """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't
-            pass
-        """
-        #testing for entry as none type
-        entry = None
-        self.assertTrue(self.opman.retrieve_doc(entry) is None)
+        """ Test the retrieve_doc method """
 
-        oplog_cursor = self.oplog_coll.find({}, tailable=True, await_data=True)
+        # Trivial case where the oplog entry is None
+        self.assertEqual(self.opman.retrieve_doc(None), None)
 
-        self.primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = self.primary_conn['test']['test'].find_one()
+        # Retrieve a document from insert operation in oplog
+        doc = {"name": "mango", "type": "fruit",
+               "ns": "test.test", "weight": 3.24, "i": 1}
+        self.primary_conn["test"]["test"].insert(doc)
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        oplog_entry = next(oplog_entries)
+        self.assertEqual(self.opman.retrieve_doc(oplog_entry), doc)
 
-        #testing for search after inserting a document
-        self.assertEqual(self.opman.retrieve_doc(last_oplog_entry),
-                         target_entry)
+        # Retrieve a document from update operation in oplog
+        self.primary_conn["test"]["test"].update(
+            {"i": 1},
+            {"$set": {"sounds-like": "mongo"}}
+        )
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        doc["sounds-like"] = "mongo"
+        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), doc)
 
-        self.primary_conn['test']['test'].update({'name': 'paulie'},
-                                                 {"$set":  {'name': 'paul'}})
+        # Retrieve a document from remove operation in oplog
+        # (expected: None)
+        self.primary_conn["test"]["test"].remove({
+            "i": 1
+        })
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), None)
 
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = self.primary_conn['test']['test'].find_one()
-
-        #testing for search after updating a document
-        self.assertEqual(self.opman.retrieve_doc(last_oplog_entry),
-                         target_entry)
-
-        self.primary_conn['test']['test'].remove({'name': 'paul'})
-        last_oplog_entry = next(oplog_cursor)
-
-        #testing for search after deleting a document
-        self.assertEqual(self.opman.retrieve_doc(last_oplog_entry), None)
-
-        last_oplog_entry['o']['_id'] = 'badID'
-
-        #testing for bad doc id as input
-        self.assertEqual(self.opman.retrieve_doc(last_oplog_entry), None)
+        # Retrieve a document with bad _id
+        # (expected: None)
+        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
+        self.assertEqual(self.opman.retrieve_doc(oplog_entry), None)
 
     def test_get_oplog_cursor(self):
         '''Test the get_oplog_cursor method'''
@@ -109,7 +118,7 @@ class TestOplogManager(unittest.TestCase):
 
         # earliest entry is after given timestamp
         doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
-        self.primary_conn["test"]["mcsharded"].insert(doc)
+        self.primary_conn["test"]["test"].insert(doc)
         self.assertEqual(self.opman.get_oplog_cursor(
             bson.Timestamp(1, 0)), None)
 
@@ -121,117 +130,128 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(self.opman.retrieve_doc(cursor[0]), doc)
 
         # many entries before and after timestamp
-        self.primary_conn["test"]["mcsharded"].insert(
-            {"i": i} for i in range(2, 2002))
+        self.primary_conn["test"]["test"].insert(
+            {"i": i} for i in range(2, 1002))
         oplog_cursor = self.oplog_coll.find(
             sort=[("ts", pymongo.ASCENDING)]
         )
 
-        # startup message + insert at beginning of tests + many inserts
-        self.assertEqual(oplog_cursor.count(), 1 + 1 + 998)
+        # startup + insert + 1000 inserts
+        self.assertEqual(oplog_cursor.count(), 2 + 1000)
         pivot = oplog_cursor.skip(400).limit(1)[0]
 
         goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
-        self.assertEqual(goc_cursor.count(), 1 + 1 + 998 - 400)
+        self.assertEqual(goc_cursor.count(), 2 + 1000 - 400)
 
         # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
-        doc = self.primary_conn["test"]["mcsharded"].find_one(
+        doc = self.primary_conn["test"]["test"].find_one(
             {"_id": next(goc_cursor)["o"]["_id"]})
         self.assertEqual(doc["i"], self.opman.retrieve_doc(pivot)["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
-        """Test get_last_oplog_timestamp in oplog_manager. Assertion failure
-            if it doesn't pass
-        """
+        """Test the get_last_oplog_timestamp method"""
 
-        #test empty oplog
+        # "empty" the oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
         self.assertEqual(self.opman.get_last_oplog_timestamp(), None)
 
-        #test non-empty oplog
-        oplog_cursor = self.oplog_coll.find({}, tailable=True, await_data=True)
-        self.primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
+        # Test non-empty oplog
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.primary_conn["test"]["test"].insert({
+                "i": i + 500
+            })
+        oplog = self.primary_conn["local"]["oplog.rs"]
+        oplog = oplog.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
         self.assertEqual(self.opman.get_last_oplog_timestamp(),
-                         last_oplog_entry['ts'])
+                         oplog["ts"])
 
     def test_dump_collection(self):
-        """Test dump_collection in oplog_manager. Assertion failure if it
-            doesn't pass
+        """Test the dump_collection method
+
+        Cases:
+
+        1. empty oplog
+        2. non-empty oplog
         """
-        #with documents
-        self.primary_conn['test']['test'].insert({'name': 'paulie'})
-        search_ts = self.opman.get_last_oplog_timestamp()
-        self.opman.dump_collection()
 
-        doc_manager = self.opman.doc_managers[0]
-        doc_manager.commit()
-        solr_results = doc_manager._search()
-        self.assertEqual(len(solr_results), 1)
-        solr_doc = solr_results[0]
-        self.assertEqual(long_to_bson_ts(solr_doc['_ts']), search_ts)
-        self.assertEqual(solr_doc['name'], 'paulie')
-        self.assertEqual(solr_doc['ns'], 'test.test')
+        # Test with empty oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
+        last_ts = self.opman.dump_collection()
+        self.assertEqual(last_ts, None)
 
-        # test multiple targets
-        doc_managers = [DocManager(), DocManager(), DocManager()]
-        self.opman.doc_managers = doc_managers
-        self.primary_conn["test"]["test"].remove()
+        # Test with non-empty oplog
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
         for i in range(1000):
-            self.primary_conn["test"]["test"].insert({"i": i})
-        self.opman.dump_collection()
-        for dm in doc_managers:
-            self.assertEqual(len(dm._search()), 1000)
+            self.primary_conn["test"]["test"].insert({
+                "i": i + 500
+            })
+        last_ts = self.opman.get_last_oplog_timestamp()
+        self.assertEqual(last_ts, self.opman.dump_collection())
+        self.assertEqual(len(self.opman.doc_managers[0]._search()), 1000)
 
     def test_init_cursor(self):
-        """Test init_cursor in oplog_manager. Assertion failure if it
-            doesn't pass
+        """Test the init_cursor method
+
+        Cases:
+
+        1. no last checkpoint, no collection dump
+        2. no last checkpoint, collection dump ok and stuff to dump
+        3. no last checkpoint, nothing to dump, stuff in oplog
+        4. no last checkpoint, nothing to dump, nothing in oplog
+        5. last checkpoint exists
         """
-        self.opman.checkpoint = None  # needed for these tests
 
-        # initial tests with no config file and empty oplog
-        self.assertEqual(self.opman.init_cursor(), None)
+        # N.B. these sub-cases build off of each other and cannot be re-ordered
+        # without side-effects
 
-        # no config, single oplog entry
-        self.primary_conn['test']['test'].insert({'name': 'paulie'})
-        search_ts = self.opman.get_last_oplog_timestamp()
-        cursor = self.opman.init_cursor()
-        self.assertEqual(cursor.count(), 1)
-        self.assertEqual(self.opman.checkpoint, search_ts)
-
-        # with config file, assert that size != 0
-        os.system('touch temp_config.txt')
-
-        cursor = self.opman.init_cursor()
-        oplog_dict = self.opman.oplog_progress.get_dict()
-
-        self.assertEqual(cursor.count(), 1)
-        self.assertTrue(str(self.opman.oplog) in oplog_dict)
-        self.assertTrue(oplog_dict[str(self.opman.oplog)] ==
-                        self.opman.checkpoint)
-
-        os.system('rm temp_config.txt')
-
-        # test init_cursor when OplogThread created with/without no-dump option
-        # insert some documents (will need to be dumped)
-        self.primary_conn['test']['test'].remove()
-        self.primary_conn['test']['test'].insert(
-            {"_id": i} for i in range(100))
-
-        # test no-dump option
-        docman = self.opman.doc_managers[0]
-        docman._delete()
+        # No last checkpoint, no collection dump, nothing in oplog
+        # "change oplog collection" to put nothing in oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
         self.opman.collection_dump = False
-        self.opman.oplog_progress = LockingDict()
-        # init_cursor has the side-effect of causing a collection dump
-        self.opman.init_cursor()
-        self.assertEqual(len(docman._search()), 0)
+        self.assertEqual(self.opman.init_cursor(), None)
+        self.assertEqual(self.opman.checkpoint, None)
 
-        # test w/o no-dump option
-        docman._delete()
+        # No last checkpoint, empty collections, nothing in oplog
         self.opman.collection_dump = True
+        self.assertEqual(self.opman.init_cursor(), None)
+        self.assertEqual(self.opman.checkpoint, None)
+
+        # No last checkpoint, empty collections, something in oplog
+        self.opman.oplog = self.primary_conn['local']['oplog.rs']
+        collection = self.primary_conn["test"]["test"]
+        collection.insert({"i": 1})
+        collection.remove({"i": 1})
+        time.sleep(3)
+        last_ts = self.opman.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        self.assertEqual(self.opman.checkpoint, last_ts)
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
+
+        # No last checkpoint, non-empty collections, stuff in oplog
         self.opman.oplog_progress = LockingDict()
-        self.opman.init_cursor()
-        self.assertEqual(len(docman._search()), 100)
+        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        self.assertEqual(self.opman.checkpoint, last_ts)
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
+
+        # Last checkpoint exists
+        progress = LockingDict()
+        self.opman.oplog_progress = progress
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        entry = list(
+            self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        progress.get_dict()[str(self.opman.oplog)] = entry[0]["ts"]
+        self.opman.oplog_progress = progress
+        self.opman.checkpoint = None
+        cursor = self.opman.init_cursor()
+        self.assertEqual(entry[1]["ts"], next(cursor)["ts"])
+        self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)],
+                             entry[0]["ts"])
 
     def test_filter_fields(self):
         docman = self.opman.doc_managers[0]
@@ -274,6 +294,7 @@ class TestOplogManager(unittest.TestCase):
                         "test.test2": "test.test2_dest"}
         self.opman.dest_mapping = dest_mapping
         self.opman.namespace_set = source_ns
+        docman = self.opman.doc_managers[0]
         # start replicating
         self.opman.start()
 
@@ -286,9 +307,9 @@ class TestOplogManager(unittest.TestCase):
             # test insert
             self.primary_conn[db][coll].insert(base_doc)
 
-            assert_soon(lambda: len(self.docman._search()) == 1)
-            self.assertEqual(self.docman._search()[0]["ns"], dest_mapping[ns])
-            bad = [d for d in self.docman._search() if d["ns"] == ns]
+            assert_soon(lambda: len(docman._search()) == 1)
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
             # test update
@@ -298,20 +319,20 @@ class TestOplogManager(unittest.TestCase):
             )
 
             def update_complete():
-                docs = self.docman._search()
+                docs = docman._search()
                 for d in docs:
                     if d.get("weakness") == "kryptonite":
                         return True
                     return False
             assert_soon(update_complete)
-            self.assertEqual(self.docman._search()[0]["ns"], dest_mapping[ns])
-            bad = [d for d in self.docman._search() if d["ns"] == ns]
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
             # test delete
             self.primary_conn[db][coll].remove({"_id": 1})
-            assert_soon(lambda: len(self.docman._search()) == 0)
-            bad = [d for d in self.docman._search()
+            assert_soon(lambda: len(docman._search()) == 0)
+            bad = [d for d in docman._search()
                    if d["ns"] == dest_mapping[ns]]
             self.assertEqual(len(bad), 0)
 
@@ -326,14 +347,14 @@ class TestOplogManager(unittest.TestCase):
             # test insert
             self.primary_conn[db][coll].insert(base_doc)
             time.sleep(1)
-            self.assertEqual(len(self.docman._search()), 0)
+            self.assertEqual(len(docman._search()), 0)
             # test update
             self.primary_conn[db][coll].update(
                 {"_id": 1},
                 {"$set": {"weakness": "kryptonite"}}
             )
             time.sleep(1)
-            self.assertEqual(len(self.docman._search()), 0)
+            self.assertEqual(len(docman._search()), 0)
 
     def test_many_targets(self):
         """Test that one OplogThread is capable of replicating to more than

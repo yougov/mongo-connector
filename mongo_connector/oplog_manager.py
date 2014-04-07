@@ -358,7 +358,7 @@ class OplogThread(threading.Thread):
         configs i.e. when we're starting for the first time.
         """
 
-        dump_set = self.namespace_set
+        dump_set = self.namespace_set or []
         logging.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
         #no namespaces specified
@@ -452,11 +452,12 @@ class OplogThread(threading.Thread):
                     logging.debug("OplogThread: DocManager %s has not"
                                   "bulk_upsert method.  Upserting documents "
                                   "serially for collection dump." % str(dm))
+                    num = 0
                     for num, doc in enumerate(docs_to_dump()):
                         if num % 10000 == 0:
                             logging.debug("Upserted %d docs." % num)
                         dm.upsert(doc)
-                    logging.debug("Upserted %d  docs" % num)
+                    logging.debug("Upserted %d docs" % num)
 
             # cleanup
             for t in dumping_threads:
