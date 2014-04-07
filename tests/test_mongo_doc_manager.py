@@ -41,7 +41,8 @@ class MongoDocManagerTester(unittest.TestCase):
                                                         '--noprealloc'])
         cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
         cls.MongoDoc = DocManager(cls.standalone_pair)
-        cls.mongo = MongoClient(cls.standalone_pair)['test']['test']
+        cls.mongo_conn = MongoClient(cls.standalone_pair)
+        cls.mongo = cls.mongo_conn['test']['test']
 
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
@@ -58,6 +59,7 @@ class MongoDocManagerTester(unittest.TestCase):
         """Empty Mongo at the start of every test
         """
 
+        self.mongo_conn.drop_database("__mongo_connector")
         self.mongo.remove()
 
         conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
@@ -77,7 +79,8 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly insert into Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
@@ -85,7 +88,8 @@ class MongoDocManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
-        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(1)
         res = self.mongo.find()
@@ -97,11 +101,14 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly delete from Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
         self.assertTrue(res.count() == 1)
+        if "ns" not in docc:
+            docc["ns"] = 'test.test'
 
         self.MongoDoc.remove(docc)
         time.sleep(1)
@@ -113,9 +120,11 @@ class MongoDocManagerTester(unittest.TestCase):
         _search(), compare.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         self.MongoDoc.commit()
         search = list(self.MongoDoc._search())
@@ -143,9 +152,9 @@ class MongoDocManagerTester(unittest.TestCase):
         search = list(self.MongoDoc.search(5767301236327972865,
                                            5767301236327972866))
         self.assertTrue(len(search) == 2)
-        result_names = [result.get("name") for result in search]
-        self.assertIn('John', result_names)
-        self.assertIn('John Paul', result_names)
+        result_id = [result.get("_id") for result in search]
+        self.assertIn('1', result_id)
+        self.assertIn('2', result_id)
 
     def test_search_namespaces(self):
         """Test search within timestamp range with a given namespace set
