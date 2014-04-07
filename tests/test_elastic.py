@@ -22,10 +22,11 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import socket
 
 sys.path[0:0] = [""]
 
+from elasticsearch import Elasticsearch, exceptions as es_exceptions
+from elasticsearch.client import IndicesClient
 from pymongo import MongoClient
 
 from tests.setup_cluster import (kill_mongo_proc,
@@ -33,20 +34,12 @@ from tests.setup_cluster import (kill_mongo_proc,
                                  start_cluster,
                                  kill_all,
                                  PORTS_ONE)
-from bson.dbref import DBRef
-from bson.objectid import ObjectId
-from bson.code import Code
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from mongo_connector.errors import OperationFailed
 from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import assert_soon
-
-NUMBER_OF_DOC_DIRS = 100
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
-CONFIG = os.environ.get('CONFIG', "config.txt")
 
 
 class TestElastic(unittest.TestCase):
@@ -62,17 +55,11 @@ class TestElastic(unittest.TestCase):
     def setUpClass(cls):
         """ Starts the cluster
         """
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.elastic_doc = DocManager('localhost:9200',
                                      auto_commit=False)
-        cls.flag = start_cluster()
-        if cls.flag:
-            cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']))
-
-        import logging
-        logger = logging.getLogger()
-        loglevel = logging.INFO
-        logger.setLevel(loglevel)
+        assert(start_cluster())
+        cls.conn = MongoClient('%s:%s' % ('localhost', PORTS_ONE['PRIMARY']),
+                               replicaSet='demo-repl')
 
     @classmethod
     def tearDownClass(cls):
@@ -88,11 +75,14 @@ class TestElastic(unittest.TestCase):
     def setUp(self):
         """ Starts a new connector for every test
         """
-        if not self.flag:
-            self.fail("Shards cannot be added to mongos")
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
         self.connector = Connector(
-            address='%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']),
-            oplog_checkpoint=CONFIG,
+            address='%s:%s' % ('localhost', PORTS_ONE['PRIMARY']),
+            oplog_checkpoint='config.txt',
             target_url='localhost:9200',
             ns_set=['test.test'],
             u_key='_id',
@@ -103,11 +93,17 @@ class TestElastic(unittest.TestCase):
         try:
             self.elastic_doc._remove()
         except OperationFailed:
-            pass                # test.test index may not yet exist
+            try:
+                # Create test.test index if necessary
+                client = Elasticsearch(hosts=['localhost:9200'])
+                idx_client = IndicesClient(client)
+                idx_client.create(index='test.test')
+            except es_exceptions.TransportError:
+                pass
+
         self.conn['test']['test'].remove()
         self.connector.start()
-        while len(self.connector.shard_set) == 0:
-            pass
+        assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: sum(1 for _ in self.elastic_doc._search()) == 0)
 
     def test_shard_length(self):
@@ -154,7 +150,7 @@ class TestElastic(unittest.TestCase):
             restarting both.
         """
 
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
 
         self.conn['test']['test'].insert({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
@@ -163,25 +159,15 @@ class TestElastic(unittest.TestCase):
         assert_soon(condition1)
         assert_soon(condition2)
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
         time.sleep(5)
-
-        count = 0
-        while True:
-            try:
-                self.conn['test']['test'].insert({'name': 'pauline'})
-                break
-            except OperationFailure:
-                time.sleep(1)
-                count += 1
-                if count >= 60:
-                    sys.exit(1)
-                continue
+        retry_until_ok(self.conn.test.test.insert,
+                       {'name': 'pauline'})
         assert_soon(lambda: sum(1 for _ in self.elastic_doc._search()) == 2)
         result_set_1 = list(self.elastic_doc._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
@@ -190,7 +176,7 @@ class TestElastic(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -209,18 +195,15 @@ class TestElastic(unittest.TestCase):
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
 
     def test_stress(self):
-        """Test stress by inserting and removing the number of documents
-            specified in global
-            variable
-        """
+        """Test stress by inserting and removing a large number of documents"""
 
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             result_set_1 = self.elastic_doc._search()
             for item in result_set_1:
                 if(item['name'] == 'Paul' + str(i)):
@@ -231,23 +214,23 @@ class TestElastic(unittest.TestCase):
             in global variable. Strategy for rollback is the same as before.
         """
 
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
 
         time.sleep(5)
         count = -1
-        while count + 1 < NUMBER_OF_DOC_DIRS:
+        while count + 1 < 100:
             try:
                 count += 1
                 self.conn['test']['test'].insert(
@@ -263,7 +246,7 @@ class TestElastic(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -273,45 +256,16 @@ class TestElastic(unittest.TestCase):
                          "replset1b.log")
 
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
 
         result_set_1 = list(self.elastic_doc._search())
-        self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(len(result_set_1), 100)
         for item in result_set_1:
             self.assertTrue('Paul' in item['name'])
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(retry_until_ok(find_cursor.count), 100)
 
-    def test_non_standard_fields(self):
-        """ Tests ObjectIds, DBrefs, etc
-        """
-        # This test can break if it attempts to insert before the dump takes
-        # place- this prevents it (other tests affected too actually)
-        while (self.connector.shard_set['demo-repl'].checkpoint is None):
-            time.sleep(1)
-        docs = [
-            {'foo': [1, 2]},
-            {'bar': {'hello': 'world'}},
-            {'code': Code("function x() { return 1; }")},
-            {'dbref': {'_ref': DBRef('simple',
-                                     ObjectId('509b8db456c02c5ab7e63c34'))}}
-        ]
-        try:
-            self.conn['test']['test'].insert(docs)
-        except OperationFailure:
-            self.fail("Cannot insert documents into Elastic!")
-
-        search = self.elastic_doc._search
-        assert_soon(lambda: sum(1 for _ in search()) == len(docs),
-                    "Did not get all expected documents")
-        self.assertIn("dbref", self.elastic_doc.get_last_doc())
-
-
-def abort_test():
-    """Aborts the test
-    """
-    sys.exit(1)
 
 if __name__ == '__main__':
     unittest.main()

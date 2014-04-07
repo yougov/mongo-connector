@@ -15,7 +15,6 @@
 """A set of utilities used throughout the mongo-connector
 """
 
-import sys
 import time
 import logging
 
@@ -24,6 +23,7 @@ try:
     from urllib2 import urlopen, URLError
 except ImportError:
     from urllib.request import urlopen, URLError
+
 
 def bson_ts_to_long(timestamp):
     """Convert BSON timestamp into integer.

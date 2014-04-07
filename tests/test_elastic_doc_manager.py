@@ -49,8 +49,11 @@ class ElasticDocManagerTester(unittest.TestCase):
         """Empty ElasticSearch at the start of every test
         """
         try:
-            self.elastic_conn.delete_by_query("test.test", "string",
-                                              {"match_all": {}})
+            self.elastic_conn.delete_by_query(
+                index="test.test",
+                doc_type="string",
+                q="*:*"
+            )
         except (es_exceptions.ConnectionError,
                 es_exceptions.TransportError):
             pass

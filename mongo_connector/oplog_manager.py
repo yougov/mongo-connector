@@ -332,7 +332,8 @@ class OplogThread(threading.Thread):
 
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
-        cursor_ts_long = util.bson_ts_to_long(cursor[0].get("ts"))
+        cursor_ts_long = retry_until_ok(util.bson_ts_to_long,
+                                        cursor[0].get("ts"))
         given_ts_long = util.bson_ts_to_long(timestamp)
         if cursor_ts_long > given_ts_long:
             # first entry in oplog is beyond timestamp, we've fallen behind!
@@ -343,7 +344,7 @@ class OplogThread(threading.Thread):
 
             return cursor
         elif cursor_len > 1:
-            doc = next(cursor)
+            doc = retry_until_ok(next, cursor)
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
@@ -363,11 +364,12 @@ class OplogThread(threading.Thread):
 
         #no namespaces specified
         if not self.namespace_set:
-            db_list = self.main_connection.database_names()
+            db_list = retry_until_ok(self.main_connection.database_names)
             for database in db_list:
                 if database == "config" or database == "local":
                     continue
-                coll_list = self.main_connection[database].collection_names()
+                coll_list = retry_until_ok(
+                    self.main_connection[database].collection_names)
                 for coll in coll_list:
                     if coll.startswith("system"):
                         continue
@@ -521,7 +523,7 @@ class OplogThread(threading.Thread):
                              % (self.oplog, msg))
         elif timestamp is None:
             # set timestamp to top of oplog
-            timestamp = self.get_last_oplog_timestamp()
+            timestamp = retry_until_ok(self.get_last_oplog_timestamp)
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
@@ -649,10 +651,19 @@ class OplogThread(threading.Thread):
                               "docs.")
                 remov_inc = 0
                 for doc in doc_hash.values():
-                    remov_inc += 1
-                    dm.remove(doc)
-                    logging.debug("OplogThread: Rollback, removed %s " %
-                                  str(doc))
+                    try:
+                        dm.remove(doc)
+                        remov_inc += 1
+                        logging.debug("OplogThread: Rollback, removed %s " %
+                                      str(doc))
+                    except errors.OperationFailed:
+                        logging.warning(
+                            "Could not delete docucument during rollback: %s "
+                            "This can happen if this document was already "
+                            "removed by another rollback happening at the "
+                            "same time.",
+                            str(doc)
+                        )
 
                 logging.debug("OplogThread: Rollback, removed %d docs." %
                               remov_inc)
