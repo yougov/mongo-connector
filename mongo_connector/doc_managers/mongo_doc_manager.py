@@ -79,6 +79,13 @@ class DocManager():
         database, coll = doc['ns'].split('.', 1)
         try:
             self.mongo[database][coll].save(doc)
+            self.mongo["__mongo-connector"][coll].save({
+                self.unique_key: doc[self.unique_key],
+                "_ts": doc["_ts"],
+                "ns": doc["ns"]
+            })
+            del doc['ns']
+            del doc["_ts"]
         except pymongo.errors.OperationFailure:
             raise errors.OperationFailed("Could not complete upsert on MongoDB")
         except InvalidDocument:
@@ -100,8 +107,12 @@ class DocManager():
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
-            for document in target_coll.find({'_ts': {'$lte': end_ts,
-                                                      '$gte': start_ts}}):
+            for unique_key in self.mongo["_mongo-connector"][coll].find(
+                {'_ts': {'$lte': end_ts,
+                         '$gte': start_ts}}
+            ):
+                document = target_coll.find_one(
+                    {self.unique_key: unique_key})
                 yield document
 
     def commit(self):
@@ -116,8 +127,12 @@ class DocManager():
             for namespace in self._namespaces():
                 database, coll = namespace.split('.', 1)
                 target_coll = self.mongo[database][coll]
-                for doc in target_coll.find(limit=1).sort('_ts', -1):
-                    yield doc
+                for unique_key in self.mongo["_mongo-connector"][coll].find(
+                    limit=1
+                    ).sort('_ts', -1):
+                    document = target_coll.find_one(
+                        {self.unique_key: unique_key})
+                    yield document
 
         return max(docs_by_ts(), key=lambda x:x["_ts"])
 
