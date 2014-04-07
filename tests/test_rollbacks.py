@@ -210,7 +210,8 @@ class TestRollbacks(unittest.TestCase):
             data="replset1b",
             log="replset1b.log"
         )
-        while secondary["admin"].command("replSetGetStatus")["myState"] != 2:
+        while retry_until_ok(secondary["admin"].command,
+                             "replSetGetStatus")["myState"] != 2:
             time.sleep(1)
         while retry_until_ok(self.primary_conn["test"]["mc"].find().count) == 0:
             time.sleep(1)
@@ -218,6 +219,9 @@ class TestRollbacks(unittest.TestCase):
         # Only first document should exist in MongoDB
         self.assertEqual(self.primary_conn["test"]["mc"].count(), 1)
         self.assertEqual(self.primary_conn["test"]["mc"].find_one()["i"], 0)
+
+        # Give OplogThread some time to catch up
+        time.sleep(10)
 
         # Same case should hold for the doc managers
         for dm in self.opman.doc_managers:

@@ -65,10 +65,6 @@ class TestElastic(unittest.TestCase):
         os.system('rm %s; touch %s' % (CONFIG, CONFIG))
         cls.elastic_doc = DocManager('localhost:9200',
                                      auto_commit=False)
-        try:
-            cls.elastic_doc._remove()
-        except OperationFailed:
-            pass                # test.test index may not yet exist
         cls.flag = start_cluster()
         if cls.flag:
             cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']))
@@ -103,10 +99,15 @@ class TestElastic(unittest.TestCase):
             auth_key=None,
             doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py'
         )
+        # Clean out test databases
+        try:
+            self.elastic_doc._remove()
+        except OperationFailed:
+            pass                # test.test index may not yet exist
+        self.conn['test']['test'].remove()
         self.connector.start()
         while len(self.connector.shard_set) == 0:
             pass
-        self.conn['test']['test'].remove()
         assert_soon(lambda: sum(1 for _ in self.elastic_doc._search()) == 0)
 
     def test_shard_length(self):

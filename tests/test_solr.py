@@ -94,7 +94,6 @@ class TestSynchronizer(unittest.TestCase):
             auth_key=None,
             doc_manager='mongo_connector/doc_managers/solr_doc_manager.py'
         )
-        self.connector.start()
         while len(self.connector.shard_set) == 0:
             time.sleep(1)
         count = 0
@@ -110,6 +109,7 @@ class TestSynchronizer(unittest.TestCase):
                                       'many times in setup')
         while (len(self.solr_conn.search('*:*')) != 0):
             time.sleep(1)
+        self.connector.start()
 
     def tearDown(self):
         self.connector.join()
