@@ -57,7 +57,11 @@ class TestSynchronizer(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
         use_mongos = True
         if PORTS_ONE['MONGOS'] != "27217":
             use_mongos = False

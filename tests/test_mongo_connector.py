@@ -99,11 +99,14 @@ class TestMongoConnector(unittest.TestCase):
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
         """
-        os.system('touch %s' % (TEMP_CONFIG))
-        config_file_path = TEMP_CONFIG
+        try:
+            os.unlink("temp_config.txt")
+        except OSError:
+            pass
+        open("temp_config.txt", "w").close()
         conn = Connector(
             address=MAIN_ADDRESS,
-            oplog_checkpoint=config_file_path,
+            oplog_checkpoint="temp_config.txt",
             target_url=None,
             ns_set=['test.test'],
             u_key='_id',
@@ -117,23 +120,23 @@ class TestMongoConnector(unittest.TestCase):
         #pretend to insert a thread/timestamp pair
         conn.write_oplog_progress()
 
-        data = json.load(open(config_file_path, 'r'))
+        data = json.load(open("temp_config.txt", 'r'))
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(12, 34))
 
         #ensure the temp file was deleted
-        self.assertFalse(os.path.exists(config_file_path + '~'))
+        self.assertFalse(os.path.exists("temp_config.txt" + '~'))
 
         #ensure that updates work properly
         conn.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         conn.write_oplog_progress()
 
-        config_file = open(config_file_path, 'r')
+        config_file = open("temp_config.txt", 'r')
         data = json.load(config_file)
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
-        os.system('rm ' + config_file_path)
+        os.unlink("temp_config.txt")
         config_file.close()
 
     def test_read_oplog_progress(self):
@@ -152,8 +155,13 @@ class TestMongoConnector(unittest.TestCase):
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)
 
-        os.system('touch %s' % (TEMP_CONFIG))
-        conn.oplog_checkpoint = TEMP_CONFIG
+        try:
+            os.unlink("temp_config.txt")
+        except OSError:
+            pass
+        open("temp_config.txt", "w").close()
+
+        conn.oplog_checkpoint = "temp_config.txt"
 
         #testing with empty file
         self.assertEqual(conn.read_oplog_progress(), None)
@@ -178,7 +186,7 @@ class TestMongoConnector(unittest.TestCase):
         conn.read_oplog_progress()
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
-        os.system('rm ' + TEMP_CONFIG)
+        os.unlink("temp_config.txt")
 
     def test_many_targets(self):
         """Test that DocManagers are created and assigned to target URLs

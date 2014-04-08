@@ -41,9 +41,7 @@ from tests.util import assert_soon
 
 NUMBER_OF_DOC_DIRS = 100
 HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
 CONFIG = os.environ.get('CONFIG', "config.txt")
-PORTS_ONE['MONGOS'] = MAIN_ADDR
 
 
 class TestSynchronizer(unittest.TestCase):
@@ -57,13 +55,17 @@ class TestSynchronizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
         start_single_mongod_instance("30000", "MC", "MC_log")
         cls.mongo_doc = DocManager("localhost:30000")
         cls.mongo_doc._remove()
-        cls.flag = start_cluster()
-        if cls.flag:
-            cls.conn = MongoClient("%s:%s" % (HOSTNAME,  PORTS_ONE['MONGOS']))
+        assert(start_cluster())
+        cls.conn = MongoClient("%s:%s" % (HOSTNAME,  PORTS_ONE['PRIMARY']),
+                               replicaSet="demo-repl")
 
     @classmethod
     def tearDownClass(cls):
@@ -76,10 +78,8 @@ class TestSynchronizer(unittest.TestCase):
         self.connector.join()
 
     def setUp(self):
-        if not self.flag:
-            self.fail("Shards cannot be added to mongos")
         self.connector = Connector(
-            address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
+            address="localhost:%s" % PORTS_ONE["PRIMARY"],
             oplog_checkpoint=CONFIG,
             target_url='%s:30000' % (HOSTNAME),
             ns_set=['test.test'],
@@ -144,26 +144,13 @@ class TestSynchronizer(unittest.TestCase):
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
 
         kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
-
         new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
-
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
-        assert_soon(condition)
+        assert_soon(lambda: retry_until_ok(condition))
 
-        time.sleep(5)
-        count = 0
-        while True:
-            try:
-                result_set_1 = self.conn['test']['test'].insert(
-                    {'name': 'pauline'})
-                break
-            except OperationFailure:
-                time.sleep(1)
-                count += 1
-                if count >= 60:
-                    sys.exit(1)
-                continue
+        retry_until_ok(self.conn.test.test.insert,
+                       {'name': 'pauline'})
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 2)
         result_set_1 = list(self.mongo_doc._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})

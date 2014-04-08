@@ -68,11 +68,12 @@ def kill_mongo_proc(host, port):
     except ConnectionFailure:
         for proc in psutil.process_iter():
             try:
-                if len(proc.cmdline) > 0:
-                    if "mongo" in proc.cmdline[0] and port in proc.cmdline:
+                cmdline = proc.cmdline()
+                if len(cmdline) > 0:
+                    if "mongo" in cmdline[0] and port in cmdline:
                         proc.terminate()
                         break
-            except psutil._error.AccessDenied:
+            except psutil.AccessDenied:
                 pass
     else:
         try:
