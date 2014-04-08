@@ -79,7 +79,6 @@ class DocManager():
         """
         database, coll = doc['ns'].split('.', 1)
         try:
-            self.mongo[database][coll].save(doc)
             self.mongo["__mongo-connector"][coll].save({
                 self.unique_key: doc[self.unique_key],
                 "_ts": doc["_ts"],
@@ -87,6 +86,7 @@ class DocManager():
             })
             del doc['ns']
             del doc["_ts"]
+            self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
             raise errors.OperationFailed("Could not complete upsert on MongoDB")
         except InvalidDocument:
