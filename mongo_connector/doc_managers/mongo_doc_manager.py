@@ -71,6 +71,7 @@ class DocManager():
     def stop(self):
         """Stops any running threads
         """
+        self.mongo.drop_database("__mongo-connector")
         pass
 
     def upsert(self, doc):
