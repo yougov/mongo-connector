@@ -48,6 +48,8 @@ class DocManager():
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.unique_key = unique_key
         self.namespace_set = kwargs.get("namespace_set")
+        for namespace in self._namespaces():
+            self.mongo["__mongo-connector"][namespace].create_index("_ts")
 
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
@@ -79,7 +81,7 @@ class DocManager():
         """
         database, coll = doc['ns'].split('.', 1)
         try:
-            self.mongo["__mongo-connector"][coll].save({
+            self.mongo["__mongo-connector"][doc['ns']].save({
                 self.unique_key: doc[self.unique_key],
                 "_ts": doc["_ts"],
                 "ns": doc["ns"]
@@ -101,6 +103,8 @@ class DocManager():
         database, coll = doc['ns'].split('.', 1)
         self.mongo[database][coll].remove(
             {self.unique_key: doc[self.unique_key]})
+        self.mongo["__mongo-connector"][doc['ns']].remove(
+            {self.unique_key: doc[self.unique_key]})
 
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
@@ -108,7 +112,7 @@ class DocManager():
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
-            for unique_key in self.mongo["_mongo-connector"][coll].find(
+            for unique_key in self.mongo["_mongo-connector"][namespace].find(
                 {'_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
             ):
