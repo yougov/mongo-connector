@@ -22,7 +22,6 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import socket
 
 sys.path[0:0] = [""]
 
@@ -38,10 +37,6 @@ from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import assert_soon
-
-NUMBER_OF_DOC_DIRS = 100
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-CONFIG = os.environ.get('CONFIG', "config.txt")
 
 
 class TestSynchronizer(unittest.TestCase):
@@ -64,14 +59,14 @@ class TestSynchronizer(unittest.TestCase):
         cls.mongo_doc = DocManager("localhost:30000")
         cls.mongo_doc._remove()
         assert(start_cluster())
-        cls.conn = MongoClient("%s:%s" % (HOSTNAME,  PORTS_ONE['PRIMARY']),
+        cls.conn = MongoClient("localhost:%s" % PORTS_ONE['PRIMARY'],
                                replicaSet="demo-repl")
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_mongo_proc(HOSTNAME, 30000)
+        kill_mongo_proc('localhost', 30000)
         kill_all()
 
     def tearDown(self):
@@ -80,8 +75,8 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         self.connector = Connector(
             address="localhost:%s" % PORTS_ONE["PRIMARY"],
-            oplog_checkpoint=CONFIG,
-            target_url='%s:30000' % (HOSTNAME),
+            oplog_checkpoint="config.txt",
+            target_url='localhost:30000',
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None,
@@ -136,15 +131,15 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
         self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
@@ -159,7 +154,7 @@ class TestSynchronizer(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -183,13 +178,13 @@ class TestSynchronizer(unittest.TestCase):
             variable
         """
 
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
         search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             result_set_1 = self.mongo_doc._search()
             for item in result_set_1:
                 if(item['name'] == 'Paul' + str(i)):
@@ -200,23 +195,23 @@ class TestSynchronizer(unittest.TestCase):
             in global variable. Strategy for rollback is the same as before.
         """
 
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
         search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
 
         time.sleep(5)
         count = -1
-        while count + 1 < NUMBER_OF_DOC_DIRS:
+        while count + 1 < 100:
             try:
                 count += 1
                 self.conn['test']['test'].insert(
@@ -232,7 +227,7 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], result_set_2['_id'])
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -242,15 +237,15 @@ class TestSynchronizer(unittest.TestCase):
                          "replset1b.log")
 
         search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == NUMBER_OF_DOC_DIRS
+        condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
 
         result_set_1 = list(self.mongo_doc._search())
-        self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(len(result_set_1), 100)
         for item in result_set_1:
             self.assertTrue('Paul' in item['name'])
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(retry_until_ok(find_cursor.count), 100)
 
 
 if __name__ == '__main__':

@@ -17,7 +17,6 @@
 
 import os
 import sys
-import socket
 
 sys.path[0:0] = [""]
 
@@ -29,19 +28,13 @@ else:
 import time
 import json
 from mongo_connector.connector import Connector
-from tests.setup_cluster import start_cluster, kill_all
+from tests.setup_cluster import start_cluster, kill_all, PORTS_ONE
 from bson.timestamp import Timestamp
 from mongo_connector import errors
 from mongo_connector.doc_managers import (
     doc_manager_simulator
 )
 from mongo_connector.util import long_to_bson_ts
-
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
-MAIN_ADDRESS = "%s:%s" % (HOSTNAME, MAIN_ADDR)
-CONFIG = os.environ.get('CONFIG', "config.txt")
-TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 
 
 class TestMongoConnector(unittest.TestCase):
@@ -58,12 +51,12 @@ class TestMongoConnector(unittest.TestCase):
     def setUpClass(cls):
         """ Initializes the cluster
         """
-
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        use_mongos = True
-        if MAIN_ADDRESS.split(":")[1] != "27217":
-            use_mongos = False
-        cls.flag = start_cluster(use_mongos=use_mongos)
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
+        cls.flag = start_cluster()
 
     @classmethod
     def tearDownClass(cls):
@@ -78,8 +71,8 @@ class TestMongoConnector(unittest.TestCase):
             self.fail("Shards cannot be added to mongos")
 
         conn = Connector(
-            address=MAIN_ADDRESS,
-            oplog_checkpoint=CONFIG,
+            address="localhost:%s" % PORTS_ONE["PRIMARY"],
+            oplog_checkpoint='config.txt',
             target_url=None,
             ns_set=['test.test'],
             u_key='_id',
@@ -105,7 +98,7 @@ class TestMongoConnector(unittest.TestCase):
             pass
         open("temp_config.txt", "w").close()
         conn = Connector(
-            address=MAIN_ADDRESS,
+            address="localhost:%s" % PORTS_ONE["PRIMARY"],
             oplog_checkpoint="temp_config.txt",
             target_url=None,
             ns_set=['test.test'],
@@ -144,7 +137,7 @@ class TestMongoConnector(unittest.TestCase):
         """
 
         conn = Connector(
-            address=MAIN_ADDRESS,
+            address="localhost:%s" % PORTS_ONE["PRIMARY"],
             oplog_checkpoint=None,
             target_url=None,
             ns_set=['test.test'],
@@ -196,7 +189,7 @@ class TestMongoConnector(unittest.TestCase):
 
         # no doc manager or target URLs
         connector_kwargs = {
-            "address": MAIN_ADDR,
+            "address": "localhost:%s" % PORTS_ONE["PRIMARY"],
             "oplog_checkpoint": None,
             "ns_set": None,
             "u_key": None,
@@ -234,7 +227,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("elastic_doc_manager")
             ],
             target_url=[
-                MAIN_ADDR,
+                "localhost:%s" % PORTS_ONE['PRIMARY'],
                 "foobar",
                 "bazbaz"
             ],
@@ -255,7 +248,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("doc_manager_simulator")
             ],
             target_url=[
-                MAIN_ADDR,
+                "localhost:%s" % PORTS_ONE["PRIMARY"],
                 "foobar",
                 "bazbaz"
             ],
@@ -268,7 +261,8 @@ class TestMongoConnector(unittest.TestCase):
                          "doc_manager_simulator")
         self.assertEqual(c.doc_managers[2].__module__,
                          "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[0].url, MAIN_ADDR)
+        self.assertEqual(c.doc_managers[0].url,
+                         "localhost:%s" % PORTS_ONE["PRIMARY"])
         self.assertEqual(c.doc_managers[1].url, "foobar")
         self.assertEqual(c.doc_managers[2].url, "bazbaz")
 
@@ -280,7 +274,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("doc_manager_simulator")
             ],
             target_url=[
-                MAIN_ADDR
+                "localhost:%s" % PORTS_ONE["PRIMARY"]
             ],
             **connector_kwargs
         )

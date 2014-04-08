@@ -16,7 +16,6 @@
 """
 import os
 import sys
-import socket
 
 sys.path[0:0] = [""]
 
@@ -30,28 +29,17 @@ else:
 from tests.setup_cluster import (kill_mongo_proc,
                                  start_mongo_proc,
                                  start_cluster,
-                                 kill_all)
-from threading import Timer
+                                 kill_all,
+                                 PORTS_ONE)
+from tests.util import assert_soon
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
-
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-             "CONFIG": "27220", "MONGOS": "27117"}
-NUMBER_OF_DOC_DIRS = 100
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-PORTS_ONE['MONGOS'] = os.environ.get('MAIN_ADDR', "27217")
-CONFIG = os.environ.get('CONFIG', "config.txt")
 
 
 class TestSynchronizer(unittest.TestCase):
     """ Tests the synchronizers
     """
-
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
 
     @classmethod
     def setUpClass(cls):
@@ -62,28 +50,21 @@ class TestSynchronizer(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
-        use_mongos = True
-        if PORTS_ONE['MONGOS'] != "27217":
-            use_mongos = False
 
-        cls.flag = start_cluster(use_mongos=use_mongos)
-        if cls.flag:
-            cls.conn = MongoClient('%s:%s' % (HOSTNAME, PORTS_ONE['MONGOS']))
-            timer = Timer(60, abort_test)
-            cls.connector = Connector(
-                address="%s:%s" % (HOSTNAME, PORTS_ONE["MONGOS"]),
-                oplog_checkpoint=CONFIG,
-                target_url=None,
-                ns_set=['test.test'],
-                u_key='_id',
-                auth_key=None
-            )
-            cls.synchronizer = cls.connector.doc_managers[0]
-            timer.start()
-            cls.connector.start()
-            while len(cls.connector.shard_set) == 0:
-                pass
-            timer.cancel()
+        assert(start_cluster())
+        cls.conn = MongoClient('localhost:%s' % PORTS_ONE['PRIMARY'],
+                               replicaSet='demo-repl')
+        cls.connector = Connector(
+            address="%s:%s" % ('localhost', PORTS_ONE["PRIMARY"]),
+            oplog_checkpoint='config.txt',
+            target_url=None,
+            ns_set=['test.test'],
+            u_key='_id',
+            auth_key=None
+        )
+        cls.synchronizer = cls.connector.doc_managers[0]
+        cls.connector.start()
+        assert_soon(lambda: len(cls.connector.shard_set) != 0)
 
     @classmethod
     def tearDownClass(cls):
@@ -95,12 +76,8 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         """ Clears the db
         """
-        if not self.flag:
-            self.fail("Shards cannot be added to mongos")
-
         self.conn['test']['test'].remove()
-        while (len(self.synchronizer._search()) != 0):
-            time.sleep(1)
+        assert_soon(lambda: len(self.synchronizer._search()) == 0)
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
@@ -147,41 +124,30 @@ class TestSynchronizer(unittest.TestCase):
             killing primary, inserting another doc, killing secondary,
             and then restarting both.
         """
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
 
         self.conn['test']['test'].insert({'name': 'paul'})
         while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
 
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
-        count = 0
-        while True:
-            try:
-                self.conn['test']['test'].insert({'name': 'pauline'})
-                break
-            except OperationFailure:
-                count += 1
-                if count > 60:
-                    self.fail('Call to insert failed too'
-                              ' many times in test_rollback')
-                time.sleep(1)
-                continue
-        while (len(self.synchronizer._search()) != 2):
-            time.sleep(1)
+        retry_until_ok(self.conn.test.test.insert,
+                       {'name': 'pauline'})
+        assert_soon(lambda: len(self.synchronizer._search()) == 2)
         result_set_1 = self.synchronizer._search()
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -203,13 +169,13 @@ class TestSynchronizer(unittest.TestCase):
     def test_stress(self):
         """Stress test the system by inserting a large number of docs.
         """
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS:
+        while len(self.synchronizer._search()) != 100:
             time.sleep(5)
        # conn['test']['test'].create_index('name')
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             result_set_1 = self.synchronizer._search()
             for item in result_set_1:
                 if (item['name'] == 'Paul' + str(i)):
@@ -222,22 +188,22 @@ class TestSynchronizer(unittest.TestCase):
         """
         while len(self.synchronizer._search()) != 0:
             time.sleep(1)
-        for i in range(0, NUMBER_OF_DOC_DIRS):
+        for i in range(0, 100):
             self.conn['test']['test'].insert(
                 {'name': 'Paul ' + str(i)})
 
-        while len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS:
+        while len(self.synchronizer._search()) != 100:
             time.sleep(1)
-        primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['PRIMARY'])
+        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
+        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
 
-        new_primary_conn = MongoClient(HOSTNAME, int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
         count = -1
-        while count + 1 < NUMBER_OF_DOC_DIRS:
+        while count + 1 < 100:
             try:
                 count += 1
                 self.conn['test']['test'].insert(
@@ -255,7 +221,7 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], result_set_2['_id'])
 
-        kill_mongo_proc(HOSTNAME, PORTS_ONE['SECONDARY'])
+        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -265,15 +231,15 @@ class TestSynchronizer(unittest.TestCase):
         start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
                          "replset1b.log")
 
-        while (len(self.synchronizer._search()) != NUMBER_OF_DOC_DIRS):
+        while (len(self.synchronizer._search()) != 100):
             time.sleep(5)
 
         result_set_1 = self.synchronizer._search()
-        self.assertEqual(len(result_set_1), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(len(result_set_1), 100)
         for item in result_set_1:
             self.assertTrue('Paul' in item['name'])
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), NUMBER_OF_DOC_DIRS)
+        self.assertEqual(retry_until_ok(find_cursor.count), 100)
 
 
 def abort_test(self):
