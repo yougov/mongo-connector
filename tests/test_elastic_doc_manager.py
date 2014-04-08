@@ -32,11 +32,6 @@ class ElasticDocManagerTester(unittest.TestCase):
     """Test class for elastic_docManager
     """
 
-    def runTest(self):
-        """Runs all Tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         """Initializes ES DocManager and a direct connection to elastic_conn

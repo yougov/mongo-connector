@@ -46,11 +46,6 @@ class UtilTester(unittest.TestCase):
     """ Tests the utils
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        super(UtilTester, self).__init__()
-
     def test_bson_ts_to_long(self):
         """Test bson_ts_to_long and long_to_bson_ts
         """

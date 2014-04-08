@@ -46,11 +46,6 @@ class TestElastic(unittest.TestCase):
     """ Tests the Elastic instance
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         """ Starts the cluster

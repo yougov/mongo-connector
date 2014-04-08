@@ -43,11 +43,6 @@ class TestSynchronizer(unittest.TestCase):
     """ Tests the mongo instance
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         try:

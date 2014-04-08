@@ -44,11 +44,6 @@ class TestSynchronizer(unittest.TestCase):
     """ Tests Solr
     """
 
-    def runTest(self):
-        """ Runs tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         assert(start_cluster())

@@ -41,12 +41,6 @@ class TestMongoConnector(unittest.TestCase):
     """ Test Class for the Mongo Connector
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         """ Initializes the cluster

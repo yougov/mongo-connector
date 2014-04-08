@@ -33,11 +33,6 @@ class MongoDocManagerTester(unittest.TestCase):
     """Test class for MongoDocManager
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
         start_single_mongod_instance("30000", "MC", "MC_log")
