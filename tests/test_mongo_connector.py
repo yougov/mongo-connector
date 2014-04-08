@@ -50,7 +50,7 @@ class TestMongoConnector(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
-        cls.flag = start_cluster()
+        assert(start_cluster())
 
     @classmethod
     def tearDownClass(cls):
@@ -61,9 +61,6 @@ class TestMongoConnector(unittest.TestCase):
     def test_connector(self):
         """Test whether the connector initiates properly
         """
-        if not self.flag:
-            self.fail("Shards cannot be added to mongos")
-
         conn = Connector(
             address="localhost:%s" % PORTS_ONE["PRIMARY"],
             oplog_checkpoint='config.txt',

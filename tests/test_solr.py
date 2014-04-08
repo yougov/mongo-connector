@@ -37,7 +37,6 @@ from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
-from requests.exceptions import MissingSchema
 
 
 class TestSynchronizer(unittest.TestCase):
@@ -50,13 +49,6 @@ class TestSynchronizer(unittest.TestCase):
         cls.conn = MongoClient('localhost:%s' % PORTS_ONE['PRIMARY'],
                                replicaSet='demo-repl')
         cls.solr_conn = Solr('http://localhost:8983/solr')
-        # Creating a Solr object with an invalid URL
-        # doesn't create an exception
-        try:
-            cls.solr_conn.commit()
-        except (SolrError, MissingSchema):
-            cls.err_msg = "Cannot connect to Solr!"
-            cls.flag = False
         cls.solr_conn.delete(q='*:*')
 
     @classmethod
