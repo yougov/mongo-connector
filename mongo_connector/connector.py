@@ -663,10 +663,9 @@ def main():
         ## Create a mapping of source ns to dest ns as a dict
         dest_mapping = dict(zip(ns_set, dest_ns_set))
 
-    if options.fields is None:
-        fields = []
-    else:
-        fields = options.fields.split(',')
+    fields = options.fields
+    if fields is not None:
+        fields = fields.split(',')
 
     key = None
     if options.auth_file is not None:
