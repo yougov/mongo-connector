@@ -49,7 +49,7 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo', 'pysolr >= 3.1.0',
-                        'simplejson', 'elasticsearch',
+                        'simplejson', 'elasticsearch < 1.0.0',
                         'algoliasearch'],
       packages=["mongo_connector", "mongo_connector.doc_managers"],
       package_data={
