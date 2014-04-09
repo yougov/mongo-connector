@@ -115,7 +115,7 @@ def start_single_mongod_instance(port, data, log):
     remove_dir(os.path.join(DEMO_SERVER_DATA, data))
     create_dir(os.path.join(DEMO_SERVER_DATA, data))
     create_dir(DEMO_SERVER_LOG)
-    cmd = ("mongod --fork --noprealloc --port %s --dbpath %s "
+    cmd = ("mongod  --noprealloc --port %s --dbpath %s "
            "--logpath %s --logappend" %
            (port,
             os.path.join(DEMO_SERVER_DATA, data),
@@ -128,7 +128,7 @@ def start_single_mongod_instance(port, data, log):
 def start_mongo_proc(port, repl_set_name, data, log):
     """Create the replica set
     """
-    cmd = ("mongod --fork --replSet %s --noprealloc --port %s --dbpath %s"
+    cmd = ("mongod --replSet %s --noprealloc --port %s --dbpath %s"
            " --shardsvr --nojournal --logpath %s --logappend"
            " --setParameter enableTestCommands=1" %
            (repl_set_name, port,
@@ -194,7 +194,7 @@ def start_cluster(sharded=False, use_mongos=True):
 
     if use_mongos:
         # Setup config server
-        cmd = ("mongod --oplogSize 500 --fork --configsvr "
+        cmd = ("mongod --oplogSize 500 --configsvr "
                "--noprealloc --port %s "
                "--dbpath %s --logpath %s --logappend" % (
                    PORTS_ONE["CONFIG"],
@@ -209,7 +209,7 @@ def start_cluster(sharded=False, use_mongos=True):
             lambda: MongoClient('localhost', int(PORTS_ONE['CONFIG'])))
 
         # Setup the mongos, same mongos for both shards
-        cmd = ("mongos --port %s --fork --configdb localhost:%s"
+        cmd = ("mongos --port %s --configdb localhost:%s"
                " --chunkSize 1  --logpath %s --logappend" % (
                    PORTS_ONE["MONGOS"],
                    PORTS_ONE["CONFIG"],
