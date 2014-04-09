@@ -22,10 +22,12 @@ if sys.version_info[:2] == (2, 6):
 else:
     import unittest
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
+from elasticsearch.client import IndicesClient
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
+from mongo_connector.errors import OperationFailed
 
 
 class ElasticDocManagerTester(unittest.TestCase):
@@ -44,14 +46,15 @@ class ElasticDocManagerTester(unittest.TestCase):
         """Empty ElasticSearch at the start of every test
         """
         try:
-            self.elastic_conn.delete_by_query(
-                index="test.test",
-                doc_type="string",
-                q="*:*"
-            )
-        except (es_exceptions.ConnectionError,
-                es_exceptions.TransportError):
-            pass
+            self.elastic_doc._remove()
+        except OperationFailed:
+            try:
+                # Create test.test index if necessary
+                client = Elasticsearch(hosts=['localhost:9200'])
+                idx_client = IndicesClient(client)
+                idx_client.create(index='test.test')
+            except es_exceptions.TransportError:
+                pass
 
     def test_upsert(self):
         """Ensure we can properly insert into ElasticSearch via DocManager.

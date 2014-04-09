@@ -86,21 +86,6 @@ class TestSynchronizer(unittest.TestCase):
 
         self.assertEqual(len(self.connector.shard_set), 1)
 
-    def test_initial(self):
-        """Tests search and assures that the databases are clear.
-        """
-
-        while (True):
-            try:
-                self.conn['test']['test'].remove()
-                break
-            except OperationFailure:
-                continue
-
-        self.solr_conn.delete(q='*:*')
-        self.assertEqual(self.conn['test']['test'].find().count(), 0)
-        self.assertEqual(len(self.solr_conn.search('*:*')), 0)
-
     def test_insert(self):
         """Tests insert
         """
@@ -118,12 +103,10 @@ class TestSynchronizer(unittest.TestCase):
     def test_remove(self):
         """Tests remove
         """
-
+        self.conn['test']['test'].insert({'name': 'paulie'})
+        assert_soon(lambda: len(self.solr_conn.search("*:*")) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        while (len(self.solr_conn.search('*:*')) == 1):
-            time.sleep(1)
-        result_set_1 = self.solr_conn.search('paulie')
-        self.assertEqual(len(result_set_1), 0)
+        assert_soon(lambda: len(self.solr_conn.search("*:*")) == 0)
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by inserting one doc, killing
@@ -190,9 +173,6 @@ class TestSynchronizer(unittest.TestCase):
     def test_stressed_rollback(self):
         """Test stressed rollback with a large number of documents"""
 
-        self.conn['test']['test'].remove()
-        while len(self.solr_conn.search('*:*', rows=100)) != 0:
-            time.sleep(1)
         for i in range(0, 100):
             self.conn['test']['test'].insert(
                 {'name': 'Paul ' + str(i)})
@@ -351,8 +331,6 @@ class TestSynchronizer(unittest.TestCase):
         <dynamicField name="characters.*" type="string" ... />
 
         """
-
-        self.solr_conn.delete(q='*:*')
 
         # Connector is already running
         self.conn["test"]["test"].insert({

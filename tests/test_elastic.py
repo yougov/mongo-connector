@@ -108,14 +108,6 @@ class TestElastic(unittest.TestCase):
 
         self.assertEqual(len(self.connector.shard_set), 1)
 
-    def test_initial(self):
-        """Tests search and assures that the databases are clear.
-        """
-
-        self.conn['test']['test'].remove()
-        self.assertEqual(self.conn['test']['test'].find().count(), 0)
-        self.assertEqual(sum(1 for _ in self.elastic_doc._search()), 0)
-
     def test_insert(self):
         """Tests insert
         """

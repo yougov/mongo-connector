@@ -78,8 +78,7 @@ class TestSynchronizer(unittest.TestCase):
             doc_manager='mongo_connector/doc_managers/mongo_doc_manager.py'
         )
         self.connector.start()
-        while len(self.connector.shard_set) == 0:
-            pass
+        assert_soon(lambda: len(self.connector.shard_set) > 0)
         self.conn['test']['test'].remove()
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
 
@@ -89,14 +88,6 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.assertEqual(len(self.connector.shard_set), 1)
-
-    def test_initial(self):
-        """Tests search and assures that the databases are clear.
-        """
-
-        self.conn['test']['test'].remove()
-        self.assertEqual(self.conn['test']['test'].find().count(), 0)
-        self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
 
     def test_insert(self):
         """Tests insert
