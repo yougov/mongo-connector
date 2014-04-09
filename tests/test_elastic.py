@@ -82,7 +82,8 @@ class TestElastic(unittest.TestCase):
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None,
-            doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py'
+            doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py',
+            auto_commit_interval=0
         )
         # Clean out test databases
         try:

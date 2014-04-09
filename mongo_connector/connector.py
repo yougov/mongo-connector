@@ -283,6 +283,11 @@ class Connector(threading.Thread):
                 )
                 return
 
+            # Establish a connection to the replica set as a whole
+            main_conn.disconnect()
+            main_conn = MongoClient(self.address,
+                                    replicaSet=is_master['setName'])
+
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
 

@@ -70,7 +70,8 @@ class TestSynchronizer(unittest.TestCase):
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None,
-            doc_manager='mongo_connector/doc_managers/solr_doc_manager.py'
+            doc_manager='mongo_connector/doc_managers/solr_doc_manager.py',
+            auto_commit_interval=0
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)

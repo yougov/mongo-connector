@@ -278,6 +278,6 @@ def start_cluster(sharded=False, use_mongos=True):
     assert_soon(lambda: admin.command("isMaster")['ismaster'])
     secondary = MongoClient('localhost:%s' % PORTS_ONE["SECONDARY"])
     c = lambda: secondary.admin.command("replSetGetStatus")["myState"] == 2
-    assert_soon(c)
+    assert_soon(c, max_tries=120)
 
     return True

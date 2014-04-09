@@ -120,8 +120,8 @@ class TestMongoConnector(unittest.TestCase):
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
-        os.unlink("temp_config.txt")
         config_file.close()
+        os.unlink("temp_config.txt")
 
     def test_read_oplog_progress(self):
         """Test read_oplog_progress
