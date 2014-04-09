@@ -280,11 +280,17 @@ class OplogThread(threading.Thread):
 
         coll = self.main_connection[db_name][coll_name]
 
-        doc = util.retry_until_ok(
-            coll.find_one,
-            {'_id': doc_id},
-            fields=self.fields
-        )
+        if len(self.fields) == 0 or self.fields is None:
+            doc = util.retry_until_ok(
+                coll.find_one,
+                {'_id': doc_id}
+            )
+        else:
+            doc = util.retry_until_ok(
+                coll.find_one,
+                {'_id': doc_id},
+                fields=self.fields
+            )
 
         return doc
 
@@ -390,18 +396,29 @@ class OplogThread(threading.Thread):
                 while attempts < 60:
                     target_coll = self.main_connection[database][coll]
                     if not last_id:
-                        cursor = util.retry_until_ok(
-                            target_coll.find,
-                            fields=self.fields,
-                            sort=[("_id", pymongo.ASCENDING)]
-                        )
+                        if len(self.fields) == 0 or self.fields is None:
+                            cursor = util.retry_until_ok(
+                                target_coll.find,
+                                sort=[("_id", pymongo.ASCENDING)]
+                            )
+                        else:
+                            cursor = util.retry_until_ok(
+                                target_coll.find,
+                                fields=self.fields,
+                                sort=[("_id", pymongo.ASCENDING)]
+                            )
                     else:
-                        cursor = util.retry_until_ok(
-                            target_coll.find,
-                            {"_id": {"$gt": last_id}},
-                            fields=self.fields,
-                            sort=[("_id", pymongo.ASCENDING)]
-                        )
+                        if len(self.fields) == 0 or self.fields is None:
+                            cursor = util.retry_until_ok(
+                                target_coll.find,
+                                sort=[("_id", pymongo.ASCENDING)]
+                            )
+                        else:
+                            cursor = util.retry_until_ok(
+                                target_coll.find,
+                                fields=self.fields,
+                                sort=[("_id", pymongo.ASCENDING)]
+                            )
                     try:
                         for doc in cursor:
                             if not self.running:
@@ -621,11 +638,17 @@ class OplogThread(threading.Thread):
                 obj_id = bson.objectid.ObjectId
                 bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
 
-                to_update = util.retry_until_ok(
-                    self.main_connection[database][coll].find,
-                    {'_id': {'$in': bson_obj_id_list}},
-                    fields=self.fields
-                )
+                if len(self.fields) == 0 or self.fields is None:
+                    to_update = util.retry_until_ok(
+                        self.main_connection[database][coll].find,
+                        {'_id': {'$in': bson_obj_id_list}}
+                    )
+                else:
+                    to_update = util.retry_until_ok(
+                        self.main_connection[database][coll].find,
+                        {'_id': {'$in': bson_obj_id_list}},
+                        fields=self.fields
+                    )
                 #doc list are docs in target system, to_update are
                 #docs in mongo
                 doc_hash = {}  # hash by _id
