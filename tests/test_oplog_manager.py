@@ -52,7 +52,7 @@ class TestOplogManager(unittest.TestCase):
             doc_manager=DocManager(),
             oplog_progress_dict=LockingDict(),
             namespace_set=None,
-            auth_key=None,      # TODO: support auth in this test
+            auth_key=None,
             auth_username=None,
             repl_set='demo-repl'
         )
