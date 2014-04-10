@@ -447,7 +447,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
 
         # Case 1: only one primary goes down, shard1 in this case
-        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
+        kill_mongo_proc(PORTS_ONE["PRIMARY"])
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -467,7 +467,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                     max_tries=120)
 
         # Kill the new primary
-        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
+        kill_mongo_proc(PORTS_ONE["SECONDARY"])
 
         # Start both servers back up
         start_mongo_proc(
@@ -512,8 +512,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         ##############################
 
         # Case 2: Primaries on both shards go down
-        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
-        kill_mongo_proc("localhost", PORTS_TWO["PRIMARY"])
+        kill_mongo_proc(PORTS_ONE["PRIMARY"])
+        kill_mongo_proc(PORTS_TWO["PRIMARY"])
 
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -534,8 +534,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
-        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
-        kill_mongo_proc("localhost", PORTS_TWO["SECONDARY"])
+        kill_mongo_proc(PORTS_ONE["SECONDARY"])
+        kill_mongo_proc(PORTS_TWO["SECONDARY"])
 
         # Start the servers back up...
         # Shard 1

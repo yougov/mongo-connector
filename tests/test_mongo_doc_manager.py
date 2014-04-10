@@ -48,7 +48,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        kill_mongo_proc('localhost', 30000)
+        kill_mongo_proc(30000)
 
     def setUp(self):
         """Empty Mongo at the start of every test

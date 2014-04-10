@@ -147,7 +147,7 @@ class TestElastic(unittest.TestCase):
         assert_soon(condition1)
         assert_soon(condition2)
 
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
@@ -164,7 +164,7 @@ class TestElastic(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -209,7 +209,7 @@ class TestElastic(unittest.TestCase):
         condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
         primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
@@ -234,7 +234,7 @@ class TestElastic(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")

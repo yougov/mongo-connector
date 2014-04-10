@@ -122,7 +122,7 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         while len(self.solr_conn.search('*:*')) != 1:
             time.sleep(1)
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
@@ -139,7 +139,7 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -182,7 +182,7 @@ class TestSynchronizer(unittest.TestCase):
                 != 100):
             time.sleep(1)
         primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin_db = new_primary_conn['admin']
@@ -212,7 +212,7 @@ class TestSynchronizer(unittest.TestCase):
                 {'name': item['name']})
             self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
 

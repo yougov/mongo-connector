@@ -61,7 +61,7 @@ class TestSynchronizer(unittest.TestCase):
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_mongo_proc('localhost', 30000)
+        kill_mongo_proc(30000)
         kill_all()
 
     def tearDown(self):
@@ -124,7 +124,7 @@ class TestSynchronizer(unittest.TestCase):
         assert_soon(condition)
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
 
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
@@ -140,7 +140,7 @@ class TestSynchronizer(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")
@@ -188,7 +188,7 @@ class TestSynchronizer(unittest.TestCase):
         condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
         primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc('localhost', PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(PORTS_ONE['PRIMARY'])
 
         new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
 
@@ -213,7 +213,7 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], result_set_2['_id'])
 
-        kill_mongo_proc('localhost', PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(PORTS_ONE['SECONDARY'])
 
         start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
                          "replset1a.log")

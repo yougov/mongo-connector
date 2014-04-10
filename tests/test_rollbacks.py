@@ -88,7 +88,7 @@ class TestRollbacks(unittest.TestCase):
                         "first write didn't replicate to secondary")
 
         # Kill the primary
-        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
+        kill_mongo_proc(PORTS_ONE["PRIMARY"])
 
         # Wait for the secondary to be promoted
         while not secondary["admin"].command("isMaster")["ismaster"]:
@@ -104,7 +104,7 @@ class TestRollbacks(unittest.TestCase):
                         "not all writes were replicated to doc manager")
 
         # Kill the new primary
-        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
+        kill_mongo_proc(PORTS_ONE["SECONDARY"])
 
         # Start both servers back up
         start_mongo_proc(
@@ -158,7 +158,7 @@ class TestRollbacks(unittest.TestCase):
                         "first write didn't replicate to secondary")
 
         # Kill the primary
-        kill_mongo_proc("localhost", PORTS_ONE["PRIMARY"])
+        kill_mongo_proc(PORTS_ONE["PRIMARY"])
 
         # Wait for the secondary to be promoted
         while not secondary["admin"].command("isMaster")["ismaster"]:
@@ -192,7 +192,7 @@ class TestRollbacks(unittest.TestCase):
             self.opman.doc_managers[2].remove({"_id": id})
 
         # Kill the new primary
-        kill_mongo_proc("localhost", PORTS_ONE["SECONDARY"])
+        kill_mongo_proc(PORTS_ONE["SECONDARY"])
 
         # Start both servers back up
         start_mongo_proc(
