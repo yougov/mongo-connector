@@ -258,16 +258,19 @@ class TestOplogManagerSharded(unittest.TestCase):
             sort=[("ts", pymongo.ASCENDING)]
         )
 
-        # startup + index + insert + delete + insert + 998 inserts
-        self.assertEqual(oplog1.count(), 5 + 998)
-        self.assertEqual(oplog2.count(), 5 + 1002)
+        # oplogs should have records for inserts performed, plus
+        # various other messages
+        oplog1_count = oplog1.count()
+        oplog2_count = oplog2.count()
+        self.assertGreaterEqual(oplog1_count, 998)
+        self.assertGreaterEqual(oplog2_count, 1002)
         pivot1 = oplog1.skip(400).limit(1)[0]
         pivot2 = oplog2.skip(400).limit(1)[0]
 
         cursor1 = self.opman1.get_oplog_cursor(pivot1["ts"])
         cursor2 = self.opman2.get_oplog_cursor(pivot2["ts"])
-        self.assertEqual(cursor1.count(), 5 + 998 - 400)
-        self.assertEqual(cursor2.count(), 5 + 1002 - 400)
+        self.assertEqual(cursor1.count(), oplog1_count - 400)
+        self.assertEqual(cursor2.count(), oplog2_count - 400)
 
         # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
         doc1 = self.mongos_conn["test"]["mcsharded"].find_one(
