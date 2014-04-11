@@ -16,31 +16,24 @@
 Utilities for spawning and killing mongodb clusters for use with the tests
 """
 
+from itertools import count
 import os
-import psutil
 import shutil
+import socket
 import subprocess
+import time
 
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
-from mongo_connector.util import retry_until_ok
+from tests import mongo_host, mongo_start_port
 from tests.util import assert_soon
 
-PORTS_ONE = {"PRIMARY": "27117", "SECONDARY": "27118", "ARBITER": "27119",
-                        "CONFIG": "27220", "MONGOS": "27217"}
-PORTS_TWO = {"PRIMARY": "27317", "SECONDARY": "27318", "ARBITER": "27319",
-                        "CONFIG": "27220", "MONGOS": "27217"}
+free_port = count(mongo_start_port)
+nodes = {}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEMO_SERVER_DATA = os.path.join(HERE, "data")
-DEMO_SERVER_LOG = os.path.join(HERE, "logs")
+DATA_ROOT = os.path.join(HERE, "data")
+LOG_ROOT = os.path.join(HERE, "logs")
 KEY_FILE = os.environ.get("KEY_FILE")
-
-
-def remove_dir(dir_path):
-    """Remove supplied directory
-    """
-    shutil.rmtree(dir_path, ignore_errors=True)
 
 
 def create_dir(dir_path):
@@ -52,198 +45,145 @@ def create_dir(dir_path):
         pass
 
 
-def kill_mongo_proc(port):
-    """ Kill given port
-    """
-    try:
-        conn = MongoClient('localhost', int(port))
-    except ConnectionFailure:
-        for proc in psutil.process_iter():
+def wait_for_proc(proc, port):
+    '''Wait for a mongo process to start on a given port'''
+    attempts = 0
+    while proc.poll() is None and attempts < 160:
+        attempts += 1
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
             try:
-                cmdline = proc.cmdline()
-                if len(cmdline) > 0:
-                    if "mongo" in cmdline[0] and port in cmdline:
-                        proc.terminate()
-                        break
-            except psutil.AccessDenied:
-                pass
-    else:
-        try:
-            conn['admin'].command('shutdown', 1, force=True)
-        except ConnectionFailure:
-            pass
-
-
-def kill_all():
-    """Kills all running mongod and mongos instances
-    """
-    for port in PORTS_ONE.values():
-        kill_mongo_proc(port)
-    for port in PORTS_TWO.values():
-        kill_mongo_proc(port)
-    remove_dir(DEMO_SERVER_LOG)
-    remove_dir(DEMO_SERVER_DATA)
-
-
-def clean_mess_on_error(func):
-    def wrap(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except:
-            kill_all()
-            raise
-    return wrap
-
-
-@clean_mess_on_error
-def start_single_mongod_instance(port, data, log):
-    """ Creates a single mongod instance
-    """
-    remove_dir(os.path.join(DEMO_SERVER_DATA, data))
-    create_dir(os.path.join(DEMO_SERVER_DATA, data))
-    create_dir(DEMO_SERVER_LOG)
-    cmd = ("mongod --noprealloc --port %s --dbpath %s "
-           "--logpath %s --logappend" %
-           (port,
-            os.path.join(DEMO_SERVER_DATA, data),
-            os.path.join(DEMO_SERVER_LOG, log)))
-    subprocess.Popen(cmd, shell=True)
-    retry_until_ok(lambda: MongoClient('localhost', int(port)))
-
-
-@clean_mess_on_error
-def start_mongo_proc(port, repl_set_name, data, log):
-    """Create the replica set
-    """
-    cmd = ("mongod --replSet %s --noprealloc --port %s --dbpath %s"
-           " --shardsvr --nojournal --logpath %s --logappend"
-           " --setParameter enableTestCommands=1" %
-           (repl_set_name, port,
-            os.path.join(DEMO_SERVER_DATA, data),
-            os.path.join(DEMO_SERVER_LOG, log)))
-
-    if KEY_FILE is not None:
-        cmd += " --keyFile " + KEY_FILE
-
-    subprocess.Popen(cmd, shell=True)
-    retry_until_ok(lambda: MongoClient('localhost', int(port)))
-
-
-#========================================= #
-#   Start Cluster                          #
-#========================================= #
-
-
-@clean_mess_on_error
-def start_cluster(sharded=False):
-    """Sets up cluster with 1 shard, replica set with 3 members
-    """
-
-    # Kill all spawned mongo[ds] and remove data and log directories
+                s.connect((mongo_host, port))
+                return True
+            except (IOError, socket.error):
+                time.sleep(0.25)
+        finally:
+            s.close()
     kill_all()
+    return False
 
-    # Create data and log directories
-    dirs = ["replset1a", "replset1b", "replset1c"]
-    if sharded:
-        dirs += ["replset2a", "replset2b", "replset2c", "config"]
-    for d in dirs:
-        create_dir(os.path.join(DEMO_SERVER_DATA, d, "journal"))
-    create_dir(DEMO_SERVER_LOG)
 
-    # Create the first replica set
-    start_mongo_proc(PORTS_ONE["PRIMARY"], "demo-repl",
-                     "replset1a", "replset1a.log")
-    start_mongo_proc(PORTS_ONE["SECONDARY"], "demo-repl",
-                     "replset1b", "replset1b.log")
-    start_mongo_proc(PORTS_ONE["ARBITER"], "demo-repl",
-                     "replset1c", "replset1c.log")
-    primary = MongoClient('localhost:%s' % PORTS_ONE["PRIMARY"])
-    primary.admin.command(
+def start_mongo_proc(proc="mongod", options=[]):
+    '''Start a single mongod or mongos process.
+    Returns the port on which the process was started.
+
+    '''
+    # Build command
+    next_free_port = next(free_port)
+    dbpath = os.path.join(DATA_ROOT, str(next_free_port))
+    logpath = os.path.join(LOG_ROOT, "%d.log" % next_free_port)
+    cmd = [proc, "--port", next_free_port, "--logpath", logpath] + options
+
+    # Refresh directories
+    create_dir(os.path.dirname(logpath))
+    if proc == 'mongod':
+        cmd.extend(['--dbpath', dbpath])
+        shutil.rmtree(dbpath, ignore_errors=True)
+        create_dir(dbpath)
+
+    # Start the process
+    cmd = list(map(str, cmd))
+    mongo = subprocess.Popen(cmd,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+    nodes[next_free_port] = {"proc": mongo, "cmd": cmd}
+    # Wait until a connection can be established
+    wait_for_proc(mongo, next_free_port)
+    return next_free_port
+
+
+def kill_mongo_proc(port):
+    '''Kill a mongod or mongos process by port number'''
+    nodes.pop(port)['proc'].terminate()
+    shutil.rmtree(os.path.join(DATA_ROOT, str(port)), ignore_errors=True)
+    os.unlink(os.path.join(LOG_ROOT, "%d.log" % port))
+
+
+def start_replica_set(set_name, num_members=3):
+    '''Start a replica set with a given name'''
+    # Start members
+    repl_ports = [start_mongo_proc(options=["--replSet", set_name,
+                                            "--noprealloc",
+                                            "--nojournal"])
+                  for i in range(num_members)]
+    # Initialize set
+    client = MongoClient(mongo_host, repl_ports[0])
+    client.admin.command(
         'replSetInitiate',
         {
-            '_id': "demo-repl", 'members': [
-                {'_id': 0, 'host': "localhost:%s" % PORTS_ONE["PRIMARY"]},
-                {'_id': 1, 'host': "localhost:%s" % PORTS_ONE["SECONDARY"]},
-                {'_id': 2, 'host': "localhost:%s" % PORTS_ONE["ARBITER"],
-                 'arbiterOnly': 'true'}
+            '_id': set_name, 'members': [
+                {'_id': i, 'host': '%s:%d' % (mongo_host, p)}
+                for i, p in enumerate(repl_ports)
             ]
         }
     )
+    # Wait for primary
+    assert_soon(lambda: client.admin.command("isMaster")['ismaster'])
+    nodes[client.port]['master'] = True
+    return repl_ports
 
-    # wait for primary to come up
-    def primary_up():
-        return retry_until_ok(primary.admin.command,
-                              "isMaster")['ismaster']
-    assert_soon(primary_up)
 
-    if sharded:
-        # Create a second replica set
-        start_mongo_proc(PORTS_TWO["PRIMARY"], "demo-repl-2",
-                         "replset2a", "replset2a.log")
-        start_mongo_proc(PORTS_TWO["SECONDARY"], "demo-repl-2",
-                         "replset2b", "replset2b.log")
-        start_mongo_proc(PORTS_TWO["ARBITER"], "demo-repl-2",
-                         "replset2c", "replset2c.log")
-        primary2 = MongoClient('localhost:%s' % PORTS_TWO["PRIMARY"])
-        primary2.admin.command(
-            "replSetInitiate",
-            {
-                '_id': "demo-repl-2", 'members': [
-                    {'_id': 0, 'host': "localhost:%s" % PORTS_TWO["PRIMARY"]},
-                    {'_id': 1, 'host': "localhost:%s" % PORTS_TWO["SECONDARY"]},
-                    {'_id': 2, 'host': "localhost:%s" % PORTS_TWO["ARBITER"],
-                     'arbiterOnly': 'true'}
-                ]
-            }
-        )
+def kill_replica_set(set_name):
+    '''Kill a replica set by name'''
+    for port, proc_doc in nodes.items():
+        if set_name in proc_doc['cmd']:
+            kill_mongo_proc(port)
 
-        # Wait for primary on shard 2 to come up
-        def primary_up():
-            return retry_until_ok(primary2.admin.command,
-                                  "isMaster")['ismaster']
-        assert_soon(primary_up)
 
-        # Setup a config server
-        cmd = ("mongod --oplogSize 500 --configsvr "
-               "--noprealloc --port %s "
-               "--dbpath %s --logpath %s --logappend" % (
-                   PORTS_ONE["CONFIG"],
-                   os.path.join(DEMO_SERVER_DATA, "config"),
-                   os.path.join(DEMO_SERVER_LOG, "config1.log")))
+def start_cluster(num_shards=2):
+    '''Start a sharded cluster. Returns the port of the mongos'''
+    # Config
+    config_port = start_mongo_proc(options=["--configsvr",
+                                            "--noprealloc",
+                                            "--nojournal"])
 
-        if KEY_FILE is not None:
-            cmd += " --keyFile " + KEY_FILE
+    # Mongos
+    mongos_port = start_mongo_proc(proc="mongos", options=[
+        "--configdb", "%s:%d" % (mongo_host, config_port)
+    ])
+    nodes[mongos_port]['config'] = config_port
 
-        subprocess.Popen(cmd, shell=True)
-        retry_until_ok(
-            lambda: MongoClient('localhost', int(PORTS_ONE['CONFIG'])))
+    # Shards
+    client = MongoClient(mongo_host, mongos_port)
+    for shard in range(num_shards):
+        shard_name = "demo-set-%d" % shard
+        repl_ports = start_replica_set(shard_name)
+        nodes[mongos_port].setdefault("shards", []).append(shard_name)
+        shard_str = "%s/%s" % (shard_name, ",".join("%s:%d" % (mongo_host, port)
+                                                    for port in repl_ports))
+        client.admin.command("addShard", shard_str)
+    return mongos_port
 
-        # Setup the mongos
-        cmd = ("mongos --port %s --configdb localhost:%s"
-               " --chunkSize 1  --logpath %s --logappend" % (
-                   PORTS_ONE["MONGOS"],
-                   PORTS_ONE["CONFIG"],
-                   os.path.join(DEMO_SERVER_LOG, "mongos1.log")))
 
-        if KEY_FILE is not None:
-            cmd += " --keyFile " + KEY_FILE
+def get_shard(mongos_port, index):
+    '''Return a document containing the primary and secondaries of a replica
+    set shard by mongos port and shard index:
 
-        subprocess.Popen(cmd, shell=True)
-        retry_until_ok(
-            lambda: MongoClient('localhost', int(PORTS_ONE["MONGOS"])))
+    {'primary': 12345, 'secondaries': [12121, 23232]}
 
-        mongos = MongoClient('localhost:%s' % PORTS_ONE["MONGOS"])
-        retry_until_ok(
-            mongos.admin.command,
-            "addShard",
-            "demo-repl/localhost:%s" % PORTS_ONE["PRIMARY"]
-        )
+    '''
+    repl = nodes[mongos_port]['shards'][index]
+    doc = {}
+    for port, node in nodes.items():
+        if repl in node['cmd']:
+            if node.get('master'):
+                doc['primary'] = port
+            else:
+                doc.setdefault('secondaries', []).append(port)
+    return doc
 
-        retry_until_ok(
-            mongos.admin.command,
-            "addShard",
-            "demo-repl-2/localhost:%s" % PORTS_TWO["PRIMARY"],
-            maxSize=1
-        )
 
-    return True
+def kill_cluster(mongos_port):
+    '''Kill mongod and mongos processes in a sharded cluster by mongos port'''
+    for shard in nodes[mongos_port].get("shards", []):
+        kill_replica_set(shard)
+    kill_mongo_proc(nodes[mongos_port]['config'])
+    kill_mongo_proc(mongos_port)
+
+
+def kill_all():
+    """Kill all mongod and mongos instances"""
+    for port in nodes.keys():
+        kill_mongo_proc(port)
+    shutil.rmtree(LOG_ROOT, ignore_errors=True)
+    shutil.rmtree(DATA_ROOT, ignore_errors=True)
