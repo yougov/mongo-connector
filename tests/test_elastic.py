@@ -29,7 +29,7 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.client import IndicesClient
 from pymongo import MongoClient
 
-from tests import elastic_pair, mongo_host
+from tests import elastic_pair, mongo_host, STRESS_COUNT
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,
                                  restart_mongo_proc,
@@ -182,13 +182,13 @@ class TestElastic(unittest.TestCase):
     def test_stress(self):
         """Test stress by inserting and removing a large number of documents"""
 
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == 100
+        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
         assert_soon(condition)
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             result_set_1 = self.elastic_doc._search()
             for item in result_set_1:
                 if(item['name'] == 'Paul' + str(i)):
@@ -199,11 +199,11 @@ class TestElastic(unittest.TestCase):
             in global variable. Strategy for rollback is the same as before.
         """
 
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == 100
+        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
         assert_soon(condition)
         primary_conn = MongoClient(mongo_host, self.primary_p)
         kill_mongo_proc(self.primary_p, destroy=False)
@@ -215,7 +215,7 @@ class TestElastic(unittest.TestCase):
 
         time.sleep(5)
         count = -1
-        while count + 1 < 100:
+        while count + 1 < STRESS_COUNT:
             try:
                 count += 1
                 self.conn['test']['test'].insert(
@@ -239,15 +239,15 @@ class TestElastic(unittest.TestCase):
         restart_mongo_proc(self.secondary_p)
 
         search = self.elastic_doc._search
-        condition = lambda: sum(1 for _ in search()) == 100
+        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
         assert_soon(condition)
 
         result_set_1 = list(self.elastic_doc._search())
-        self.assertEqual(len(result_set_1), 100)
+        self.assertEqual(len(result_set_1), STRESS_COUNT)
         for item in result_set_1:
             self.assertTrue('Paul' in item['name'])
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), 100)
+        self.assertEqual(retry_until_ok(find_cursor.count), STRESS_COUNT)
 
 
 if __name__ == '__main__':

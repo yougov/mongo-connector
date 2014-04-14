@@ -27,7 +27,7 @@ sys.path[0:0] = [""]
 
 from pymongo import MongoClient
 
-from tests import solr_pair, mongo_host
+from tests import solr_pair, mongo_host, STRESS_COUNT
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,
                                  restart_mongo_proc,
@@ -158,13 +158,13 @@ class TestSynchronizer(unittest.TestCase):
         """Test stress by inserting and removing a large amount of docs.
         """
         #stress test
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while (len(self.solr_conn.search('*:*', rows=100))
-                != 100):
+        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT))
+                != STRESS_COUNT):
             time.sleep(5)
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             result_set_1 = self.solr_conn.search('Paul ' + str(i))
             for item in result_set_1:
                 self.assertEqual(item['_id'], item['_id'])
@@ -172,12 +172,12 @@ class TestSynchronizer(unittest.TestCase):
     def test_stressed_rollback(self):
         """Test stressed rollback with a large number of documents"""
 
-        for i in range(0, 100):
+        for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert(
                 {'name': 'Paul ' + str(i)})
 
-        while (len(self.solr_conn.search('*:*', rows=100))
-                != 100):
+        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT))
+                != STRESS_COUNT):
             time.sleep(1)
         primary_conn = MongoClient(mongo_host, self.primary_p)
         kill_mongo_proc(self.primary_p, destroy=False)
@@ -189,7 +189,7 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
         time.sleep(5)
         count = -1
-        while count + 1 < 100:
+        while count + 1 < STRESS_COUNT:
             try:
                 count += 1
                 self.conn['test']['test'].insert(
@@ -198,12 +198,12 @@ class TestSynchronizer(unittest.TestCase):
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
 
-        while (len(self.solr_conn.search('*:*', rows=100 * 2)) !=
+        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT * 2)) !=
                self.conn['test']['test'].find().count()):
             time.sleep(1)
         result_set_1 = self.solr_conn.search(
             'Pauline',
-            rows=100 * 2, sort='_id asc'
+            rows=STRESS_COUNT * 2, sort='_id asc'
         )
         for item in result_set_1:
             result_set_2 = self.conn['test']['test'].find_one(
@@ -220,18 +220,18 @@ class TestSynchronizer(unittest.TestCase):
 
         while (len(self.solr_conn.search(
                 'Pauline',
-                rows=100 * 2)) != 0):
+                rows=STRESS_COUNT * 2)) != 0):
             time.sleep(15)
         result_set_1 = self.solr_conn.search(
             'Pauline',
-            rows=100 * 2
+            rows=STRESS_COUNT * 2
         )
         self.assertEqual(len(result_set_1), 0)
         result_set_2 = self.solr_conn.search(
             'Paul',
-            rows=100 * 2
+            rows=STRESS_COUNT * 2
         )
-        self.assertEqual(len(result_set_2), 100)
+        self.assertEqual(len(result_set_2), STRESS_COUNT)
 
     def test_valid_fields(self):
         """ Tests documents with field definitions

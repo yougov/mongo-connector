@@ -22,3 +22,6 @@ elastic_pair = '%s:%s' % (elastic_host, elastic_port)
 solr_host = unicode(os.environ.get("SOLR_HOST", 'localhost'))
 solr_port = unicode(os.environ.get("SOLR_PORT", 8983))
 solr_pair = '%s:%s' % (solr_host, solr_port)
+
+# Document count for stress tests
+STRESS_COUNT = 100
