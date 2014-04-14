@@ -287,6 +287,8 @@ class Connector(threading.Thread):
             main_conn.disconnect()
             main_conn = MongoClient(self.address,
                                     replicaSet=is_master['setName'])
+            if self.auth_key is not None:
+                main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
