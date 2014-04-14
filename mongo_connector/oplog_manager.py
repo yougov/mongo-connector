@@ -663,8 +663,7 @@ class OplogThread(threading.Thread):
                             "Could not delete docucument during rollback: %s "
                             "This can happen if this document was already "
                             "removed by another rollback happening at the "
-                            "same time.",
-                            str(doc)
+                            "same time." % str(doc)
                         )
 
                 logging.debug("OplogThread: Rollback, removed %d docs." %
