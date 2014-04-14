@@ -26,7 +26,9 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from pymongo import MongoClient
-from tests.setup_cluster import start_single_mongod_instance, kill_mongo_proc
+
+from tests import mongo_host
+from tests.setup_cluster import start_mongo_proc, kill_mongo_proc
 
 
 class MongoDocManagerTester(unittest.TestCase):
@@ -35,20 +37,22 @@ class MongoDocManagerTester(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        start_single_mongod_instance("30000", "MC", "MC_log")
-        cls.MongoDoc = DocManager("localhost:30000")
-        cls.mongo = MongoClient("localhost:30000")['test']['test']
+        cls.standalone_port = start_mongo_proc(options=['--nojournal',
+                                                        '--noprealloc'])
+        cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
+        cls.MongoDoc = DocManager(cls.standalone_pair)
+        cls.mongo = MongoClient(cls.standalone_pair)['test']['test']
 
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
         cls.choosy_docman = DocManager(
-            "localhost:30000",
+            cls.standalone_pair,
             namespace_set=MongoDocManagerTester.namespaces_inc
         )
 
     @classmethod
     def tearDownClass(cls):
-        kill_mongo_proc(30000)
+        kill_mongo_proc(cls.standalone_port)
 
     def setUp(self):
         """Empty Mongo at the start of every test
@@ -56,7 +60,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         self.mongo.remove()
 
-        conn = MongoClient("localhost:30000")
+        conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
             conn[db][coll].remove()
@@ -195,7 +199,7 @@ class MongoDocManagerTester(unittest.TestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        MongoClient("localhost:30000")[db][coll].remove({"_id": 99})
+        MongoClient(self.standalone_pair)[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
         self.assertEqual(last_doc["_id"], 98)

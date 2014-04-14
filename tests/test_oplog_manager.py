@@ -28,9 +28,9 @@ import pymongo
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from tests.setup_cluster import (start_cluster,
-                                 kill_all,
-                                 PORTS_ONE)
+from tests import mongo_host
+from tests.setup_cluster import (start_replica_set,
+                                 kill_replica_set)
 from tests.util import assert_soon
 
 
@@ -40,13 +40,12 @@ class TestOplogManager(unittest.TestCase):
     """
 
     def setUp(self):
-        self.assertTrue(start_cluster(), "cluster could not start")
-        self.primary_conn = pymongo.MongoClient(
-            "localhost:%s" % PORTS_ONE['PRIMARY'])
+        _, _, self.primary_p = start_replica_set('test-oplog-manager')
+        self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_conn=self.primary_conn,
-            main_address="localhost:%s" % PORTS_ONE['PRIMARY'],
+            main_address='%s:%d' % (mongo_host, self.primary_p),
             oplog_coll=self.oplog_coll,
             is_sharded=False,
             doc_manager=DocManager(),
@@ -54,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
             namespace_set=None,
             auth_key=None,
             auth_username=None,
-            repl_set='demo-repl'
+            repl_set='test-oplog-manager'
         )
 
     def tearDown(self):
@@ -63,7 +62,7 @@ class TestOplogManager(unittest.TestCase):
         except RuntimeError:
             pass                # OplogThread may not have been started
         self.primary_conn.close()
-        kill_all()
+        kill_replica_set('test-oplog-manager')
 
     def test_retrieve_doc(self):
         """ Test the retrieve_doc method """

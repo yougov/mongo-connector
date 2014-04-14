@@ -27,11 +27,11 @@ sys.path[0:0] = [""]
 
 from pymongo import MongoClient
 
-from tests.setup_cluster import (kill_mongo_proc,
-                                 start_mongo_proc,
-                                 start_cluster,
-                                 kill_all,
-                                 PORTS_ONE)
+from tests import solr_pair, mongo_host
+from tests.setup_cluster import (start_replica_set,
+                                 kill_replica_set,
+                                 restart_mongo_proc,
+                                 kill_mongo_proc)
 from tests.util import assert_soon
 from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
@@ -45,17 +45,17 @@ class TestSynchronizer(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        assert(start_cluster())
-        cls.conn = MongoClient('localhost:%s' % PORTS_ONE['PRIMARY'],
-                               replicaSet='demo-repl')
-        cls.solr_conn = Solr('http://localhost:8983/solr')
+        _, cls.secondary_p, cls.primary_p = start_replica_set('test-solr')
+        cls.conn = MongoClient(mongo_host, cls.primary_p,
+                               replicaSet='test-solr')
+        cls.solr_conn = Solr('http://%s/solr' % solr_pair)
         cls.solr_conn.delete(q='*:*')
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_all()
+        kill_replica_set('test-solr')
 
     def setUp(self):
         try:
@@ -64,7 +64,7 @@ class TestSynchronizer(unittest.TestCase):
             pass
         open("config.txt", "w").close()
         self.connector = Connector(
-            address=('localhost:%s' % PORTS_ONE['PRIMARY']),
+            address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint='config.txt',
             target_url='http://localhost:8983/solr',
             ns_set=['test.test'],
@@ -115,16 +115,16 @@ class TestSynchronizer(unittest.TestCase):
             restarting both the servers.
         """
 
-        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient(mongo_host, self.primary_p)
 
         self.conn['test']['test'].insert({'name': 'paul'})
         while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
             time.sleep(1)
         while len(self.solr_conn.search('*:*')) != 1:
             time.sleep(1)
-        kill_mongo_proc(PORTS_ONE['PRIMARY'])
+        kill_mongo_proc(self.primary_p, destroy=False)
 
-        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -139,16 +139,14 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc(PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(self.secondary_p, destroy=False)
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log")
+        restart_mongo_proc(self.primary_p)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log")
+        restart_mongo_proc(self.secondary_p)
 
         time.sleep(2)
         result_set_1 = self.solr_conn.search('pauline')
@@ -181,10 +179,10 @@ class TestSynchronizer(unittest.TestCase):
         while (len(self.solr_conn.search('*:*', rows=100))
                 != 100):
             time.sleep(1)
-        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc(PORTS_ONE['PRIMARY'])
+        primary_conn = MongoClient(mongo_host, self.primary_p)
+        kill_mongo_proc(self.primary_p, destroy=False)
 
-        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
+        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
         admin_db = new_primary_conn['admin']
 
         while admin_db.command("isMaster")['ismaster'] is False:
@@ -212,15 +210,13 @@ class TestSynchronizer(unittest.TestCase):
                 {'name': item['name']})
             self.assertEqual(item['_id'], str(result_set_2['_id']))
 
-        kill_mongo_proc(PORTS_ONE['SECONDARY'])
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log")
+        kill_mongo_proc(self.secondary_p, destroy=False)
+        restart_mongo_proc(self.primary_p)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log")
+        restart_mongo_proc(self.secondary_p)
 
         while (len(self.solr_conn.search(
                 'Pauline',

@@ -72,7 +72,8 @@ def start_mongo_proc(proc="mongod", options=[]):
     next_free_port = next(free_port)
     dbpath = os.path.join(DATA_ROOT, str(next_free_port))
     logpath = os.path.join(LOG_ROOT, "%d.log" % next_free_port)
-    cmd = [proc, "--port", next_free_port, "--logpath", logpath] + options
+    cmd = [proc, "--port", next_free_port,
+           "--logpath", logpath, "--logappend"] + options
 
     # Refresh directories
     create_dir(os.path.dirname(logpath))
@@ -92,14 +93,26 @@ def start_mongo_proc(proc="mongod", options=[]):
     return next_free_port
 
 
-def kill_mongo_proc(port):
+def restart_mongo_proc(port):
+    '''Restart a mongo process by port number that was killed'''
+    mongo = subprocess.Popen(nodes[port]['cmd'],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+    nodes[port]['proc'] = mongo
+    wait_for_proc(mongo, port)
+    return port
+
+
+def kill_mongo_proc(port, destroy=True):
     '''Kill a mongod or mongos process by port number'''
-    nodes.pop(port)['proc'].terminate()
-    shutil.rmtree(os.path.join(DATA_ROOT, str(port)), ignore_errors=True)
-    os.unlink(os.path.join(LOG_ROOT, "%d.log" % port))
+    nodes[port]['proc'].terminate()
+    if destroy:
+        shutil.rmtree(os.path.join(DATA_ROOT, str(port)), ignore_errors=True)
+        os.unlink(os.path.join(LOG_ROOT, "%d.log" % port))
+        nodes.pop(port)
 
 
-def start_replica_set(set_name, num_members=3):
+def start_replica_set(set_name, num_members=3, num_arbiters=1):
     '''Start a replica set with a given name'''
     # Start members
     repl_ports = [start_mongo_proc(options=["--replSet", set_name,
@@ -107,19 +120,33 @@ def start_replica_set(set_name, num_members=3):
                                             "--nojournal"])
                   for i in range(num_members)]
     # Initialize set
-    client = MongoClient(mongo_host, repl_ports[0])
+    client = MongoClient(mongo_host, repl_ports[-1])
     client.admin.command(
         'replSetInitiate',
         {
             '_id': set_name, 'members': [
-                {'_id': i, 'host': '%s:%d' % (mongo_host, p)}
+                {
+                    '_id': i,
+                    'host': '%s:%d' % (mongo_host, p),
+                    'arbiterOnly': (i < num_arbiters)
+                }
                 for i, p in enumerate(repl_ports)
             ]
         }
     )
     # Wait for primary
     assert_soon(lambda: client.admin.command("isMaster")['ismaster'])
+    # Wait for secondaries
+    for port in repl_ports[num_arbiters:-1]:
+        secondary_client = MongoClient(mongo_host, port)
+        assert_soon(
+            lambda: secondary_client.admin.command(
+                'replSetGetStatus')['myState'] == 2)
+    # Tag primary
     nodes[client.port]['master'] = True
+    # Tag arbiters
+    for port in repl_ports[:num_arbiters]:
+        nodes[port]['arbiter'] = True
     return repl_ports
 
 
@@ -159,7 +186,7 @@ def get_shard(mongos_port, index):
     '''Return a document containing the primary and secondaries of a replica
     set shard by mongos port and shard index:
 
-    {'primary': 12345, 'secondaries': [12121, 23232]}
+    {'primary': 12345, 'secondaries': [12121], 'arbiters': [23232]}
 
     '''
     repl = nodes[mongos_port]['shards'][index]
@@ -168,6 +195,8 @@ def get_shard(mongos_port, index):
         if repl in node['cmd']:
             if node.get('master'):
                 doc['primary'] = port
+            elif node.get('arbiter'):
+                doc.setdefault('arbiters', []).append(port)
             else:
                 doc.setdefault('secondaries', []).append(port)
     return doc

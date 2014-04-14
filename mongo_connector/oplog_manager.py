@@ -318,7 +318,7 @@ class OplogThread(threading.Thread):
                 # Applying 8 as the mask to the cursor enables OplogReplay
                 cursor.add_option(8)
                 logging.debug("OplogThread: Cursor created, getting a count.")
-                cursor_len = cursor.count()
+                cursor_len = retry_until_ok(cursor.count)
                 logging.debug("OplogThread: Count is %d" % cursor_len)
                 break
             except (pymongo.errors.AutoReconnect,
@@ -332,8 +332,8 @@ class OplogThread(threading.Thread):
 
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
-        cursor_ts_long = retry_until_ok(util.bson_ts_to_long,
-                                        cursor[0].get("ts"))
+        first_oplog_entry = retry_until_ok(next, cursor)
+        cursor_ts_long = util.bson_ts_to_long(first_oplog_entry.get("ts"))
         given_ts_long = util.bson_ts_to_long(timestamp)
         if cursor_ts_long > given_ts_long:
             # first entry in oplog is beyond timestamp, we've fallen behind!
@@ -341,11 +341,9 @@ class OplogThread(threading.Thread):
         elif cursor_len == 1:     # means we are the end of the oplog
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
-
             return cursor
         elif cursor_len > 1:
-            doc = retry_until_ok(next, cursor)
-            if timestamp == doc['ts']:
+            if timestamp == first_oplog_entry['ts']:
                 return cursor
             else:               # error condition
                 logging.error('OplogThread: %s Bad timestamp in config file'

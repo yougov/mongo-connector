@@ -26,9 +26,9 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-from tests.setup_cluster import (start_cluster,
-                                 kill_all,
-                                 PORTS_ONE)
+from tests import mongo_host
+from tests.setup_cluster import (start_replica_set,
+                                 kill_all)
 from tests.util import assert_soon
 from mongo_connector.connector import Connector
 
@@ -47,11 +47,11 @@ class TestSynchronizer(unittest.TestCase):
             pass
         open("config.txt", "w").close()
 
-        assert(start_cluster())
-        cls.conn = MongoClient('localhost:%s' % PORTS_ONE['PRIMARY'],
-                               replicaSet='demo-repl')
+        _, _, cls.primary_p = start_replica_set('test-synchronizer')
+        cls.conn = MongoClient('%s:%d' % (mongo_host, cls.primary_p),
+                               replicaSet='test-synchronizer')
         cls.connector = Connector(
-            address="%s:%s" % ('localhost', PORTS_ONE["PRIMARY"]),
+            address='%s:%d' % (mongo_host, cls.primary_p),
             oplog_checkpoint='config.txt',
             target_url=None,
             ns_set=['test.test'],

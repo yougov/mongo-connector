@@ -27,8 +27,10 @@ else:
     import unittest
 import time
 import json
+
 from mongo_connector.connector import Connector
-from tests.setup_cluster import start_cluster, kill_all, PORTS_ONE
+from tests import mongo_host
+from tests.setup_cluster import start_replica_set, kill_replica_set
 from bson.timestamp import Timestamp
 from mongo_connector import errors
 from mongo_connector.doc_managers import (
@@ -50,19 +52,19 @@ class TestMongoConnector(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
-        assert(start_cluster())
+        _, _, cls.primary_p = start_replica_set('test-mongo-connector')
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_all()
+        kill_replica_set('test-mongo-connector')
 
     def test_connector(self):
         """Test whether the connector initiates properly
         """
         conn = Connector(
-            address="localhost:%s" % PORTS_ONE["PRIMARY"],
+            address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint='config.txt',
             target_url=None,
             ns_set=['test.test'],
@@ -89,7 +91,7 @@ class TestMongoConnector(unittest.TestCase):
             pass
         open("temp_config.txt", "w").close()
         conn = Connector(
-            address="localhost:%s" % PORTS_ONE["PRIMARY"],
+            address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint="temp_config.txt",
             target_url=None,
             ns_set=['test.test'],
@@ -128,7 +130,7 @@ class TestMongoConnector(unittest.TestCase):
         """
 
         conn = Connector(
-            address="localhost:%s" % PORTS_ONE["PRIMARY"],
+            address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint=None,
             target_url=None,
             ns_set=['test.test'],
@@ -180,7 +182,7 @@ class TestMongoConnector(unittest.TestCase):
 
         # no doc manager or target URLs
         connector_kwargs = {
-            "address": "localhost:%s" % PORTS_ONE["PRIMARY"],
+            "address": '%s:%d' % (mongo_host, self.primary_p),
             "oplog_checkpoint": None,
             "ns_set": None,
             "u_key": None,
@@ -218,7 +220,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("elastic_doc_manager")
             ],
             target_url=[
-                "localhost:%s" % PORTS_ONE['PRIMARY'],
+                '%s:%d' % (mongo_host, self.primary_p),
                 "foobar",
                 "bazbaz"
             ],
@@ -239,7 +241,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("doc_manager_simulator")
             ],
             target_url=[
-                "localhost:%s" % PORTS_ONE["PRIMARY"],
+                '%s:%d' % (mongo_host, self.primary_p),
                 "foobar",
                 "bazbaz"
             ],
@@ -253,7 +255,7 @@ class TestMongoConnector(unittest.TestCase):
         self.assertEqual(c.doc_managers[2].__module__,
                          "doc_manager_simulator")
         self.assertEqual(c.doc_managers[0].url,
-                         "localhost:%s" % PORTS_ONE["PRIMARY"])
+                         '%s:%d' % (mongo_host, self.primary_p))
         self.assertEqual(c.doc_managers[1].url, "foobar")
         self.assertEqual(c.doc_managers[2].url, "bazbaz")
 
@@ -265,7 +267,7 @@ class TestMongoConnector(unittest.TestCase):
                 get_docman("doc_manager_simulator")
             ],
             target_url=[
-                "localhost:%s" % PORTS_ONE["PRIMARY"]
+                '%s:%d' % (mongo_host, self.primary_p)
             ],
             **connector_kwargs
         )

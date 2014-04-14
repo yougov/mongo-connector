@@ -26,12 +26,12 @@ else:
 sys.path[0:0] = [""]
 
 from pymongo import MongoClient
-from tests.setup_cluster import (kill_mongo_proc,
-                                 kill_all,
+from tests import mongo_host
+from tests.setup_cluster import (start_replica_set,
+                                 kill_replica_set,
                                  start_mongo_proc,
-                                 start_cluster,
-                                 start_single_mongod_instance,
-                                 PORTS_ONE)
+                                 restart_mongo_proc,
+                                 kill_mongo_proc)
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -50,28 +50,29 @@ class TestSynchronizer(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
-        start_single_mongod_instance("30000", "MC", "MC_log")
-        cls.mongo_doc = DocManager("localhost:30000")
+        cls.standalone_port = start_mongo_proc(options=['--nojournal',
+                                                        '--noprealloc'])
+        cls.mongo_doc = DocManager('%s:%d' % (mongo_host, cls.standalone_port))
         cls.mongo_doc._remove()
-        assert(start_cluster())
-        cls.conn = MongoClient("localhost:%s" % PORTS_ONE['PRIMARY'],
-                               replicaSet="demo-repl")
+        _, cls.secondary_p, cls.primary_p = start_replica_set('test-mongo')
+        cls.conn = MongoClient(mongo_host, cls.primary_p,
+                               replicaSet='test-mongo')
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_mongo_proc(30000)
-        kill_all()
+        kill_mongo_proc(cls.standalone_port)
+        kill_replica_set('test-mongo')
 
     def tearDown(self):
         self.connector.join()
 
     def setUp(self):
         self.connector = Connector(
-            address="localhost:%s" % PORTS_ONE["PRIMARY"],
+            address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint="config.txt",
-            target_url='localhost:30000',
+            target_url='%s:%d' % (mongo_host, self.standalone_port),
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None,
@@ -117,15 +118,15 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
+        primary_conn = MongoClient(mongo_host, self.primary_p)
         self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
 
-        kill_mongo_proc(PORTS_ONE['PRIMARY'])
-        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
+        kill_mongo_proc(self.primary_p, destroy=False)
+        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
@@ -140,15 +141,13 @@ class TestSynchronizer(unittest.TestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc(PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(self.secondary_p, destroy=False)
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log")
+        restart_mongo_proc(self.primary_p)
         assert_soon(
             lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log")
+        restart_mongo_proc(self.secondary_p)
 
         time.sleep(2)
         result_set_1 = list(self.mongo_doc._search())
@@ -187,10 +186,11 @@ class TestSynchronizer(unittest.TestCase):
         search = self.mongo_doc._search
         condition = lambda: sum(1 for _ in search()) == 100
         assert_soon(condition)
-        primary_conn = MongoClient('localhost', int(PORTS_ONE['PRIMARY']))
-        kill_mongo_proc(PORTS_ONE['PRIMARY'])
+        primary_conn = MongoClient(mongo_host, self.primary_p)
 
-        new_primary_conn = MongoClient('localhost', int(PORTS_ONE['SECONDARY']))
+        kill_mongo_proc(self.primary_p, destroy=False)
+
+        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
@@ -213,14 +213,12 @@ class TestSynchronizer(unittest.TestCase):
                     {'name': item['name']})
                 self.assertEqual(item['_id'], result_set_2['_id'])
 
-        kill_mongo_proc(PORTS_ONE['SECONDARY'])
+        kill_mongo_proc(self.secondary_p, destroy=False)
 
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "replset1a",
-                         "replset1a.log")
+        restart_mongo_proc(self.primary_p)
         db_admin = primary_conn['admin']
         assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "replset1b",
-                         "replset1b.log")
+        restart_mongo_proc(self.secondary_p)
 
         search = self.mongo_doc._search
         condition = lambda: sum(1 for _ in search()) == 100
