@@ -227,7 +227,8 @@ class OplogThread(threading.Thread):
                         self.update_checkpoint()
 
             except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
+                    pymongo.errors.OperationFailure,
+                    pymongo.errors.ConfigurationError):
                 err = True
 
             if err is True and self.auth_key is not None:
@@ -318,11 +319,12 @@ class OplogThread(threading.Thread):
                 # Applying 8 as the mask to the cursor enables OplogReplay
                 cursor.add_option(8)
                 logging.debug("OplogThread: Cursor created, getting a count.")
-                cursor_len = retry_until_ok(cursor.count)
+                cursor_len = cursor.count()
                 logging.debug("OplogThread: Count is %d" % cursor_len)
                 break
             except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
+                    pymongo.errors.OperationFailure,
+                    pymongo.errors.ConfigurationError):
                 pass
         if cursor_len == 0:
             logging.debug("OplogThread: Initiating rollback from "
@@ -332,7 +334,7 @@ class OplogThread(threading.Thread):
 
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
-        first_oplog_entry = retry_until_ok(next, cursor)
+        first_oplog_entry = retry_until_ok(lambda: cursor[0])
         cursor_ts_long = util.bson_ts_to_long(first_oplog_entry.get("ts"))
         given_ts_long = util.bson_ts_to_long(timestamp)
         if cursor_ts_long > given_ts_long:
@@ -341,9 +343,11 @@ class OplogThread(threading.Thread):
         elif cursor_len == 1:     # means we are the end of the oplog
             self.checkpoint = timestamp
             #to commit new TS after rollbacks
+
             return cursor
         elif cursor_len > 1:
-            if timestamp == first_oplog_entry['ts']:
+            doc = retry_until_ok(next, cursor)
+            if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
                 logging.error('OplogThread: %s Bad timestamp in config file'

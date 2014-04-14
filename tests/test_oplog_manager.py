@@ -126,7 +126,7 @@ class TestOplogManager(unittest.TestCase):
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
         self.assertEqual(cursor.count(), 1)
-        self.assertEqual(self.opman.retrieve_doc(cursor[0]), doc)
+        self.assertEqual(self.opman.retrieve_doc(next(cursor)), doc)
 
         # many entries before and after timestamp
         self.primary_conn["test"]["test"].insert(

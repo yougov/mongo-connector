@@ -73,7 +73,8 @@ def start_mongo_proc(proc="mongod", options=[]):
     dbpath = os.path.join(DATA_ROOT, str(next_free_port))
     logpath = os.path.join(LOG_ROOT, "%d.log" % next_free_port)
     cmd = [proc, "--port", next_free_port,
-           "--logpath", logpath, "--logappend"] + options
+           "--logpath", logpath, "--logappend",
+           "--setParameter", "enableTestCommands=1"] + options
 
     # Refresh directories
     create_dir(os.path.dirname(logpath))
