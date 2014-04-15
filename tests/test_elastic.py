@@ -96,7 +96,7 @@ class TestElastic(unittest.TestCase):
             except es_exceptions.TransportError:
                 pass
 
-        self.conn['test']['test'].remove()
+        self.conn.test.test.drop()
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: sum(1 for _ in self.elastic_doc._search()) == 0)
