@@ -153,7 +153,7 @@ def start_replica_set(set_name, num_members=3, num_arbiters=1):
 
 def kill_replica_set(set_name):
     '''Kill a replica set by name'''
-    for port, proc_doc in nodes.items():
+    for port, proc_doc in list(nodes.items()):
         if set_name in proc_doc['cmd']:
             kill_mongo_proc(port)
 
@@ -213,7 +213,7 @@ def kill_cluster(mongos_port):
 
 def kill_all():
     """Kill all mongod and mongos instances"""
-    for port in nodes.keys():
+    for port in list(nodes.keys()):
         kill_mongo_proc(port)
     shutil.rmtree(LOG_ROOT, ignore_errors=True)
     shutil.rmtree(DATA_ROOT, ignore_errors=True)
