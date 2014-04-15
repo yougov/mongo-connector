@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import sys
+
+if sys.version_info[0] == 3:
+    unicode = str
 
 # Configurable hosts and ports used in the tests
 mongo_host = unicode(os.environ.get("MONGO_HOST", 'localhost'))
