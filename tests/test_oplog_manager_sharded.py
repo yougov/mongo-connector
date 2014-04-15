@@ -447,37 +447,37 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.opman1.start()
         self.opman2.start()
 
-        print("Insert first documents while primaries are up")
+        # Insert first documents while primaries are up
         db_main = self.mongos_conn["test"]["mcsharded"]
         db_main.insert({"i": 0}, w=2)
         db_main.insert({"i": 1000}, w=2)
         self.assertEqual(self.shard1_conn["test"]["mcsharded"].count(), 1)
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
 
-        print("Case 1: only one primary goes down, shard1 in this case")
+        # Case 1: only one primary goes down, shard1 in this case
         kill_mongo_proc(self.shard1_prim_p, destroy=False)
 
-        print("Wait for the secondary to be promoted")
+        # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
         assert_soon(
             lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
-        print("Insert another document. This will be rolled back later")
+        # Insert another document. This will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
         db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
         db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
         self.assertEqual(db_secondary1.count(), 2)
 
-        print("Wait for replication on the doc manager")
+        # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
         c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
         assert_soon(c, "not all writes were replicated to doc manager",
                     max_tries=120)
 
-        print("Kill the new primary")
+        # Kill the new primary
         kill_mongo_proc(self.shard1_scnd_p, destroy=False)
 
-        print("Start both servers back up")
+        # Start both servers back up
         restart_mongo_proc(self.shard1_prim_p)
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
@@ -489,17 +489,17 @@ class TestOplogManagerSharded(unittest.TestCase):
         query = {"i": {"$lt": 1000}}
         assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
 
-        print("Only first document should exist in MongoDB")
+        # Only first document should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
-        print("Same should hold for the doc manager")
+        # Same should hold for the doc manager
         docman_docs = [d for d in self.opman1.doc_managers[0]._search()
                        if d["i"] < 1000]
         self.assertEqual(len(docman_docs), 1)
         self.assertEqual(docman_docs[0]["i"], 0)
 
-        print("Wait for previous rollback to complete")
+        # Wait for previous rollback to complete
         def rollback_done():
             secondary1_count = retry_until_ok(db_secondary1.count)
             secondary2_count = retry_until_ok(db_secondary2.count)
@@ -509,11 +509,11 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         ##############################
 
-        print("Case 2: Primaries on both shards go down")
+        # Case 2: Primaries on both shards go down
         kill_mongo_proc(self.shard1_prim_p, destroy=False)
         kill_mongo_proc(self.shard2_prim_p, destroy=False)
 
-        print("Wait for the secondaries to be promoted")
+        # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
         shard2_secondary_admin = self.shard2_secondary_conn["admin"]
         assert_soon(
@@ -521,21 +521,21 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(
             lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
 
-        print("Insert another document on each shard. These will be rolled back later")
+        # Insert another document on each shard. These will be rolled back later
         retry_until_ok(db_main.insert, {"i": 1})
         self.assertEqual(db_secondary1.count(), 2)
         retry_until_ok(db_main.insert, {"i": 1001})
         self.assertEqual(db_secondary2.count(), 2)
 
-        print("Wait for replication on the doc manager")
+        # Wait for replication on the doc manager
         c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
         assert_soon(c, "not all writes were replicated to doc manager")
 
-        print("Kill the new primaries")
+        # Kill the new primaries
         kill_mongo_proc(self.shard1_scnd_p, destroy=False)
         kill_mongo_proc(self.shard2_scnd_p, destroy=False)
 
-        print("Start the servers back up...")
+        # Start the servers back up...
         # Shard 1
         restart_mongo_proc(self.shard1_prim_p)
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
@@ -544,7 +544,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
-        print("Shard 2")
+        # Shard 2
         restart_mongo_proc(self.shard2_prim_p)
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
@@ -553,18 +553,18 @@ class TestOplogManagerSharded(unittest.TestCase):
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
 
-        print("Wait for the shards to come online")
+        # Wait for the shards to come online
         assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
         query2 = {"i": {"$gte": 1000}}
         assert_soon(lambda: retry_until_ok(db_main.find(query2).count) > 0)
 
-        print("Only first documents should exist in MongoDB")
+        # Only first documents should exist in MongoDB
         self.assertEqual(db_main.find(query).count(), 1)
         self.assertEqual(db_main.find_one(query)["i"], 0)
         self.assertEqual(db_main.find(query2).count(), 1)
         self.assertEqual(db_main.find_one(query2)["i"], 1000)
 
-        print("Same should hold for the doc manager")
+        # Same should hold for the doc manager
         i_values = [d["i"] for d in self.opman1.doc_managers[0]._search()]
         self.assertEqual(len(i_values), 2)
         self.assertIn(0, i_values)
