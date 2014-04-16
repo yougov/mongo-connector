@@ -35,7 +35,7 @@ extra_opts = {"test_suite": "tests"}
 
 if sys.version_info[:2] == (2, 6):
     # Need unittest2 to run unittests in Python 2.6
-    extra_opts["tests_require"] = "unittest2"
+    extra_opts["tests_require"] = ["unittest2"]
     extra_opts["test_suite"] = "unittest2.collector"
 
 setup(name='mongo-connector',
@@ -54,7 +54,7 @@ setup(name='mongo-connector',
           'mongo_connector.doc_managers': ['schema.xml']
       },
       entry_points={
-          'console_scripts' : [
+          'console_scripts': [
               'mongo-connector = mongo_connector.connector:main',
           ],
       },

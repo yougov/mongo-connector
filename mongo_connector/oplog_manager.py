@@ -30,10 +30,7 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.util import retry_until_ok
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 
 class OplogThread(threading.Thread):
@@ -103,10 +100,10 @@ class OplogThread(threading.Thread):
         logging.info('OplogThread: Initializing oplog thread')
 
         if is_sharded:
-            self.main_connection = Connection(main_address)
+            self.main_connection = MongoClient(main_address)
         else:
-            self.main_connection = Connection(main_address,
-                                              replicaSet=repl_set)
+            self.main_connection = MongoClient(main_address,
+                                               replicaSet=repl_set)
             self.oplog = self.main_connection['local']['oplog.rs']
 
         if auth_key is not None:
@@ -161,6 +158,10 @@ class OplogThread(threading.Thread):
                         # Break out if this thread should stop
                         if not self.running:
                             break
+
+                        # Don't replicate entries resulting from chunk moves
+                        if entry.get("fromMigrate"):
+                            continue
 
                         #sync the current oplog operation
                         operation = entry['op']
@@ -226,7 +227,8 @@ class OplogThread(threading.Thread):
                         self.update_checkpoint()
 
             except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
+                    pymongo.errors.OperationFailure,
+                    pymongo.errors.ConfigurationError):
                 err = True
 
             if err is True and self.auth_key is not None:
@@ -303,7 +305,7 @@ class OplogThread(threading.Thread):
             try:
                 logging.debug("OplogThread: Getting the oplog cursor "
                               "in the while true loop for get_oplog_cursor")
-                if self.namespace_set is None:
+                if not self.namespace_set:
                     cursor = self.oplog.find(
                         {'ts': {'$gte': timestamp}},
                         tailable=True, await_data=True
@@ -321,7 +323,8 @@ class OplogThread(threading.Thread):
                 logging.debug("OplogThread: Count is %d" % cursor_len)
                 break
             except (pymongo.errors.AutoReconnect,
-                    pymongo.errors.OperationFailure):
+                    pymongo.errors.OperationFailure,
+                    pymongo.errors.ConfigurationError):
                 pass
         if cursor_len == 0:
             logging.debug("OplogThread: Initiating rollback from "
@@ -331,7 +334,8 @@ class OplogThread(threading.Thread):
 
             logging.info('Finished rollback')
             return self.get_oplog_cursor(timestamp)
-        cursor_ts_long = util.bson_ts_to_long(cursor[0].get("ts"))
+        first_oplog_entry = retry_until_ok(lambda: cursor[0])
+        cursor_ts_long = util.bson_ts_to_long(first_oplog_entry.get("ts"))
         given_ts_long = util.bson_ts_to_long(timestamp)
         if cursor_ts_long > given_ts_long:
             # first entry in oplog is beyond timestamp, we've fallen behind!
@@ -342,7 +346,7 @@ class OplogThread(threading.Thread):
 
             return cursor
         elif cursor_len > 1:
-            doc = next(cursor)
+            doc = retry_until_ok(next, cursor)
             if timestamp == doc['ts']:
                 return cursor
             else:               # error condition
@@ -357,16 +361,17 @@ class OplogThread(threading.Thread):
         configs i.e. when we're starting for the first time.
         """
 
-        dump_set = self.namespace_set
+        dump_set = self.namespace_set or []
         logging.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
         #no namespaces specified
         if not self.namespace_set:
-            db_list = self.main_connection.database_names()
+            db_list = retry_until_ok(self.main_connection.database_names)
             for database in db_list:
                 if database == "config" or database == "local":
                     continue
-                coll_list = self.main_connection[database].collection_names()
+                coll_list = retry_until_ok(
+                    self.main_connection[database].collection_names)
                 for coll in coll_list:
                     if coll.startswith("system"):
                         continue
@@ -451,11 +456,12 @@ class OplogThread(threading.Thread):
                     logging.debug("OplogThread: DocManager %s has not"
                                   "bulk_upsert method.  Upserting documents "
                                   "serially for collection dump." % str(dm))
+                    num = 0
                     for num, doc in enumerate(docs_to_dump()):
                         if num % 10000 == 0:
                             logging.debug("Upserted %d docs." % num)
                         dm.upsert(doc)
-                    logging.debug("Upserted %d  docs" % num)
+                    logging.debug("Upserted %d docs" % num)
 
             # cleanup
             for t in dumping_threads:
@@ -486,7 +492,7 @@ class OplogThread(threading.Thread):
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
-        if self.namespace_set is None:
+        if not self.namespace_set:
             curr = self.oplog.find().sort(
                 '$natural', pymongo.DESCENDING
             ).limit(1)
@@ -519,7 +525,7 @@ class OplogThread(threading.Thread):
                              % (self.oplog, msg))
         elif timestamp is None:
             # set timestamp to top of oplog
-            timestamp = self.get_last_oplog_timestamp()
+            timestamp = retry_until_ok(self.get_last_oplog_timestamp)
 
         self.checkpoint = timestamp
         cursor = self.get_oplog_cursor(timestamp)
@@ -579,7 +585,8 @@ class OplogThread(threading.Thread):
         # Find the oplog entry that touched the most recent document.
         # We'll use this to figure where to pick up the oplog later.
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = self.oplog.find_one(
+        last_oplog_entry = util.retry_until_ok(
+            self.oplog.find_one,
             {'ts': {'$lte': target_ts}},
             sort=[('$natural', pymongo.DESCENDING)]
         )
@@ -646,10 +653,18 @@ class OplogThread(threading.Thread):
                               "docs.")
                 remov_inc = 0
                 for doc in doc_hash.values():
-                    remov_inc += 1
-                    dm.remove(doc)
-                    logging.debug("OplogThread: Rollback, removed %s " %
-                                  str(doc))
+                    try:
+                        dm.remove(doc)
+                        remov_inc += 1
+                        logging.debug("OplogThread: Rollback, removed %s " %
+                                      str(doc))
+                    except errors.OperationFailed:
+                        logging.warning(
+                            "Could not delete document during rollback: %s "
+                            "This can happen if this document was already "
+                            "removed by another rollback happening at the "
+                            "same time." % str(doc)
+                        )
 
                 logging.debug("OplogThread: Rollback, removed %d docs." %
                               remov_inc)

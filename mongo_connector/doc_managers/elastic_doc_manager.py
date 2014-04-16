@@ -134,7 +134,7 @@ class DocManager():
         try:
             self.elastic.delete_by_query(index="test.test",
                                          doc_type=self.doc_type,
-                                         body={"match_all": {}})
+                                         q="*:*")
         except (es_exceptions.ConnectionError):
             raise errors.ConnectionFailed("Could not connect to Elastic Search")
         except es_exceptions.TransportError:

@@ -17,6 +17,7 @@
 
 import time
 
+
 def wait_for(condition, max_tries=60):
     """Wait for a condition to be true up to a maximum number of tries
     """
@@ -24,3 +25,12 @@ def wait_for(condition, max_tries=60):
         time.sleep(1)
         max_tries -= 1
     return condition()
+
+
+def assert_soon(condition, message=None, max_tries=60):
+    """Assert that a condition eventually evaluates to True after at most
+    max_tries number of attempts
+
+    """
+    if not wait_for(condition, max_tries=max_tries):
+        raise AssertionError(message or "")
