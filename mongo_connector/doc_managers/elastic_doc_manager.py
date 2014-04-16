@@ -21,14 +21,31 @@
     same class and replace the method definitions with API calls for the
     desired backend.
     """
+import logging
+import sys
 from threading import Timer
 
 import bson.json_util as bsjson
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
+from elasticsearch.helpers import bulk
 
 from mongo_connector import errors
+from mongo_connector.compat import reraise
 from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
 from mongo_connector.util import retry_until_ok
+
+
+def wrap_exceptions(func):
+    def wrap(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except es_exceptions.ConnectionError:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            reraise(errors.ConnectionFailed, exc_value, exc_tb)
+        except es_exceptions.TransportError:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            reraise(errors.OperationFailed, exc_value, exc_tb)
+    return wrap
 
 
 class DocManager():
@@ -44,13 +61,14 @@ class DocManager():
         """
 
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
-                 unique_key='_id', **kwargs):
+                 unique_key='_id', chunk_size=500, **kwargs):
         """ Establish a connection to Elastic
         """
         self.elastic = Elasticsearch(hosts=[url])
         self.auto_commit_interval = auto_commit_interval
         self.doc_type = 'string'  # default type is string, change if needed
         self.unique_key = unique_key
+        self.chunk_size = chunk_size
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
 
@@ -59,6 +77,7 @@ class DocManager():
         """
         self.auto_commit_interval = None
 
+    @wrap_exceptions
     def upsert(self, doc):
         """Update or insert a document into Elastic
 
@@ -71,16 +90,11 @@ class DocManager():
         index = doc['ns']
         doc[self.unique_key] = str(doc["_id"])
         doc_id = doc[self.unique_key]
-        try:
-            self.elastic.index(index=index, doc_type=doc_type,
-                               body=bsjson.dumps(doc), id=doc_id,
-                               refresh=(self.auto_commit_interval == 0))
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed("Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not index document: %s" % (
-                bsjson.dumps(doc)))
+        self.elastic.index(index=index, doc_type=doc_type,
+                           body=bsjson.dumps(doc), id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
 
+    @wrap_exceptions
     def bulk_upsert(self, docs):
         """Update or insert multiple documents into Elastic
 
@@ -92,76 +106,70 @@ class DocManager():
                 index = doc["ns"]
                 doc[self.unique_key] = str(doc[self.unique_key])
                 doc_id = doc[self.unique_key]
-                yield {"index": {"_index": index, "_type": self.doc_type,
-                                 "_id": doc_id}}
-                yield doc
+                yield {
+                    "_index": index,
+                    "_type": self.doc_type,
+                    "_id": doc_id,
+                    "_source": doc
+                }
             if not doc:
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
         try:
-            self.elastic.bulk(doc_type=self.doc_type,
-                              body=docs_to_upsert(),
-                              refresh=(self.auto_commit_interval == 0))
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed("Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed(
-                "Could not bulk-insert documents into Elastic")
+            responses = bulk(client=self.elastic,
+                             actions=docs_to_upsert(),
+                             chunk_size=self.chunk_size)
+            for resp in responses[1]:
+                ok = resp['index'].get('ok')
+                if ok is None:
+                    status = resp['index'].get('status')
+                    ok = (300 > status >= 200)
+                if not ok:
+                    logging.error(
+                        "Could not bulk-upsert document "
+                        "into ElasticSearch: %r" % resp)
+            if self.auto_commit_interval == 0:
+                self.commit()
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
             pass
 
+    @wrap_exceptions
     def remove(self, doc):
         """Removes documents from Elastic
 
         The input is a python dictionary that represents a mongo document.
         """
-        try:
-            self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
-                                id=str(doc[self.unique_key]),
-                                refresh=(self.auto_commit_interval == 0))
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed("Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not remove document: %s" % (
-                bsjson.dumps(doc)))
+        self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
+                            id=str(doc[self.unique_key]),
+                            refresh=(self.auto_commit_interval == 0))
 
+    @wrap_exceptions
     def _remove(self):
         """For test purposes only. Removes all documents in test.test
         """
-        try:
-            self.elastic.delete_by_query(index="test.test",
-                                         doc_type=self.doc_type,
-                                         q="*:*")
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed("Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed("Could not remove test documents")
+        self.elastic.delete_by_query(index="test.test",
+                                     doc_type=self.doc_type,
+                                     q="*:*")
         self.commit()
 
+    @wrap_exceptions
     def _stream_search(self, *args, **kwargs):
         """Helper method for iterating over ES search results"""
-        try:
-            first_response = self.elastic.search(*args, search_type="scan",
-                                                 scroll="10m", size=100,
-                                                 **kwargs)
-            scroll_id = first_response.get("_scroll_id")
-            expected_count = first_response.get("hits", {}).get("total", 0)
-            results_returned = 0
-            while results_returned < expected_count:
-                next_response = self.elastic.scroll(scroll_id=scroll_id,
-                                                    scroll="10m")
-                results_returned += len(next_response["hits"]["hits"])
-                for doc in next_response["hits"]["hits"]:
-                    yield doc["_source"]
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed(
-                "Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed(
-                "Could not retrieve documents from Elastic Search")
+        first_response = self.elastic.search(*args, search_type="scan",
+                                             scroll="10m", size=100,
+                                             **kwargs)
+        scroll_id = first_response.get("_scroll_id")
+        expected_count = first_response.get("hits", {}).get("total", 0)
+        results_returned = 0
+        while results_returned < expected_count:
+            next_response = self.elastic.scroll(scroll_id=scroll_id,
+                                                scroll="10m")
+            results_returned += len(next_response["hits"]["hits"])
+            for doc in next_response["hits"]["hits"]:
+                yield doc["_source"]
 
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
@@ -191,22 +199,16 @@ class DocManager():
         if self.auto_commit_interval not in [None, 0]:
             Timer(self.auto_commit_interval, self.run_auto_commit).start()
 
+    @wrap_exceptions
     def get_last_doc(self):
         """Returns the last document stored in the Elastic engine.
         """
-        try:
-            result = self.elastic.search(
-                index="_all",
-                body={
-                    "query": {"match_all": {}},
-                    "sort": [{"_ts": "desc"}]
-                },
-                size=1
-            )["hits"]["hits"]
-        except (es_exceptions.ConnectionError):
-            raise errors.ConnectionFailed("Could not connect to Elastic Search")
-        except es_exceptions.TransportError:
-            raise errors.OperationFailed(
-                "Could not retrieve last document from Elastic Search")
-
+        result = self.elastic.search(
+            index="_all",
+            body={
+                "query": {"match_all": {}},
+                "sort": [{"_ts": "desc"}]
+            },
+            size=1
+        )["hits"]["hits"]
         return result[0]["_source"] if len(result) > 0 else None
