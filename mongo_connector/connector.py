@@ -31,10 +31,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 
 class Connector(threading.Thread):
@@ -265,7 +262,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = Connection(self.address)
+        main_conn = MongoClient(self.address)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -285,6 +282,13 @@ class Connector(threading.Thread):
                     'to run mongo-connector. Shutting down...' % self.address
                 )
                 return
+
+            # Establish a connection to the replica set as a whole
+            main_conn.disconnect()
+            main_conn = MongoClient(self.address,
+                                    replicaSet=is_master['setName'])
+            if self.auth_key is not None:
+                main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
@@ -355,7 +359,7 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = Connection(hosts, replicaSet=repl_set)
+                    shard_conn = MongoClient(hosts, replicaSet=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
@@ -663,9 +667,8 @@ def main():
         ## Create a mapping of source ns to dest ns as a dict
         dest_mapping = dict(zip(ns_set, dest_ns_set))
 
-    if options.fields is None:
-        fields = []
-    else:
+    fields = options.fields
+    if fields is not None:
         fields = options.fields.split(',')
 
     key = None

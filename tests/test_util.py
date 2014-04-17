@@ -15,9 +15,7 @@
 """Tests methods in util.py
 """
 
-import os
 import sys
-import inspect
 
 sys.path[0:0] = [""]
 
@@ -29,6 +27,7 @@ from bson import timestamp
 from mongo_connector.util import (bson_ts_to_long,
                                   long_to_bson_ts,
                                   retry_until_ok)
+
 
 def err_func():
     """Helper function for retry_until_ok test
@@ -47,21 +46,16 @@ class UtilTester(unittest.TestCase):
     """ Tests the utils
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        super(UtilTester, self).__init__()
-
     def test_bson_ts_to_long(self):
         """Test bson_ts_to_long and long_to_bson_ts
         """
 
         tstamp = timestamp.Timestamp(0x12345678, 0x90abcdef)
 
-        self.assertEqual(0x1234567890abcdef, 
-            bson_ts_to_long(tstamp))
+        self.assertEqual(0x1234567890abcdef,
+                         bson_ts_to_long(tstamp))
         self.assertEqual(long_to_bson_ts(0x1234567890abcdef),
-            tstamp)
+                         tstamp)
 
     def test_retry_until_ok(self):
         """Test retry_until_ok

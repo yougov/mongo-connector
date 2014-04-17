@@ -41,7 +41,7 @@ class DocManager():
         """ Verify URL and establish a connection.
         """
         try:
-            self.mongo = pymongo.Connection(url)
+            self.mongo = pymongo.MongoClient(url)
         except pymongo.errors.InvalidURI:
             raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:

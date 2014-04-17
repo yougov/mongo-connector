@@ -37,11 +37,6 @@ class SolrDocManagerTester(unittest.TestCase):
                                  auto_commit_interval=0)
         cls.solr = Solr("http://localhost:8983/solr/")
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
-
     def setUp(self):
         """Empty Solr at the start of every test
         """

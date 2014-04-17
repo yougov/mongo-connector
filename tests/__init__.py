@@ -11,3 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import sys
+
+if sys.version_info[0] == 3:
+    unicode = str
+
+# Configurable hosts and ports used in the tests
+mongo_host = unicode(os.environ.get("MONGO_HOST", 'localhost'))
+mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
+elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
+elastic_port = unicode(os.environ.get("ES_PORT", 9200))
+elastic_pair = '%s:%s' % (elastic_host, elastic_port)
+solr_host = unicode(os.environ.get("SOLR_HOST", 'localhost'))
+solr_port = unicode(os.environ.get("SOLR_PORT", 8983))
+solr_pair = '%s:%s' % (solr_host, solr_port)
+
+# Document count for stress tests
+STRESS_COUNT = 100
