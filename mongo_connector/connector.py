@@ -667,9 +667,8 @@ def main():
         ## Create a mapping of source ns to dest ns as a dict
         dest_mapping = dict(zip(ns_set, dest_ns_set))
 
-    if options.fields is None:
-        fields = []
-    else:
+    fields = options.fields
+    if fields is not None:
         fields = options.fields.split(',')
 
     key = None
