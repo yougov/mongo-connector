@@ -102,6 +102,8 @@ class MongoDocManagerTester(unittest.TestCase):
         time.sleep(3)
         res = self.mongo.find()
         self.assertTrue(res.count() == 1)
+        if "ns" not in docc:
+            docc["ns"] = 'test.test'
 
         self.MongoDoc.remove(docc)
         time.sleep(1)
