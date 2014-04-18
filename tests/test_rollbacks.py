@@ -20,7 +20,7 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.oplog_manager import OplogThread
 
 from tests import mongo_host
-from tests.util import wait_for
+from tests.util import assert_soon
 from tests.setup_cluster import (
     start_replica_set,
     kill_all,
@@ -85,8 +85,8 @@ class TestRollbacks(unittest.TestCase):
 
         # Make sure the insert is replicated
         secondary = self.secondary_conn
-        self.assertTrue(wait_for(lambda: secondary["test"]["mc"].count() == 1),
-                        "first write didn't replicate to secondary")
+        assert_soon(lambda: secondary["test"]["mc"].count() == 1,
+                    "first write didn't replicate to secondary")
 
         # Kill the primary
         kill_mongo_proc(self.primary_p, destroy=False)
@@ -100,9 +100,8 @@ class TestRollbacks(unittest.TestCase):
         self.assertEqual(secondary["test"]["mc"].count(), 2)
 
         # Wait for replication to doc manager
-        c = lambda: len(self.opman.doc_managers[0]._search()) == 2
-        self.assertTrue(wait_for(c),
-                        "not all writes were replicated to doc manager")
+        assert_soon(lambda: len(self.opman.doc_managers[0]._search()) == 2,
+                    "not all writes were replicated to doc manager")
 
         # Kill the new primary
         kill_mongo_proc(self.secondary_p, destroy=False)
@@ -110,13 +109,15 @@ class TestRollbacks(unittest.TestCase):
         # Start both servers back up
         restart_mongo_proc(self.primary_p)
         primary_admin = self.primary_conn["admin"]
-        while not primary_admin.command("isMaster")["ismaster"]:
-            time.sleep(1)
+        assert_soon(lambda: primary_admin.command("isMaster")["ismaster"],
+                    "restarted primary never resumed primary status")
         restart_mongo_proc(self.secondary_p)
-        while secondary["admin"].command("replSetGetStatus")["myState"] != 2:
-            time.sleep(1)
-        while retry_until_ok(self.main_conn["test"]["mc"].find().count) == 0:
-            time.sleep(1)
+        assert_soon(lambda: retry_until_ok(secondary.admin.command,
+                                           'replSetGetStatus')['myState'] == 2,
+                    "restarted secondary never resumed secondary status")
+        assert_soon(lambda:
+                    retry_until_ok(self.main_conn.test.mc.find().count) > 0,
+                    "documents not found after primary/secondary restarted")
 
         # Only first document should exist in MongoDB
         self.assertEqual(self.main_conn["test"]["mc"].count(), 1)
@@ -145,15 +146,15 @@ class TestRollbacks(unittest.TestCase):
 
         # Make sure the insert is replicated
         secondary = self.secondary_conn
-        self.assertTrue(wait_for(lambda: secondary["test"]["mc"].count() == 1),
-                        "first write didn't replicate to secondary")
+        assert_soon(lambda: secondary["test"]["mc"].count() == 1,
+                    "first write didn't replicate to secondary")
 
         # Kill the primary
         kill_mongo_proc(self.primary_p, destroy=False)
 
         # Wait for the secondary to be promoted
-        while not secondary["admin"].command("isMaster")["ismaster"]:
-            time.sleep(1)
+        assert_soon(lambda: secondary.admin.command("isMaster")['ismaster'],
+                    'secondary was never promoted')
 
         # Insert more documents. This will be rolled back later
         # Some of these documents will be manually removed from
@@ -172,8 +173,8 @@ class TestRollbacks(unittest.TestCase):
                 if len(dm._search()) != 10:
                     return False
             return True
-        self.assertTrue(wait_for(docmans_done),
-                        "not all writes were replicated to doc managers")
+        assert_soon(docmans_done,
+                    "not all writes were replicated to doc managers")
 
         # Remove some documents from the doc managers to simulate
         # uneven replication
@@ -188,14 +189,15 @@ class TestRollbacks(unittest.TestCase):
         # Start both servers back up
         restart_mongo_proc(self.primary_p)
         primary_admin = self.primary_conn["admin"]
-        while not primary_admin.command("isMaster")["ismaster"]:
-            time.sleep(1)
+        assert_soon(lambda: primary_admin.command("isMaster")['ismaster'],
+                    'restarted primary never resumed primary status')
         restart_mongo_proc(self.secondary_p)
-        while retry_until_ok(secondary["admin"].command,
-                             "replSetGetStatus")["myState"] != 2:
-            time.sleep(1)
-        while retry_until_ok(self.primary_conn["test"]["mc"].find().count) == 0:
-            time.sleep(1)
+        assert_soon(lambda: retry_until_ok(secondary.admin.command,
+                                           'replSetGetStatus')['myState'] == 2,
+                    "restarted secondary never resumed secondary status")
+        assert_soon(lambda:
+                    retry_until_ok(self.primary_conn.test.mc.find().count) > 0,
+                    "documents not found after primary/secondary restarted")
 
         # Only first document should exist in MongoDB
         self.assertEqual(self.primary_conn["test"]["mc"].count(), 1)
