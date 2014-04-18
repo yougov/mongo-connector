@@ -112,12 +112,15 @@ class DocManager():
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
-            for unique_key in self.mongo["_mongo-connector"][namespace].find(
+            for ts_ns_doc in self.mongo["_mongo-connector"][namespace].find(
                 {'_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
             ):
                 document = target_coll.find_one(
-                    {self.unique_key: unique_key})
+                    {self.unique_key: ts_ns_doc[self.unique_key]}
+                )
+                # document["_ts"] = ts_ns_doc["_ts"]
+                # document["ns"] = ts_ns_doc["ns"]
                 yield document
 
     def commit(self):
@@ -134,7 +137,7 @@ class DocManager():
                 target_coll = self.mongo[database][coll]
                 for unique_key in self.mongo["_mongo-connector"][coll].find(
                     limit=1
-                    ).sort('_ts', -1):
+                ).sort('_ts', -1):
                     document = target_coll.find_one(
                         {self.unique_key: unique_key})
                     yield document
