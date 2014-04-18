@@ -81,13 +81,17 @@ class DocManager():
         """
         database, coll = doc['ns'].split('.', 1)
         try:
+            ts = None
+            if "_ts" in doc:
+                ts = doc["_ts"]
+                del doc["_ts"]
+
             self.mongo["__mongo-connector"][doc['ns']].save({
                 self.unique_key: doc[self.unique_key],
-                "_ts": doc["_ts"],
+                "_ts": ts,
                 "ns": doc["ns"]
             })
             del doc['ns']
-            del doc["_ts"]
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
             raise errors.OperationFailed("Could not complete upsert on MongoDB")
@@ -112,15 +116,16 @@ class DocManager():
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
             target_coll = self.mongo[database][coll]
-            for ts_ns_doc in self.mongo["_mongo-connector"][namespace].find(
+            for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(
                 {'_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
             ):
                 document = target_coll.find_one(
                     {self.unique_key: ts_ns_doc[self.unique_key]}
                 )
-                # document["_ts"] = ts_ns_doc["_ts"]
-                # document["ns"] = ts_ns_doc["ns"]
+                if "_ts" in ts_ns_doc:
+                    document["_ts"] = ts_ns_doc["_ts"]
+                document["ns"] = ts_ns_doc["ns"]
                 yield document
 
     def commit(self):
@@ -135,11 +140,13 @@ class DocManager():
             for namespace in self._namespaces():
                 database, coll = namespace.split('.', 1)
                 target_coll = self.mongo[database][coll]
-                for unique_key in self.mongo["_mongo-connector"][coll].find(
-                    limit=1
-                ).sort('_ts', -1):
+                for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(limit=1).sort('_ts', -1):
                     document = target_coll.find_one(
-                        {self.unique_key: unique_key})
+                        {self.unique_key: ts_ns_doc[self.unique_key]}
+                    )
+                    if "_ts" in ts_ns_doc:
+                        document["_ts"] = ts_ns_doc["_ts"]
+                    document["ns"] = ts_ns_doc["ns"]
                     yield document
 
         return max(docs_by_ts(), key=lambda x:x["_ts"])
