@@ -47,7 +47,7 @@ with open("README.rst", "r") as fd:
     extra_opts['long_description'] = fd.read()
 
 setup(name='mongo-connector',
-      version="1.2",
+      version="1.2+",
       author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
