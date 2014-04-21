@@ -73,7 +73,13 @@ class DocManager():
     def stop(self):
         """Stops any running threads
         """
-        self.mongo.drop_database("__mongo-connector")
+        print (
+            """
+            Mongo Doc Manager Stopped : If you have finished your data
+            migration with mongo-connector then please drop the database
+            __mongo-connector in order to return resources to the OS.
+            """
+        )
         pass
 
     def upsert(self, doc):
@@ -81,17 +87,14 @@ class DocManager():
         """
         database, coll = doc['ns'].split('.', 1)
         try:
-            ts = None
-            if "_ts" in doc:
-                ts = doc["_ts"]
-                del doc["_ts"]
+            ts = doc.pop("_ts")
+            ns = doc.pop("ns")
 
             self.mongo["__mongo-connector"][doc['ns']].save({
                 self.unique_key: doc[self.unique_key],
                 "_ts": ts,
-                "ns": doc["ns"]
+                "ns": ns
             })
-            del doc['ns']
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
             raise errors.OperationFailed("Could not complete upsert on MongoDB")
@@ -115,18 +118,11 @@ class DocManager():
         """
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
-            target_coll = self.mongo[database][coll]
             for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(
                 {'_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
             ):
-                document = target_coll.find_one(
-                    {self.unique_key: ts_ns_doc[self.unique_key]}
-                )
-                if "_ts" in ts_ns_doc:
-                    document["_ts"] = ts_ns_doc["_ts"]
-                document["ns"] = ts_ns_doc["ns"]
-                yield document
+                yield ts_ns_doc
 
     def commit(self):
         """ Performs a commit
