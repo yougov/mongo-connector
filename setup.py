@@ -43,8 +43,11 @@ if sys.version_info[:2] == (2, 6):
     extra_opts["tests_require"] = "unittest2"
     extra_opts["test_suite"] = "unittest2.collector"
 
-with open("README.rst", "r") as fd:
-    extra_opts['long_description'] = fd.read()
+try:
+    with open("README.rst", "r") as fd:
+        extra_opts['long_description'] = fd.read()
+except IOError:
+    pass        # Install without README.rst
 
 setup(name='mongo-connector',
       version="1.2+",
