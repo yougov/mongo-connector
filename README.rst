@@ -100,7 +100,7 @@ trick::
 
 If you see a message like this from mongo-connector::
 
-  2014-04-02 22:40:04,745 - ERROR - OplogManager: Last entry no longer in oplog cannot recover! Collection(Database(MongoClient([u'localhost:1000', u'localhost:1001', u'localhost:1002']), u'local'), u'oplog.rs')
+  ERROR - OplogManager: Last entry no longer in oplog cannot recover! ...
 
 then mongo-connector may have fallen behind in the oplog, and
 discrepencies must now be resolved between the contents of the target
