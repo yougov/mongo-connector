@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 1.2.1
+-------------
+
+Version 1.2.1 fixes some trivial installation issues and renames the CHANGELOG to CHANGELOG.rst.
+
 Version 1.2
 -----------
 
