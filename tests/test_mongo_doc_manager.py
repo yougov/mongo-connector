@@ -77,7 +77,8 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly insert into Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
@@ -85,7 +86,8 @@ class MongoDocManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
-        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(1)
         res = self.mongo.find()
@@ -97,7 +99,8 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly delete from Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
@@ -115,9 +118,11 @@ class MongoDocManagerTester(unittest.TestCase):
         _search(), compare.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         self.MongoDoc.commit()
         search = list(self.MongoDoc._search())
