@@ -19,10 +19,6 @@ import time
 import logging
 
 from bson.timestamp import Timestamp
-try:
-    from urllib2 import urlopen, URLError
-except ImportError:
-    from urllib.request import urlopen, URLError
 
 
 def bson_ts_to_long(timestamp):
