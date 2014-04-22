@@ -41,13 +41,15 @@ class DocManager():
         """ Verify URL and establish a connection.
         """
         try:
-            self.mongo = pymongo.Connection(url)
+            self.mongo = pymongo.MongoClient(url)
         except pymongo.errors.InvalidURI:
             raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.unique_key = unique_key
         self.namespace_set = kwargs.get("namespace_set")
+        for namespace in self._namespaces():
+            self.mongo["__mongo-connector"][namespace].create_index("_ts")
 
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
@@ -71,6 +73,13 @@ class DocManager():
     def stop(self):
         """Stops any running threads
         """
+        print (
+            """
+            Mongo Doc Manager Stopped : If you have finished your data
+            migration with mongo-connector then please drop the database
+            __mongo-connector in order to return resources to the OS.
+            """
+        )
         pass
 
     def upsert(self, doc):
@@ -78,6 +87,14 @@ class DocManager():
         """
         database, coll = doc['ns'].split('.', 1)
         try:
+            ts = doc.pop("_ts")
+            ns = doc.pop("ns")
+
+            self.mongo["__mongo-connector"][doc['ns']].save({
+                self.unique_key: doc[self.unique_key],
+                "_ts": ts,
+                "ns": ns
+            })
             self.mongo[database][coll].save(doc)
         except pymongo.errors.OperationFailure:
             raise errors.OperationFailed("Could not complete upsert on MongoDB")
@@ -93,16 +110,19 @@ class DocManager():
         database, coll = doc['ns'].split('.', 1)
         self.mongo[database][coll].remove(
             {self.unique_key: doc[self.unique_key]})
+        self.mongo["__mongo-connector"][doc['ns']].remove(
+            {self.unique_key: doc[self.unique_key]})
 
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
         """
         for namespace in self._namespaces():
             database, coll = namespace.split('.', 1)
-            target_coll = self.mongo[database][coll]
-            for document in target_coll.find({'_ts': {'$lte': end_ts,
-                                                      '$gte': start_ts}}):
-                yield document
+            for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(
+                {'_ts': {'$lte': end_ts,
+                         '$gte': start_ts}}
+            ):
+                yield ts_ns_doc
 
     def commit(self):
         """ Performs a commit
@@ -116,8 +136,14 @@ class DocManager():
             for namespace in self._namespaces():
                 database, coll = namespace.split('.', 1)
                 target_coll = self.mongo[database][coll]
-                for doc in target_coll.find(limit=1).sort('_ts', -1):
-                    yield doc
+                for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(limit=1).sort('_ts', -1):
+                    document = target_coll.find_one(
+                        {self.unique_key: ts_ns_doc[self.unique_key]}
+                    )
+                    if "_ts" in ts_ns_doc:
+                        document["_ts"] = ts_ns_doc["_ts"]
+                    document["ns"] = ts_ns_doc["ns"]
+                    yield document
 
         return max(docs_by_ts(), key=lambda x:x["_ts"])
 

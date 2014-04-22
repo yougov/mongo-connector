@@ -899,6 +899,12 @@
    <field name="_ts" type="long" indexed="true" stored="true" />
    <field name="ns" type="string" indexed="true" stored="true"/>
 
+   <!-- these fields are used in test_solr.test_nested_fields -->
+   <field name="billing.address.street" type="string" indexed="true" stored="true" />
+   <field name="billing.address.state" type="string" indexed="true" stored="true" />
+   <dynamicField name="numbers.*" type="string" indexed="true" stored="true"/>
+   <dynamicField name="characters.*" type="string" indexed="true" stored="true"/>
+
    <field name="id" type="string" indexed="true" stored="true" />
    <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
    <field name="alphaNameSort" type="alphaOnlySort" indexed="true" stored="false"/>

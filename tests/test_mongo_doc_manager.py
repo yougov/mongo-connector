@@ -21,44 +21,38 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import inspect
-import os
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
-from tests.setup_cluster import start_single_mongod_instance, kill_mongo_proc
+from pymongo import MongoClient
+
+from tests import mongo_host
+from tests.setup_cluster import start_mongo_proc, kill_mongo_proc
 
 
 class MongoDocManagerTester(unittest.TestCase):
     """Test class for MongoDocManager
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-        unittest.TestCase.__init__(self)
-
     @classmethod
     def setUpClass(cls):
-        start_single_mongod_instance("30000", "/MC", "MC_log")
-        cls.MongoDoc = DocManager("localhost:30000")
-        cls.mongo = Connection("localhost:30000")['test']['test']
+        cls.standalone_port = start_mongo_proc(options=['--nojournal',
+                                                        '--noprealloc'])
+        cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
+        cls.MongoDoc = DocManager(cls.standalone_pair)
+        cls.mongo = MongoClient(cls.standalone_pair)['test']['test']
 
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
         cls.choosy_docman = DocManager(
-            "localhost:30000",
+            cls.standalone_pair,
             namespace_set=MongoDocManagerTester.namespaces_inc
         )
 
     @classmethod
     def tearDownClass(cls):
-        kill_mongo_proc('localhost', 30000)
+        kill_mongo_proc(cls.standalone_port)
 
     def setUp(self):
         """Empty Mongo at the start of every test
@@ -66,7 +60,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         self.mongo.remove()
 
-        conn = Connection("localhost:30000")
+        conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
             conn[db][coll].remove()
@@ -83,7 +77,8 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly insert into Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
@@ -91,7 +86,8 @@ class MongoDocManagerTester(unittest.TestCase):
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
-        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(1)
         res = self.mongo.find()
@@ -103,11 +99,14 @@ class MongoDocManagerTester(unittest.TestCase):
         """Ensure we can properly delete from Mongo via DocManager.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         res = self.mongo.find()
         self.assertTrue(res.count() == 1)
+        if "ns" not in docc:
+            docc["ns"] = 'test.test'
 
         self.MongoDoc.remove(docc)
         time.sleep(1)
@@ -119,9 +118,11 @@ class MongoDocManagerTester(unittest.TestCase):
         _search(), compare.
         """
 
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
+        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
+        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test',
+                '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         self.MongoDoc.commit()
         search = list(self.MongoDoc._search())
@@ -159,7 +160,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         for ns in self.namespaces_inc + self.namespaces_exc:
             for i in range(100):
-                self.choosy_docman.upsert({"_id":i, "ns":ns, "_ts":i})
+                self.choosy_docman.upsert({"_id": i, "ns": ns, "_ts": i})
 
         results = list(self.choosy_docman.search(0, 49))
         self.assertEqual(len(results), 100)
@@ -192,7 +193,7 @@ class MongoDocManagerTester(unittest.TestCase):
 
         # latest document is not in included namespace
         for i in range(100):
-            ns = self.namespaces_inc[0] if i%2 == 0 else self.namespaces_exc[0]
+            ns = (self.namespaces_inc, self.namespaces_exc)[i % 2][0]
             self.choosy_docman.upsert({
                 "_id": i,
                 "ns": ns,
@@ -205,7 +206,7 @@ class MongoDocManagerTester(unittest.TestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        Connection("localhost:30000")[db][coll].remove({"_id": 99})
+        MongoClient(self.standalone_pair)[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
         self.assertEqual(last_doc["_id"], 98)

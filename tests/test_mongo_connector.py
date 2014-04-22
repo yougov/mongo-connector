@@ -17,8 +17,6 @@
 
 import os
 import sys
-import inspect
-import socket
 
 sys.path[0:0] = [""]
 
@@ -29,57 +27,47 @@ else:
     import unittest
 import time
 import json
+
 from mongo_connector.connector import Connector
-from tests.setup_cluster import start_cluster, kill_all
+from tests import mongo_host
+from tests.setup_cluster import start_replica_set, kill_replica_set
 from bson.timestamp import Timestamp
+from mongo_connector import errors
+from mongo_connector.doc_managers import (
+    doc_manager_simulator
+)
 from mongo_connector.util import long_to_bson_ts
 
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-MAIN_ADDR = os.environ.get('MAIN_ADDR', "27217")
-MAIN_ADDRESS = "%s:%s" % (HOSTNAME, MAIN_ADDR)
-CONFIG = os.environ.get('CONFIG', "config.txt")
-TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 
-
-class MongoInternalTester(unittest.TestCase):
+class TestMongoConnector(unittest.TestCase):
     """ Test Class for the Mongo Connector
     """
 
-    def runTest(self):
-        """ Runs the tests
-        """
-
-        unittest.TestCase.__init__(self)
-
     @classmethod
-    def setUpClass(cls):    
+    def setUpClass(cls):
         """ Initializes the cluster
         """
-
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        use_mongos = True
-        if MAIN_ADDRESS.split(":")[1] != "27217":
-            use_mongos = False
-        cls.flag = start_cluster(use_mongos=use_mongos)
+        try:
+            os.unlink("config.txt")
+        except OSError:
+            pass
+        open("config.txt", "w").close()
+        _, _, cls.primary_p = start_replica_set('test-mongo-connector')
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_all()
+        kill_replica_set('test-mongo-connector')
 
     def test_connector(self):
         """Test whether the connector initiates properly
         """
-        if not self.flag:
-            self.fail("Shards cannot be added to mongos")
-
         conn = Connector(
-            address=MAIN_ADDRESS,
-            oplog_checkpoint=CONFIG,
+            address='%s:%d' % (mongo_host, self.primary_p),
+            oplog_checkpoint='config.txt',
             target_url=None,
             ns_set=['test.test'],
-            dest_ns_dict={'test.test': 'test.test'},
             u_key='_id',
             auth_key=None
         )
@@ -97,13 +85,15 @@ class MongoInternalTester(unittest.TestCase):
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
         """
-        os.system('touch %s' % (TEMP_CONFIG))
-        config_file_path = TEMP_CONFIG
+        try:
+            os.unlink("temp_config.txt")
+        except OSError:
+            pass
+        open("temp_config.txt", "w").close()
         conn = Connector(
-            address=MAIN_ADDRESS,
-            oplog_checkpoint=config_file_path,
+            address='%s:%d' % (mongo_host, self.primary_p),
+            oplog_checkpoint="temp_config.txt",
             target_url=None,
-            dest_ns_dict={'test.test': 'test.test'},
             ns_set=['test.test'],
             u_key='_id',
             auth_key=None
@@ -116,35 +106,34 @@ class MongoInternalTester(unittest.TestCase):
         #pretend to insert a thread/timestamp pair
         conn.write_oplog_progress()
 
-        data = json.load(open(config_file_path, 'r'))
+        data = json.load(open("temp_config.txt", 'r'))
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(12, 34))
 
         #ensure the temp file was deleted
-        self.assertFalse(os.path.exists(config_file_path + '~'))
+        self.assertFalse(os.path.exists("temp_config.txt" + '~'))
 
         #ensure that updates work properly
         conn.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         conn.write_oplog_progress()
 
-        config_file = open(config_file_path, 'r')
+        config_file = open("temp_config.txt", 'r')
         data = json.load(config_file)
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
-        os.system('rm ' + config_file_path)
         config_file.close()
+        os.unlink("temp_config.txt")
 
     def test_read_oplog_progress(self):
         """Test read_oplog_progress
         """
 
         conn = Connector(
-            address=MAIN_ADDRESS,
+            address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint=None,
             target_url=None,
             ns_set=['test.test'],
-            dest_ns_dict={'test.test': 'test.test'},
             u_key='_id',
             auth_key=None
         )
@@ -152,8 +141,13 @@ class MongoInternalTester(unittest.TestCase):
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)
 
-        os.system('touch %s' % (TEMP_CONFIG))
-        conn.oplog_checkpoint = TEMP_CONFIG
+        try:
+            os.unlink("temp_config.txt")
+        except OSError:
+            pass
+        open("temp_config.txt", "w").close()
+
+        conn.oplog_checkpoint = "temp_config.txt"
 
         #testing with empty file
         self.assertEqual(conn.read_oplog_progress(), None)
@@ -178,7 +172,115 @@ class MongoInternalTester(unittest.TestCase):
         conn.read_oplog_progress()
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
-        os.system('rm ' + TEMP_CONFIG)
+        os.unlink("temp_config.txt")
+
+    def test_many_targets(self):
+        """Test that DocManagers are created and assigned to target URLs
+        correctly when instantiating a Connector object with multiple target
+        URLs
+        """
+
+        # no doc manager or target URLs
+        connector_kwargs = {
+            "address": '%s:%d' % (mongo_host, self.primary_p),
+            "oplog_checkpoint": None,
+            "ns_set": None,
+            "u_key": None,
+            "auth_key": None
+        }
+        c = Connector(target_url=None, **connector_kwargs)
+        self.assertEqual(len(c.doc_managers), 1)
+        self.assertIsInstance(c.doc_managers[0],
+                              doc_manager_simulator.DocManager)
+
+        # N.B. This assumes we're in mongo-connector/tests
+        def get_docman(name):
+            return os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                os.pardir,
+                "mongo_connector",
+                "doc_managers",
+                "%s.py" % name
+            )
+
+        # only target URL provided
+        with self.assertRaises(errors.ConnectorError):
+            Connector(target_url="localhost:9200", **connector_kwargs)
+
+        # one doc manager taking a target URL, no URL provided
+        with self.assertRaises(TypeError):
+            c = Connector(doc_manager=get_docman("mongo_doc_manager"),
+                          **connector_kwargs)
+
+        # 1:1 target URLs and doc managers
+        c = Connector(
+            doc_manager=[
+                get_docman("elastic_doc_manager"),
+                get_docman("doc_manager_simulator"),
+                get_docman("elastic_doc_manager")
+            ],
+            target_url=[
+                '%s:%d' % (mongo_host, self.primary_p),
+                "foobar",
+                "bazbaz"
+            ],
+            **connector_kwargs
+        )
+        self.assertEqual(len(c.doc_managers), 3)
+        # Connector uses doc manager filename as module name
+        self.assertEqual(c.doc_managers[0].__module__,
+                         "elastic_doc_manager")
+        self.assertEqual(c.doc_managers[1].__module__,
+                         "doc_manager_simulator")
+        self.assertEqual(c.doc_managers[2].__module__,
+                         "elastic_doc_manager")
+
+        # more target URLs than doc managers
+        c = Connector(
+            doc_manager=[
+                get_docman("doc_manager_simulator")
+            ],
+            target_url=[
+                '%s:%d' % (mongo_host, self.primary_p),
+                "foobar",
+                "bazbaz"
+            ],
+            **connector_kwargs
+        )
+        self.assertEqual(len(c.doc_managers), 3)
+        self.assertEqual(c.doc_managers[0].__module__,
+                         "doc_manager_simulator")
+        self.assertEqual(c.doc_managers[1].__module__,
+                         "doc_manager_simulator")
+        self.assertEqual(c.doc_managers[2].__module__,
+                         "doc_manager_simulator")
+        self.assertEqual(c.doc_managers[0].url,
+                         '%s:%d' % (mongo_host, self.primary_p))
+        self.assertEqual(c.doc_managers[1].url, "foobar")
+        self.assertEqual(c.doc_managers[2].url, "bazbaz")
+
+        # more doc managers than target URLs
+        c = Connector(
+            doc_manager=[
+                get_docman("elastic_doc_manager"),
+                get_docman("doc_manager_simulator"),
+                get_docman("doc_manager_simulator")
+            ],
+            target_url=[
+                '%s:%d' % (mongo_host, self.primary_p)
+            ],
+            **connector_kwargs
+        )
+        self.assertEqual(len(c.doc_managers), 3)
+        self.assertEqual(c.doc_managers[0].__module__,
+                         "elastic_doc_manager")
+        self.assertEqual(c.doc_managers[1].__module__,
+                         "doc_manager_simulator")
+        self.assertEqual(c.doc_managers[2].__module__,
+                         "doc_manager_simulator")
+        # extra doc managers should have None as target URL
+        self.assertEqual(c.doc_managers[1].url, None)
+        self.assertEqual(c.doc_managers[2].url, None)
 
 if __name__ == '__main__':
     unittest.main()

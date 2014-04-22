@@ -23,6 +23,7 @@
 """
 
 import exceptions
+from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
 
 
 class DocManager():
@@ -34,7 +35,8 @@ class DocManager():
     opposed to multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, auto_commit=True, unique_key='_id', **kwargs):
+    def __init__(self, url=None, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
+                 unique_key='_id', **kwargs):
         """Verify URL and establish a connection.
 
         This method should, if necessarity, verify the url to the backend
@@ -117,12 +119,13 @@ class DocManager():
         """Periodically commits to the engine server, if needed.
 
         This function commits all changes to the engine, and then
-        starts a timer that calls this function again in one second.
-        The reason for this function is to prevent overloading engine from
-        other searchers. This function may be modified based on the backend
-        engine and how commits are handled, as timers may not be necessary
-        in all instances. It does not have to be implemented if commits
-        are not necessary
+        starts a timer that calls this function again in
+        self.auto_commit_interval seconds. The reason for this
+        function is to prevent overloading engine from other
+        searchers. This function may be modified based on the backend
+        engine and how commits are handled, as timers may not be
+        necessary in all instances. It does not have to be implemented
+        if commits are not necessary
         """
         raise exceptions.NotImplementedError
 

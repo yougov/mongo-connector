@@ -15,435 +15,252 @@
 """Test oplog manager methods
 """
 
-import os
-import sys
-import inspect
 import time
+import sys
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-import re
-import socket
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection    
 
-sys.path[0:0] = [""]
+import bson
+import pymongo
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from tests.setup_cluster import (kill_mongo_proc,
-                                          start_mongo_proc,
-                                          start_cluster,
-                                          kill_all)
-from tests.util import wait_for
-from pymongo.errors import OperationFailure
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.util import(long_to_bson_ts,
-                                 bson_ts_to_long,
-                                 retry_until_ok)
-from bson.objectid import ObjectId
+from tests import mongo_host
+from tests.setup_cluster import (start_replica_set,
+                                 kill_replica_set)
+from tests.util import assert_soon
 
-PORTS_ONE = {"PRIMARY":  "27117", "SECONDARY":  "27118", "ARBITER":  "27119",
-             "CONFIG":  "27220", "MAIN":  "27217"}
-
-AUTH_FILE = os.environ.get('AUTH_FILE', None)
-AUTH_USERNAME = os.environ.get('AUTH_USERNAME', None)
-HOSTNAME = os.environ.get('HOSTNAME', socket.gethostname())
-PORTS_ONE['MAIN'] = os.environ.get('MAIN_ADDR', "27217")
-CONFIG = os.environ.get('CONFIG', "config.txt")
-TEMP_CONFIG = os.environ.get('TEMP_CONFIG', "temp_config.txt")
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
         cluster
     """
-    def runTest(self):
-        """Runs all Tests
-        """
-        unittest.TestCase.__init__(self)
-
-    @classmethod
-    def setUpClass(cls):
-        """ Initializes the cluster
-        """
-        os.system('rm %s; touch %s' % (CONFIG, CONFIG))
-        cls.AUTH_KEY = None
-        cls.flag = True
-        if AUTH_FILE:
-            # We want to get the credentials from this file
-            try:
-                key = (open(AUTH_FILE)).read()
-                re.sub(r'\s', '', key)
-                cls.AUTH_KEY = key
-            except IOError:
-                print('Could not parse authentication file!')
-                cls.flag = False
-                cls.err_msg = "Could not read key file!"
-
-        if not start_cluster(key_file=AUTH_FILE):
-            cls.flag = False
-            cls.err_msg = "Shards cannot be added to mongos"
-
-    @classmethod
-    def tearDownClass(cls):
-        """ Kills cluster instance
-        """
-        kill_all()
 
     def setUp(self):
-        """ Fails if we were unable to start the cluster
-        """
-        if not self.flag:
-            self.fail(self.err_msg)
+        _, _, self.primary_p = start_replica_set('test-oplog-manager')
+        self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
+        self.oplog_coll = self.primary_conn.local['oplog.rs']
+        self.opman = OplogThread(
+            primary_conn=self.primary_conn,
+            main_address='%s:%d' % (mongo_host, self.primary_p),
+            oplog_coll=self.oplog_coll,
+            is_sharded=False,
+            doc_manager=DocManager(),
+            oplog_progress_dict=LockingDict(),
+            namespace_set=None,
+            auth_key=None,
+            auth_username=None,
+            repl_set='test-oplog-manager'
+        )
 
-    @classmethod
-    def get_oplog_thread(cls):
-        """ Set up connection with mongo. Returns oplog, the connection and
-            oplog collection
-
-            This function clears the oplog
-        """
-        is_sharded = True
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
-
-        primary_conn['test']['test'].drop()
-        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
-
-        if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
-            is_sharded = False
-        oplog_coll = primary_conn['local']['oplog.rs']
-        oplog_coll.drop()           # reset the oplog
-
-        primary_conn['local'].create_collection('oplog.rs', capped=True,
-                                                size=1000000)
-        namespace_set = ['test.test']
-        dest_ns_dict = {'test.test': 'test.test'}
-        doc_manager = DocManager()
-        oplog = OplogThread(primary_conn=primary_conn,
-                            main_address=mongos_addr,
-                            oplog_coll=oplog_coll,
-                            is_sharded=is_sharded,
-                            doc_manager=doc_manager,
-                            oplog_progress_dict=LockingDict(),
-                            namespace_set=namespace_set,
-                            auth_key=cls.AUTH_KEY,
-                            dest_namespace_dict=dest_ns_dict,
-                            auth_username=AUTH_USERNAME,
-                            repl_set="demo-repl")
-
-        return(oplog, primary_conn, oplog_coll)
-
-    @classmethod
-    def get_new_oplog(cls):
-        """ Set up connection with mongo. Returns oplog, the connection and
-            oplog collection
-
-            This function does not clear the oplog
-        """
-        is_sharded = True
-        primary_conn = Connection(HOSTNAME, int(PORTS_ONE["PRIMARY"]))
-        if primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            primary_conn = Connection(HOSTNAME, int(PORTS_ONE["SECONDARY"]))
-
-        mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
-        if PORTS_ONE["MAIN"] == PORTS_ONE["PRIMARY"]:
-            mongos_addr = "%s:%s" % (HOSTNAME, PORTS_ONE['MAIN'])
-            is_sharded = False
-        oplog_coll = primary_conn['local']['oplog.rs']
-
-        namespace_set = ['test.test']
-        dest_ns_dict = {'test.test': 'test.test'}
-        doc_manager = DocManager()
-        oplog = OplogThread(primary_conn=primary_conn,
-                            main_address=mongos_addr,
-                            oplog_coll=oplog_coll,
-                            is_sharded=is_sharded,
-                            doc_manager=doc_manager,
-                            oplog_progress_dict=LockingDict(),
-                            namespace_set=namespace_set,
-                            auth_key=cls.AUTH_KEY,
-                            dest_namespace_dict=dest_ns_dict,
-                            auth_username=AUTH_USERNAME,
-                            repl_set="demo-repl")
-        return(oplog, primary_conn, oplog.main_connection, oplog_coll)
+    def tearDown(self):
+        try:
+            self.opman.join()
+        except RuntimeError:
+            pass                # OplogThread may not have been started
+        self.primary_conn.close()
+        kill_replica_set('test-oplog-manager')
 
     def test_retrieve_doc(self):
-        """Test retrieve_doc in oplog_manager. Assertion failure if it doesn't
-            pass
-        """
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        #testing for entry as none type
-        entry = None
-        self.assertTrue(test_oplog.retrieve_doc(entry) is None)
+        """ Test the retrieve_doc method """
 
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
+        # Trivial case where the oplog entry is None
+        self.assertEqual(self.opman.retrieve_doc(None), None)
 
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = primary_conn['test']['test'].find_one()
+        # Retrieve a document from insert operation in oplog
+        doc = {"name": "mango", "type": "fruit",
+               "ns": "test.test", "weight": 3.24, "i": 1}
+        self.primary_conn["test"]["test"].insert(doc)
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        oplog_entry = next(oplog_entries)
+        self.assertEqual(self.opman.retrieve_doc(oplog_entry), doc)
 
-        #testing for search after inserting a document
-        self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry),
-                         target_entry)
+        # Retrieve a document from update operation in oplog
+        self.primary_conn["test"]["test"].update(
+            {"i": 1},
+            {"$set": {"sounds-like": "mongo"}}
+        )
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        doc["sounds-like"] = "mongo"
+        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), doc)
 
-        primary_conn['test']['test'].update({'name': 'paulie'},
-                                            {"$set":  {'name': 'paul'}})
+        # Retrieve a document from remove operation in oplog
+        # (expected: None)
+        self.primary_conn["test"]["test"].remove({
+            "i": 1
+        })
+        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
+            sort=[("ts", pymongo.DESCENDING)],
+            limit=1
+        )
+        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), None)
 
-        last_oplog_entry = next(oplog_cursor)
-        target_entry = primary_conn['test']['test'].find_one()
-
-        #testing for search after updating a document
-        self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry),
-                         target_entry)
-
-        primary_conn['test']['test'].remove({'name': 'paul'})
-        last_oplog_entry = next(oplog_cursor)
-
-        #testing for search after deleting a document
-        self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry), None)
-
-        last_oplog_entry['o']['_id'] = 'badID'
-
-        #testing for bad doc id as input
-        self.assertEqual(test_oplog.retrieve_doc(last_oplog_entry), None)
-
-        #test_oplog.join()
+        # Retrieve a document with bad _id
+        # (expected: None)
+        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
+        self.assertEqual(self.opman.retrieve_doc(oplog_entry), None)
 
     def test_get_oplog_cursor(self):
-        """Test get_oplog_cursor in oplog_manager. Assertion failure if
-            it doesn't pass
-        """
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
+        '''Test the get_oplog_cursor method'''
 
-        #test None cursor
-        self.assertEqual(test_oplog.get_oplog_cursor(None), None)
+        # Trivial case: timestamp is None
+        self.assertEqual(self.opman.get_oplog_cursor(None), None)
 
-        #test with one document
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        timestamp = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.get_oplog_cursor(timestamp)
+        # earliest entry is after given timestamp
+        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
+        self.primary_conn["test"]["test"].insert(doc)
+        self.assertEqual(self.opman.get_oplog_cursor(
+            bson.Timestamp(1, 0)), None)
+
+        # earliest entry is the only one at/after timestamp
+        latest_timestamp = self.opman.get_last_oplog_timestamp()
+        cursor = self.opman.get_oplog_cursor(latest_timestamp)
+        self.assertNotEqual(cursor, None)
         self.assertEqual(cursor.count(), 1)
+        self.assertEqual(self.opman.retrieve_doc(next(cursor)), doc)
 
-        #test with two documents, one after the timestamp
-        primary_conn['test']['test'].insert({'name': 'paul'})
-        cursor = test_oplog.get_oplog_cursor(timestamp)
-        self.assertEqual(cursor.count(), 2)
+        # many entries before and after timestamp
+        self.primary_conn["test"]["test"].insert(
+            {"i": i} for i in range(2, 1002))
+        oplog_cursor = self.oplog_coll.find(
+            sort=[("ts", pymongo.ASCENDING)]
+        )
 
-        #test case where timestamp is not in oplog which implies we're too
-        #behind
-        oplog_coll = primary_conn['local']['oplog.rs']
-        oplog_coll.drop()           # reset the oplog
-        primary_conn['local'].create_collection('oplog.rs', capped=True,
-                                                size=10000)
+        # startup + insert + 1000 inserts
+        self.assertEqual(oplog_cursor.count(), 2 + 1000)
+        pivot = oplog_cursor.skip(400).limit(1)[0]
 
-        primary_conn['test']['test'].insert({'name': 'pauline'})
-        self.assertEqual(test_oplog.get_oplog_cursor(timestamp), None)
-        #test_oplog.join()
-        #need to add tests for 'except' part of get_oplog_cursor
+        goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
+        self.assertEqual(goc_cursor.count(), 2 + 1000 - 400)
+
+        # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
+        doc = self.primary_conn["test"]["test"].find_one(
+            {"_id": next(goc_cursor)["o"]["_id"]})
+        self.assertEqual(doc["i"], self.opman.retrieve_doc(pivot)["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
-        """Test get_last_oplog_timestamp in oplog_manager. Assertion failure
-            if it doesn't pass
-        """
+        """Test the get_last_oplog_timestamp method"""
 
-        #test empty oplog
-        test_oplog, primary_conn, oplog_coll = self.get_oplog_thread()
-        self.assertEqual(test_oplog.get_last_oplog_timestamp(), None)
+        # "empty" the oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
+        self.assertEqual(self.opman.get_last_oplog_timestamp(), None)
 
-        #test non-empty oplog
-        oplog_cursor = oplog_coll.find({}, tailable=True, await_data=True)
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        last_oplog_entry = next(oplog_cursor)
-        self.assertEqual(test_oplog.get_last_oplog_timestamp(),
-                         last_oplog_entry['ts'])
-
-        #test_oplog.join()
+        # Test non-empty oplog
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.primary_conn["test"]["test"].insert({
+                "i": i + 500
+            })
+        oplog = self.primary_conn["local"]["oplog.rs"]
+        oplog = oplog.find().sort("$natural", pymongo.DESCENDING).limit(1)[0]
+        self.assertEqual(self.opman.get_last_oplog_timestamp(),
+                         oplog["ts"])
 
     def test_dump_collection(self):
-        """Test dump_collection in oplog_manager. Assertion failure if it
-            doesn't pass
+        """Test the dump_collection method
+
+        Cases:
+
+        1. empty oplog
+        2. non-empty oplog
         """
 
-        test_oplog, primary_conn, search_ts = self.get_oplog_thread()
-        solr = DocManager()
-        test_oplog.doc_manager = solr
+        # Test with empty oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
+        last_ts = self.opman.dump_collection()
+        self.assertEqual(last_ts, None)
 
-        #with documents
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        test_oplog.dump_collection()
-
-        test_oplog.doc_manager.commit()
-        solr_results = solr._search()
-        self.assertEqual(len(solr_results), 1)
-        solr_doc = solr_results[0]
-        self.assertEqual(long_to_bson_ts(solr_doc['_ts']), search_ts)
-        self.assertEqual(solr_doc['name'], 'paulie')
-        self.assertEqual(solr_doc['ns'], 'test.test')
+        # Test with non-empty oplog
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
+        for i in range(1000):
+            self.primary_conn["test"]["test"].insert({
+                "i": i + 500
+            })
+        last_ts = self.opman.get_last_oplog_timestamp()
+        self.assertEqual(last_ts, self.opman.dump_collection())
+        self.assertEqual(len(self.opman.doc_managers[0]._search()), 1000)
 
     def test_init_cursor(self):
-        """Test init_cursor in oplog_manager. Assertion failure if it
-            doesn't pass
+        """Test the init_cursor method
+
+        Cases:
+
+        1. no last checkpoint, no collection dump
+        2. no last checkpoint, collection dump ok and stuff to dump
+        3. no last checkpoint, nothing to dump, stuff in oplog
+        4. no last checkpoint, nothing to dump, nothing in oplog
+        5. last checkpoint exists
         """
 
-        test_oplog, primary_conn, search_ts = self.get_oplog_thread()
-        test_oplog.checkpoint = None  # needed for these tests
+        # N.B. these sub-cases build off of each other and cannot be re-ordered
+        # without side-effects
 
-        # initial tests with no config file and empty oplog
-        self.assertEqual(test_oplog.init_cursor(), None)
+        # No last checkpoint, no collection dump, nothing in oplog
+        # "change oplog collection" to put nothing in oplog
+        self.opman.oplog = self.primary_conn["test"]["emptycollection"]
+        self.opman.collection_dump = False
+        self.assertEqual(self.opman.init_cursor(), None)
+        self.assertEqual(self.opman.checkpoint, None)
 
-        # no config, single oplog entry
-        primary_conn['test']['test'].insert({'name': 'paulie'})
-        search_ts = test_oplog.get_last_oplog_timestamp()
-        cursor = test_oplog.init_cursor()
-        self.assertEqual(cursor.count(), 1)
-        self.assertEqual(test_oplog.checkpoint, search_ts)
+        # No last checkpoint, empty collections, nothing in oplog
+        self.opman.collection_dump = True
+        self.assertEqual(self.opman.init_cursor(), None)
+        self.assertEqual(self.opman.checkpoint, None)
 
-        # with config file, assert that size != 0
-        os.system('touch temp_config.txt')
+        # No last checkpoint, empty collections, something in oplog
+        self.opman.oplog = self.primary_conn['local']['oplog.rs']
+        collection = self.primary_conn["test"]["test"]
+        collection.insert({"i": 1})
+        collection.remove({"i": 1})
+        time.sleep(3)
+        last_ts = self.opman.get_last_oplog_timestamp()
+        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        self.assertEqual(self.opman.checkpoint, last_ts)
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
 
-        cursor = test_oplog.init_cursor()
-        oplog_dict = test_oplog.oplog_progress.get_dict()
+        # No last checkpoint, non-empty collections, stuff in oplog
+        self.opman.oplog_progress = LockingDict()
+        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        self.assertEqual(self.opman.checkpoint, last_ts)
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
 
-        self.assertEqual(cursor.count(), 1)
-        self.assertTrue(str(test_oplog.oplog) in oplog_dict)
-        self.assertTrue(oplog_dict[str(test_oplog.oplog)] ==
-                        test_oplog.checkpoint)
-
-        os.system('rm temp_config.txt')
-
-        # test init_cursor when OplogThread created with/without no-dump option
-        # insert some documents (will need to be dumped)
-        primary_conn['test']['test'].remove()
-        primary_conn['test']['test'].insert(({"_id":i} for i in range(100)))
-
-        # test no-dump option
-        docman = DocManager()
-        docman._delete()
-        test_oplog.doc_manager = docman
-        test_oplog.collection_dump = False
-        test_oplog.oplog_progress = LockingDict()
-        # init_cursor has the side-effect of causing a collection dump
-        test_oplog.init_cursor()
-        self.assertEqual(len(docman._search()), 0)
-
-        # test w/o no-dump option
-        docman._delete()
-        test_oplog.collection_dump = True
-        test_oplog.oplog_progress = LockingDict()
-        test_oplog.init_cursor()
-        self.assertEqual(len(docman._search()), 100)
-
-    def test_rollback(self):
-        """Test rollback in oplog_manager. Assertion failure if it doesn't pass
-            We force a rollback by inserting a doc, killing the primary,
-            inserting another doc, killing the new primary, and then restarting
-            both.
-        """
-        os.system('rm config.txt; touch config.txt')
-        test_oplog, primary_conn, mongos, solr = self.get_new_oplog()
-
-        if not start_cluster():
-            self.fail('Cluster could not be started successfully!')
-
-        solr = DocManager()
-        test_oplog.doc_manager = solr
-        solr._delete()          # equivalent to solr.delete(q='*: *')
-
-        mongos['test']['test'].remove({})
-        mongos['test']['test'].insert( 
-             {'_id': ObjectId('4ff74db3f646462b38000001'),
-             'name': 'paulie'},
-             safe=True
-             )
-        while (mongos['test']['test'].find().count() != 1):
-            time.sleep(1)
-        cutoff_ts = test_oplog.get_last_oplog_timestamp()
-
-        first_doc = {'name': 'paulie', '_ts': bson_ts_to_long(cutoff_ts),
-                     'ns': 'test.test',
-                     '_id':  ObjectId('4ff74db3f646462b38000001')}
-
-        #try kill one, try restarting
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['PRIMARY'])
-
-        new_primary_conn = Connection(HOSTNAME, int(PORTS_ONE['SECONDARY']))
-        admin = new_primary_conn['admin']
-        while admin.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        count = 0
-        while True:
-            try:
-                mongos['test']['test'].insert({
-                    '_id': ObjectId('4ff74db3f646462b38000002'),
-                    'name': 'paul'}, 
-                    safe=True)
-                break
-            except OperationFailure:
-                count += 1
-                if count > 60:
-                    self.fail('Call to insert doc failed too many times')
-                time.sleep(1)
-                continue
-        while (mongos['test']['test'].find().count() != 2):
-            time.sleep(1)
-        kill_mongo_proc(primary_conn.host, PORTS_ONE['SECONDARY'])
-        start_mongo_proc(PORTS_ONE['PRIMARY'], "demo-repl", "/replset1a",
-                       "/replset1a.log", None)
-
-        #wait for master to be established
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-
-        start_mongo_proc(PORTS_ONE['SECONDARY'], "demo-repl", "/replset1b",
-                       "/replset1b.log", None)
-
-        #wait for secondary to be established
-        admin = new_primary_conn['admin']
-        while admin.command("replSetGetStatus")['myState'] != 2:
-            time.sleep(1)
-        while retry_until_ok(mongos['test']['test'].find().count) != 1:
-            time.sleep(1)
-
-        self.assertEqual(str(new_primary_conn.port), PORTS_ONE['SECONDARY'])
-        self.assertEqual(str(primary_conn.port), PORTS_ONE['PRIMARY'])
-
-        last_ts = test_oplog.get_last_oplog_timestamp()
-        second_doc = {'name': 'paul', '_ts': bson_ts_to_long(last_ts),
-                      'ns': 'test.test', 
-                      '_id': ObjectId('4ff74db3f646462b38000002')}
-
-        test_oplog.doc_manager.upsert(first_doc)
-        test_oplog.doc_manager.upsert(second_doc)
-
-        test_oplog.rollback()
-        test_oplog.doc_manager.commit()
-        results = solr._search()
-
-        assert(len(results) == 1)
-
-        self.assertEqual(results[0]['name'], 'paulie')
-        self.assertTrue(results[0]['_ts'] <= bson_ts_to_long(cutoff_ts))
-
-        #test_oplog.join()
+        # Last checkpoint exists
+        progress = LockingDict()
+        self.opman.oplog_progress = progress
+        for i in range(1000):
+            collection.insert({"i": i + 500})
+        entry = list(
+            self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=2))
+        progress.get_dict()[str(self.opman.oplog)] = entry[0]["ts"]
+        self.opman.oplog_progress = progress
+        self.opman.checkpoint = None
+        cursor = self.opman.init_cursor()
+        self.assertEqual(entry[1]["ts"], next(cursor)["ts"])
+        self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
+        with self.opman.oplog_progress as prog:
+            self.assertEqual(prog.get_dict()[str(self.opman.oplog)],
+                             entry[0]["ts"])
 
     def test_filter_fields(self):
-        opman, _, _ = self.get_oplog_thread()
-        docman = opman.doc_manager
-        conn = opman.main_connection
+        docman = self.opman.doc_managers[0]
+        conn = self.opman.main_connection
 
         include_fields = ["a", "b", "c"]
         exclude_fields = ["d", "e", "f"]
 
         # Set fields to care about
-        opman.fields = include_fields
+        self.opman.fields = include_fields
         # Documents have more than just these fields
         doc = {
             "a": 1, "b": 2, "c": 3,
@@ -452,14 +269,124 @@ class TestOplogManager(unittest.TestCase):
         }
         db = conn['test']['test']
         db.insert(doc)
-        wait_for(lambda: db.count() == 1)
-        opman.dump_collection()
+        assert_soon(lambda: db.count() == 1)
+        self.opman.dump_collection()
 
         result = docman._search()[0]
         keys = result.keys()
         for inc, exc in zip(include_fields, exclude_fields):
             self.assertIn(inc, keys)
             self.assertNotIn(exc, keys)
+
+    def test_namespace_mapping(self):
+        """Test mapping of namespaces
+        Cases:
+
+        upsert/delete/update of documents:
+        1. in namespace set, mapping provided
+        2. outside of namespace set, mapping provided
+        """
+
+        source_ns = ["test.test1", "test.test2"]
+        phony_ns = ["test.phony1", "test.phony2"]
+        dest_mapping = {"test.test1": "test.test1_dest",
+                        "test.test2": "test.test2_dest"}
+        self.opman.dest_mapping = dest_mapping
+        self.opman.namespace_set = source_ns
+        docman = self.opman.doc_managers[0]
+        # start replicating
+        self.opman.start()
+
+        base_doc = {"_id": 1, "name": "superman"}
+
+        # doc in namespace set
+        for ns in source_ns:
+            db, coll = ns.split(".", 1)
+
+            # test insert
+            self.primary_conn[db][coll].insert(base_doc)
+
+            assert_soon(lambda: len(docman._search()) == 1)
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
+            self.assertEqual(len(bad), 0)
+
+            # test update
+            self.primary_conn[db][coll].update(
+                {"_id": 1},
+                {"$set": {"weakness": "kryptonite"}}
+            )
+
+            def update_complete():
+                docs = docman._search()
+                for d in docs:
+                    if d.get("weakness") == "kryptonite":
+                        return True
+                    return False
+            assert_soon(update_complete)
+            self.assertEqual(docman._search()[0]["ns"], dest_mapping[ns])
+            bad = [d for d in docman._search() if d["ns"] == ns]
+            self.assertEqual(len(bad), 0)
+
+            # test delete
+            self.primary_conn[db][coll].remove({"_id": 1})
+            assert_soon(lambda: len(docman._search()) == 0)
+            bad = [d for d in docman._search()
+                   if d["ns"] == dest_mapping[ns]]
+            self.assertEqual(len(bad), 0)
+
+            # cleanup
+            self.primary_conn[db][coll].remove()
+            self.opman.doc_managers[0]._delete()
+
+        # doc not in namespace set
+        for ns in phony_ns:
+            db, coll = ns.split(".", 1)
+
+            # test insert
+            self.primary_conn[db][coll].insert(base_doc)
+            time.sleep(1)
+            self.assertEqual(len(docman._search()), 0)
+            # test update
+            self.primary_conn[db][coll].update(
+                {"_id": 1},
+                {"$set": {"weakness": "kryptonite"}}
+            )
+            time.sleep(1)
+            self.assertEqual(len(docman._search()), 0)
+
+    def test_many_targets(self):
+        """Test that one OplogThread is capable of replicating to more than
+        one target.
+        """
+        doc_managers = [DocManager(), DocManager(), DocManager()]
+        self.opman.doc_managers = doc_managers
+
+        # start replicating
+        self.opman.start()
+        self.primary_conn["test"]["test"].insert({
+            "name": "kermit",
+            "color": "green"
+        })
+        self.primary_conn["test"]["test"].insert({
+            "name": "elmo",
+            "color": "firetruck red"
+        })
+
+        assert_soon(
+            lambda: sum(len(d._search()) for d in doc_managers) == 6,
+            "OplogThread should be able to replicate to multiple targets"
+        )
+
+        self.primary_conn["test"]["test"].remove({"name": "elmo"})
+
+        assert_soon(
+            lambda: sum(len(d._search()) for d in doc_managers) == 3,
+            "OplogThread should be able to replicate to multiple targets"
+        )
+        for d in doc_managers:
+            self.assertEqual(d._search()[0]["name"], "kermit")
+
 
 if __name__ == '__main__':
     unittest.main()
