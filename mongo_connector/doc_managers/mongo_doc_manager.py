@@ -74,11 +74,9 @@ class DocManager():
         """Stops any running threads
         """
         print (
-            """
-            Mongo Doc Manager Stopped : If you have finished your data
-            migration with mongo-connector then please drop the database
-            __mongo-connector in order to return resources to the OS.
-            """
+            "Mongo Doc Manager Stopped : If you have finished your data"
+            "migration with mongo-connector then please drop the database"
+            "__mongo-connector in order to return resources to the OS."
         )
         pass
 
@@ -140,9 +138,6 @@ class DocManager():
                     document = target_coll.find_one(
                         {self.unique_key: ts_ns_doc[self.unique_key]}
                     )
-                    if "_ts" in ts_ns_doc:
-                        document["_ts"] = ts_ns_doc["_ts"]
-                    document["ns"] = ts_ns_doc["ns"]
                     yield document
 
         return max(docs_by_ts(), key=lambda x:x["_ts"])
