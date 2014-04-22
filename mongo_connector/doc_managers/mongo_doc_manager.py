@@ -90,7 +90,7 @@ class DocManager():
             ts = doc.pop("_ts")
             ns = doc.pop("ns")
 
-            self.mongo["__mongo-connector"][doc['ns']].save({
+            self.mongo["__mongo-connector"][ns].save({
                 self.unique_key: doc[self.unique_key],
                 "_ts": ts,
                 "ns": ns
