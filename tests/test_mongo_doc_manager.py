@@ -41,7 +41,8 @@ class MongoDocManagerTester(unittest.TestCase):
                                                         '--noprealloc'])
         cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
         cls.MongoDoc = DocManager(cls.standalone_pair)
-        cls.mongo = MongoClient(cls.standalone_pair)['test']['test']
+        cls.mongo_conn = MongoClient(cls.standalone_pair)
+        cls.mongo = cls.mongo_conn['test']['test']
 
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
@@ -58,6 +59,7 @@ class MongoDocManagerTester(unittest.TestCase):
         """Empty Mongo at the start of every test
         """
 
+        self.mongo_conn.drop_database("__mongo_connector")
         self.mongo.remove()
 
         conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
@@ -150,9 +152,9 @@ class MongoDocManagerTester(unittest.TestCase):
         search = list(self.MongoDoc.search(5767301236327972865,
                                            5767301236327972866))
         self.assertTrue(len(search) == 2)
-        result_names = [result.get("name") for result in search]
-        self.assertIn('John', result_names)
-        self.assertIn('John Paul', result_names)
+        result_id = [result.get("_id") for result in search]
+        self.assertIn('1', result_id)
+        self.assertIn('2', result_id)
 
     def test_search_namespaces(self):
         """Test search within timestamp range with a given namespace set
