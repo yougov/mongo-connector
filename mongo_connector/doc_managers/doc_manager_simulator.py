@@ -22,9 +22,10 @@ implementation with real systems.
 """
 
 from mongo_connector.errors import OperationFailed
+from mongo_connector.doc_managers import DocManagerBase
 
 
-class DocManager():
+class DocManager(DocManagerBase):
     """BackendSimulator emulates both a target DocManager and a server.
 
     The DocManager class creates a connection to the backend engine and
@@ -47,6 +48,16 @@ class DocManager():
         """Stops any running threads in the DocManager.
         """
         pass
+
+    def update(self, doc, update_spec):
+        """Apply updates given in update_spec to the document whose id
+        matches that of doc.
+
+        """
+        document = self.doc_dict[doc["_id"]]
+        updated = self.apply_update(document, update_spec)
+        self.upsert(updated)
+        return updated
 
     def upsert(self, doc):
         """Adds a document to the doc dict.

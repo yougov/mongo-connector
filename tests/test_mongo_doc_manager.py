@@ -75,6 +75,26 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertEqual(set(self.namespaces_inc),
                          set(self.choosy_docman._namespaces()))
 
+    def test_update(self):
+        doc = {"_id": '1', "ns": "test.test", "_ts": 1,
+               "a": 1, "b": 2}
+        self.choosy_docman.upsert(doc)
+        # $set only
+        update_spec = {"$set": {"a": 1, "b": 2}}
+        doc = self.choosy_docman.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "a": 1, "b": 2})
+        # $unset only
+        update_spec = {"$unset": {"a": True}}
+        doc = self.choosy_docman.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "b": 2})
+        # mixed $set/$unset
+        update_spec = {"$unset": {"b": True}, "$set": {"c": 3}}
+        doc = self.choosy_docman.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "c": 3})
+
     def test_upsert(self):
         """Ensure we can properly insert into Mongo via DocManager.
         """

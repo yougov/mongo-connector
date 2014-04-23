@@ -30,7 +30,7 @@ from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
-from mongo_connector.doc_managers import exception_wrapper
+from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
 
 
 # pysolr only has 1 exception: SolrError
@@ -42,7 +42,7 @@ ADMIN_URL = 'admin/luke?show=schema&wt=json'
 decoder = json.JSONDecoder()
 
 
-class DocManager():
+class DocManager(DocManagerBase):
     """The DocManager class creates a connection to the backend engine and
     adds/removes documents, and in the case of rollback, searches for them.
 
@@ -160,6 +160,20 @@ class DocManager():
         """ Stops the instance
         """
         pass
+
+    @wrap_exceptions
+    def update(self, doc, update_spec):
+        """Apply updates given in update_spec to the document whose id
+        matches that of doc.
+
+        """
+        query = "%s:%s" % (self.unique_key, str(doc['_id']))
+        results = self.solr.search(query)
+        # Results is a lazy iterable containing only 1 result
+        for doc in results:
+            updated = self.apply_update(doc, update_spec)
+            self.upsert(updated)
+        return updated
 
     @wrap_exceptions
     def upsert(self, doc):

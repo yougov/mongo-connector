@@ -32,7 +32,7 @@ from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
-from mongo_connector.doc_managers import exception_wrapper
+from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
 
 
 wrap_exceptions = exception_wrapper({
@@ -40,7 +40,7 @@ wrap_exceptions = exception_wrapper({
     es_exceptions.TransportError: errors.OperationFailed})
 
 
-class DocManager():
+class DocManager(DocManagerBase):
     """The DocManager class creates a connection to the backend engine and
         adds/removes documents, and in the case of rollback, searches for them.
 
@@ -68,6 +68,18 @@ class DocManager():
         """ Stops the instance
         """
         self.auto_commit_interval = None
+
+    @wrap_exceptions
+    def update(self, doc, update_spec):
+        """Apply updates given in update_spec to the document whose id
+        matches that of doc.
+
+        """
+        document = self.elastic.get(index=doc['ns'],
+                                    id=str(doc['_id']))
+        updated = self.apply_update(document['_source'], update_spec)
+        self.upsert(updated)
+        return updated
 
     @wrap_exceptions
     def upsert(self, doc):

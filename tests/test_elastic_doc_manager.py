@@ -56,6 +56,26 @@ class ElasticDocManagerTester(unittest.TestCase):
             except es_exceptions.TransportError:
                 pass
 
+    def test_update(self):
+        doc = {"_id": '1', "ns": "test.test", "_ts": 1,
+               "a": 1, "b": 2}
+        self.elastic_doc.upsert(doc)
+        # $set only
+        update_spec = {"$set": {"a": 1, "b": 2}}
+        doc = self.elastic_doc.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "a": 1, "b": 2})
+        # $unset only
+        update_spec = {"$unset": {"a": True}}
+        doc = self.elastic_doc.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "b": 2})
+        # mixed $set/$unset
+        update_spec = {"$unset": {"b": True}, "$set": {"c": 3}}
+        doc = self.elastic_doc.update(doc, update_spec)
+        self.assertEqual(doc, {"_id": '1', "ns": "test.test", "_ts": 1,
+                               "c": 3})
+
     def test_upsert(self):
         """Ensure we can properly insert into ElasticSearch via DocManager.
         """

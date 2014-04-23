@@ -43,6 +43,38 @@ class SolrDocManagerTester(unittest.TestCase):
 
         self.solr.delete(q='*:*')
 
+    def test_update(self):
+        doc = {"_id": '1', "ns": "test.test", "_ts": 1,
+               "title": "abc", "description": "def"}
+        self.SolrDoc.upsert(doc)
+        # $set only
+        update_spec = {"$set": {"title": "qaz", "description": "wsx"}}
+        doc = self.SolrDoc.update(doc, update_spec)
+        expected = {"_id": '1', "ns": "test.test", "_ts": 1,
+                    "title": "qaz", "description": "wsx"}
+        # We can't use assertEqual here, because Solr adds some
+        # additional fields like _version_ to all documents
+        for k, v in expected.items():
+            self.assertEqual(doc[k], v)
+
+        # $unset only
+        update_spec = {"$unset": {"title": True}}
+        doc = self.SolrDoc.update(doc, update_spec)
+        expected = {"_id": '1', "ns": "test.test", "_ts": 1,
+                    "description": "wsx"}
+        for k, v in expected.items():
+            self.assertEqual(doc[k], v)
+        self.assertNotIn("title", doc)
+
+        # mixed $set/$unset
+        update_spec = {"$unset": {"description": True},
+                       "$set": {"subject": "edc"}}
+        doc = self.SolrDoc.update(doc, update_spec)
+        expected = {"_id": '1', "ns": "test.test", "_ts": 1, "subject": "edc"}
+        for k, v in expected.items():
+            self.assertEqual(doc[k], v)
+        self.assertNotIn("description", doc)
+
     def test_upsert(self):
         """Ensure we can properly insert into Solr via DocManager.
         """
