@@ -59,7 +59,7 @@ class MongoDocManagerTester(unittest.TestCase):
         """Empty Mongo at the start of every test
         """
 
-        self.mongo_conn.drop_database("__mongo-connector")
+        self.mongo_conn.drop_database("__mongo_connector")
         self.mongo.remove()
 
         conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
