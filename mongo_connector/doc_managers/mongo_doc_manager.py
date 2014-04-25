@@ -133,12 +133,9 @@ class DocManager():
         def docs_by_ts():
             for namespace in self._namespaces():
                 database, coll = namespace.split('.', 1)
-                target_coll = self.mongo[database][coll]
-                for ts_ns_doc in self.mongo["__mongo-connector"][namespace].find(limit=1).sort('_ts', -1):
-                    document = target_coll.find_one(
-                        {self.unique_key: ts_ns_doc[self.unique_key]}
-                    )
-                    yield document
+                mc_coll = self.mongo["__mongo-connector"][namespace]
+                for ts_ns_doc in mc_coll.find(limit=1).sort('_ts', -1):
+                    yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x:x["_ts"])
 
