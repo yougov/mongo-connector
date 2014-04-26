@@ -94,8 +94,8 @@ class OplogThread(threading.Thread):
         #This is the username used for authentication.
         self.auth_username = auth_username
 
-        # List of fields to export
-        self.fields = fields
+        # Set of fields to export
+        self._fields = set(fields) if fields else None
 
         logging.info('OplogThread: Initializing oplog thread')
 
@@ -115,6 +115,19 @@ class OplogThread(threading.Thread):
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             logging.warning('%s %s' % (err_msg, self.primary_connection))
+
+    @property
+    def fields(self):
+        return self._fields
+
+    @fields.setter
+    def fields(self, value):
+        if value:
+            self._fields = set(value)
+            # Always include _id field
+            self._fields.add('_id')
+        else:
+            self._fields = None
 
     def run(self):
         """Start the oplog worker.
@@ -144,6 +157,7 @@ class OplogThread(threading.Thread):
             err = False
             remove_inc = 0
             upsert_inc = 0
+            update_inc = 0
             try:
                 logging.debug("OplogThread: about to process new oplog "
                               "entries")
@@ -163,6 +177,12 @@ class OplogThread(threading.Thread):
                         if entry.get("fromMigrate"):
                             continue
 
+                        # Take fields out of the oplog entry that
+                        # shouldn't be replicated. This may nullify
+                        # the document if there's nothing to do.
+                        if not self.filter_oplog_entry(entry):
+                            continue
+
                         #sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
@@ -170,44 +190,50 @@ class OplogThread(threading.Thread):
                         # use namespace mapping if one exists
                         ns = self.dest_mapping.get(entry['ns'], ns)
 
-                        #delete
-                        try:
-                            logging.debug("OplogThread: Operation for this "
-                                          "entry is %s" % str(operation))
-                            if operation == 'd':
-                                entry['_id'] = entry['o']['_id']
-                                for dm in self.doc_managers:
+                        for docman in self.doc_managers:
+                            try:
+                                logging.debug("OplogThread: Operation for this "
+                                              "entry is %s" % str(operation))
+
+                                # Remove
+                                if operation == 'd':
+                                    entry['_id'] = entry['o']['_id']
+                                    docman.remove(entry)
                                     remove_inc += 1
-                                    dm.remove(entry)
-                            #insert/update. They are equal because of lack
-                            #of support for partial update
-                            elif operation == 'i' or operation == 'u':
-                                doc = self.retrieve_doc(entry)
-                                if doc is not None:
+                                # Insert
+                                elif operation == 'i':  # Insert
+                                    # Retrieve inserted document from
+                                    # 'o' field in oplog record
+                                    doc = entry.get('o')
+                                    # Extract timestamp and namespace
                                     doc['_ts'] = util.bson_ts_to_long(
                                         entry['ts'])
                                     doc['ns'] = ns
-                                    for dm in self.doc_managers:
-                                        upsert_inc += 1
-                                        dm.upsert(doc)
-                        except errors.OperationFailed:
-                            logging.error(
-                                "Unable to %s doc with id %s" % (
-                                    "delete" if operation == "d" else "upsert",
-                                    str(entry['_id'])
-                                ))
-                        except errors.ConnectionFailed:
-                            logging.error(
-                                "Network error while trying to %s %s" % (
-                                    "delete" if operation == "d" else "upsert",
-                                    str(entry['_id'])
-                                ))
+                                    docman.upsert(doc)
+                                    upsert_inc += 1
+                                # Update
+                                elif operation == 'u':
+                                    doc = {"_id": entry['o2']['_id'],
+                                           "_ts": util.bson_ts_to_long(
+                                               entry['ts']),
+                                           "ns": ns}
+                                    # 'o' field contains the update spec
+                                    docman.update(doc, entry.get('o', {}))
+                                    update_inc += 1
+                            except errors.OperationFailed:
+                                logging.exception(
+                                    "Unable to process oplog document %r"
+                                    % entry)
+                            except errors.ConnectionFailed:
+                                logging.exception(
+                                    "Connection failed while processing oplog "
+                                    "document %r" % entry)
 
-                        if (remove_inc + upsert_inc) % 1000 == 0:
-                            logging.debug("OplogThread: Removed %d "
-                                          " documents and upserted %d "
-                                          " documents so far"
-                                          % (remove_inc, upsert_inc))
+                        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
+                            logging.debug(
+                                "OplogThread: Documents removed: %d, "
+                                "inserted: %d, updated: %d so far" % (
+                                    remove_inc, upsert_inc, update_inc))
 
                         logging.debug("OplogThread: Doc is processed.")
 
@@ -229,6 +255,9 @@ class OplogThread(threading.Thread):
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
                     pymongo.errors.ConfigurationError):
+                logging.exception(
+                    "Cursor closed due to an exception. "
+                    "Will attempt to reconnect.")
                 err = True
 
             if err is True and self.auth_key is not None:
@@ -247,9 +276,9 @@ class OplogThread(threading.Thread):
                 self.checkpoint = last_ts
                 self.update_checkpoint()
 
-            logging.debug("OplogThread: Sleeping.  This batch I removed %d "
-                          " documents and I upserted %d documents."
-                          % (remove_inc, upsert_inc))
+            logging.debug("OplogThread: Sleeping. Documents removed: %d, "
+                          "upserted: %d, updated: %d"
+                          % (remove_inc, upsert_inc, update_inc))
             time.sleep(2)
 
     def join(self):
@@ -259,36 +288,31 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
-    def retrieve_doc(self, entry):
-        """Given the doc ID's, retrieve those documents from the mongos.
-        """
+    def filter_oplog_entry(self, entry):
+        """Remove fields from an oplog entry that should not be replicated."""
+        if not self._fields:
+            return entry
 
-        if not entry:
-            return None
+        def pop_excluded_fields(doc):
+            for key in set(doc) - self._fields:
+                doc.pop(key)
 
-        namespace = entry['ns']
+        # 'i' indicates an insert. 'o' field is the doc to be inserted.
+        if entry['op'] == 'i':
+            pop_excluded_fields(entry['o'])
+        # 'u' indicates an update. 'o' field is the update spec.
+        elif entry['op'] == 'u':
+            pop_excluded_fields(entry['o'].get("$set", {}))
+            pop_excluded_fields(entry['o'].get("$unset", {}))
+            # not allowed to have empty $set/$unset, so remove if empty
+            if "$set" in entry['o'] and not entry['o']['$set']:
+                entry['o'].pop("$set")
+            if "$unset" in entry['o'] and not entry['o']['$unset']:
+                entry['o'].pop("$unset")
+            if not entry['o']:
+                return None
 
-        # Update operations don't have an 'o' field specifying the document
-        #- instead it specifies
-        # the changes. So we use 'o2' for updates to get the doc_id later.
-
-        if 'o2' in entry:
-            doc_field = 'o2'
-        else:
-            doc_field = 'o'
-
-        doc_id = entry[doc_field]['_id']
-        db_name, coll_name = namespace.split('.', 1)
-
-        coll = self.main_connection[db_name][coll_name]
-
-        doc = util.retry_until_ok(
-            coll.find_one,
-            {'_id': doc_id},
-            fields=self.fields
-        )
-
-        return doc
+        return entry
 
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog.
@@ -397,14 +421,14 @@ class OplogThread(threading.Thread):
                     if not last_id:
                         cursor = util.retry_until_ok(
                             target_coll.find,
-                            fields=self.fields,
+                            fields=self._fields,
                             sort=[("_id", pymongo.ASCENDING)]
                         )
                     else:
                         cursor = util.retry_until_ok(
                             target_coll.find,
                             {"_id": {"$gt": last_id}},
-                            fields=self.fields,
+                            fields=self._fields,
                             sort=[("_id", pymongo.ASCENDING)]
                         )
                     try:
@@ -631,7 +655,7 @@ class OplogThread(threading.Thread):
                 to_update = util.retry_until_ok(
                     self.main_connection[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    fields=self.fields
+                    fields=self._fields
                 )
                 #doc list are docs in target system, to_update are
                 #docs in mongo

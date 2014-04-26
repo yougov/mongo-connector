@@ -101,6 +101,46 @@ class TestSynchronizer(unittest.TestCase):
         result_set_1 = self.synchronizer._search()
         self.assertEqual(len(result_set_1), 0)
 
+    def test_update(self):
+        """Test that Connector can replicate updates successfully."""
+        doc = {"a": 1, "b": 2}
+        self.conn.test.test.insert(doc)
+        selector = {"_id": doc['_id']}
+
+        def update_and_retrieve(update_spec):
+            self.conn.test.test.update(selector, update_spec)
+            # Give the connector some time to perform update
+            time.sleep(1)
+            return self.synchronizer._search()[0]
+
+        # $set only
+        doc = update_and_retrieve({"$set": {"b": 4}})
+        self.assertEqual(doc['a'], 1)
+        self.assertEqual(doc['b'], 4)
+
+        # $unset only
+        doc = update_and_retrieve({"$unset": {"a": True}})
+        self.assertNotIn('a', doc)
+        self.assertEqual(doc['b'], 4)
+
+        # mixed $set/$unset
+        doc = update_and_retrieve({"$unset": {"b": True}, "$set": {"c": 3}})
+        self.assertEqual(doc['c'], 3)
+        self.assertNotIn('b', doc)
+
+        # ensure update works when fields are given
+        opthread = self.connector.shard_set[0]
+        opthread.fields = ['a', 'b', 'c']
+        try:
+            doc = update_and_retrieve({"$set": {"d": 10}})
+            self.assertEqual(self.conn.test.test.find_one(doc['_id'])['d'], 10)
+            self.assertNotIn('d', doc)
+            doc = update_and_retrieve({"$set": {"a": 10}})
+            self.assertEqual(doc['a'], 10)
+        finally:
+            # cleanup
+            opthread.fields = None
+
 
 if __name__ == '__main__':
     unittest.main()
