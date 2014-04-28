@@ -22,6 +22,7 @@ import re
 import json
 from datetime import date
 import bson.json_util as bsjson
+import bson
 
 from algoliasearch import algoliasearch
 from mongo_connector import errors
@@ -77,6 +78,12 @@ class DocManager():
             return tree
         return  self.attributes_remap[tree]
 
+    def serialize(self, value):
+        if isinstance(value, bson.objectid.ObjectId):
+            return str(value)
+        else:
+            return value
+
     def apply_filter(self, doc, filter):
         if not filter:
             return doc, True
@@ -100,9 +107,9 @@ class DocManager():
                         part, state = self.apply_filter(elt, filter[key])
                         if state:
                             if append:
-                                filtered_doc[key].append(part)
+                                filtered_doc[key].append(self.serialize(part))
                             else:
-                                filtered_doc[key] = part
+                                filtered_doc[key] = self.serialize(part)
                         elif _all_op_ == "and":
                             del filtered_doc[key]
                             _all_ = False;
@@ -112,9 +119,9 @@ class DocManager():
                             if filter[key] == "" or eval(re.sub(r"_\$", "elt", filter[key])):
                                 state = True
                                 if append:
-                                    filtered_doc[key].append(elt)
+                                    filtered_doc[key].append(self.serialize(elt))
                                 else:
-                                    filtered_doc[key] = elt
+                                    filtered_doc[key] = self.serialize(elt)
                             elif _all_op_ == "and":
                                 del filtered_doc[key]
                                 _all_ = False
@@ -134,7 +141,7 @@ class DocManager():
             return doc
         remapped_doc = doc 
         for key, value in self.attributes_remap.items():
-            exec("remapped_doc" + value + " = " + "doc" + key)
+            exec("remapped_doc" + value + " = self.serialize(" + "doc" + key + ")")
             exec('del remapped_doc' + key) 
         return remapped_doc
                 
@@ -179,13 +186,14 @@ class DocManager():
     def commit(self):
         """ Send the current batch of updates
         """
+	print("commit")
         try:
             request = {}
             with self.mutex:
                 if len(self.batch) == 0:
                     return
-                self.batch.append({ 'action': 'changeSettings', 'body': { 'userData': { 'lastObjectID': self.last_object_id } } })
                 self.index.batch({ 'requests': self.batch })
+		self.index.setSettings({ 'userData': { 'lastObjectID': self.last_object_id } })
                 self.batch = []
         except algoliasearch.AlgoliaException as e:
             raise errors.ConnectionFailed("Could not connect to Algolia Search: %s" % e)
@@ -200,7 +208,7 @@ class DocManager():
     def get_last_doc(self):
         """ Returns the last document stored in Algolia.
         """
-        last_object_id = get_last_object_id()
+        last_object_id = self.get_last_object_id()
         if last_object_id is None:
             return None
         try:
@@ -208,7 +216,7 @@ class DocManager():
         except algoliasearch.AlgoliaException as e:
             raise errors.ConnectionFailed("Could not connect to Algolia Search: %s" % e)
 
-    def get_last_object_id():
+    def get_last_object_id(self):
         try:
             return (self.index.getSettings()['userData'] or {}).get('lastObjectID', None)
         except algoliasearch.AlgoliaException as e:
