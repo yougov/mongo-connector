@@ -31,10 +31,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 
-try:
-    from pymongo import MongoClient as Connection
-except ImportError:
-    from pymongo import Connection
+from pymongo import MongoClient
 
 
 class Connector(threading.Thread):
@@ -63,7 +60,6 @@ class Connector(threading.Thread):
                 loader = importlib.machinery.SourceFileLoader(name, path)
                 module = loader.load_module(name)
             except ImportError:
-                import imp
                 module = imp.load_source(name, path)
             return module
 
@@ -157,7 +153,7 @@ class Connector(threading.Thread):
                             d.DocManager(**docman_kwargs))
                 # If more target URLs were given than doc managers, may need
                 # to create additional doc managers
-                for url in self.target_urls[i+1:]:
+                for url in self.target_urls[i + 1:]:
                     self.doc_managers.append(
                         doc_manager_modules[-1].DocManager(url,
                                                            **docman_kwargs))
@@ -266,7 +262,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = Connection(self.address)
+        main_conn = MongoClient(self.address)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -286,6 +282,13 @@ class Connector(threading.Thread):
                     'to run mongo-connector. Shutting down...' % self.address
                 )
                 return
+
+            # Establish a connection to the replica set as a whole
+            main_conn.disconnect()
+            main_conn = MongoClient(self.address,
+                                    replicaSet=is_master['setName'])
+            if self.auth_key is not None:
+                main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
@@ -356,7 +359,7 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = Connection(hosts, replicaSet=repl_set)
+                    shard_conn = MongoClient(hosts, replicaSet=repl_set)
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
@@ -405,7 +408,7 @@ def main():
                       """ replica sets, supply the address of the"""
                       """ primary. For example, `-m localhost:27217`"""
                       """ would be a valid argument to `-m`. Don't use"""
-                      """ quotes around the address""")
+                      """ quotes around the address.""")
 
     #-o is to specify the oplog-config file. This file is used by the system
     #to store the last timestamp read on a specific oplog. This allows for
@@ -582,11 +585,28 @@ def main():
                       """ interval, which should be preferred to this"""
                       """ option.""")
 
+    #-v enables vebose logging
+    parser.add_option("-v", "--verbose", action="store_true",
+                      dest="verbose", default=False,
+                      help="Sets verbose logging to be on.")
+
+    #-w enable logging to a file
+    parser.add_option("-w", "--logfile", dest="logfile",
+                      help=("Log all output to a file rather than stream to "
+                            "stderr.   Omit to stream to stderr."))
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
     loglevel = logging.INFO
+    if options.verbose:
+        loglevel = logging.DEBUG
     logger.setLevel(loglevel)
+
+    if options.enable_syslog and options.logfile:
+        print ("You cannot specify syslog and a logfile simultaneously, please"
+               " choose the logging method you would prefer.")
+        sys.exit(0)
 
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
@@ -596,6 +616,16 @@ def main():
         )
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
+    elif options.logfile is not None:
+        try:
+            log_out = logging.FileHandler(options.logfile)
+        except Exception as e:
+            raise e
+            sys.exit(0)
+        log_out.setLevel(loglevel)
+        log_out.setFormatter(logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(log_out)
     else:
         log_out = logging.StreamHandler()
         log_out.setLevel(loglevel)
@@ -637,9 +667,8 @@ def main():
         ## Create a mapping of source ns to dest ns as a dict
         dest_mapping = dict(zip(ns_set, dest_ns_set))
 
-    if options.fields is None:
-        fields = []
-    else:
+    fields = options.fields
+    if fields is not None:
         fields = options.fields.split(',')
 
     key = None
