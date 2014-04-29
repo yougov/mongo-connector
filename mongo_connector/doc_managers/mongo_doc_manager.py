@@ -73,7 +73,7 @@ class DocManager():
         """
         pass
 
-    def upsert(self, doc):
+    def upsert(self, doc, raw_update_operation=None):
         """Update or insert a document into Mongo
         """
         database, coll = doc['ns'].split('.', 1)

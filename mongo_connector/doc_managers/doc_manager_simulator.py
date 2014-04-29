@@ -48,7 +48,7 @@ class DocManager():
         """
         pass
 
-    def upsert(self, doc):
+    def upsert(self, doc, raw_update_operation=None):
         """Adds a document to the doc dict.
         """
 

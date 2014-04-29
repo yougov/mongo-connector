@@ -78,7 +78,7 @@ class DocManager():
         self.auto_commit_interval = None
 
     @wrap_exceptions
-    def upsert(self, doc):
+    def upsert(self, doc, raw_update_operation=None):
         """Update or insert a document into Elastic
 
         If you'd like to have different types of document in your database,
