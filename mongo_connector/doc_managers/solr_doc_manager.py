@@ -150,7 +150,7 @@ class DocManager():
         """
         pass
 
-    def upsert(self, doc):
+    def upsert(self, doc, raw_update_operation=None):
         """Update or insert a document into Solr
 
         This method should call whatever add/insert/update method exists for

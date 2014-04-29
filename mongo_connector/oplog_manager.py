@@ -189,7 +189,7 @@ class OplogThread(threading.Thread):
                                     doc['ns'] = ns
                                     for dm in self.doc_managers:
                                         upsert_inc += 1
-                                        dm.upsert(doc)
+                                        dm.upsert(doc, entry['o'])
                         except errors.OperationFailed:
                             logging.error(
                                 "Unable to %s doc with id %s" % (

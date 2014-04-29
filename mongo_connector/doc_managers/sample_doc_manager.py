@@ -63,7 +63,7 @@ class DocManager():
         """
         raise exceptions.NotImplementedError
 
-    def upsert(self, doc):
+    def upsert(self, doc, raw_update_operation=None):
         """Update or insert a document into engine.
         The documents has ns and _ts fields.
 
@@ -78,6 +78,11 @@ class DocManager():
         contents if there is considerable delay in trailing the oplog.
         We have only one function for update and insert because incremental
         updates are not supported, so there is no update option.
+
+        The raw_update_operation parameter contains the update itself using
+        a subset of MongoDB’s $ syntax. If you are only interested in fields
+        being written so you can update a cache, then you only need
+        check the contents of $set
         """
         raise exceptions.NotImplementedError
 
