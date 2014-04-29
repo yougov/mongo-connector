@@ -186,7 +186,6 @@ class DocManager():
     def commit(self):
         """ Send the current batch of updates
         """
-	print("commit")
         try:
             request = {}
             with self.mutex:
