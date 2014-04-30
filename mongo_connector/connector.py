@@ -294,11 +294,11 @@ class Connector(threading.Thread):
             oplog_coll = main_conn['local']['oplog.rs']
 
             prim_admin = main_conn.admin
-            repl_set = prim_admin.command("replSetGetStatus")['set']
+            repl_set = prim_admin.command("isMaster")['setName']
 
             oplog = OplogThread(
                 primary_conn=main_conn,
-                main_address=(main_conn.host + ":" + str(main_conn.port)),
+                main_address=self.address,
                 oplog_coll=oplog_coll,
                 is_sharded=False,
                 doc_manager=self.doc_managers,
