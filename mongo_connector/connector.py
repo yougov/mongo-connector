@@ -293,12 +293,9 @@ class Connector(threading.Thread):
             #non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
 
-            prim_admin = main_conn.admin
-            repl_set = prim_admin.command("replSetGetStatus")['set']
-
             oplog = OplogThread(
                 primary_conn=main_conn,
-                main_address=(main_conn.host + ":" + str(main_conn.port)),
+                main_address=self.address,
                 oplog_coll=oplog_coll,
                 is_sharded=False,
                 doc_manager=self.doc_managers,
@@ -306,7 +303,7 @@ class Connector(threading.Thread):
                 namespace_set=self.ns_set,
                 auth_key=self.auth_key,
                 auth_username=self.auth_username,
-                repl_set=repl_set,
+                repl_set=is_master['setName'],
                 collection_dump=self.collection_dump,
                 batch_size=self.batch_size,
                 fields=self.fields,
