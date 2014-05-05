@@ -18,3 +18,7 @@ DEFAULT_BATCH_SIZE = -1
 # Interval in seconds between doc manager flushes (i.e. auto commit)
 # default = None (never auto commit)
 DEFAULT_COMMIT_INTERVAL = None
+# Maximum # of documents to send in a single bulk request through a
+# DocManager. This only affects DocManagers that cannot stream their
+# requests.
+DEFAULT_MAX_BULK = 500

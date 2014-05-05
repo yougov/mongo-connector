@@ -26,7 +26,8 @@ import json
 import bson.json_util as bsjson
 from pysolr import Solr, SolrError
 from mongo_connector import errors
-from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
+from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
+                                       DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
@@ -43,7 +44,7 @@ class DocManager():
     """
 
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
-                 unique_key='_id', **kwargs):
+                 unique_key='_id', chunk_size=DEFAULT_MAX_BULK, **kwargs):
         """Verify Solr URL and establish a connection.
         """
         self.solr = Solr(url)
@@ -53,6 +54,7 @@ class DocManager():
             self.auto_commit_interval = auto_commit_interval * 1000
         else:
             self.auto_commit_interval = None
+        self.chunk_size = chunk_size
         self.field_list = []
         self._build_fields()
 
@@ -173,13 +175,26 @@ class DocManager():
 
         docs may be any iterable
         """
+        if self.auto_commit_interval is not None:
+            add_kwargs = {
+                "commit": (self.auto_commit_interval == 0),
+                "commitWithin": self.auto_commit_interval
+            }
+        else:
+            add_kwargs = {"commit": False}
+
         try:
             cleaned = (self._clean_doc(d) for d in docs)
-            if self.auto_commit_interval is not None:
-                self.solr.add(cleaned, commit=(self.auto_commit_interval == 0),
-                              commitWithin=str(self.auto_commit_interval))
+            if self.chunk_size > 0:
+                batch = [next(cleaned) for i in range(self.chunk_size)]
+                while True:
+                    self.solr.add(batch, **add_kwargs)
+                    try:
+                        batch = [next(cleaned) for i in range(self.chunk_size)]
+                    except StopIteration:
+                        break
             else:
-                self.solr.add(cleaned, commit=False)
+                self.solr.add(cleaned, **add_kwargs)
         except SolrError:
             raise errors.OperationFailed(
                 "Could not bulk-insert documents into Solr")

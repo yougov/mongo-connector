@@ -31,7 +31,8 @@ from elasticsearch.helpers import bulk
 
 from mongo_connector import errors
 from mongo_connector.compat import reraise
-from mongo_connector.constants import DEFAULT_COMMIT_INTERVAL
+from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
+                                       DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
 
 
@@ -61,7 +62,7 @@ class DocManager():
         """
 
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
-                 unique_key='_id', chunk_size=500, **kwargs):
+                 unique_key='_id', chunk_size=DEFAULT_MAX_BULK, **kwargs):
         """ Establish a connection to Elastic
         """
         self.elastic = Elasticsearch(hosts=[url])
@@ -117,9 +118,13 @@ class DocManager():
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
         try:
-            responses = bulk(client=self.elastic,
-                             actions=docs_to_upsert(),
-                             chunk_size=self.chunk_size)
+            if self.chunk_size > 0:
+                responses = bulk(client=self.elastic,
+                                 actions=docs_to_upsert(),
+                                 chunk_size=self.chunk_size)
+            else:
+                responses = bulk(client=self.elastic,
+                                 actions=docs_to_upsert())
             for resp in responses[1]:
                 ok = resp['index'].get('ok')
                 if ok is None:
