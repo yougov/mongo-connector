@@ -186,13 +186,11 @@ class DocManager():
         try:
             cleaned = (self._clean_doc(d) for d in docs)
             if self.chunk_size > 0:
-                batch = [next(cleaned) for i in range(self.chunk_size)]
-                while True:
+                batch = list(next(cleaned) for i in range(self.chunk_size))
+                while batch:
                     self.solr.add(batch, **add_kwargs)
-                    try:
-                        batch = [next(cleaned) for i in range(self.chunk_size)]
-                    except StopIteration:
-                        break
+                    batch = list(next(cleaned)
+                                 for i in range(self.chunk_size))
             else:
                 self.solr.add(cleaned, **add_kwargs)
         except SolrError:
