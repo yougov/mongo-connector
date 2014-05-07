@@ -25,10 +25,18 @@ import json
 
 import bson.json_util as bsjson
 from pysolr import Solr, SolrError
+
 from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
+from mongo_connector.doc_managers import exception_wrapper
+
+
+# pysolr only has 1 exception: SolrError
+wrap_exceptions = exception_wrapper({
+    SolrError: errors.OperationFailed})
+
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
 decoder = json.JSONDecoder()
@@ -67,6 +75,7 @@ class DocManager():
                 field_list.append(key)
         return field_list
 
+    @wrap_exceptions
     def _build_fields(self):
         """ Builds a list of valid fields
         """
@@ -152,6 +161,7 @@ class DocManager():
         """
         pass
 
+    @wrap_exceptions
     def upsert(self, doc):
         """Update or insert a document into Solr
 
@@ -159,17 +169,14 @@ class DocManager():
         the backend engine and add the document in there. The input will
         always be one mongo document, represented as a Python dictionary.
         """
-        try:
-            if self.auto_commit_interval is not None:
-                self.solr.add([self._clean_doc(doc)],
-                              commit=(self.auto_commit_interval == 0),
-                              commitWithin=str(self.auto_commit_interval))
-            else:
-                self.solr.add([self._clean_doc(doc)], commit=False)
-        except SolrError:
-            raise errors.OperationFailed(
-                "Could not insert %r into Solr" % bsjson.dumps(doc))
+        if self.auto_commit_interval is not None:
+            self.solr.add([self._clean_doc(doc)],
+                          commit=(self.auto_commit_interval == 0),
+                          commitWithin=str(self.auto_commit_interval))
+        else:
+            self.solr.add([self._clean_doc(doc)], commit=False)
 
+    @wrap_exceptions
     def bulk_upsert(self, docs):
         """Update or insert multiple documents into Solr
 
@@ -183,20 +190,17 @@ class DocManager():
         else:
             add_kwargs = {"commit": False}
 
-        try:
-            cleaned = (self._clean_doc(d) for d in docs)
-            if self.chunk_size > 0:
-                batch = list(next(cleaned) for i in range(self.chunk_size))
-                while batch:
-                    self.solr.add(batch, **add_kwargs)
-                    batch = list(next(cleaned)
-                                 for i in range(self.chunk_size))
-            else:
-                self.solr.add(cleaned, **add_kwargs)
-        except SolrError:
-            raise errors.OperationFailed(
-                "Could not bulk-insert documents into Solr")
+        cleaned = (self._clean_doc(d) for d in docs)
+        if self.chunk_size > 0:
+            batch = list(next(cleaned) for i in range(self.chunk_size))
+            while batch:
+                self.solr.add(batch, **add_kwargs)
+                batch = list(next(cleaned)
+                             for i in range(self.chunk_size))
+        else:
+            self.solr.add(cleaned, **add_kwargs)
 
+    @wrap_exceptions
     def remove(self, doc):
         """Removes documents from Solr
 
@@ -205,17 +209,20 @@ class DocManager():
         self.solr.delete(id=str(doc[self.unique_key]),
                          commit=(self.auto_commit_interval == 0))
 
+    @wrap_exceptions
     def _remove(self):
         """Removes everything
         """
         self.solr.delete(q='*:*', commit=(self.auto_commit_interval == 0))
 
+    @wrap_exceptions
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range.
         """
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
         return self.solr.search(query, rows=100000000)
 
+    @wrap_exceptions
     def _search(self, query):
         """For test purposes only. Performs search on Solr with given query
             Does not have to be implemented.
@@ -227,6 +234,7 @@ class DocManager():
         """
         retry_until_ok(self.solr.commit)
 
+    @wrap_exceptions
     def get_last_doc(self):
         """Returns the last document stored in the Solr engine.
         """

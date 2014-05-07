@@ -23,8 +23,14 @@
 
 import logging
 import pymongo
+
 from mongo_connector import errors
-from bson.errors import InvalidDocument
+from mongo_connector.doc_managers import exception_wrapper
+
+
+wrap_exceptions = exception_wrapper({
+    pymongo.errors.ConnectionFailure: errors.ConnectionFailed,
+    pymongo.errors.OperationFailure: errors.OperationFailed})
 
 
 class DocManager():
@@ -53,6 +59,7 @@ class DocManager():
         for namespace in self._namespaces():
             self.mongo["__mongo_connector"][namespace].create_index("_ts")
 
+    @wrap_exceptions
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
         """
@@ -81,25 +88,22 @@ class DocManager():
             "__mongo_connector in order to return resources to the OS."
         )
 
+    @wrap_exceptions
     def upsert(self, doc):
         """Update or insert a document into Mongo
         """
         database, coll = doc['ns'].split('.', 1)
-        try:
-            ts = doc.pop("_ts")
-            ns = doc.pop("ns")
+        ts = doc.pop("_ts")
+        ns = doc.pop("ns")
 
-            self.mongo["__mongo_connector"][ns].save({
-                self.unique_key: doc[self.unique_key],
-                "_ts": ts,
-                "ns": ns
-            })
-            self.mongo[database][coll].save(doc)
-        except pymongo.errors.OperationFailure:
-            raise errors.OperationFailed("Could not complete upsert on MongoDB")
-        except InvalidDocument:
-            raise errors.OperationFailed("Cannot insert invalid doc to MongoDB")
+        self.mongo["__mongo_connector"][ns].save({
+            self.unique_key: doc[self.unique_key],
+            "_ts": ts,
+            "ns": ns
+        })
+        self.mongo[database][coll].save(doc)
 
+    @wrap_exceptions
     def remove(self, doc):
         """Removes document from Mongo
 
@@ -112,6 +116,7 @@ class DocManager():
         self.mongo["__mongo_connector"][doc['ns']].remove(
             {self.unique_key: doc[self.unique_key]})
 
+    @wrap_exceptions
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
         """
@@ -128,6 +133,7 @@ class DocManager():
         """
         return
 
+    @wrap_exceptions
     def get_last_doc(self):
         """Returns the last document stored in Mongo.
         """
@@ -138,13 +144,15 @@ class DocManager():
                 for ts_ns_doc in mc_coll.find(limit=1).sort('_ts', -1):
                     yield ts_ns_doc
 
-        return max(docs_by_ts(), key=lambda x:x["_ts"])
+        return max(docs_by_ts(), key=lambda x: x["_ts"])
 
+    @wrap_exceptions
     def _remove(self):
         """For test purposes only. Removes all documents in test.test
         """
         self.mongo['test']['test'].remove()
 
+    @wrap_exceptions
     def _search(self):
         """For test purposes only. Performs search on MongoDB with empty query.
         Does not have to be implemented.

@@ -22,7 +22,6 @@
     desired backend.
     """
 import logging
-import sys
 from threading import Timer
 
 import bson.json_util as bsjson
@@ -30,23 +29,15 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import bulk
 
 from mongo_connector import errors
-from mongo_connector.compat import reraise
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
+from mongo_connector.doc_managers import exception_wrapper
 
 
-def wrap_exceptions(func):
-    def wrap(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except es_exceptions.ConnectionError:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            reraise(errors.ConnectionFailed, exc_value, exc_tb)
-        except es_exceptions.TransportError:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            reraise(errors.OperationFailed, exc_value, exc_tb)
-    return wrap
+wrap_exceptions = exception_wrapper({
+    es_exceptions.ConnectionError: errors.ConnectionFailed,
+    es_exceptions.TransportError: errors.OperationFailed})
 
 
 class DocManager():
