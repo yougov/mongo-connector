@@ -68,7 +68,7 @@ class DocManager():
             for coll in coll_list:
                 if coll.startswith("system"):
                     continue
-                namespace = str(database) + "." + str(coll)
+                namespace = "%s.%s" % (database, coll)
                 user_namespaces.append(namespace)
         return user_namespaces
 

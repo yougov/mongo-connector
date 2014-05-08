@@ -375,7 +375,7 @@ class OplogThread(threading.Thread):
                 for coll in coll_list:
                     if coll.startswith("system"):
                         continue
-                    namespace = str(database) + "." + str(coll)
+                    namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
 
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
