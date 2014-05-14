@@ -176,13 +176,13 @@ class Connector(threading.Thread):
                     logging.critical("MongoConnector: Could not "
                                      "create a progress log: %s" %
                                      str(e))
-                    sys.exit(1)
+                    sys.exit(2)
             else:
                 if (not os.access(self.oplog_checkpoint, os.W_OK)
                         and not os.access(self.oplog_checkpoint, os.R_OK)):
                     logging.critical("Invalid permissions on %s! Exiting" %
                                      (self.oplog_checkpoint))
-                    sys.exit(1)
+                    sys.exit(2)
 
     def join(self):
         """ Joins thread, stops it from running
@@ -603,7 +603,7 @@ def main():
     if options.enable_syslog and options.logfile:
         print ("You cannot specify syslog and a logfile simultaneously, please"
                " choose the logging method you would prefer.")
-        sys.exit(0)
+        sys.exit(1)
 
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
@@ -614,11 +614,7 @@ def main():
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
     elif options.logfile is not None:
-        try:
-            log_out = logging.FileHandler(options.logfile)
-        except Exception as e:
-            raise e
-            sys.exit(0)
+        log_out = logging.FileHandler(options.logfile)
         log_out.setLevel(loglevel)
         log_out.setFormatter(logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s'))
