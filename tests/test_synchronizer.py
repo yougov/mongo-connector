@@ -53,9 +53,7 @@ class TestSynchronizer(unittest.TestCase):
         cls.connector = Connector(
             address='%s:%d' % (mongo_host, cls.primary_p),
             oplog_checkpoint='config.txt',
-            target_url=None,
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None
         )
         cls.synchronizer = cls.connector.doc_managers[0]

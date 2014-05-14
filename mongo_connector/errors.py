@@ -35,11 +35,5 @@ class EmptyDocsError(MongoConnectorError):
     """
 
 
-class ConnectorError(MongoConnectorError):
-    """Raised when creating a mongo_connector.Connector object with
-    nonsensical parameters
-    """
-
-
 class UpdateDoesNotApply(OperationFailed):
     """Raised when an update operation cannot be applied to a document."""

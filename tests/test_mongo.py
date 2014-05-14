@@ -72,11 +72,9 @@ class TestSynchronizer(unittest.TestCase):
         self.connector = Connector(
             address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint="config.txt",
-            target_url='%s:%d' % (mongo_host, self.standalone_port),
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None,
-            doc_manager='mongo_connector/doc_managers/mongo_doc_manager.py'
+            doc_managers=(self.mongo_doc,)
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)

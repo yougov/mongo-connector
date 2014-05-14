@@ -28,14 +28,10 @@ else:
 import time
 import json
 
-from mongo_connector.connector import Connector
+from mongo_connector.connector import Connector, create_doc_managers
 from tests import mongo_host
 from tests.setup_cluster import start_replica_set, kill_replica_set
 from bson.timestamp import Timestamp
-from mongo_connector import errors
-from mongo_connector.doc_managers import (
-    doc_manager_simulator
-)
 from mongo_connector.util import long_to_bson_ts
 
 
@@ -66,9 +62,7 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint='config.txt',
-            target_url=None,
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None
         )
         conn.start()
@@ -93,9 +87,7 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint="temp_config.txt",
-            target_url=None,
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None
         )
 
@@ -132,9 +124,7 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint=None,
-            target_url=None,
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None
         )
 
@@ -174,113 +164,59 @@ class TestMongoConnector(unittest.TestCase):
 
         os.unlink("temp_config.txt")
 
-    def test_many_targets(self):
-        """Test that DocManagers are created and assigned to target URLs
-        correctly when instantiating a Connector object with multiple target
-        URLs
-        """
-
-        # no doc manager or target URLs
-        connector_kwargs = {
-            "address": '%s:%d' % (mongo_host, self.primary_p),
-            "oplog_checkpoint": None,
-            "ns_set": None,
-            "u_key": None,
-            "auth_key": None
-        }
-        c = Connector(target_url=None, **connector_kwargs)
-        self.assertEqual(len(c.doc_managers), 1)
-        self.assertIsInstance(c.doc_managers[0],
-                              doc_manager_simulator.DocManager)
-
-        # N.B. This assumes we're in mongo-connector/tests
-        def get_docman(name):
-            return os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                os.pardir,
-                "mongo_connector",
-                "doc_managers",
-                "%s.py" % name
-            )
-
+    def test_create_doc_managers(self):
+        """Test that DocManagers are created correctly for given CLI options."""
         # only target URL provided
-        with self.assertRaises(errors.ConnectorError):
-            Connector(target_url="localhost:9200", **connector_kwargs)
+        with self.assertRaises(SystemExit):
+            create_doc_managers(urls="abcxyz.com")
 
         # one doc manager taking a target URL, no URL provided
-        with self.assertRaises(TypeError):
-            c = Connector(doc_manager=get_docman("mongo_doc_manager"),
-                          **connector_kwargs)
+        with self.assertRaises(SystemExit):
+            create_doc_managers(names="solr_doc_manager")
 
         # 1:1 target URLs and doc managers
-        c = Connector(
-            doc_manager=[
-                get_docman("elastic_doc_manager"),
-                get_docman("doc_manager_simulator"),
-                get_docman("elastic_doc_manager")
-            ],
-            target_url=[
-                '%s:%d' % (mongo_host, self.primary_p),
+        names = ["elastic_doc_manager",
+                 "doc_manager_simulator",
+                 "elastic_doc_manager"]
+        urls = ['%s:%d' % (mongo_host, self.primary_p),
                 "foobar",
-                "bazbaz"
-            ],
-            **connector_kwargs
+                "bazbaz"]
+        doc_managers = create_doc_managers(
+            names=",".join(names),
+            urls=",".join(urls)
         )
-        self.assertEqual(len(c.doc_managers), 3)
+        self.assertEqual(len(doc_managers), 3)
         # Connector uses doc manager filename as module name
-        self.assertEqual(c.doc_managers[0].__module__,
-                         "elastic_doc_manager")
-        self.assertEqual(c.doc_managers[1].__module__,
-                         "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[2].__module__,
-                         "elastic_doc_manager")
+        for index, name in enumerate(names):
+            self.assertEqual(doc_managers[index].__module__,
+                             "mongo_connector.doc_managers.%s" % name)
 
         # more target URLs than doc managers
-        c = Connector(
-            doc_manager=[
-                get_docman("doc_manager_simulator")
-            ],
-            target_url=[
-                '%s:%d' % (mongo_host, self.primary_p),
-                "foobar",
-                "bazbaz"
-            ],
-            **connector_kwargs
-        )
-        self.assertEqual(len(c.doc_managers), 3)
-        self.assertEqual(c.doc_managers[0].__module__,
-                         "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[1].__module__,
-                         "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[2].__module__,
-                         "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[0].url,
-                         '%s:%d' % (mongo_host, self.primary_p))
-        self.assertEqual(c.doc_managers[1].url, "foobar")
-        self.assertEqual(c.doc_managers[2].url, "bazbaz")
+        doc_managers = create_doc_managers(
+            names="doc_manager_simulator",
+            urls=",".join(urls))
+        self.assertEqual(len(doc_managers), 3)
+        for dm in doc_managers:
+            self.assertEqual(
+                dm.__module__,
+                "mongo_connector.doc_managers.doc_manager_simulator")
+        for index, url in enumerate(urls):
+            self.assertEqual(doc_managers[index].url, url)
 
         # more doc managers than target URLs
-        c = Connector(
-            doc_manager=[
-                get_docman("elastic_doc_manager"),
-                get_docman("doc_manager_simulator"),
-                get_docman("doc_manager_simulator")
-            ],
-            target_url=[
-                '%s:%d' % (mongo_host, self.primary_p)
-            ],
-            **connector_kwargs
-        )
-        self.assertEqual(len(c.doc_managers), 3)
-        self.assertEqual(c.doc_managers[0].__module__,
-                         "elastic_doc_manager")
-        self.assertEqual(c.doc_managers[1].__module__,
-                         "doc_manager_simulator")
-        self.assertEqual(c.doc_managers[2].__module__,
-                         "doc_manager_simulator")
-        # extra doc managers should have None as target URL
-        self.assertEqual(c.doc_managers[1].url, None)
-        self.assertEqual(c.doc_managers[2].url, None)
+        names = ["elastic_doc_manager",
+                 "doc_manager_simulator",
+                 "doc_manager_simulator"]
+        doc_managers = create_doc_managers(
+            names=",".join(names),
+            urls='%s:%d' % (mongo_host, self.primary_p))
+        for index, name in enumerate(names):
+            self.assertEqual(
+                doc_managers[index].__module__,
+                "mongo_connector.doc_managers.%s" % name)
+        self.assertEqual(doc_managers[1].url, None)
+        self.assertEqual(doc_managers[2].url, None)
+
 
 if __name__ == '__main__':
     unittest.main()

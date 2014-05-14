@@ -48,7 +48,7 @@ class TestOplogManager(unittest.TestCase):
             main_address='%s:%d' % (mongo_host, self.primary_p),
             oplog_coll=self.oplog_coll,
             is_sharded=False,
-            doc_manager=DocManager(),
+            doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
             namespace_set=None,
             auth_key=None,

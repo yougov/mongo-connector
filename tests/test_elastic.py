@@ -102,15 +102,13 @@ class TestElastic(ElasticsearchTestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
+        docman = DocManager(elastic_pair)
         self.connector = Connector(
             address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint='config.txt',
-            target_url=elastic_pair,
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None,
-            doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py',
-            auto_commit_interval=0
+            doc_managers=(docman,)
         )
 
         self.conn.test.test.drop()

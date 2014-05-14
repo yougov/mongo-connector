@@ -66,7 +66,7 @@ class TestRollbacks(unittest.TestCase):
             main_address='%s:%d' % (mongo_host, self.primary_p),
             oplog_coll=self.main_conn["local"]["oplog.rs"],
             is_sharded=False,
-            doc_manager=doc_manager,
+            doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             namespace_set=["test.mc"],
             auth_key=None,

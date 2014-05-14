@@ -35,6 +35,7 @@ from tests.setup_cluster import (start_replica_set,
 from tests.util import assert_soon
 from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
+from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 
@@ -63,15 +64,14 @@ class TestSynchronizer(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
+        docman = DocManager('http://%s/solr' % solr_pair,
+                            auto_commit_interval=0)
         self.connector = Connector(
             address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint='config.txt',
-            target_url='http://localhost:8983/solr',
             ns_set=['test.test'],
-            u_key='_id',
             auth_key=None,
-            doc_manager='mongo_connector/doc_managers/solr_doc_manager.py',
-            auto_commit_interval=0
+            doc_managers=(docman,)
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)

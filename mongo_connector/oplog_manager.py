@@ -37,7 +37,7 @@ class OplogThread(threading.Thread):
     """OplogThread gathers the updates for a single oplog.
     """
     def __init__(self, primary_conn, main_address, oplog_coll, is_sharded,
-                 doc_manager, oplog_progress_dict, namespace_set, auth_key,
+                 doc_managers, oplog_progress_dict, namespace_set, auth_key,
                  auth_username, repl_set=None, collection_dump=True,
                  batch_size=DEFAULT_BATCH_SIZE, fields=None,
                  dest_mapping={}, continue_on_error=False):
@@ -67,10 +67,7 @@ class OplogThread(threading.Thread):
 
         #A document manager for each target system.
         #These are the same for all threads.
-        if type(doc_manager) == list:
-            self.doc_managers = doc_manager
-        else:
-            self.doc_managers = [doc_manager]
+        self.doc_managers = doc_managers
 
         #Boolean describing whether or not the thread is running.
         self.running = True
