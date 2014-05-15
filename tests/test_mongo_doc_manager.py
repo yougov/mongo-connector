@@ -78,7 +78,7 @@ class MongoDocManagerTester(unittest.TestCase):
     def test_update(self):
         doc = {"_id": '1', "ns": "test.test", "_ts": 1,
                "a": 1, "b": 2}
-        self.choosy_docman.upsert(doc)
+        self.mongo.insert(doc)
         # $set only
         update_spec = {"$set": {"a": 1, "b": 2}}
         doc = self.choosy_docman.update(doc, update_spec)

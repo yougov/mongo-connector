@@ -64,51 +64,6 @@ class TestOplogManager(unittest.TestCase):
         self.primary_conn.close()
         kill_replica_set('test-oplog-manager')
 
-    def test_retrieve_doc(self):
-        """ Test the retrieve_doc method """
-
-        # Trivial case where the oplog entry is None
-        self.assertEqual(self.opman.retrieve_doc(None), None)
-
-        # Retrieve a document from insert operation in oplog
-        doc = {"name": "mango", "type": "fruit",
-               "ns": "test.test", "weight": 3.24, "i": 1}
-        self.primary_conn["test"]["test"].insert(doc)
-        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        oplog_entry = next(oplog_entries)
-        self.assertEqual(self.opman.retrieve_doc(oplog_entry), doc)
-
-        # Retrieve a document from update operation in oplog
-        self.primary_conn["test"]["test"].update(
-            {"i": 1},
-            {"$set": {"sounds-like": "mongo"}}
-        )
-        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        doc["sounds-like"] = "mongo"
-        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), doc)
-
-        # Retrieve a document from remove operation in oplog
-        # (expected: None)
-        self.primary_conn["test"]["test"].remove({
-            "i": 1
-        })
-        oplog_entries = self.primary_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        self.assertEqual(self.opman.retrieve_doc(next(oplog_entries)), None)
-
-        # Retrieve a document with bad _id
-        # (expected: None)
-        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
-        self.assertEqual(self.opman.retrieve_doc(oplog_entry), None)
-
     def test_get_oplog_cursor(self):
         '''Test the get_oplog_cursor method'''
 
@@ -126,7 +81,9 @@ class TestOplogManager(unittest.TestCase):
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
         self.assertEqual(cursor.count(), 1)
-        self.assertEqual(self.opman.retrieve_doc(next(cursor)), doc)
+        next_entry_id = next(cursor)['o']['_id']
+        retrieved = self.primary_conn.test.test.find_one(next_entry_id)
+        self.assertEqual(retrieved, doc)
 
         # many entries before and after timestamp
         self.primary_conn["test"]["test"].insert(
@@ -145,7 +102,8 @@ class TestOplogManager(unittest.TestCase):
         # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
         doc = self.primary_conn["test"]["test"].find_one(
             {"_id": next(goc_cursor)["o"]["_id"]})
-        self.assertEqual(doc["i"], self.opman.retrieve_doc(pivot)["i"] + 1)
+        retrieved = self.primary_conn.test.test.find_one(pivot['o']['_id'])
+        self.assertEqual(doc["i"], retrieved["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""
@@ -387,6 +345,77 @@ class TestOplogManager(unittest.TestCase):
         for d in doc_managers:
             self.assertEqual(d._search()[0]["name"], "kermit")
 
+    def test_filter_oplog_entry(self):
+        # Test oplog entries: these are callables, since
+        # filter_oplog_entry modifies the oplog entry in-place
+        insert_op = lambda: {
+            "op": "i",
+            "o": {
+                "_id": 0,
+                "a": 1,
+                "b": 2,
+                "c": 3
+            }
+        }
+        update_op = lambda: {
+            "op": "u",
+            "o": {
+                "$set": {
+                    "a": 4,
+                    "b": 5
+                },
+                "$unset": {
+                    "c": True
+                }
+            },
+            "o2": {
+                "_id": 1
+            }
+        }
+
+        # Case 0: insert op, no fields provided
+        self.opman.fields = None
+        filtered = self.opman.filter_oplog_entry(insert_op())
+        self.assertEqual(filtered, insert_op())
+
+        # Case 1: insert op, fields provided
+        self.opman.fields = ['a', 'b']
+        filtered = self.opman.filter_oplog_entry(insert_op())
+        self.assertEqual(filtered['o'], {'_id': 0, 'a': 1, 'b': 2})
+
+        # Case 2: insert op, fields provided, doc becomes empty except for _id
+        self.opman.fields = ['d', 'e', 'f']
+        filtered = self.opman.filter_oplog_entry(insert_op())
+        self.assertEqual(filtered['o'], {'_id': 0})
+
+        # Case 3: update op, no fields provided
+        self.opman.fields = None
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertEqual(filtered, update_op())
+
+        # Case 4: update op, fields provided
+        self.opman.fields = ['a', 'c']
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('b', filtered['o']['$set'])
+        self.assertIn('a', filtered['o']['$set'])
+        self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
+
+        # Case 5: update op, fields provided, empty $set
+        self.opman.fields = ['c']
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('$set', filtered['o'])
+        self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
+
+        # Case 6: update op, fields provided, empty $unset
+        self.opman.fields = ['a', 'b']
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('$unset', filtered['o'])
+        self.assertEqual(filtered['o']['$set'], update_op()['o']['$set'])
+
+        # Case 7: update op, fields provided, entry is nullified
+        self.opman.fields = ['d', 'e', 'f']
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertEqual(filtered, None)
 
 if __name__ == '__main__':
     unittest.main()

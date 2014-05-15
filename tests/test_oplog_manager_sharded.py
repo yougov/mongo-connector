@@ -190,51 +190,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.shard2_secondary_conn.close()
         kill_all()
 
-    def test_retrieve_doc(self):
-        """ Test the retrieve_doc method """
-
-        # Trivial case where the oplog entry is None
-        self.assertEqual(self.opman1.retrieve_doc(None), None)
-
-        # Retrieve a document from insert operation in oplog
-        doc = {"name": "mango", "type": "fruit",
-               "ns": "test.mcsharded", "weight": 3.24, "i": 1}
-        self.mongos_conn["test"]["mcsharded"].insert(doc)
-        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        oplog_entry = next(oplog_entries)
-        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), doc)
-
-        # Retrieve a document from update operation in oplog
-        self.mongos_conn["test"]["mcsharded"].update(
-            {"i": 1},
-            {"$set": {"sounds-like": "mongo"}}
-        )
-        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        doc["sounds-like"] = "mongo"
-        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), doc)
-
-        # Retrieve a document from remove operation in oplog
-        # (expected: None)
-        self.mongos_conn["test"]["mcsharded"].remove({
-            "i": 1
-        })
-        oplog_entries = self.shard1_conn["local"]["oplog.rs"].find(
-            sort=[("ts", pymongo.DESCENDING)],
-            limit=1
-        )
-        self.assertEqual(self.opman1.retrieve_doc(next(oplog_entries)), None)
-
-        # Retrieve a document with bad _id
-        # (expected: None)
-        oplog_entry["o"]["_id"] = "ThisIsNotAnId123456789"
-        self.assertEqual(self.opman1.retrieve_doc(oplog_entry), None)
-
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
 
@@ -252,7 +207,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor = self.opman1.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
         self.assertEqual(cursor.count(), 1)
-        self.assertEqual(self.opman1.retrieve_doc(cursor[0]), doc)
+        next_entry_id = cursor[0]['o']['_id']
+        retrieved = self.mongos_conn.test.mcsharded.find_one(next_entry_id)
+        self.assertEqual(retrieved, doc)
 
         # many entries before and after timestamp
         for i in range(2, 2002):
@@ -285,8 +242,12 @@ class TestOplogManagerSharded(unittest.TestCase):
             {"_id": next(cursor1)["o"]["_id"]})
         doc2 = self.mongos_conn["test"]["mcsharded"].find_one(
             {"_id": next(cursor2)["o"]["_id"]})
-        self.assertEqual(doc1["i"], self.opman1.retrieve_doc(pivot1)["i"] + 1)
-        self.assertEqual(doc2["i"], self.opman2.retrieve_doc(pivot2)["i"] + 1)
+        piv1id = pivot1['o']['_id']
+        piv2id = pivot2['o']['_id']
+        retrieved1 = self.mongos_conn.test.mcsharded.find_one(piv1id)
+        retrieved2 = self.mongos_conn.test.mcsharded.find_one(piv2id)
+        self.assertEqual(doc1["i"], retrieved1["i"] + 1)
+        self.assertEqual(doc2["i"], retrieved2["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""
