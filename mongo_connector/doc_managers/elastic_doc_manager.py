@@ -24,7 +24,6 @@
 import logging
 from threading import Timer
 
-import bson.json_util as bsjson
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
 
@@ -33,6 +32,7 @@ from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
 from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 
 
 wrap_exceptions = exception_wrapper({
@@ -63,6 +63,7 @@ class DocManager(DocManagerBase):
         self.chunk_size = chunk_size
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
+        self._formatter = DefaultDocumentFormatter()
 
     def stop(self):
         """ Stops the instance
@@ -97,7 +98,7 @@ class DocManager(DocManagerBase):
         # No need to duplicate '_id' in source document
         doc_id = str(doc.pop("_id"))
         self.elastic.index(index=index, doc_type=doc_type,
-                           body=bsjson.dumps(doc), id=doc_id,
+                           body=self._formatter.format_document(doc), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
         # Don't mutate doc argument
         doc['_id'] = doc_id
@@ -117,7 +118,7 @@ class DocManager(DocManagerBase):
                     "_index": index,
                     "_type": self.doc_type,
                     "_id": doc_id,
-                    "_source": doc
+                    "_source": self._formatter.format_document(doc)
                 }
             if not doc:
                 raise errors.EmptyDocsError(

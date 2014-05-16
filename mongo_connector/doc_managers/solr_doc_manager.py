@@ -23,7 +23,6 @@ replace the method definitions with API calls for the desired backend.
 import re
 import json
 
-import bson.json_util as bsjson
 from pysolr import Solr, SolrError
 
 from mongo_connector import errors
@@ -31,6 +30,7 @@ from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
 from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.doc_managers.formatters import DocumentFlattener
 
 
 # pysolr only has 1 exception: SolrError
@@ -65,6 +65,7 @@ class DocManager(DocManagerBase):
         self.chunk_size = chunk_size
         self.field_list = []
         self._build_fields()
+        self._formatter = DocumentFlattener()
 
     def _parse_fields(self, result, field_name):
         """ If Schema access, parse fields and build respective lists
@@ -118,35 +119,16 @@ class DocManager(DocManagerBase):
           {"a": 2, "b.c.d": 5, "e.0": 6, "e.1": 7, "e.2": 8}
 
         """
-        # SOLR cannot index fields within sub-documents, so flatten documents
-        # with the dot-separated path to each value as the respective key
-        def flattened(doc):
-            def flattened_kernel(doc, path):
-                for k, v in doc.items():
-                    path.append(k)
-                    if isinstance(v, dict):
-                        for inner_k, inner_v in flattened_kernel(v, path):
-                            yield inner_k, inner_v
-                    elif isinstance(v, list):
-                        for li, lv in enumerate(v):
-                            path.append(str(li))
-                            if isinstance(lv, dict):
-                                for dk, dv in flattened_kernel(lv, path):
-                                    yield dk, dv
-                            else:
-                                yield ".".join(path), lv
-                            path.pop()
-                    else:
-                        yield ".".join(path), v
-                    path.pop()
-            return dict(flattened_kernel(doc, []))
 
         # Translate the _id field to whatever unique key we're using.
         # _id may not exist in the doc, if we retrieved it from Solr
         # as part of update.
         if '_id' in doc:
             doc[self.unique_key] = doc.pop("_id")
-        flat_doc = flattened(doc)
+
+        # SOLR cannot index fields within sub-documents, so flatten documents
+        # with the dot-separated path to each value as the respective key
+        flat_doc = self._formatter.format_document(doc)
 
         # Only include fields that are explicitly provided in the
         # schema or match one of the dynamic field patterns, if
