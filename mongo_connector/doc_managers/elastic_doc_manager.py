@@ -26,7 +26,7 @@ from threading import Timer
 
 import bson.json_util as bsjson
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from elasticsearch.helpers import bulk
+from elasticsearch.helpers import bulk, scan
 
 from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
@@ -166,18 +166,9 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def _stream_search(self, *args, **kwargs):
         """Helper method for iterating over ES search results"""
-        first_response = self.elastic.search(*args, search_type="scan",
-                                             scroll="10m", size=100,
-                                             **kwargs)
-        scroll_id = first_response.get("_scroll_id")
-        expected_count = first_response.get("hits", {}).get("total", 0)
-        results_returned = 0
-        while results_returned < expected_count:
-            next_response = self.elastic.scroll(scroll_id=scroll_id,
-                                                scroll="10m")
-            results_returned += len(next_response["hits"]["hits"])
-            for doc in next_response["hits"]["hits"]:
-                yield doc["_source"]
+        for hit in scan(self.elastic, query=kwargs.pop('body', None),
+                                                scroll='10m', **kwargs):
+            yield hit['_source']
 
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
