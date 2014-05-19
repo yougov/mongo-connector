@@ -155,15 +155,6 @@ class DocManager(DocManagerBase):
                             refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
-    def _remove(self):
-        """For test purposes only. Removes all documents in test.test
-        """
-        self.elastic.delete_by_query(index="test.test",
-                                     doc_type=self.doc_type,
-                                     q="*:*")
-        self.commit()
-
-    @wrap_exceptions
     def _stream_search(self, *args, **kwargs):
         """Helper method for iterating over ES search results"""
         first_response = self.elastic.search(*args, search_type="scan",
@@ -188,13 +179,6 @@ class DocManager(DocManagerBase):
                                        "lte": end_ts
                                    }}}})
 
-    def _search(self):
-        """For test purposes only. Performs search on Elastic with empty query.
-        Does not have to be implemented.
-        """
-        return self._stream_search(index="test.test",
-                                   body={"query": {"match_all": {}}})
-
     def commit(self):
         """This function is used to force a refresh/commit.
         """
@@ -211,12 +195,16 @@ class DocManager(DocManagerBase):
     def get_last_doc(self):
         """Returns the last document stored in the Elastic engine.
         """
-        result = self.elastic.search(
-            index="_all",
-            body={
-                "query": {"match_all": {}},
-                "sort": [{"_ts": "desc"}]
-            },
-            size=1
-        )["hits"]["hits"]
-        return result[0]["_source"] if len(result) > 0 else None
+        try:
+            result = self.elastic.search(
+                index="_all",
+                body={
+                    "query": {"match_all": {}},
+                    "sort": [{"_ts": "desc"}]
+                },
+                size=1
+            )["hits"]["hits"]
+            return result[0]["_source"] if len(result) > 0 else None
+        except es_exceptions.RequestError:
+            # no documents so ES returns 400 because of undefined _ts mapping
+            return None

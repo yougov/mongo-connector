@@ -21,40 +21,17 @@ if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
     import unittest
-from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from elasticsearch.client import IndicesClient
+from tests import elastic_pair
+from tests.test_elastic import ElasticsearchTestCase
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
-from mongo_connector.errors import OperationFailed
 
 
-class ElasticDocManagerTester(unittest.TestCase):
+class ElasticDocManagerTester(ElasticsearchTestCase):
     """Test class for elastic_docManager
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """Initializes ES DocManager and a direct connection to elastic_conn
-        """
-        cls.elastic_doc = DocManager("localhost:9200",
-                                     auto_commit_interval=0)
-        cls.elastic_conn = Elasticsearch(server="localhost:9200")
-
-    def setUp(self):
-        """Empty ElasticSearch at the start of every test
-        """
-        try:
-            self.elastic_doc._remove()
-        except OperationFailed:
-            try:
-                # Create test.test index if necessary
-                client = Elasticsearch(hosts=['localhost:9200'])
-                idx_client = IndicesClient(client)
-                idx_client.create(index='test.test')
-            except es_exceptions.TransportError:
-                pass
 
     def test_update(self):
         doc = {"_id": '1', "ns": "test.test", "_ts": 1,
@@ -153,7 +130,7 @@ class ElasticDocManagerTester(unittest.TestCase):
         self.elastic_doc.upsert(docc)
         docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
-        search = list(self.elastic_doc._search())
+        search = list(self._search())
         search2 = self.elastic_conn.search(
             index="test.test",
             body={"query": {"match_all": {}}}
@@ -191,7 +168,7 @@ class ElasticDocManagerTester(unittest.TestCase):
         """
 
         docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
-        docman = DocManager("localhost:9200")
+        docman = DocManager(elastic_pair)
         # test cases:
         # -1 = no autocommit
         # 0 = commit immediately
@@ -204,14 +181,13 @@ class ElasticDocManagerTester(unittest.TestCase):
             else:
                 # Allow just a little extra time
                 time.sleep(autocommit_interval + 1)
-            results = list(docman._search())
+            results = list(self._search())
             self.assertEqual(len(results), 1,
                              "should commit document with "
                              "auto_commit_interval = %s" % str(
                                  autocommit_interval))
             self.assertEqual(results[0]["name"], "Waldo")
-            docman._remove()
-            docman.commit()
+            self._remove()
         docman.stop()
 
     def test_get_last_doc(self):
