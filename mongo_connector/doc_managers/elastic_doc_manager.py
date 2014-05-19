@@ -26,7 +26,7 @@ from threading import Timer
 
 import bson.json_util as bsjson
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from elasticsearch.helpers import bulk, scan
+from elasticsearch.helpers import scan, streaming_bulk
 
 from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
@@ -121,18 +121,15 @@ class DocManager(DocManagerBase):
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
         try:
+            kw = {}
             if self.chunk_size > 0:
-                responses = bulk(client=self.elastic,
-                                 actions=docs_to_upsert(),
-                                 chunk_size=self.chunk_size)
-            else:
-                responses = bulk(client=self.elastic,
-                                 actions=docs_to_upsert())
-            for resp in responses[1]:
-                ok = resp['index'].get('ok')
-                if ok is None:
-                    status = resp['index'].get('status')
-                    ok = (300 > status >= 200)
+                kw['chunk_size'] = self.chunk_size
+
+            responses = streaming_bulk(client=self.elastic,
+                                actions=docs_to_upsert(),
+                                **kw)
+
+            for ok, resp in responses:
                 if not ok:
                     logging.error(
                         "Could not bulk-upsert document "
