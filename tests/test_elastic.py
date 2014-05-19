@@ -59,6 +59,9 @@ class ElasticsearchTestCase(unittest.TestCase):
         return self.elastic_doc._stream_search(index="test.test",
                                    body={"query": {"match_all": {}}})
 
+    def _count(self):
+        return self.elastic_conn.count(index='test.test')['count']
+
     def _remove(self):
         self.elastic_conn.indices.delete_mapping(index="test.test",
                                     doc_type=self.elastic_doc.doc_type)
@@ -112,7 +115,7 @@ class TestElastic(ElasticsearchTestCase):
         self.conn.test.test.drop()
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
-        assert_soon(lambda: sum(1 for _ in self._search()) == 0)
+        assert_soon(lambda: self._count() == 0)
 
     def test_shard_length(self):
         """Tests the shard_length to see if the shard set was recognized
@@ -126,7 +129,7 @@ class TestElastic(ElasticsearchTestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self._search()) > 0)
+        assert_soon(lambda: self._count() > 0)
         result_set_1 = list(self._search())
         self.assertEqual(len(result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
@@ -139,10 +142,10 @@ class TestElastic(ElasticsearchTestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+        assert_soon(lambda: self._count() == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self._search()) != 1)
-        self.assertEqual(sum(1 for _ in self._search()), 0)
+        assert_soon(lambda: self._count() != 1)
+        self.assertEqual(self._count(), 0)
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
@@ -155,7 +158,7 @@ class TestElastic(ElasticsearchTestCase):
         self.conn['test']['test'].insert({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
             {'name': 'paul'}).count() == 1
-        condition2 = lambda: sum(1 for _ in self._search()) == 1
+        condition2 = lambda: self._count() == 1
         assert_soon(condition1)
         assert_soon(condition2)
 
@@ -168,7 +171,7 @@ class TestElastic(ElasticsearchTestCase):
         time.sleep(5)
         retry_until_ok(self.conn.test.test.insert,
                        {'name': 'pauline'})
-        assert_soon(lambda: sum(1 for _ in self._search()) == 2)
+        assert_soon(lambda: self._count() == 2)
         result_set_1 = list(self._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
@@ -198,8 +201,7 @@ class TestElastic(ElasticsearchTestCase):
         for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        search = self._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
+        condition = lambda: self._count() == STRESS_COUNT
         assert_soon(condition)
         for i in range(0, STRESS_COUNT):
             result_set_1 = self._search()
@@ -215,8 +217,7 @@ class TestElastic(ElasticsearchTestCase):
         for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
-        search = self._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
+        condition = lambda: self._count() == STRESS_COUNT
         assert_soon(condition)
         primary_conn = MongoClient(mongo_host, self.primary_p)
         kill_mongo_proc(self.primary_p, destroy=False)
@@ -235,7 +236,7 @@ class TestElastic(ElasticsearchTestCase):
                     {'name': 'Pauline ' + str(count)})
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
-        assert_soon(lambda: sum(1 for _ in self._search())
+        assert_soon(lambda: self._count()
                     == self.conn['test']['test'].find().count())
         result_set_1 = self._search()
         for item in result_set_1:
