@@ -41,6 +41,8 @@ from tests.util import assert_soon
 
 
 class ElasticsearchTestCase(unittest.TestCase):
+    """Base class for all ES TestCases."""
+
     @classmethod
     def setUpClass(cls):
         cls.elastic_conn = Elasticsearch(hosts=[elastic_pair])
@@ -50,22 +52,28 @@ class ElasticsearchTestCase(unittest.TestCase):
     def setUp(self):
         # Create target index in elasticsearch
         self.elastic_conn.indices.create(index='test.test')
-        self.elastic_conn.cluster.health(wait_for_status='yellow', index='test.test')
+        self.elastic_conn.cluster.health(wait_for_status='yellow',
+                                         index='test.test')
 
     def tearDown(self):
         self.elastic_conn.indices.delete(index='test.test', ignore=404)
 
     def _search(self):
-        return self.elastic_doc._stream_search(index="test.test",
-                                   body={"query": {"match_all": {}}})
+        return self.elastic_doc._stream_search(
+            index="test.test",
+            body={"query": {"match_all": {}}}
+        )
 
     def _count(self):
         return self.elastic_conn.count(index='test.test')['count']
 
     def _remove(self):
-        self.elastic_conn.indices.delete_mapping(index="test.test",
-                                    doc_type=self.elastic_doc.doc_type)
+        self.elastic_conn.indices.delete_mapping(
+            index="test.test",
+            doc_type=self.elastic_doc.doc_type
+        )
         self.elastic_conn.indices.refresh(index="test.test")
+
 
 class TestElastic(ElasticsearchTestCase):
     """ Tests the Elastic instance

@@ -126,8 +126,8 @@ class DocManager(DocManagerBase):
                 kw['chunk_size'] = self.chunk_size
 
             responses = streaming_bulk(client=self.elastic,
-                                actions=docs_to_upsert(),
-                                **kw)
+                                       actions=docs_to_upsert(),
+                                       **kw)
 
             for ok, resp in responses:
                 if not ok:
@@ -155,17 +155,25 @@ class DocManager(DocManagerBase):
     def _stream_search(self, *args, **kwargs):
         """Helper method for iterating over ES search results"""
         for hit in scan(self.elastic, query=kwargs.pop('body', None),
-                                                scroll='10m', **kwargs):
+                        scroll='10m', **kwargs):
             yield hit['_source']
 
     def search(self, start_ts, end_ts):
         """Called to query Elastic for documents in a time range.
         """
-        return self._stream_search(index="_all",
-                                   body={"query": {"range": {"_ts": {
-                                       "gte": start_ts,
-                                       "lte": end_ts
-                                   }}}})
+        return self._stream_search(
+            index="_all",
+            body={
+                "query": {
+                    "filtered": {
+                        "filter": {
+                            "range": {
+                                "_ts": {"gte": start_ts, "lte": end_ts}
+                            }
+                        }
+                    }
+                }
+            })
 
     def commit(self):
         """This function is used to force a refresh/commit.
