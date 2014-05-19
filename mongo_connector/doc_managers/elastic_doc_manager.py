@@ -183,10 +183,17 @@ class DocManager(DocManagerBase):
         """Called to query Elastic for documents in a time range.
         """
         return self._stream_search(index="_all",
-                                   body={"query": {"range": {"_ts": {
-                                       "gte": start_ts,
-                                       "lte": end_ts
-                                   }}}})
+                body={
+                    "query": {
+                        "filtered": {
+                            "filter": {
+                                "range": {
+                                    "_ts": { "gte": start_ts, "lte": end_ts}
+                                }
+                            }
+                        }
+                    }
+                })
 
     def _search(self):
         """For test purposes only. Performs search on Elastic with empty query.
