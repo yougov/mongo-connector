@@ -203,11 +203,10 @@ class TestElastic(ElasticsearchTestCase):
         time.sleep(5)
         condition = lambda: self._count() == STRESS_COUNT
         assert_soon(condition)
-        for i in range(0, STRESS_COUNT):
-            result_set_1 = self._search()
-            for item in result_set_1:
-                if(item['name'] == 'Paul' + str(i)):
-                    self.assertEqual(item['_id'], item['_id'])
+        self.assertEqual(
+            set('Paul ' + str(i) for i in range(STRESS_COUNT)),
+            set(item['name'] for item in self._search())
+        )
 
     def test_stressed_rollback(self):
         """Test stressed rollback with number of documents equal to specified
