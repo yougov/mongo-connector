@@ -14,6 +14,7 @@
 import sys
 
 from mongo_connector.compat import reraise
+from mongo_connector.errors import UpdateDoesNotApply
 
 
 def exception_wrapper(mapping):
@@ -36,9 +37,60 @@ class DocManagerBase(object):
 
     def apply_update(self, doc, update_spec):
         """Apply an update operation to a document."""
-        doc.update(update_spec.get("$set", {}))
-        for key in update_spec.get("$unset", []):
-            doc.pop(key)
+
+        # Helper to cast a key for a list or dict, or raise ValueError
+        def _convert_or_raise(container, key):
+            if isinstance(container, dict):
+                return key
+            elif isinstance(container, list):
+                return int(key)
+            else:
+                raise ValueError
+
+        # Helper to retrieve (and/or create)
+        # a dot-separated path within a document.
+        def _retrieve_path(container, path, create=False):
+            looking_at = container
+            for part in path:
+                if isinstance(looking_at, dict):
+                    if create and not part in looking_at:
+                        looking_at[part] = {}
+                    looking_at = looking_at[part]
+                elif isinstance(looking_at, list):
+                    index = int(part)
+                    if create and len(looking_at) < index:
+                        looking_at.extend(
+                            [None] * (len(looking_at) - index - 1))
+                        looking_at.append({})
+                    looking_at = looking_at[index]
+                else:
+                    raise ValueError
+            return looking_at
+
+        try:
+            # $set
+            for to_set in update_spec.get("$set", []):
+                value = update_spec['$set'][to_set]
+                if '.' in to_set:
+                    path = to_set.split(".")
+                    where = _retrieve_path(doc, path[:-1], create=True)
+                    where[_convert_or_raise(where, path[-1])] = value
+                else:
+                    doc[to_set] = value
+
+            # $unset
+            for to_unset in update_spec.get("$unset", []):
+                if '.' in to_unset:
+                    path = to_unset.split(".")
+                    where = _retrieve_path(doc, path[:-1])
+                    where.pop(_convert_or_raise(where, path[-1]))
+                else:
+                    doc.pop(to_unset)
+        except (KeyError, ValueError, AttributeError, IndexError):
+            exc_t, exc_v, exc_tb = sys.exc_info()
+            reraise(UpdateDoesNotApply,
+                    "Cannot apply update %r to %r" % (update_spec, doc),
+                    exc_tb)
         return doc
 
     def bulk_upsert(self, docs):

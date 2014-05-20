@@ -109,6 +109,59 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test'].remove({'name': 'paulie'})
         assert_soon(lambda: len(self.solr_conn.search("*:*")) == 0)
 
+    def test_update(self):
+        """Test update operations on Solr.
+
+        Need to have the following defined in schema.xml:
+
+        <field name="a" type="int" indexed="true" stored="true" />
+        <field name="b.0.c" type="int" indexed="true" stored="true" />
+        <field name="b.0.e" type="int" indexed="true" stored="true" />
+        <field name="b.1.d" type="int" indexed="true" stored="true" />
+        <field name="b.1.f" type="int" indexed="true" stored="true" />
+        """
+        docman = self.connector.doc_managers[0]
+
+        # Insert
+        self.conn.test.test.insert({"a": 0})
+        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) == 1)
+
+        def check_update(update_spec):
+            updated = self.conn.test.test.find_and_modify(
+                {"a": 0},
+                update_spec,
+                new=True
+            )
+            # Stringify _id to match what will be retrieved from Solr
+            updated['_id'] = str(updated['_id'])
+            # Flatten the MongoDB document to match Solr
+            updated = docman._clean_doc(updated)
+            # Allow some time for update to propagate
+            time.sleep(1)
+            replicated = list(docman._search("a:0"))[0]
+            # Remove add'l fields until these are stored in a separate Solr core
+            replicated.pop("_ts")
+            replicated.pop("ns")
+            # Remove field added by Solr
+            replicated.pop("_version_")
+            self.assertEqual(replicated, docman._clean_doc(updated))
+
+        # Update by adding a field.
+        # Note that Solr can't mix types within an array
+        check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
+
+        # Update by changing a value within a sub-document (contains array)
+        check_update({"$inc": {"b.0.c": 1}})
+
+        # Update by changing the value within an array
+        check_update({"$inc": {"b.1.f": 12}})
+
+        # Update by replacing an entire sub-document
+        check_update({"$set": {"b.0": {"e": 4}}})
+
+        # Update by adding a sub-document
+        check_update({"$set": {"b": {"0": {"c": 100}}}})
+
     def test_rollback(self):
         """Tests rollback. We force a rollback by inserting one doc, killing
             primary, adding another doc, killing the new primary, and

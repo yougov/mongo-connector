@@ -113,6 +113,38 @@ class TestSynchronizer(unittest.TestCase):
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) != 1)
         self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
 
+    def test_update(self):
+        """Test update operations."""
+        # Insert
+        self.conn.test.test.insert({"a": 0})
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+
+        def check_update(update_spec):
+            updated = self.conn.test.test.find_and_modify(
+                {"a": 0},
+                update_spec,
+                new=True
+            )
+            # Allow some time for update to propagate
+            time.sleep(2)
+            replicated = self.mongo_doc.mongo.test.test.find_one({"a": 0})
+            self.assertEqual(replicated, updated)
+
+        # Update by adding a field
+        check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
+
+        # Update by changing a value within a sub-document (contains array)
+        check_update({"$inc": {"b.0.c": 1}})
+
+        # Update by changing the value within an array
+        check_update({"$inc": {"b.1.f": 12}})
+
+        # Update by changing an entire sub-document
+        check_update({"$set": {"b.0": {"e": 4}}})
+
+        # Update by adding a sub-document
+        check_update({"$set": {"b": {"0": {"c": 100}}}})
+
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
             primary, adding another doc, killing the new primary, and then

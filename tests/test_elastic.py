@@ -155,6 +155,43 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(lambda: self._count() != 1)
         self.assertEqual(self._count(), 0)
 
+    def test_update(self):
+        """Test update operations."""
+        # Insert
+        self.conn.test.test.insert({"a": 0})
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+
+        def check_update(update_spec):
+            updated = self.conn.test.test.find_and_modify(
+                {"a": 0},
+                update_spec,
+                new=True
+            )
+            # Stringify _id to match what will be retrieved from ES
+            updated['_id'] = str(updated['_id'])
+            # Allow some time for update to propagate
+            time.sleep(1)
+            replicated = next(self._search())
+            # Remove add'l fields until these are stored in a separate ES index
+            replicated.pop("_ts")
+            replicated.pop("ns")
+            self.assertEqual(replicated, updated)
+
+        # Update by adding a field. Note that ES can't mix types within an array
+        check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
+
+        # Update by changing a value within a sub-document (contains array)
+        check_update({"$inc": {"b.0.c": 1}})
+
+        # Update by changing the value within an array
+        check_update({"$inc": {"b.1.f": 12}})
+
+        # Update by changing an entire sub-document
+        check_update({"$set": {"b.0": {"e": 4}}})
+
+        # Update by adding a sub-document
+        check_update({"$set": {"b": {"0": {"c": 100}}}})
+
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
             primary, adding another doc, killing the new primary, and then

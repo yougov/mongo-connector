@@ -161,6 +161,24 @@ class DocManager(DocManagerBase):
         """
         pass
 
+    def apply_update(self, doc, update_spec):
+        """Override DocManagerBase.apply_update to have flat documents."""
+        for to_set in update_spec.get("$set", []):
+            value = update_spec['$set'][to_set]
+            # Find dotted-path to the value, remove that key from doc, then
+            # put value at key:
+            keys_to_pop = []
+            for key in doc:
+                if key.startswith(to_set):
+                    if key == to_set or key[len(to_set)] == '.':
+                        keys_to_pop.append(key)
+            for key in keys_to_pop:
+                doc.pop(key)
+            doc[to_set] = value
+        for to_unset in update_spec.get("$unset", []):
+            doc.pop(to_unset)
+        return doc
+
     @wrap_exceptions
     def update(self, doc, update_spec):
         """Apply updates given in update_spec to the document whose id
@@ -173,7 +191,7 @@ class DocManager(DocManagerBase):
         for doc in results:
             updated = self.apply_update(doc, update_spec)
             self.upsert(updated)
-        return updated
+            return updated
 
     @wrap_exceptions
     def upsert(self, doc):
