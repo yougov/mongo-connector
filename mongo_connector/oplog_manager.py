@@ -198,6 +198,7 @@ class OplogThread(threading.Thread):
                                 # Remove
                                 if operation == 'd':
                                     entry['_id'] = entry['o']['_id']
+                                    entry['ns'] = ns
                                     docman.remove(entry)
                                     remove_inc += 1
                                 # Insert
