@@ -36,9 +36,15 @@ class DocManagerBase(object):
 
     def apply_update(self, doc, update_spec):
         """Apply an update operation to a document."""
-        doc.update(update_spec.get("$set", {}))
-        for key in update_spec.get("$unset", []):
-            doc.pop(key)
+        if "$set" in update_spec or "$unset" in update_spec:
+            doc.update(update_spec.get("$set", {}))
+            for key in update_spec.get("$unset", []):
+                doc.pop(key)
+        else:
+            ns = doc['ns']
+            doc = update_spec
+            doc['ns'] = ns
+
         return doc
 
     def bulk_upsert(self, docs):
