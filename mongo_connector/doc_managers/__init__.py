@@ -67,31 +67,38 @@ class DocManagerBase(object):
                     raise ValueError
             return looking_at
 
-        try:
-            # $set
-            for to_set in update_spec.get("$set", []):
-                value = update_spec['$set'][to_set]
-                if '.' in to_set:
-                    path = to_set.split(".")
-                    where = _retrieve_path(doc, path[:-1], create=True)
-                    where[_convert_or_raise(where, path[-1])] = value
-                else:
-                    doc[to_set] = value
+        # wholesale document replacement
+        if not "$set" in update_spec and not "$unset" in update_spec:
+            # update spec contains the new document in its entirety
+            update_spec['_ts'] = doc['_ts']
+            update_spec['ns'] = doc['ns']
+            return update_spec
+        else:
+            try:
+                # $set
+                for to_set in update_spec.get("$set", []):
+                    value = update_spec['$set'][to_set]
+                    if '.' in to_set:
+                        path = to_set.split(".")
+                        where = _retrieve_path(doc, path[:-1], create=True)
+                        where[_convert_or_raise(where, path[-1])] = value
+                    else:
+                        doc[to_set] = value
 
-            # $unset
-            for to_unset in update_spec.get("$unset", []):
-                if '.' in to_unset:
-                    path = to_unset.split(".")
-                    where = _retrieve_path(doc, path[:-1])
-                    where.pop(_convert_or_raise(where, path[-1]))
-                else:
-                    doc.pop(to_unset)
-        except (KeyError, ValueError, AttributeError, IndexError):
-            exc_t, exc_v, exc_tb = sys.exc_info()
-            reraise(UpdateDoesNotApply,
-                    "Cannot apply update %r to %r" % (update_spec, doc),
-                    exc_tb)
-        return doc
+                # $unset
+                for to_unset in update_spec.get("$unset", []):
+                    if '.' in to_unset:
+                        path = to_unset.split(".")
+                        where = _retrieve_path(doc, path[:-1])
+                        where.pop(_convert_or_raise(where, path[-1]))
+                    else:
+                        doc.pop(to_unset)
+            except (KeyError, ValueError, AttributeError, IndexError):
+                exc_t, exc_v, exc_tb = sys.exc_info()
+                reraise(UpdateDoesNotApply,
+                        "Cannot apply update %r to %r" % (update_spec, doc),
+                        exc_tb)
+            return doc
 
     def bulk_upsert(self, docs):
         """Upsert each document in a set of documents.

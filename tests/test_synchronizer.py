@@ -113,6 +113,12 @@ class TestSynchronizer(unittest.TestCase):
             time.sleep(1)
             return self.synchronizer._search()[0]
 
+        # Update whole document
+        doc = update_and_retrieve({"a": 1, "b": 2, "c": 10})
+        self.assertEqual(doc['a'], 1)
+        self.assertEqual(doc['b'], 2)
+        self.assertEqual(doc['c'], 10)
+
         # $set only
         doc = update_and_retrieve({"$set": {"b": 4}})
         self.assertEqual(doc['a'], 1)

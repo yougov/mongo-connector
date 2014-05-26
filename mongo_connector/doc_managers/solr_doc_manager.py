@@ -163,6 +163,12 @@ class DocManager(DocManagerBase):
 
     def apply_update(self, doc, update_spec):
         """Override DocManagerBase.apply_update to have flat documents."""
+        # Replace a whole document
+        if not '$set' in update_spec and not '$unset' in update_spec:
+            # update spec contains the new document
+            update_spec['_ts'] = doc['_ts']
+            update_spec['ns'] = doc['ns']
+            return update_spec
         for to_set in update_spec.get("$set", []):
             value = update_spec['$set'][to_set]
             # Find dotted-path to the value, remove that key from doc, then
@@ -187,9 +193,15 @@ class DocManager(DocManagerBase):
         """
         query = "%s:%s" % (self.unique_key, str(doc['_id']))
         results = self.solr.search(query)
-        # Results is a lazy iterable containing only 1 result
+        if not len(results):
+            # Document may not be retrievable yet
+            self.commit()
+            results = self.solr.search(query)
+        # Results is an iterable containing only 1 result
         for doc in results:
             updated = self.apply_update(doc, update_spec)
+            # A _version_ of 0 will always apply the update
+            updated['_version_'] = 0
             self.upsert(updated)
             return updated
 
