@@ -78,6 +78,8 @@ class DocManager(DocManagerBase):
         document = self.elastic.get(index=doc['ns'],
                                     id=str(doc['_id']))
         updated = self.apply_update(document['_source'], update_spec)
+        # _id is immutable in MongoDB, so won't have changed in update
+        updated['_id'] = document['_id']
         self.upsert(updated)
         return updated
 
@@ -92,11 +94,13 @@ class DocManager(DocManagerBase):
         """
         doc_type = self.doc_type
         index = doc['ns']
-        doc[self.unique_key] = str(doc["_id"])
-        doc_id = doc[self.unique_key]
+        # No need to duplicate '_id' in source document
+        doc_id = str(doc.pop("_id"))
         self.elastic.index(index=index, doc_type=doc_type,
                            body=bsjson.dumps(doc), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
+        # Don't mutate doc argument
+        doc['_id'] = doc_id
 
     @wrap_exceptions
     def bulk_upsert(self, docs):
@@ -108,8 +112,7 @@ class DocManager(DocManagerBase):
             doc = None
             for doc in docs:
                 index = doc["ns"]
-                doc[self.unique_key] = str(doc[self.unique_key])
-                doc_id = doc[self.unique_key]
+                doc_id = str(doc.pop("_id"))
                 yield {
                     "_index": index,
                     "_type": self.doc_type,
@@ -148,19 +151,19 @@ class DocManager(DocManagerBase):
         The input is a python dictionary that represents a mongo document.
         """
         self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
-                            id=str(doc[self.unique_key]),
+                            id=str(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
     def _stream_search(self, *args, **kwargs):
-        """Helper method for iterating over ES search results"""
+        """Helper method for iterating over ES search results."""
         for hit in scan(self.elastic, query=kwargs.pop('body', None),
                         scroll='10m', **kwargs):
+            hit['_source']['_id'] = hit['_id']
             yield hit['_source']
 
     def search(self, start_ts, end_ts):
-        """Called to query Elastic for documents in a time range.
-        """
+        """Called to query Elastic for documents in a time range."""
         return self._stream_search(
             index="_all",
             body={
@@ -196,11 +199,13 @@ class DocManager(DocManagerBase):
                 index="_all",
                 body={
                     "query": {"match_all": {}},
-                    "sort": [{"_ts": "desc"}]
+                    "sort": [{"_ts": "desc"}],
                 },
                 size=1
             )["hits"]["hits"]
-            return result[0]["_source"] if len(result) > 0 else None
+            for r in result:
+                r['_source']['_id'] = r['_id']
+                return r['_source']
         except es_exceptions.RequestError:
             # no documents so ES returns 400 because of undefined _ts mapping
             return None

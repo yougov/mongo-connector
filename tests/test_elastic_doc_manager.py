@@ -34,8 +34,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
     """
 
     def test_update(self):
-        doc = {"_id": '1', "ns": "test.test", "_ts": 1,
-               "a": 1, "b": 2}
+        doc = {"_id": '1', "ns": "test.test", "_ts": 1, "a": 1, "b": 2}
         self.elastic_doc.upsert(doc)
         # $set only
         update_spec = {"$set": {"a": 1, "b": 2}}
@@ -64,8 +63,8 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
             body={"query": {"match_all": {}}}
         )["hits"]["hits"]
         for doc in res:
-            doc = doc["_source"]
-            self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
+            self.assertEqual(doc['_id'], '1')
+            self.assertEqual(doc['_source']['name'], 'John')
 
     def test_bulk_upsert(self):
         """Ensure we can properly insert many documents at once into
@@ -81,7 +80,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
             body={"query": {"match_all": {}}},
             size=1001
         )["hits"]["hits"]
-        returned_ids = sorted(int(doc["_source"]["_id"]) for doc in res)
+        returned_ids = sorted(int(doc["_id"]) for doc in res)
         self.assertEqual(len(returned_ids), 1000)
         for i, r in enumerate(returned_ids):
             self.assertEqual(r, i)
@@ -131,15 +130,18 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
         docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         search = list(self._search())
-        search2 = self.elastic_conn.search(
+        search2 = []
+        es_cursor = self.elastic_conn.search(
             index="test.test",
-            body={"query": {"match_all": {}}}
-        )["hits"]["hits"]
-        search2 = [x["_source"] for x in search2]
+            body={"query": {"match_all": {}}})["hits"]["hits"]
+        for doc in es_cursor:
+            source = doc['_source']
+            source['_id'] = doc['_id']
+            search2.append(source)
         self.assertEqual(len(search), len(search2))
-        self.assertTrue(len(search) != 0)
-        self.assertTrue(all(x in search for x in search2) and
-                        all(y in search2 for y in search))
+        self.assertNotEqual(len(search), 0)
+        self.assertTrue(all(x in search for x in search2))
+        self.assertTrue(all(y in search2 for y in search))
 
     def test_search(self):
         """Query ElasticSearch for docs in a timestamp range.

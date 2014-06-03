@@ -478,10 +478,11 @@ def main():
     #for the target system,
     parser.add_option("-u", "--unique-key", action="store", type="string",
                       dest="u_key", default="_id", help=
-                      """Used to specify the mongoDB field that will serve """
+                      """The name of the MongoDB field that will serve """
                       """as the unique key for the target system. """
-                      """The default is "_id", which can be noted by """
-                      """'-u _id'""")
+                      """Note that this option does not apply """
+                      """when targeting another MongoDB cluster. """
+                      """Defaults to "_id".""")
 
     #-f is to specify the authentication key file. This file is used by mongos
     #to authenticate connections to the shards, and we'll use it in the oplog

@@ -56,6 +56,7 @@ class DocManager(DocManagerBase):
         """
         document = self.doc_dict[doc["_id"]]
         updated = self.apply_update(document, update_spec)
+        updated[self.unique_key] = updated.pop("_id")
         self.upsert(updated)
         return updated
 
@@ -63,12 +64,12 @@ class DocManager(DocManagerBase):
         """Adds a document to the doc dict.
         """
 
-        self.doc_dict[doc[self.unique_key]] = doc
+        self.doc_dict[doc["_id"]] = doc
 
     def remove(self, doc):
         """Removes the document from the doc dict.
         """
-        doc_id = doc[self.unique_key]
+        doc_id = doc["_id"]
         try:
             del self.doc_dict[doc_id]
         except KeyError:

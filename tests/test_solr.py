@@ -76,7 +76,7 @@ class TestSynchronizer(unittest.TestCase):
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         retry_until_ok(self.conn.test.test.remove)
-        assert_soon(lambda: len(self.solr_conn.search('*:*')) == 0)
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 0)
 
     def tearDown(self):
         self.connector.join()
@@ -92,9 +92,8 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        while (len(self.solr_conn.search('*:*')) == 0):
-            time.sleep(1)
-        result_set_1 = self.solr_conn.search('paulie')
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
+        result_set_1 = list(self.solr_conn.search('paulie'))
         self.assertEqual(len(result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
         for item in result_set_1:
@@ -105,9 +104,9 @@ class TestSynchronizer(unittest.TestCase):
         """Tests remove
         """
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: len(self.solr_conn.search("*:*")) == 1)
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        assert_soon(lambda: len(self.solr_conn.search("*:*")) == 0)
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 0)
 
     def test_update(self):
         """Test update operations on Solr.
@@ -174,10 +173,10 @@ class TestSynchronizer(unittest.TestCase):
         primary_conn = MongoClient(mongo_host, self.primary_p)
 
         self.conn['test']['test'].insert({'name': 'paul'})
-        while self.conn['test']['test'].find({'name': 'paul'}).count() != 1:
-            time.sleep(1)
-        while len(self.solr_conn.search('*:*')) != 1:
-            time.sleep(1)
+        assert_soon(
+            lambda: self.conn.test.test.find({'name': 'paul'}).count() == 1)
+        assert_soon(
+            lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 1)
         kill_mongo_proc(self.primary_p, destroy=False)
 
         new_primary_conn = MongoClient(mongo_host, self.secondary_p)
@@ -187,10 +186,10 @@ class TestSynchronizer(unittest.TestCase):
         time.sleep(5)
         retry_until_ok(self.conn.test.test.insert,
                        {'name': 'pauline'})
-        while (len(self.solr_conn.search('*:*')) != 2):
-            time.sleep(1)
+        assert_soon(
+            lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 2)
 
-        result_set_1 = self.solr_conn.search('pauline')
+        result_set_1 = list(self.solr_conn.search('pauline'))
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
@@ -206,9 +205,9 @@ class TestSynchronizer(unittest.TestCase):
 
         time.sleep(2)
         result_set_1 = self.solr_conn.search('pauline')
-        self.assertEqual(len(result_set_1), 0)
+        self.assertEqual(sum(1 for _ in result_set_1), 0)
         result_set_2 = self.solr_conn.search('paul')
-        self.assertEqual(len(result_set_2), 1)
+        self.assertEqual(sum(1 for _ in result_set_2), 1)
 
     def test_stress(self):
         """Test stress by inserting and removing a large amount of docs.
@@ -217,9 +216,9 @@ class TestSynchronizer(unittest.TestCase):
         for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
-        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT))
-                != STRESS_COUNT):
-            time.sleep(5)
+        assert_soon(
+            lambda: sum(1 for _ in self.solr_conn.search(
+                '*:*', rows=STRESS_COUNT)) == STRESS_COUNT)
         for i in range(0, STRESS_COUNT):
             result_set_1 = self.solr_conn.search('Paul ' + str(i))
             for item in result_set_1:
@@ -232,9 +231,9 @@ class TestSynchronizer(unittest.TestCase):
             self.conn['test']['test'].insert(
                 {'name': 'Paul ' + str(i)})
 
-        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT))
-                != STRESS_COUNT):
-            time.sleep(1)
+        assert_soon(
+            lambda: sum(1 for _ in self.solr_conn.search(
+                '*:*', rows=STRESS_COUNT)) == STRESS_COUNT)
         primary_conn = MongoClient(mongo_host, self.primary_p)
         kill_mongo_proc(self.primary_p, destroy=False)
 
@@ -254,9 +253,10 @@ class TestSynchronizer(unittest.TestCase):
             except (OperationFailure, AutoReconnect):
                 time.sleep(1)
 
-        while (len(self.solr_conn.search('*:*', rows=STRESS_COUNT * 2)) !=
-               self.conn['test']['test'].find().count()):
-            time.sleep(1)
+        collection_size = self.conn['test']['test'].find().count()
+        assert_soon(
+            lambda: sum(1 for _ in self.solr_conn.search(
+                '*:*', rows=STRESS_COUNT * 2)) == collection_size)
         result_set_1 = self.solr_conn.search(
             'Pauline',
             rows=STRESS_COUNT * 2, sort='_id asc'
@@ -274,19 +274,17 @@ class TestSynchronizer(unittest.TestCase):
 
         restart_mongo_proc(self.secondary_p)
 
-        while (len(self.solr_conn.search(
-                'Pauline',
-                rows=STRESS_COUNT * 2)) != 0):
-            time.sleep(15)
-        result_set_1 = self.solr_conn.search(
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search(
+            'Pauline', rows=STRESS_COUNT * 2)) == 0)
+        result_set_1 = list(self.solr_conn.search(
             'Pauline',
             rows=STRESS_COUNT * 2
-        )
+        ))
         self.assertEqual(len(result_set_1), 0)
-        result_set_2 = self.solr_conn.search(
+        result_set_2 = list(self.solr_conn.search(
             'Paul',
             rows=STRESS_COUNT * 2
-        )
+        ))
         self.assertEqual(len(result_set_2), STRESS_COUNT)
 
     def test_valid_fields(self):
@@ -300,16 +298,10 @@ class TestSynchronizer(unittest.TestCase):
         )
 
         docman = self.connector.doc_managers[0]
-        for _ in range(60):
-            if len(docman._search("*:*")) != 0:
-                break
-            time.sleep(1)
-        else:
-            self.fail("Timeout when removing docs from Solr")
-
+        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) > 0)
         result = docman.get_last_doc()
         self.assertIn('popularity', result)
-        self.assertEqual(len(docman._search(
+        self.assertEqual(sum(1 for _ in docman._search(
             "name=test_valid")), 1)
 
     def test_invalid_fields(self):
@@ -323,16 +315,11 @@ class TestSynchronizer(unittest.TestCase):
         )
 
         docman = self.connector.doc_managers[0]
-        for _ in range(60):
-            if len(docman._search("*:*")) != 0:
-                break
-            time.sleep(1)
-        else:
-            self.fail("Timeout when removing docs from Solr")
+        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) > 0)
 
         result = docman.get_last_doc()
         self.assertNotIn('break_this_test', result)
-        self.assertEqual(len(docman._search(
+        self.assertEqual(sum(1 for _ in docman._search(
             "name=test_invalid")), 1)
 
     def test_dynamic_fields(self):
@@ -359,12 +346,12 @@ class TestSynchronizer(unittest.TestCase):
         self.conn["test"]["test"].insert(match_none)
 
         # Should have documents in Solr now
-        assert_soon(lambda: len(self.solr_conn.search("*:*")) > 0,
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) > 0,
                     "Solr doc manager should allow dynamic fields")
 
         # foo_i and i_foo should be indexed, foo field should not exist
-        self.assertEqual(len(self.solr_conn.search("foo_i:100")), 1)
-        self.assertEqual(len(self.solr_conn.search("i_foo:200")), 1)
+        self.assertEqual(sum(1 for _ in self.solr_conn.search("foo_i:100")), 1)
+        self.assertEqual(sum(1 for _ in self.solr_conn.search("i_foo:200")), 1)
 
         # SolrError: "undefined field foo"
         logger = logging.getLogger("pysolr")
@@ -406,7 +393,7 @@ class TestSynchronizer(unittest.TestCase):
             ]
         })
 
-        assert_soon(lambda: len(self.solr_conn.search("*:*")) > 0,
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) > 0,
                     "documents should have been replicated to Solr")
 
         # Search for first document

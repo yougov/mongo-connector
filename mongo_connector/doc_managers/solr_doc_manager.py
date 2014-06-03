@@ -141,8 +141,11 @@ class DocManager(DocManagerBase):
                     path.pop()
             return dict(flattened_kernel(doc, []))
 
-        # Translate the _id field to whatever unique key we're using
-        doc[self.unique_key] = doc["_id"]
+        # Translate the _id field to whatever unique key we're using.
+        # _id may not exist in the doc, if we retrieved it from Solr
+        # as part of update.
+        if '_id' in doc:
+            doc[self.unique_key] = doc.pop("_id")
         flat_doc = flattened(doc)
 
         # Only include fields that are explicitly provided in the
@@ -250,7 +253,7 @@ class DocManager(DocManagerBase):
 
         The input is a python dictionary that represents a mongo document.
         """
-        self.solr.delete(id=str(doc[self.unique_key]),
+        self.solr.delete(id=str(doc["_id"]),
                          commit=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
@@ -260,18 +263,25 @@ class DocManager(DocManagerBase):
         self.solr.delete(q='*:*', commit=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
+    def _stream_search(self, query):
+        """Helper method for iterating over Solr search results."""
+        for doc in self.solr.search(query, rows=100000000):
+            if self.unique_key != "_id":
+                doc["_id"] = doc.pop(self.unique_key)
+            yield doc
+
+    @wrap_exceptions
     def search(self, start_ts, end_ts):
-        """Called to query Solr for documents in a time range.
-        """
+        """Called to query Solr for documents in a time range."""
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self.solr.search(query, rows=100000000)
+        return self._stream_search(query)
 
     @wrap_exceptions
     def _search(self, query):
         """For test purposes only. Performs search on Solr with given query
             Does not have to be implemented.
         """
-        return self.solr.search(query, rows=200)
+        return self._stream_search(query)
 
     def commit(self):
         """This function is used to force a commit.
@@ -288,7 +298,6 @@ class DocManager(DocManagerBase):
         except ValueError:
             return None
 
-        if len(result) == 0:
-            return None
-
-        return result.docs[0]
+        for r in result:
+            r['_id'] = r.pop(self.unique_key)
+            return r

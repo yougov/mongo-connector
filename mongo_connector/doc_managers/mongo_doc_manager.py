@@ -45,7 +45,7 @@ class DocManager(DocManagerBase):
         them as fields in the document, due to compatibility issues.
         """
 
-    def __init__(self, url, unique_key='_id', **kwargs):
+    def __init__(self, url, **kwargs):
         """ Verify URL and establish a connection.
         """
         try:
@@ -54,7 +54,6 @@ class DocManager(DocManagerBase):
             raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
-        self.unique_key = unique_key
         self.namespace_set = kwargs.get("namespace_set")
         for namespace in self._namespaces():
             self.mongo["__mongo_connector"][namespace].create_index("_ts")
@@ -96,7 +95,7 @@ class DocManager(DocManagerBase):
         """
         db, coll = doc['ns'].split('.', 1)
         updated = self.mongo[db][coll].find_and_modify(
-            {self.unique_key: doc['_id']},
+            {'_id': doc['_id']},
             update_spec,
             new=True
         )
@@ -111,7 +110,7 @@ class DocManager(DocManagerBase):
         ns = doc.pop("ns")
 
         self.mongo["__mongo_connector"][ns].save({
-            self.unique_key: doc[self.unique_key],
+            '_id': doc['_id'],
             "_ts": ts,
             "ns": ns
         })
@@ -125,10 +124,8 @@ class DocManager(DocManagerBase):
         The documents has ns and _ts fields.
         """
         database, coll = doc['ns'].split('.', 1)
-        self.mongo[database][coll].remove(
-            {self.unique_key: doc[self.unique_key]})
-        self.mongo["__mongo_connector"][doc['ns']].remove(
-            {self.unique_key: doc[self.unique_key]})
+        self.mongo[database][coll].remove({'_id': doc["_id"]})
+        self.mongo["__mongo_connector"][doc['ns']].remove({'_id': doc["_id"]})
 
     @wrap_exceptions
     def search(self, start_ts, end_ts):

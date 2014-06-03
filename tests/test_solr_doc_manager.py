@@ -110,7 +110,8 @@ class SolrDocManagerTester(unittest.TestCase):
                  "ns": "test.test"} for i in range(1000))
         self.SolrDoc.bulk_upsert(docs)
 
-        res = sorted(int(x["weight"]) for x in self.solr.search("*:*", rows=1001))
+        res = sorted(int(x["weight"])
+                     for x in self.solr.search("*:*", rows=1001))
         self.assertEqual(len(res), 1000)
         for i, r in enumerate(res):
             self.assertEqual(r, 2*i)
@@ -136,8 +137,8 @@ class SolrDocManagerTester(unittest.TestCase):
         self.SolrDoc.upsert(docc)
         docc = {'_id': '2', 'name': 'Paul'}
         self.SolrDoc.upsert(docc)
-        search = self.SolrDoc._search('*:*')
-        search2 = self.solr.search('*:*')
+        search = list(self.SolrDoc._search('*:*'))
+        search2 = list(self.solr.search('*:*'))
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
         self.assertTrue(all(x in search for x in search2) and
@@ -155,8 +156,9 @@ class SolrDocManagerTester(unittest.TestCase):
         self.SolrDoc.upsert(docc)
         docc = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870}
         self.SolrDoc.upsert(docc)
-        search = self.SolrDoc.search(5767301236327972865, 5767301236327972866)
-        search2 = self.solr.search('John')
+        search = list(self.SolrDoc.search(5767301236327972865,
+                                          5767301236327972866))
+        search2 = list(self.solr.search('John'))
         self.assertTrue(len(search) == len(search2))
         self.assertTrue(len(search) != 0)
 
