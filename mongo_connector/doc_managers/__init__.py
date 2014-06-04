@@ -109,22 +109,39 @@ class DocManagerBase(object):
             self.upsert(doc)
 
     def update(self, doc, update_spec):
+        """Update a document.
+
+        ``update_spec`` is the update operation as provided by an oplog record
+        in the "o" field.
+        """
         raise NotImplementedError
 
     def upsert(self, document):
+        """(Re-)insert a document."""
         raise NotImplementedError
 
     def remove(self, doc):
+        """Remove a document.
+
+        ``doc`` is a dict that provides the namespace and id of the document
+        to be removed in its ``ns`` and ``_id`` fields, respectively.
+        """
         raise NotImplementedError
 
     def search(self, start_ts, end_ts):
+        """Get an iterable of documents that were inserted or updated
+        between ``start_ts`` and ``end_ts``.
+        """
         raise NotImplementedError
 
     def commit(self):
+        """Commit all outstanding writes."""
         raise NotImplementedError
 
     def get_last_doc(self):
+        """Get the document that was modified most recently."""
         raise NotImplementedError
 
     def stop(self):
+        """Stop all threads started by this DocManager."""
         raise NotImplementedError
