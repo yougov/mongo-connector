@@ -157,9 +157,6 @@ class TestElastic(ElasticsearchTestCase):
             # Allow some time for update to propagate
             time.sleep(1)
             replicated = next(self._search())
-            # Remove add'l fields until these are stored in a separate ES index
-            replicated.pop("_ts")
-            replicated.pop("ns")
             self.assertEqual(replicated, updated)
 
         # Update by adding a field. Note that ES can't mix types within an array
