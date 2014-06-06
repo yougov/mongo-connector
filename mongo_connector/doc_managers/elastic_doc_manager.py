@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Receives documents from the oplog worker threads and indexes them
-    into the backend.
+"""Elasticsearch implementation of the DocManager interface.
 
-    This file is a document manager for the Elastic search engine, but the
-    intent is that this file can be used as an example to add on different
-    backends. To extend this to other systems, simply implement the exact
-    same class and replace the method definitions with API calls for the
-    desired backend.
-    """
+Receives documents from an OplogThread and takes the appropriate actions on
+Elasticsearch.
+"""
 import logging
 from threading import Timer
 
@@ -41,21 +37,14 @@ wrap_exceptions = exception_wrapper({
 
 
 class DocManager(DocManagerBase):
-    """The DocManager class creates a connection to the backend engine and
-        adds/removes documents, and in the case of rollback, searches for them.
+    """Elasticsearch implementation of the DocManager interface.
 
-        The reason for storing id/doc pairs as opposed to doc's is so that
-        multiple updates to the same doc reflect the most up to date version as
-        opposed to multiple, slightly different versions of a doc.
-
-        We are using elastic native fields for _id and ns, but we also store
-        them as fields in the document, due to compatibility issues.
-        """
+    Receives documents from an OplogThread and takes the appropriate actions on
+    Elasticsearch.
+    """
 
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK, **kwargs):
-        """ Establish a connection to Elastic
-        """
         self.elastic = Elasticsearch(hosts=[url])
         self.auto_commit_interval = auto_commit_interval
         self.doc_type = 'string'  # default type is string, change if needed
@@ -66,15 +55,13 @@ class DocManager(DocManagerBase):
         self._formatter = DefaultDocumentFormatter()
 
     def stop(self):
-        """ Stops the instance
-        """
+        """Stop the auto-commit thread."""
         self.auto_commit_interval = None
 
     @wrap_exceptions
     def update(self, doc, update_spec):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
-
         """
         document = self.elastic.get(index=doc['ns'],
                                     id=str(doc['_id']))
@@ -86,13 +73,7 @@ class DocManager(DocManagerBase):
 
     @wrap_exceptions
     def upsert(self, doc):
-        """Update or insert a document into Elastic
-
-        If you'd like to have different types of document in your database,
-        you can store the doc type as a field in Mongo and set doc_type to
-        that field. (e.g. doc_type = doc['_type'])
-
-        """
+        """Insert a document into Elasticsearch."""
         doc_type = self.doc_type
         index = doc['ns']
         # No need to duplicate '_id' in source document
@@ -105,10 +86,7 @@ class DocManager(DocManagerBase):
 
     @wrap_exceptions
     def bulk_upsert(self, docs):
-        """Update or insert multiple documents into Elastic
-
-        docs may be any iterable
-        """
+        """Insert multiple documents into Elasticsearch."""
         def docs_to_upsert():
             doc = None
             for doc in docs:
@@ -147,10 +125,7 @@ class DocManager(DocManagerBase):
 
     @wrap_exceptions
     def remove(self, doc):
-        """Removes documents from Elastic
-
-        The input is a python dictionary that represents a mongo document.
-        """
+        """Remove a document from Elasticsearch."""
         self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
                             id=str(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
@@ -164,7 +139,11 @@ class DocManager(DocManagerBase):
             yield hit['_source']
 
     def search(self, start_ts, end_ts):
-        """Called to query Elastic for documents in a time range."""
+        """Query Elasticsearch for documents in a time range.
+
+        This method is used to find documents that may be in conflict during
+        a rollback event in MongoDB.
+        """
         return self._stream_search(
             index="_all",
             body={
@@ -180,20 +159,21 @@ class DocManager(DocManagerBase):
             })
 
     def commit(self):
-        """This function is used to force a refresh/commit.
-        """
+        """Refresh all Elasticsearch indexes."""
         retry_until_ok(self.elastic.indices.refresh, index="")
 
     def run_auto_commit(self):
-        """Periodically commits to the Elastic server.
-        """
+        """Periodically commit to the Elastic server."""
         self.elastic.indices.refresh()
         if self.auto_commit_interval not in [None, 0]:
             Timer(self.auto_commit_interval, self.run_auto_commit).start()
 
     @wrap_exceptions
     def get_last_doc(self):
-        """Returns the last document stored in the Elastic engine.
+        """Get the most recently modified document from Elasticsearch.
+
+        This method is used to help define a time window within which documents
+        may be in conflict after a MongoDB rollback.
         """
         try:
             result = self.elastic.search(
