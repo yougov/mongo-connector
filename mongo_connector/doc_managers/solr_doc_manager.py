@@ -214,7 +214,7 @@ class DocManager(DocManagerBase):
         if self.auto_commit_interval is not None:
             add_kwargs = {
                 "commit": (self.auto_commit_interval == 0),
-                "commitWithin": self.auto_commit_interval
+                "commitWithin": str(self.auto_commit_interval)
             }
         else:
             add_kwargs = {"commit": False}
