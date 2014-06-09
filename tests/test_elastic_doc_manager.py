@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests each of the functions in elastic_doc_manager
-"""
-
+"""Unit tests for the Elastic DocManager."""
 import time
 import sys
 if sys.version_info[:2] == (2, 6):
@@ -30,10 +28,10 @@ from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 
 
 class ElasticDocManagerTester(ElasticsearchTestCase):
-    """Test class for elastic_docManager
-    """
+    """Unit tests for the Elastic DocManager."""
 
     def test_update(self):
+        """Test the update method."""
         doc = {"_id": '1', "ns": "test.test", "_ts": 1, "a": 1, "b": 2}
         self.elastic_doc.upsert(doc)
         # $set only
@@ -53,9 +51,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
                                "c": 3})
 
     def test_upsert(self):
-        """Ensure we can properly insert into ElasticSearch via DocManager.
-        """
-
+        """Test the upsert method."""
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         res = self.elastic_conn.search(
@@ -67,10 +63,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
             self.assertEqual(doc['_source']['name'], 'John')
 
     def test_bulk_upsert(self):
-        """Ensure we can properly insert many documents at once into
-        ElasticSearch via DocManager.
-
-        """
+        """Test the bulk_upsert method."""
         self.elastic_doc.bulk_upsert([])
 
         docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
@@ -100,9 +93,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
             self.assertEqual(r, 2*i)
 
     def test_remove(self):
-        """Ensure we can properly delete from ElasticSearch via DocManager.
-        """
-
+        """Test the remove method."""
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
         res = self.elastic_conn.search(
@@ -121,11 +112,10 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
         self.assertEqual(len(res), 0)
 
     def test_search(self):
-        """Query ElasticSearch for docs in a timestamp range.
+        """Test the search method.
 
-        We use API and DocManager's search(start_ts,end_ts), and then compare.
+        Make sure we can retrieve documents last modified within a time range.
         """
-
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865,
                 'ns': 'test.test'}
         self.elastic_doc.upsert(docc)
@@ -143,9 +133,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
         self.assertIn('John Paul', result_names)
 
     def test_elastic_commit(self):
-        """Test that documents get properly added to ElasticSearch.
-        """
-
+        """Test the auto_commit_interval attribute."""
         docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
         docman = DocManager(elastic_pair)
         # test cases:
@@ -170,8 +158,9 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
         docman.stop()
 
     def test_get_last_doc(self):
-        """Insert documents, verify that get_last_doc() returns the one with
-            the latest timestamp.
+        """Test the get_last_doc method.
+
+        Make sure we can retrieve the document most recently modified from ES.
         """
         base = self.elastic_doc.get_last_doc()
         ts = base.get("_ts", 0) if base else 0
