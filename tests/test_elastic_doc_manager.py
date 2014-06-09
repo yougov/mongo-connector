@@ -120,29 +120,6 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
         res = [x["_source"] for x in res]
         self.assertEqual(len(res), 0)
 
-    def test_full_search(self):
-        """Query ElasticSearch for all docs via API and via DocManager's
-            _search(), compare.
-        """
-
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        search = list(self._search())
-        search2 = []
-        es_cursor = self.elastic_conn.search(
-            index="test.test",
-            body={"query": {"match_all": {}}})["hits"]["hits"]
-        for doc in es_cursor:
-            source = doc['_source']
-            source['_id'] = doc['_id']
-            search2.append(source)
-        self.assertEqual(len(search), len(search2))
-        self.assertNotEqual(len(search), 0)
-        self.assertTrue(all(x in search for x in search2))
-        self.assertTrue(all(y in search2 for y in search))
-
     def test_search(self):
         """Query ElasticSearch for docs in a timestamp range.
 
