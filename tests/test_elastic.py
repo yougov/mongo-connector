@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test elastic search using the synchronizer, i.e. as it would be used by an
-    user
-"""
+"""Integration tests for mongo-connector + Elasticsearch."""
 import time
 import os
 import sys
@@ -76,13 +74,11 @@ class ElasticsearchTestCase(unittest.TestCase):
 
 
 class TestElastic(ElasticsearchTestCase):
-    """ Tests the Elastic instance
-    """
+    """Integration tests for mongo-connector + Elasticsearch."""
 
     @classmethod
     def setUpClass(cls):
-        """ Starts the cluster
-        """
+        """Start the cluster."""
         super(TestElastic, cls).setUpClass()
         _, cls.secondary_p, cls.primary_p = start_replica_set('test-elastic')
         cls.conn = MongoClient(mongo_host, cls.primary_p,
@@ -90,19 +86,16 @@ class TestElastic(ElasticsearchTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """ Kills cluster instance
-        """
+        """Kill the cluster."""
         kill_replica_set('test-elastic')
 
     def tearDown(self):
-        """ Ends the connector
-        """
+        """Stop the Connector thread."""
         super(TestElastic, self).tearDown()
         self.connector.join()
 
     def setUp(self):
-        """ Starts a new connector for every test
-        """
+        """Start a new Connector for each test."""
         super(TestElastic, self).setUp()
         try:
             os.unlink("config.txt")
@@ -126,16 +119,10 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(lambda: self._count() == 0)
 
     def test_shard_length(self):
-        """Tests the shard_length to see if the shard set was recognized
-            properly
-        """
-
         self.assertEqual(len(self.connector.shard_set), 1)
 
     def test_insert(self):
-        """Tests insert
-        """
-
+        """Test insert operations."""
         self.conn['test']['test'].insert({'name': 'paulie'})
         assert_soon(lambda: self._count() > 0)
         result_set_1 = list(self._search())
@@ -146,9 +133,7 @@ class TestElastic(ElasticsearchTestCase):
             self.assertEqual(item['name'], result_set_2['name'])
 
     def test_remove(self):
-        """Tests remove
-        """
-
+        """Tests remove operations."""
         self.conn['test']['test'].insert({'name': 'paulie'})
         assert_soon(lambda: self._count() == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
@@ -196,11 +181,12 @@ class TestElastic(ElasticsearchTestCase):
         check_update({"a": 0, "b": {"1": {"d": 10000}}})
 
     def test_rollback(self):
-        """Tests rollback. We force a rollback by adding a doc, killing the
-            primary, adding another doc, killing the new primary, and then
-            restarting both.
-        """
+        """Test behavior during a MongoDB rollback.
 
+        We force a rollback by adding a doc, killing the primary,
+        adding another doc, killing the new primary, and then
+        restarting both.
+        """
         primary_conn = MongoClient(mongo_host, self.primary_p)
 
         self.conn['test']['test'].insert({'name': 'paul'})
@@ -244,8 +230,7 @@ class TestElastic(ElasticsearchTestCase):
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
 
     def test_stress(self):
-        """Test stress by inserting and removing a large number of documents"""
-
+        """Stress test for inserting and removing many documents."""
         for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
         time.sleep(5)
@@ -257,10 +242,7 @@ class TestElastic(ElasticsearchTestCase):
         )
 
     def test_stressed_rollback(self):
-        """Test stressed rollback with number of documents equal to specified
-            in global variable. Strategy for rollback is the same as before.
-        """
-
+        """Stress test for a rollback with many documents."""
         for i in range(0, STRESS_COUNT):
             self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
 
