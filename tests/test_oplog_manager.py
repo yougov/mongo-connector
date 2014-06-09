@@ -147,6 +147,32 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(last_ts, self.opman.dump_collection())
         self.assertEqual(len(self.opman.doc_managers[0]._search()), 1000)
 
+    def test_dump_collection_with_error(self):
+        """Test the dump_collection method with invalid documents.
+
+        Cases:
+
+        1. non-empty oplog, continue_on_error=True, invalid documents
+        """
+
+        # non-empty oplog, continue_on_error=True, invalid documents
+        self.opman.continue_on_error = True
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
+
+        docs = [{'a': i} for i in range(100)]
+        for i in range(50, 60):
+            docs[i]['_upsert_exception'] = True
+        self.primary_conn['test']['test'].insert(docs)
+
+        last_ts = self.opman.get_last_oplog_timestamp()
+        self.assertEqual(last_ts, self.opman.dump_collection())
+        docs = self.opman.doc_managers[0]._search()
+        docs.sort()
+        
+        self.assertEqual(len(docs), 90)
+        for doc, correct_a in zip(docs, range(0, 50) + range(60, 100)):
+            self.assertEquals(doc['a'], correct_a)
+
     def test_init_cursor(self):
         """Test the init_cursor method
 
