@@ -12,6 +12,11 @@ if PY3:
     long = int
 
 RE_TYPE = type(re.compile(""))
+try:
+    from bson.regex import Regex
+    RE_TYPES = (RE_TYPE, Regex)
+except ImportError:
+    RE_TYPES = (RE_TYPE,)
 
 
 class DocumentFormatter(object):
@@ -53,7 +58,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
             return self.format_document(value)
         elif isinstance(value, list):
             return [self.transform_value(v) for v in value]
-        if isinstance(value, (RE_TYPE, bson.Regex)):
+        if isinstance(value, RE_TYPES):
             flags = ""
             if value.flags & re.IGNORECASE:
                 flags += "i"
