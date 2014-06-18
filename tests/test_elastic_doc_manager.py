@@ -72,6 +72,7 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
 
         docs = (self.put_metadata({"_id": i}) for i in range(1000))
         self.elastic_doc.bulk_upsert(docs)
+        self.elastic_doc.commit()
         res = self.elastic_conn.search(
             index="test.test",
             body={"query": {"match_all": {}}},
