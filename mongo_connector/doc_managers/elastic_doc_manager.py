@@ -17,7 +17,6 @@
 Receives documents from an OplogThread and takes the appropriate actions on
 Elasticsearch.
 """
-import itertools
 import logging
 
 from threading import Timer
@@ -117,43 +116,30 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def bulk_upsert(self, docs):
         """Insert multiple documents into Elasticsearch."""
-        docs_iter, docs_meta_iter = itertools.tee(docs)
-
-        def meta_docs_to_upsert():
-            doc = None
-            for doc in docs_meta_iter:
-                document_meta = {
-                    "_index": self.meta_index_name,
-                    "_type": self.meta_type,
-                    "_id": doc['_id'],
-                    "_source": {
-                        "_ns": doc['ns'],
-                        "ts": doc['_ts']
-                    }
-                }
-                yield document_meta
-            if not doc:
-                raise errors.EmptyDocsError(
-                    "Cannot upsert an empty sequence of "
-                    "documents into Elastic Search")
-
         def docs_to_upsert():
             doc = None
-            for doc in docs_iter:
+            for doc in docs:
                 # Remove metadata and redundant _id
                 index = doc.pop("ns")
                 doc_id = str(doc.pop("_id"))
                 timestamp = doc.pop("_ts")
-                yield {
+                document_action = {
                     "_index": index,
                     "_type": self.doc_type,
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
                 }
-                # Put metadata back for use in meta_docs_to_upsert
-                doc['_id'] = doc_id
-                doc['ns'] = index,
-                doc['_ts'] = timestamp
+                document_meta = {
+                    "_index": self.meta_index_name,
+                    "_type": self.meta_type,
+                    "_id": doc_id,
+                    "_source": {
+                        "_ns": index,
+                        "ts": timestamp
+                    }
+                }
+                yield document_action
+                yield document_meta
             if not doc:
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
@@ -163,14 +149,11 @@ class DocManager(DocManagerBase):
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
 
-            meta_responses = streaming_bulk(client=self.elastic,
-                                            actions=meta_docs_to_upsert(),
-                                            **kw)
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
 
-            for ok, resp in itertools.chain(responses, meta_responses):
+            for ok, resp in responses:
                 if not ok:
                     logging.error(
                         "Could not bulk-upsert document "
