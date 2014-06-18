@@ -98,7 +98,7 @@ class OplogThread(threading.Thread):
         self.auth_username = auth_username
 
         # Set of fields to export
-        self._fields = set(fields) if fields else None
+        self.fields = fields
 
         logging.info('OplogThread: Initializing oplog thread')
 
