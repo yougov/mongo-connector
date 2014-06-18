@@ -10,6 +10,7 @@ from mongo_connector.compat import PY3
 
 if PY3:
     long = int
+    unicode = str
 
 RE_TYPE = type(re.compile(""))
 try:
@@ -84,7 +85,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
         elif isinstance(value, (int, long, float)):
             return value
         # Default
-        return str(value)
+        return unicode(value)
 
     def transform_element(self, key, value):
         yield key, self.transform_value(value)
