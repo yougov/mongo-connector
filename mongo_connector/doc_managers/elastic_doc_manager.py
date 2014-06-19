@@ -99,8 +99,7 @@ class DocManager(DocManagerBase):
         doc_id = str(doc.pop("_id"))
         metadata = {
             "ns": index,
-            "_ts": doc.pop("_ts"),
-            "_id": doc_id
+            "_ts": doc.pop("_ts")
         }
         # Index the source document
         self.elastic.index(index=index, doc_type=doc_type,
