@@ -67,8 +67,13 @@ class DocManagerBase(object):
                     raise ValueError
             return looking_at
 
-        # Update operation using update operators
-        if "$set" in update_spec or "$unset" in update_spec:
+        # wholesale document replacement
+        if not "$set" in update_spec and not "$unset" in update_spec:
+            # update spec contains the new document in its entirety
+            update_spec['_ts'] = doc['_ts']
+            update_spec['ns'] = doc['ns']
+            return update_spec
+        else:
             try:
                 # $set
                 for to_set in update_spec.get("$set", []):
@@ -94,11 +99,6 @@ class DocManagerBase(object):
                         "Cannot apply update %r to %r" % (update_spec, doc),
                         exc_tb)
             return doc
-        else:   # Wholesale document replacement
-            # update spec contains the new document in its entirety
-            update_spec['_ts'] = doc['_ts']
-            update_spec['ns'] = doc['ns']
-            return update_spec
 
     def bulk_upsert(self, docs):
         """Upsert each document in a set of documents.
