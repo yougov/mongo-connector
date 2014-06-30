@@ -1,4 +1,5 @@
 import base64
+import datetime
 import re
 
 from uuid import UUID
@@ -83,6 +84,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
         elif isinstance(value, UUID):
             return value.hex
         elif isinstance(value, (int, long, float)):
+            return value
+        elif isinstance(value, datetime.datetime):
             return value
         # Default
         return unicode(value)

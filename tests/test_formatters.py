@@ -1,3 +1,4 @@
+import datetime
 import re
 import sys
 import uuid
@@ -25,8 +26,9 @@ class TestFormatters(unittest.TestCase):
         cls.oid = bson.ObjectId()
         cls.regex = re.compile("hello", re.VERBOSE | re.MULTILINE)
         cls.lst = [cls.regex, cls.bin1, cls.bin2, cls.xuuid, cls.oid]
+        cls.date = datetime.datetime.now()
         cls.doc = {'r': cls.regex, 'b1': cls.bin1, 'b2': cls.bin2,
-                   'uuid': cls.xuuid, 'oid': cls.oid}
+                   'uuid': cls.xuuid, 'oid': cls.oid, 'd': cls.date}
         cls.doc_nested = {"doc": cls.doc}
         cls.doc_list = {"list": [cls.doc, cls.doc_nested, cls.lst]}
 
@@ -46,6 +48,9 @@ class TestFormatters(unittest.TestCase):
             self.assertEqual(trans(self.bin2), 'AGhlbGxvAA==')
         else:
             self.assertEqual(trans(self.bin2), self.bin2)
+
+        # datetime
+        self.assertEqual(trans(self.date), self.date)
 
         # UUID
         self.assertEqual(trans(self.xuuid), self.xuuid.hex)
