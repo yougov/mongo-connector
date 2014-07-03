@@ -65,9 +65,19 @@ class DocManager(DocManagerBase):
         """
         document = self.elastic.get(index=doc['ns'],
                                     id=str(doc['_id']))
-        updated = self.apply_update(document['_source'], update_spec)
+        update = None
+        if not "_source" in document:
+            updated = self.apply_update(document, update_spec)
+            for ap_set in updated:
+                logging.info ("upd : %r : %r", ap_set, updated[ap_set])
+            updated['ns'] = doc['ns']
+            updated['_ts'] = doc['_ts']
+        else:
+            updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
+        updated['_doc_op_'] = 'u'
+
         self.upsert(updated)
         return updated
 
@@ -78,9 +88,24 @@ class DocManager(DocManagerBase):
         index = doc['ns']
         # No need to duplicate '_id' in source document
         doc_id = str(doc.pop("_id"))
-        self.elastic.index(index=index, doc_type=doc_type,
-                           body=self._formatter.format_document(doc), id=doc_id,
-                           refresh=(self.auto_commit_interval == 0))
+        
+        # check for operation
+        operation = None
+        if not "_doc_op_" in doc:
+            operation = 'i'
+        else:
+            operation = doc.pop("_doc_op_")
+
+	updbody = {}
+        if operation == 'u':
+            updbody['doc']=self._formatter.format_document(doc)
+            self.elastic.update(index=index, doc_type=doc_type, id=doc_id,
+                                body=updbody,
+                                refresh=(self.auto_commit_interval == 0))
+        else:
+            self.elastic.index(index=index, doc_type=doc_type,
+                               body=self._formatter.format_document(doc), id=doc_id,
+                               refresh=(self.auto_commit_interval == 0))
         # Don't mutate doc argument
         doc['_id'] = doc_id
 
