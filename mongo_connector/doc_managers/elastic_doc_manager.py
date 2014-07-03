@@ -62,21 +62,22 @@ class DocManager(DocManagerBase):
     def update(self, doc, update_spec):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
+	TODO: We should be able to do an intial get and figure out whether
+        _source is enabled or not.  If _source is enabled, we can avoid a get call 
+        which will improve update performance.
         """
         document = self.elastic.get(index=doc['ns'],
                                     id=str(doc['_id']))
         update = None
         if not "_source" in document:
             updated = self.apply_update(document, update_spec)
-            for ap_set in updated:
-                logging.info ("upd : %r : %r", ap_set, updated[ap_set])
             updated['ns'] = doc['ns']
             updated['_ts'] = doc['_ts']
         else:
             updated = self.apply_update(document['_source'], update_spec)
+	    updated['_doc_op_'] = 'u'
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        updated['_doc_op_'] = 'u'
 
         self.upsert(updated)
         return updated
