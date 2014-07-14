@@ -1,6 +1,21 @@
 Changelog
 =========
 
+Version 2.0.dev0
+----------------
+
+Version 2.0.dev0 is a development version that will become version 2.0.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+
+- The constructor signatures for OplogThread and Connector have changed:
+        - The `u_key` and `target_url` keyword arguments have been removed from the constructor for Connector.
+        - `target_url` is gone from the OplogThread constructor.
+        - The `doc_manager` keyword argument in the constructors for Connector and OplogThread is now called `doc_managers`.
+        - The `doc_managers` keyword argument in Connector takes a list of **instances** of `DocManager`, rather that a list of strings corresponding to files that define DocManagers.
+- ConnectorError has been removed. Exceptions that occur when constructing Connector will be passed on to the caller.
+
 Version 1.2.1
 -------------
 
