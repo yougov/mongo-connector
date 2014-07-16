@@ -27,10 +27,11 @@ import pymongo
 from mongo_connector import errors
 from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
 
-
 wrap_exceptions = exception_wrapper({
     pymongo.errors.ConnectionFailure: errors.ConnectionFailed,
     pymongo.errors.OperationFailure: errors.OperationFailed})
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManager(DocManagerBase):
@@ -81,7 +82,7 @@ class DocManager(DocManagerBase):
     def stop(self):
         """Stops any running threads
         """
-        logging.info(
+        LOG.info(
             "Mongo DocManager Stopped: If you will not target this system "
             "again with mongo-connector then please drop the database "
             "__mongo_connector in order to return resources to the OS."

@@ -33,10 +33,11 @@ from mongo_connector.util import retry_until_ok
 from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 
-
 wrap_exceptions = exception_wrapper({
     es_exceptions.ConnectionError: errors.ConnectionFailed,
     es_exceptions.TransportError: errors.OperationFailed})
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManager(DocManagerBase):
@@ -154,7 +155,7 @@ class DocManager(DocManagerBase):
 
             for ok, resp in responses:
                 if not ok:
-                    logging.error(
+                    LOG.error(
                         "Could not bulk-upsert document "
                         "into ElasticSearch: %r" % resp)
             if self.auto_commit_interval == 0:

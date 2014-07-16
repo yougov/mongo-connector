@@ -35,8 +35,7 @@ from mongo_connector.doc_managers import (
 
 from pymongo import MongoClient
 
-LOG = logging.getLogger('mongo-connector')
-LOG.addHandler(logging.NullHandler())
+LOG = logging.getLogger(__name__)
 
 
 class Connector(threading.Thread):
@@ -102,20 +101,20 @@ class Connector(threading.Thread):
                 info_str = ("MongoConnector: Can't find %s, "
                             "attempting to create an empty progress log" %
                             self.oplog_checkpoint)
-                logging.info(info_str)
+                LOG.info(info_str)
                 try:
                     # Create oplog progress file
                     open(self.oplog_checkpoint, "w").close()
                 except IOError as e:
-                    logging.critical("MongoConnector: Could not "
-                                     "create a progress log: %s" %
-                                     str(e))
+                    LOG.critical("MongoConnector: Could not "
+                                 "create a progress log: %s" %
+                                 str(e))
                     sys.exit(2)
             else:
                 if (not os.access(self.oplog_checkpoint, os.W_OK)
                         and not os.access(self.oplog_checkpoint, os.R_OK)):
-                    logging.critical("Invalid permissions on %s! Exiting" %
-                                     (self.oplog_checkpoint))
+                    LOG.critical("Invalid permissions on %s! Exiting" %
+                                 (self.oplog_checkpoint))
                     sys.exit(2)
 
     def join(self):
@@ -168,7 +167,7 @@ class Connector(threading.Thread):
         # Check for empty file
         try:
             if os.stat(self.oplog_checkpoint).st_size == 0:
-                logging.info("MongoConnector: Empty oplog progress file.")
+                LOG.info("MongoConnector: Empty oplog progress file.")
                 return None
         except OSError:
             return None
@@ -178,8 +177,8 @@ class Connector(threading.Thread):
             data = json.load(source)
         except ValueError:       # empty file
             reason = "It may be empty or corrupt."
-            logging.info("MongoConnector: Can't read oplog progress file. %s" %
-                         (reason))
+            LOG.info("MongoConnector: Can't read oplog progress file. %s" %
+                     (reason))
             source.close()
             return None
 
@@ -211,7 +210,7 @@ class Connector(threading.Thread):
             # Make sure we are connected to a replica set
             is_master = main_conn.admin.command("isMaster")
             if not "setName" in is_master:
-                logging.error(
+                LOG.error(
                     'No replica set at "%s"! A replica set is required '
                     'to run mongo-connector. Shutting down...' % self.address
                 )
@@ -245,15 +244,15 @@ class Connector(threading.Thread):
                 continue_on_error=self.continue_on_error
             )
             self.shard_set[0] = oplog
-            logging.info('MongoConnector: Starting connection thread %s' %
-                         main_conn)
+            LOG.info('MongoConnector: Starting connection thread %s' %
+                     main_conn)
             oplog.start()
 
             while self.can_run:
                 if not self.shard_set[0].running:
-                    logging.error("MongoConnector: OplogThread"
-                                  " %s unexpectedly stopped! Shutting down" %
-                                  (str(self.shard_set[0])))
+                    LOG.error("MongoConnector: OplogThread"
+                              " %s unexpectedly stopped! Shutting down" %
+                              (str(self.shard_set[0])))
                     self.oplog_thread_join()
                     for dm in self.doc_managers:
                         dm.stop()
@@ -269,10 +268,10 @@ class Connector(threading.Thread):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
-                            logging.error("MongoConnector: OplogThread "
-                                          "%s unexpectedly stopped! Shutting "
-                                          "down" %
-                                          (str(self.shard_set[shard_id])))
+                            LOG.error("MongoConnector: OplogThread "
+                                      "%s unexpectedly stopped! Shutting "
+                                      "down" %
+                                      (str(self.shard_set[shard_id])))
                             self.oplog_thread_join()
                             for dm in self.doc_managers:
                                 dm.stop()
@@ -285,7 +284,7 @@ class Connector(threading.Thread):
                         repl_set, hosts = shard_doc['host'].split('/')
                     except ValueError:
                         cause = "The system only uses replica sets!"
-                        logging.error("MongoConnector: %s", cause)
+                        LOG.exception("MongoConnector: %s", cause)
                         self.oplog_thread_join()
                         for dm in self.doc_managers:
                             dm.stop()
@@ -312,7 +311,7 @@ class Connector(threading.Thread):
                     )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
-                    logging.info("MongoConnector: %s %s" % (msg, shard_conn))
+                    LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
         self.oplog_thread_join()
@@ -321,7 +320,7 @@ class Connector(threading.Thread):
     def oplog_thread_join(self):
         """Stops all the OplogThreads
         """
-        logging.info('MongoConnector: Stopping all OplogThreads')
+        LOG.info('MongoConnector: Stopping all OplogThreads')
         for thread in self.shard_set.values():
             thread.join()
 
@@ -358,11 +357,10 @@ def create_doc_managers(names=None, urls=None, unique_key="_id",
     target_urls = urls.split(",") if urls else None
 
     doc_managers = []
+    docman_kwargs = {"unique_key": unique_key,
+                     "namespace_set": ns_set,
+                     "auto_commit_interval": auto_commit_interval}
     if names is not None:
-        # Instantiate DocManagers with correct arguments
-        docman_kwargs = {"unique_key": unique_key,
-                         "namespace_set": ns_set,
-                         "auto_commit_interval": auto_commit_interval}
         for dm, url in zip_longest(doc_manager_classes, target_urls or []):
             # If more target URLs were given than doc managers, may need to
             # create additional doc managers
@@ -604,10 +602,14 @@ def main():
 
     (options, args) = parser.parse_args()
 
+    root_logger = logging.getLogger()
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s")
+
     loglevel = logging.INFO
     if options.verbose:
         loglevel = logging.DEBUG
-    LOG.setLevel(loglevel)
+    root_logger.setLevel(loglevel)
 
     if options.enable_syslog and options.logfile:
         LOG.error("You cannot specify syslog and a logfile simultaneously, "
@@ -616,24 +618,23 @@ def main():
 
     if options.enable_syslog:
         syslog_info = options.syslog_host.split(":")
-        syslog_host = logging.handlers.SysLogHandler(
+        log_out = logging.handlers.SysLogHandler(
             address=(syslog_info[0], int(syslog_info[1])),
             facility=options.syslog_facility
         )
-        syslog_host.setLevel(loglevel)
-        LOG.addHandler(syslog_host)
+        log_out.setLevel(loglevel)
+        log_out.setFormatter(formatter)
+        root_logger.addHandler(log_out)
     elif options.logfile is not None:
         log_out = logging.FileHandler(options.logfile)
         log_out.setLevel(loglevel)
-        log_out.setFormatter(logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'))
-        LOG.addHandler(log_out)
+        log_out.setFormatter(formatter)
+        root_logger.addHandler(log_out)
     else:
         log_out = logging.StreamHandler()
         log_out.setLevel(loglevel)
-        log_out.setFormatter(logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'))
-        LOG.addHandler(log_out)
+        log_out.setFormatter(formatter)
+        root_logger.addHandler(log_out)
 
     LOG.info('Beginning Mongo Connector')
 
@@ -676,7 +677,7 @@ def main():
             key = open(options.auth_file).read()
             re.sub(r'\s', '', key)
         except IOError:
-            LOG.error('Could not parse password authentication file!')
+            LOG.exception('Could not parse password authentication file!')
             sys.exit(1)
 
     if options.password is not None:
@@ -711,7 +712,7 @@ def main():
             if not connector.is_alive():
                 break
         except KeyboardInterrupt:
-            logging.info("Caught keyboard interrupt, exiting!")
+            LOG.info("Caught keyboard interrupt, exiting!")
             connector.join()
             break
 

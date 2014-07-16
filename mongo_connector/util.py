@@ -20,6 +20,7 @@ import logging
 
 from bson.timestamp import Timestamp
 
+LOG = logging.getLogger(__name__)
 
 def bson_ts_to_long(timestamp):
     """Convert BSON timestamp into integer.
@@ -54,7 +55,7 @@ def retry_until_ok(func, *args, **kwargs):
         except:
             count += 1
             if count > 60:
-                logging.error('Call to %s failed too many times in '
+                LOG.exception('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
             time.sleep(1)
