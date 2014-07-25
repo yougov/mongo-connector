@@ -25,7 +25,8 @@ import logging
 import pymongo
 
 from mongo_connector import errors
-from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.util import exception_wrapper
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
 wrap_exceptions = exception_wrapper({
     pymongo.errors.ConnectionFailure: errors.ConnectionFailed,

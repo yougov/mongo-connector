@@ -20,9 +20,8 @@ into the backend.
 Please look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
-
 from mongo_connector.errors import OperationFailed
-from mongo_connector.doc_managers import DocManagerBase
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
 
 class DocManager(DocManagerBase):

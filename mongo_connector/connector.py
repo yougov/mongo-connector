@@ -29,9 +29,8 @@ from mongo_connector import constants, util
 from mongo_connector.compat import zip_longest
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.doc_managers import (
-    DocManagerBase,
-    doc_manager_simulator as simulator)
+from mongo_connector.doc_managers import doc_manager_simulator as simulator
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
 from pymongo import MongoClient
 

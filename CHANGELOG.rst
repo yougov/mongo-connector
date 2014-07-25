@@ -15,6 +15,8 @@ Breaking Changes
         - The `doc_manager` keyword argument in the constructors for Connector and OplogThread is now called `doc_managers`.
         - The `doc_managers` keyword argument in Connector takes a list of **instances** of `DocManager`, rather that a list of strings corresponding to files that define DocManagers.
 - ConnectorError has been removed. Exceptions that occur when constructing Connector will be passed on to the caller.
+- The DocManagerBase class moved from mongo_connector.doc_managers to mongo_connector.doc_managers.doc_manager_base
+- The exception_wrapper function moved from mongo_connector.doc_managers to mongo_connector.util
 
 Version 1.2.1
 -------------

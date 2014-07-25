@@ -29,8 +29,8 @@ from elasticsearch.helpers import scan, streaming_bulk
 from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
-from mongo_connector.util import retry_until_ok
-from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.util import exception_wrapper, retry_until_ok
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 
 wrap_exceptions = exception_wrapper({
