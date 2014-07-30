@@ -67,16 +67,14 @@ class TestOplogManager(unittest.TestCase):
     def test_get_oplog_cursor(self):
         '''Test the get_oplog_cursor method'''
 
-        # Trivial case: timestamp is None
-        self.assertEqual(self.opman.get_oplog_cursor(None), None)
-
-        # earliest entry is after given timestamp
-        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
-        self.primary_conn["test"]["test"].insert(doc)
-        self.assertEqual(self.opman.get_oplog_cursor(
-            bson.Timestamp(1, 0)), None)
+        # timestamp is None - all oplog entries are returned.
+        cursor = self.opman.get_oplog_cursor(None)
+        self.assertEqual(cursor.count(),
+                         self.primary_conn["local"]["oplog.rs"].count())
 
         # earliest entry is the only one at/after timestamp
+        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
+        self.primary_conn["test"]["test"].insert(doc)
         latest_timestamp = self.opman.get_last_oplog_timestamp()
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
@@ -98,12 +96,6 @@ class TestOplogManager(unittest.TestCase):
 
         goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
         self.assertEqual(goc_cursor.count(), 2 + 1000 - 400)
-
-        # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
-        doc = self.primary_conn["test"]["test"].find_one(
-            {"_id": next(goc_cursor)["o"]["_id"]})
-        retrieved = self.primary_conn.test.test.find_one(pivot['o']['_id'])
-        self.assertEqual(doc["i"], retrieved["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""
@@ -168,7 +160,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(last_ts, self.opman.dump_collection())
         docs = self.opman.doc_managers[0]._search()
         docs.sort()
-        
+
         self.assertEqual(len(docs), 90)
         for doc, correct_a in zip(docs, range(0, 50) + range(60, 100)):
             self.assertEquals(doc['a'], correct_a)
@@ -182,7 +174,9 @@ class TestOplogManager(unittest.TestCase):
         2. no last checkpoint, collection dump ok and stuff to dump
         3. no last checkpoint, nothing to dump, stuff in oplog
         4. no last checkpoint, nothing to dump, nothing in oplog
-        5. last checkpoint exists
+        5. no last checkpoint, no collection dump, stuff in oplog
+        6. last checkpoint exists
+        7. last checkpoint is behind
         """
 
         # N.B. these sub-cases build off of each other and cannot be re-ordered
@@ -192,12 +186,15 @@ class TestOplogManager(unittest.TestCase):
         # "change oplog collection" to put nothing in oplog
         self.opman.oplog = self.primary_conn["test"]["emptycollection"]
         self.opman.collection_dump = False
-        self.assertEqual(self.opman.init_cursor(), None)
+        self.assertTrue(all(doc['op'] == 'n'
+                            for doc in self.opman.init_cursor()[0]))
         self.assertEqual(self.opman.checkpoint, None)
 
         # No last checkpoint, empty collections, nothing in oplog
         self.opman.collection_dump = True
-        self.assertEqual(self.opman.init_cursor(), None)
+        cursor, cursor_len = self.opman.init_cursor()
+        self.assertEqual(cursor, None)
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman.checkpoint, None)
 
         # No last checkpoint, empty collections, something in oplog
@@ -207,17 +204,22 @@ class TestOplogManager(unittest.TestCase):
         collection.remove({"i": 1})
         time.sleep(3)
         last_ts = self.opman.get_last_oplog_timestamp()
-        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        cursor, cursor_len = self.opman.init_cursor()
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman.checkpoint, last_ts)
         with self.opman.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
 
-        # No last checkpoint, non-empty collections, stuff in oplog
+        # No last checkpoint, no collection dump, something in oplog
         self.opman.oplog_progress = LockingDict()
-        self.assertEqual(next(self.opman.init_cursor())["ts"], last_ts)
+        self.opman.collection_dump = False
+        collection.insert({"i": 2})
+        last_ts = self.opman.get_last_oplog_timestamp()
+        cursor, cursor_len = self.opman.init_cursor()
+        for i in range(cursor_len - 1):
+            next(cursor)
+        self.assertEqual(next(cursor)['o']['i'], 2)
         self.assertEqual(self.opman.checkpoint, last_ts)
-        with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
 
         # Last checkpoint exists
         progress = LockingDict()
@@ -229,12 +231,22 @@ class TestOplogManager(unittest.TestCase):
         progress.get_dict()[str(self.opman.oplog)] = entry[0]["ts"]
         self.opman.oplog_progress = progress
         self.opman.checkpoint = None
-        cursor = self.opman.init_cursor()
-        self.assertEqual(entry[1]["ts"], next(cursor)["ts"])
+        cursor, cursor_len = self.opman.init_cursor()
+        self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
         self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
         with self.opman.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman.oplog)],
                              entry[0]["ts"])
+
+        # Last checkpoint is behind
+        progress = LockingDict()
+        progress.get_dict()[str(self.opman.oplog)] = bson.Timestamp(1, 0)
+        self.opman.oplog_progress = progress
+        self.opman.checkpoint = None
+        cursor, cursor_len = self.opman.init_cursor()
+        self.assertEqual(cursor_len, 0)
+        self.assertEqual(cursor, None)
+        self.assertIsNotNone(self.opman.checkpoint)
 
     def test_filter_fields(self):
         docman = self.opman.doc_managers[0]
