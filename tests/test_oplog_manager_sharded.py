@@ -193,16 +193,14 @@ class TestOplogManagerSharded(unittest.TestCase):
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
 
-        # Trivial case: timestamp is None
-        self.assertEqual(self.opman1.get_oplog_cursor(None), None)
-
-        # earliest entry is after given timestamp
-        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
-        self.mongos_conn["test"]["mcsharded"].insert(doc)
-        self.assertEqual(self.opman1.get_oplog_cursor(
-            bson.Timestamp(1, 0)), None)
+        # timestamp is None - all oplog entries are returned.
+        cursor = self.opman.get_oplog_cursor(None)
+        self.assertEqual(cursor.count(),
+                         self.primary_conn["local"]["oplog.rs"].count())
 
         # earliest entry is the only one at/after timestamp
+        doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
+        self.mongos_conn["test"]["mcsharded"].insert(doc)
         latest_timestamp = self.opman1.get_last_oplog_timestamp()
         cursor = self.opman1.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
@@ -236,18 +234,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         cursor2 = self.opman2.get_oplog_cursor(pivot2["ts"])
         self.assertEqual(cursor1.count(), oplog1_count - 400)
         self.assertEqual(cursor2.count(), oplog2_count - 400)
-
-        # get_oplog_cursor fast-forwards *one doc beyond* the given timestamp
-        doc1 = self.mongos_conn["test"]["mcsharded"].find_one(
-            {"_id": next(cursor1)["o"]["_id"]})
-        doc2 = self.mongos_conn["test"]["mcsharded"].find_one(
-            {"_id": next(cursor2)["o"]["_id"]})
-        piv1id = pivot1['o']['_id']
-        piv2id = pivot2['o']['_id']
-        retrieved1 = self.mongos_conn.test.mcsharded.find_one(piv1id)
-        retrieved2 = self.mongos_conn.test.mcsharded.find_one(piv2id)
-        self.assertEqual(doc1["i"], retrieved1["i"] + 1)
-        self.assertEqual(doc2["i"], retrieved2["i"] + 1)
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""
@@ -313,7 +299,9 @@ class TestOplogManagerSharded(unittest.TestCase):
         2. no last checkpoint, collection dump ok and stuff to dump
         3. no last checkpoint, nothing to dump, stuff in oplog
         4. no last checkpoint, nothing to dump, nothing in oplog
-        5. last checkpoint exists
+        5. no last checkpoint, no collection dump, stuff in oplog
+        6. last checkpoint exists
+        7. last checkpoint is behind
         """
 
         # N.B. these sub-cases build off of each other and cannot be re-ordered
@@ -325,17 +313,23 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
         self.opman1.collection_dump = False
         self.opman2.collection_dump = False
-        self.assertEqual(self.opman1.init_cursor(), None)
+        self.assertTrue(all(doc['op'] == 'n'
+                            for doc in self.opman1.init_cursor()[0]))
         self.assertEqual(self.opman1.checkpoint, None)
-        self.assertEqual(self.opman2.init_cursor(), None)
+        self.assertTrue(all(doc['op'] == 'n'
+                            for doc in self.opman2.init_cursor()[0]))
         self.assertEqual(self.opman2.checkpoint, None)
 
         # No last checkpoint, empty collections, nothing in oplog
-        self.opman1.collection_dump = True
-        self.opman2.collection_dump = True
-        self.assertEqual(self.opman1.init_cursor(), None)
+        self.opman1.collection_dump = self.opman2.collection_dump = True
+
+        cursor, cursor_len = self.opman1.init_cursor()
+        self.assertEqual(cursor, None)
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman1.checkpoint, None)
-        self.assertEqual(self.opman2.init_cursor(), None)
+        cursor, cursor_len = self.opman2.init_cursor()
+        self.assertEqual(cursor, None)
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman2.checkpoint, None)
 
         # No last checkpoint, empty collections, something in oplog
@@ -347,25 +341,30 @@ class TestOplogManagerSharded(unittest.TestCase):
         collection.remove({"i": 1})
         time.sleep(3)
         last_ts1 = self.opman1.get_last_oplog_timestamp()
-        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        cursor, cursor_len = self.opman1.init_cursor()
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         with self.opman1.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
         # init_cursor should point to startup message in shard2 oplog
-        cursor = self.opman2.init_cursor()
-        self.assertEqual(next(cursor)["ts"], oplog_startup_ts)
+        cursor, cursor_len = self.opman2.init_cursor()
+        self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman2.checkpoint, oplog_startup_ts)
 
-        # No last checkpoint, non-empty collections, stuff in oplog
+        # No last checkpoint, no collection dump, stuff in oplog
         progress = LockingDict()
         self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        self.opman1.collection_dump = self.opman2.collection_dump = False
         collection.insert({"i": 1200})
         last_ts2 = self.opman2.get_last_oplog_timestamp()
-        self.assertEqual(next(self.opman1.init_cursor())["ts"], last_ts1)
+        self.opman1.init_cursor()
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         with self.opman1.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
-        self.assertEqual(next(self.opman2.init_cursor())["ts"], last_ts2)
+        cursor, cursor_len = self.opman2.init_cursor()
+        for i in range(cursor_len - 1):
+            next(cursor)
+        self.assertEqual(next(cursor)["o"]["i"], 1200)
         self.assertEqual(self.opman2.checkpoint, last_ts2)
         with self.opman2.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman2.oplog)], last_ts2)
@@ -383,8 +382,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         progress.get_dict()[str(self.opman2.oplog)] = entry2[0]["ts"]
         self.opman1.oplog_progress = self.opman2.oplog_progress = progress
         self.opman1.checkpoint = self.opman2.checkpoint = None
-        cursor1 = self.opman1.init_cursor()
-        cursor2 = self.opman2.init_cursor()
+        cursor1, cursor_len1 = self.opman1.init_cursor()
+        cursor2, cursor_len2 = self.opman2.init_cursor()
         self.assertEqual(entry1[1]["ts"], next(cursor1)["ts"])
         self.assertEqual(entry2[1]["ts"], next(cursor2)["ts"])
         self.assertEqual(self.opman1.checkpoint, entry1[0]["ts"])
@@ -395,6 +394,21 @@ class TestOplogManagerSharded(unittest.TestCase):
         with self.opman2.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[str(self.opman2.oplog)],
                              entry2[0]["ts"])
+
+        # Last checkpoint is behind
+        progress = LockingDict()
+        progress.get_dict()[str(self.opman1.oplog)] = bson.Timestamp(1, 0)
+        progress.get_dict()[str(self.opman2.oplog)] = bson.Timestamp(1, 0)
+        self.opman1.oplog_progress = self.opman2.oplog_progress = progress
+        self.opman1.checkpoint = self.opman2.checkpoint = None
+        cursor, cursor_len = self.opman1.init_cursor()
+        self.assertEqual(cursor_len, 0)
+        self.assertEqual(cursor, None)
+        self.assertIsNotNone(self.opman1.checkpoint)
+        cursor, cursor_len = self.opman2.init_cursor()
+        self.assertEqual(cursor_len, 0)
+        self.assertEqual(cursor, None)
+        self.assertIsNotNone(self.opman2.checkpoint)
 
     def test_rollback(self):
         """Test the rollback method in a sharded environment
@@ -455,6 +469,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
         # Same should hold for the doc manager
+        time.sleep(1)
         docman_docs = [d for d in self.opman1.doc_managers[0]._search()
                        if d["i"] < 1000]
         self.assertEqual(len(docman_docs), 1)
