@@ -25,6 +25,7 @@ else:
 
 sys.path[0:0] = [""]
 
+from gridfs import GridFS
 from pymongo import MongoClient
 from tests import mongo_host, STRESS_COUNT
 from tests.setup_cluster import (start_replica_set,
@@ -74,11 +75,14 @@ class TestSynchronizer(unittest.TestCase):
             oplog_checkpoint="config.txt",
             ns_set=['test.test'],
             auth_key=None,
-            doc_managers=(self.mongo_doc,)
+            doc_managers=(self.mongo_doc,),
+            gridfs_set=['test.test']
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         self.conn['test']['test'].remove()
+        self.conn['test']['test.files'].remove()
+        self.conn['test']['test.chunks'].remove()
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
 
     def test_shard_length(self):
@@ -110,6 +114,28 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test'].remove({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) != 1)
         self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
+
+    def test_insert_file(self):
+        """Tests inserting a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        test_data = "test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt")
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) > 0)
+
+        res = list(self.mongo_doc._search())
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc['filename'], 'test.txt')
+        self.assertEqual(doc['_id'], id)
+        self.assertEqual(doc['content'], test_data)
+
+    def test_remove_file(self):
+        fs = GridFS(self.conn['test'], 'test')
+        id = fs.put("test file", filename="test.txt")
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        fs.delete(id)
+        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
 
     def test_update(self):
         """Test update operations."""

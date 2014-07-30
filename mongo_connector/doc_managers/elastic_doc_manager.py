@@ -17,6 +17,7 @@
 Receives documents from an OplogThread and takes the appropriate actions on
 Elasticsearch.
 """
+import base64
 import logging
 
 from threading import Timer
@@ -24,6 +25,7 @@ from threading import Timer
 import bson.json_util
 
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
+from elasticsearch.client import IndicesClient
 from elasticsearch.helpers import scan, streaming_bulk
 
 from mongo_connector import errors
@@ -35,10 +37,10 @@ from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 
 wrap_exceptions = exception_wrapper({
     es_exceptions.ConnectionError: errors.ConnectionFailed,
-    es_exceptions.TransportError: errors.OperationFailed})
+    es_exceptions.TransportError: errors.OperationFailed,
+    es_exceptions.NotFoundError: errors.OperationFailed})
 
 LOG = logging.getLogger(__name__)
-
 
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
@@ -50,7 +52,7 @@ class DocManager(DocManagerBase):
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  meta_index_name="mongodb_meta", meta_type="mongodb_meta",
-                 **kwargs):
+                 attachment_field="content", **kwargs):
         self.elastic = Elasticsearch(hosts=[url])
         self.auto_commit_interval = auto_commit_interval
         self.doc_type = 'string'  # default type is string, change if needed
@@ -61,6 +63,9 @@ class DocManager(DocManagerBase):
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
         self._formatter = DefaultDocumentFormatter()
+
+        self.has_attachment_mapping = False
+        self.attachment_field = attachment_field
 
     def stop(self):
         """Stop the auto-commit thread."""
@@ -164,6 +169,40 @@ class DocManager(DocManagerBase):
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
             pass
+
+    @wrap_exceptions
+    def insert_file(self, f):
+        doc = f.get_metadata()
+        doc_id = str(doc.pop('_id'))
+        doc_type = self.doc_type
+        index = doc.pop('ns')
+
+        # make sure that elasticsearch treats it like a file
+        if not self.has_attachment_mapping:
+            body = {
+                "properties": {
+                    self.attachment_field: {"type": "attachment"}
+                }
+            }
+            self.elastic.indices.put_mapping(index=index,
+                                             doc_type=doc_type,
+                                             body=body)
+            self.has_attachment_mapping = True
+
+        metadata = {
+            'ns': index,
+            '_ts': doc.pop('_ts')
+        }
+
+        doc = self._formatter.format_document(doc)
+        doc[self.attachment_field] = base64.b64encode(f.read()).decode()
+
+        self.elastic.index(index=index, doc_type=doc_type,
+                           body=doc, id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
+        self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
+                           body=bson.json_util.dumps(metadata), id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
     def remove(self, doc):

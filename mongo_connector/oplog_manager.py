@@ -28,6 +28,7 @@ import threading
 import traceback
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
+from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import retry_until_ok
 
 from pymongo import MongoClient
@@ -42,7 +43,7 @@ class OplogThread(threading.Thread):
                  doc_managers, oplog_progress_dict, namespace_set, auth_key,
                  auth_username, repl_set=None, collection_dump=True,
                  batch_size=DEFAULT_BATCH_SIZE, fields=None,
-                 dest_mapping={}, continue_on_error=False):
+                 dest_mapping={}, continue_on_error=False, gridfs_set=[]):
         """Initialize the oplog thread.
         """
         super(OplogThread, self).__init__()
@@ -83,6 +84,10 @@ class OplogThread(threading.Thread):
 
         #The set of namespaces to process from the mongo cluster.
         self.namespace_set = namespace_set
+
+        #The set of gridfs namespaces to process from the mongo cluster
+        self.gridfs_set = gridfs_set
+        self.gridfs_files_set = [ns + '.files' for ns in self.gridfs_set]
 
         #The dict of source namespaces to destination namespaces
         self.dest_mapping = dest_mapping
@@ -190,9 +195,25 @@ class OplogThread(threading.Thread):
                         operation = entry['op']
                         ns = entry['ns']
 
-                        db, coll = ns.split('.', 1)
+                        if '.' not in ns:
+                            continue
+                        coll = ns.split('.', 1)[1]
+
+                        # Ignore system collections
                         if coll.startswith("system."):
                             continue
+
+                        # Ignore GridFS chunks
+                        if coll.endswith('.chunks'):
+                            continue
+
+                        is_gridfs_file = False
+                        if coll.endswith(".files"):
+                            if ns in self.gridfs_files_set:
+                                ns = ns[:-len(".files")]
+                                is_gridfs_file = True
+                            else:
+                                continue
 
                         # use namespace mapping if one exists
                         ns = self.dest_mapping.get(entry['ns'], ns)
@@ -217,7 +238,11 @@ class OplogThread(threading.Thread):
                                     doc['_ts'] = util.bson_ts_to_long(
                                         entry['ts'])
                                     doc['ns'] = ns
-                                    docman.upsert(doc)
+                                    if is_gridfs_file:
+                                        docman.insert_file(GridFSFile(
+                                            self.main_connection, doc))
+                                    else:
+                                        docman.upsert(doc)
                                     upsert_inc += 1
                                 # Update
                                 elif operation == 'u':
@@ -331,7 +356,9 @@ class OplogThread(threading.Thread):
             try:
                 query = {}
                 if self.namespace_set:
-                    query['ns'] = {'$in': self.namespace_set}
+                    query['ns'] = {
+                        '$in': self.namespace_set + self.gridfs_files_set
+                    }
 
                 if timestamp is None:
                     cursor = self.oplog.find(
@@ -369,7 +396,11 @@ class OplogThread(threading.Thread):
                 coll_list = retry_until_ok(
                     self.main_connection[database].collection_names)
                 for coll in coll_list:
-                    if coll.startswith("system"):
+                    # ignore system collections
+                    if coll.startswith("system."):
+                        continue
+                    # ignore gridfs collections
+                    if coll.endswith(".files") or coll.endswith(".chunks"):
                         continue
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
@@ -379,7 +410,7 @@ class OplogThread(threading.Thread):
             return None
         long_ts = util.bson_ts_to_long(timestamp)
 
-        def docs_to_dump():
+        def docs_to_dump(dump_set):
             for namespace in dump_set:
                 LOG.info("OplogThread: dumping collection %s"
                          % namespace)
@@ -420,7 +451,7 @@ class OplogThread(threading.Thread):
         def upsert_each(dm):
             num_inserted = 0
             num_failed = 0
-            for num, doc in enumerate(docs_to_dump()):
+            for num, doc in enumerate(docs_to_dump(dump_set)):
                 if num % 10000 == 0:
                     LOG.debug("Upserted %d docs." % num)
                 try:
@@ -439,7 +470,7 @@ class OplogThread(threading.Thread):
 
         def upsert_all(dm):
             try:
-                dm.bulk_upsert(docs_to_dump())
+                dm.bulk_upsert(docs_to_dump(dump_set))
             except Exception as e:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
@@ -451,7 +482,7 @@ class OplogThread(threading.Thread):
 
         def do_dump(dm, error_queue):
             try:
-                # Bulk upsert if possible
+                # Dump the documents, bulk upsert if possible
                 if hasattr(dm, "bulk_upsert"):
                     LOG.debug("OplogThread: Using bulk upsert function for "
                               "collection dump")
@@ -462,6 +493,13 @@ class OplogThread(threading.Thread):
                         "bulk_upsert method.  Upserting documents "
                         "serially for collection dump." % str(dm))
                     upsert_each(dm)
+
+                # Dump Gridfs files
+                for doc in docs_to_dump(self.gridfs_files_set):
+                    doc['ns'] = doc['ns'][:-len(".files")]
+                    dm.insert_file(
+                        GridFSFile(self.main_connection, doc))
+
             except:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,
@@ -517,7 +555,7 @@ class OplogThread(threading.Thread):
             ).limit(1)
         else:
             curr = self.oplog.find(
-                {'ns': {'$in': self.namespace_set}}
+                {'ns': {'$in': self.namespace_set + self.gridfs_files_set}}
             ).sort('$natural', pymongo.DESCENDING).limit(1)
 
         if curr.count(with_limit_and_skip=True) == 0:

@@ -13,9 +13,10 @@
 # limitations under the License.
 
 """Integration tests for mongo-connector + Elasticsearch."""
-import time
+import base64
 import os
 import sys
+import time
 if sys.version_info[:2] == (2, 6):
     import unittest2 as unittest
 else:
@@ -24,6 +25,7 @@ else:
 sys.path[0:0] = [""]
 
 from elasticsearch import Elasticsearch
+from gridfs import GridFS
 from pymongo import MongoClient
 
 from tests import elastic_pair, mongo_host, STRESS_COUNT
@@ -56,10 +58,11 @@ class ElasticsearchTestCase(unittest.TestCase):
     def tearDown(self):
         self.elastic_conn.indices.delete(index='test.test', ignore=404)
 
-    def _search(self):
+    def _search(self, query=None):
+        query = query or {"match_all": {}}
         return self.elastic_doc._stream_search(
             index="test.test",
-            body={"query": {"match_all": {}}}
+            body={"query": query}
         )
 
     def _count(self):
@@ -108,10 +111,14 @@ class TestElastic(ElasticsearchTestCase):
             oplog_checkpoint='config.txt',
             ns_set=['test.test'],
             auth_key=None,
-            doc_managers=(docman,)
+            doc_managers=(docman,),
+            gridfs_set=['test.test']
         )
 
         self.conn.test.test.drop()
+        self.conn.test.test.files.drop()
+        self.conn.test.test.chunks.drop()
+
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: self._count() == 0)
@@ -137,6 +144,29 @@ class TestElastic(ElasticsearchTestCase):
         self.conn['test']['test'].remove({'name': 'paulie'})
         assert_soon(lambda: self._count() != 1)
         self.assertEqual(self._count(), 0)
+
+    def test_insert_file(self):
+        """Tests inserting a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        test_data = "test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt")
+        assert_soon(lambda: self._count() > 0)
+
+        query = {"match": {"_all": "test_insert_file"}}
+        res = list(self._search(query))
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc['filename'], 'test.txt')
+        self.assertEqual(doc['_id'], str(id))
+        self.assertEqual(base64.b64decode(doc['content']), test_data)
+
+    def test_remove_file(self):
+        fs = GridFS(self.conn['test'], 'test')
+        id = fs.put("test file", filename="test.txt")
+        assert_soon(lambda: self._count() == 1)
+        fs.delete(id)
+        assert_soon(lambda: self._count() == 0)
 
     def test_update(self):
         """Test update operations."""

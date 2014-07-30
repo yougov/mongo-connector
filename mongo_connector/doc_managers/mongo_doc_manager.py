@@ -24,6 +24,7 @@
 import logging
 import pymongo
 
+from gridfs import GridFS
 from mongo_connector import errors
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
@@ -126,8 +127,27 @@ class DocManager(DocManagerBase):
         The documents has ns and _ts fields.
         """
         database, coll = doc['ns'].split('.', 1)
-        self.mongo[database][coll].remove({'_id': doc["_id"]})
-        self.mongo["__mongo_connector"][doc['ns']].remove({'_id': doc["_id"]})
+
+        doc2 = self.mongo['__mongo_connector'][doc['ns']].find_and_modify(
+            {'_id': doc['_id']}, remove=True)
+        if doc2.get('gridfs_id'):
+            GridFS(self.mongo[database], coll).delete(doc2['gridfs_id'])
+        else:
+            self.mongo[database][coll].remove({'_id': doc["_id"]})
+
+    @wrap_exceptions
+    def insert_file(self, f):
+        database, coll = f.ns.split('.', 1)
+        ts = f._ts
+        ns = f.ns
+
+        id = GridFS(self.mongo[database], coll).put(f, filename=f.filename)
+        self.mongo["__mongo_connector"][ns].save({
+            '_id': f._id,
+            '_ts': ts,
+            'ns': ns,
+            'gridfs_id': id
+        })
 
     @wrap_exceptions
     def search(self, start_ts, end_ts):
@@ -164,10 +184,21 @@ class DocManager(DocManagerBase):
         """For test purposes only. Removes all documents in test.test
         """
         self.mongo['test']['test'].remove()
+        self.mongo['test']['test.files'].remove()
+        self.mongo['test']['test.chunks'].remove()
 
     @wrap_exceptions
     def _search(self):
         """For test purposes only. Performs search on MongoDB with empty query.
         Does not have to be implemented.
         """
-        return self.mongo['test']['test'].find()
+        for doc in self.mongo['test']['test'].find():
+            yield doc
+
+        fs = GridFS(self.mongo['test'], 'test')
+        for doc in self.mongo['__mongo_connector']['test.test'].find():
+            if doc.get('gridfs_id'):
+                for f in fs.find({'_id': doc['gridfs_id']}):
+                    doc['filename'] = f.filename
+                    doc['content'] = f.read()
+                    yield doc

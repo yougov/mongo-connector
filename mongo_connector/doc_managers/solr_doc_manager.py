@@ -20,22 +20,27 @@ is that this file can be used as an example to add on different backends.
 To extend this to other systems, simply implement the exact same class and
 replace the method definitions with API calls for the desired backend.
 """
-import re
 import json
+import logging
+import os
+import re
+import urllib
 
 from pysolr import Solr, SolrError
 
 from mongo_connector import errors
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
+from mongo_connector.compat import Request, urlopen, URLError, HTTPError
 from mongo_connector.util import exception_wrapper, retry_until_ok
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DocumentFlattener
 
-
-# pysolr only has 1 exception: SolrError
 wrap_exceptions = exception_wrapper({
-    SolrError: errors.OperationFailed})
+    SolrError: errors.OperationFailed,
+    URLError: errors.ConnectionFailed,
+    HTTPError: errors.ConnectionFailed
+})
 
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
@@ -55,6 +60,7 @@ class DocManager(DocManagerBase):
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK, **kwargs):
         """Verify Solr URL and establish a connection.
         """
+        self.url = url
         self.solr = Solr(url)
         self.unique_key = unique_key
         # pysolr does things in milliseconds
@@ -228,6 +234,23 @@ class DocManager(DocManagerBase):
                              for i in range(self.chunk_size))
         else:
             self.solr.add(cleaned, **add_kwargs)
+
+    @wrap_exceptions
+    def insert_file(self, f):
+        params = self._formatter.format_document(f.get_metadata())
+        params[self.unique_key] = params.pop('_id')
+        params = dict(('literal.' + k, v) for k, v in params.items())
+
+        if self.auto_commit_interval == 0:
+            params['commit'] = 'true'
+
+        request = Request(os.path.join(
+            self.url, "update/extract?%s" % urllib.urlencode(params)))
+
+        request.add_header("Content-type", "application/octet-stream")
+        request.add_data(f)
+        response = urlopen(request)
+        logging.debug(response.read())
 
     @wrap_exceptions
     def remove(self, doc):

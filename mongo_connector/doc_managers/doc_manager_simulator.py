@@ -69,6 +69,13 @@ class DocManager(DocManagerBase):
 
         self.doc_dict[doc["_id"]] = doc
 
+    def insert_file(self, f):
+        """Inserts a file to the doc dict.
+        """
+        doc = f.get_metadata()
+        doc['content'] = f.read()
+        self.doc_dict[f._id] = doc
+
     def remove(self, doc):
         """Removes the document from the doc dict.
         """

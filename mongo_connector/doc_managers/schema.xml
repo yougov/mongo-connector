@@ -939,6 +939,11 @@
    <field name="last_modified" type="date" indexed="true" stored="true"/>
    <field name="links" type="string" indexed="true" stored="true" multiValued="true"/>
 
+   <field name="content" type="text_general" indexed="false" stored="true" multiValued="true"/>
+   <field name="filename" type="string" indexed="true" stored="true"/>
+   <field name="upload_date" type="date" indexed="true" stored="true"/>
+   <field name="md5" type="string" indexed="false" stored="true"/>
+
    <!-- catchall field, containing all other searchable text fields (implemented
         via copyField further on in this schema  -->
    <field name="text" type="text_general" indexed="true" stored="false" multiValued="true"/>
@@ -1032,6 +1037,9 @@
    <copyField source="features" dest="text"/>
    <copyField source="includes" dest="text"/>
    <copyField source="manu" dest="manu_exact"/>
+
+   <copyField source="filename" dest="text"/>
+   <copyField source="content" dest="text"/>
 
    <!-- Copy the price into a currency enabled field (default USD) -->
    <copyField source="price" dest="price_c"/>

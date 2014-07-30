@@ -25,6 +25,7 @@ else:
 
 sys.path[0:0] = [""]
 
+from gridfs import GridFS
 from pymongo import MongoClient
 
 from tests import solr_pair, mongo_host, STRESS_COUNT
@@ -71,11 +72,14 @@ class TestSynchronizer(unittest.TestCase):
             oplog_checkpoint='config.txt',
             ns_set=['test.test'],
             auth_key=None,
-            doc_managers=(docman,)
+            doc_managers=(docman,),
+            gridfs_set=['test.test']
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         retry_until_ok(self.conn.test.test.remove)
+        retry_until_ok(self.conn.test.test.files.remove)
+        retry_until_ok(self.conn.test.test.chunks.remove)
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 0)
 
     def tearDown(self):
@@ -106,6 +110,30 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test'].insert({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 0)
+
+    def test_insert_file(self):
+        """Tests inserting a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        test_data = "test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt")
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
+
+        res = list(self.solr_conn.search('test_insert_file'))
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc['filename'], "test.txt")
+        self.assertEqual(doc['_id'], str(id))
+        self.assertEqual(doc['content'][0].strip(), test_data.strip())
+
+    def test_remove_file(self):
+        """Tests removing a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        id = fs.put("test file", filename="test.txt")
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 1)
+        fs.delete(id)
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 0)
 
     def test_update(self):

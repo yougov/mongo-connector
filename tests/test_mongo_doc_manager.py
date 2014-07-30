@@ -28,6 +28,7 @@ from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from pymongo import MongoClient
 
 from tests import mongo_host
+from tests.test_gridfs_file import MockGridFSFile
 from tests.setup_cluster import start_mongo_proc, kill_mongo_proc
 
 
@@ -60,7 +61,7 @@ class MongoDocManagerTester(unittest.TestCase):
         """
 
         self.mongo_conn.drop_database("__mongo_connector")
-        self.mongo.remove()
+        self.MongoDoc._remove()
 
         conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
         for ns in self.namespaces_inc + self.namespaces_exc:
@@ -103,8 +104,8 @@ class MongoDocManagerTester(unittest.TestCase):
                 '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
-        res = self.mongo.find()
-        self.assertTrue(res.count() == 1)
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
@@ -112,8 +113,8 @@ class MongoDocManagerTester(unittest.TestCase):
                 '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(1)
-        res = self.mongo.find()
-        self.assertTrue(res.count() == 1)
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
 
@@ -125,15 +126,53 @@ class MongoDocManagerTester(unittest.TestCase):
                 '_ts': 5767301236327972865}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
-        res = self.mongo.find()
-        self.assertTrue(res.count() == 1)
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 1)
         if "ns" not in docc:
             docc["ns"] = 'test.test'
 
         self.MongoDoc.remove(docc)
         time.sleep(1)
-        res = self.mongo.find()
-        self.assertTrue(res.count() == 0)
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 0)
+
+    def test_insert_file(self):
+        test_data = ' '.join(str(x) for x in range(100000))
+        docc = {
+            '_id': 'test_id',
+            '_ts': 10,
+            'ns': 'test.test',
+            'filename': 'test_filename',
+            'upload_date': 5,
+            'md5': 'test_md5'
+        }
+        self.MongoDoc.insert_file(MockGridFSFile(docc, test_data))
+        res = self.MongoDoc._search()
+        for doc in res:
+            self.assertEqual(doc['_id'], docc['_id'])
+            self.assertEqual(doc['_ts'], docc['_ts'])
+            self.assertEqual(doc['ns'], docc['ns'])
+            self.assertEqual(doc['filename'], docc['filename'])
+            self.assertEqual(doc['content'], test_data)
+
+    def test_remove_file(self):
+        test_data = 'hello world'
+        docc = {
+            '_id': 'test_id',
+            '_ts': 10,
+            'ns': 'test.test',
+            'filename': 'test_filename',
+            'upload_date': 5,
+            'md5': 'test_md5'
+        }
+
+        self.MongoDoc.insert_file(MockGridFSFile(docc, test_data))
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 1)
+
+        self.MongoDoc.remove(docc)
+        res = list(self.MongoDoc._search())
+        self.assertEqual(len(res), 0)
 
     def test_full_search(self):
         """Query Mongo for all docs via API and via DocManager's
@@ -149,8 +188,8 @@ class MongoDocManagerTester(unittest.TestCase):
         self.MongoDoc.commit()
         search = list(self.MongoDoc._search())
         search2 = list(self.mongo.find())
-        self.assertTrue(len(search) == len(search2))
-        self.assertTrue(len(search) != 0)
+        self.assertEqual(len(search), len(search2))
+        self.assertNotEqual(len(search), 0)
         self.assertTrue(all(x in search for x in search2) and
                         all(y in search2 for y in search))
 
@@ -171,7 +210,7 @@ class MongoDocManagerTester(unittest.TestCase):
         self.MongoDoc.upsert(docc3)
         search = list(self.MongoDoc.search(5767301236327972865,
                                            5767301236327972866))
-        self.assertTrue(len(search) == 2)
+        self.assertEqual(len(search), 2)
         result_id = [result.get("_id") for result in search]
         self.assertIn('1', result_id)
         self.assertIn('2', result_id)
@@ -201,12 +240,12 @@ class MongoDocManagerTester(unittest.TestCase):
         self.MongoDoc.upsert(docc)
         time.sleep(1)
         doc = self.MongoDoc.get_last_doc()
-        self.assertTrue(doc['_id'] == '4')
+        self.assertEqual(doc['_id'], '4')
         docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
         self.MongoDoc.upsert(docc)
         time.sleep(3)
         doc = self.MongoDoc.get_last_doc()
-        self.assertTrue(doc['_id'] == '6')
+        self.assertEqual(doc['_id'], '6')
 
     def test_get_last_doc_namespaces(self):
         """Ensure that get_last_doc returns the latest document in one of

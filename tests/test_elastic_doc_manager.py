@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Unit tests for the Elastic DocManager."""
+import base64
 import time
 import sys
 if sys.version_info[:2] == (2, 6):
@@ -21,11 +22,11 @@ else:
     import unittest
 from tests import elastic_pair
 from tests.test_elastic import ElasticsearchTestCase
+from tests.test_gridfs_file import MockGridFSFile
 
 sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
-
 
 class ElasticDocManagerTester(ElasticsearchTestCase):
     """Unit tests for the Elastic DocManager."""
@@ -114,6 +115,45 @@ class ElasticDocManagerTester(ElasticsearchTestCase):
             body={"query": {"match_all": {}}}
         )["hits"]["hits"]
         res = [x["_source"] for x in res]
+        self.assertEqual(len(res), 0)
+
+    def test_insert_file(self):
+        """Ensure we can properly insert a file into ElasticSearch
+        """
+        test_data = ' '.join(str(x) for x in range(100000))
+        docc = {
+            '_id': 'test_id',
+            '_ts': 10,
+            'ns': 'test.test',
+            'filename': 'test_filename',
+            'upload_date': 5,
+            'md5': 'test_md5'
+        }
+        self.elastic_doc.insert_file(MockGridFSFile(docc, test_data))
+        res = self._search()
+        for doc in res:
+            self.assertEqual(doc['_id'], docc['_id'])
+            self.assertEqual(doc['filename'], docc['filename'])
+            self.assertEqual(base64.b64decode(doc['content']),
+                             test_data.strip())
+
+    def test_remove_file(self):
+        test_data = 'hello world'
+        docc = {
+            '_id': 'test_id',
+            '_ts': 10,
+            'ns': 'test.test',
+            'filename': 'test_filename',
+            'upload_date': 5,
+            'md5': 'test_md5'
+        }
+
+        self.elastic_doc.insert_file(MockGridFSFile(docc, test_data))
+        res = list(self._search())
+        self.assertEqual(len(res), 1)
+
+        self.elastic_doc.remove(docc)
+        res = list(self._search())
         self.assertEqual(len(res), 0)
 
     def test_search(self):

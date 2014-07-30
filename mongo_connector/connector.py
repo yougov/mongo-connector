@@ -45,7 +45,7 @@ class Connector(threading.Thread):
                  collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
                  fields=None, dest_mapping={},
                  auto_commit_interval=constants.DEFAULT_COMMIT_INTERVAL,
-                 continue_on_error=False):
+                 continue_on_error=False, gridfs_set=[]):
 
         super(Connector, self).__init__()
 
@@ -60,6 +60,9 @@ class Connector(threading.Thread):
 
         #The set of relevant namespaces to consider
         self.ns_set = ns_set
+
+        #The set of gridfs namespaces to consider
+        self.gridfs_set = gridfs_set
 
         #The dict of source namespace to destination namespace
         self.dest_mapping = dest_mapping
@@ -240,7 +243,8 @@ class Connector(threading.Thread):
                 batch_size=self.batch_size,
                 fields=self.fields,
                 dest_mapping=self.dest_mapping,
-                continue_on_error=self.continue_on_error
+                continue_on_error=self.continue_on_error,
+                gridfs_set=self.gridfs_set
             )
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
@@ -306,7 +310,8 @@ class Connector(threading.Thread):
                         batch_size=self.batch_size,
                         fields=self.fields,
                         dest_mapping=self.dest_mapping,
-                        continue_on_error=self.continue_on_error
+                        continue_on_error=self.continue_on_error,
+                        gridfs_set=self.gridfs_set
                     )
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
@@ -589,6 +594,14 @@ def main():
                       " set of documents due to errors may cause undefined"
                       " behavior. Use this flag to dump only.")
 
+    # Specify which gridfs namespaces to replicate
+    parser.add_option("--gridfs-set", action="store",
+                      dest="gridfs_set", help=
+                      "Used to specify the gridfs namespaces we want to"
+                      " consider. For example, if your file metadata is stored"
+                      " in `test.fs.files` and chunks in `test.fs.chunks`,"
+                      " then use `--gridfs-set test.fs`.")
+
     #-v enables vebose logging
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False,
@@ -668,7 +681,12 @@ def main():
 
     fields = options.fields
     if fields is not None:
-        fields = options.fields.split(',')
+        fields = fields.split(',')
+
+    if options.gridfs_set:
+        gridfs_set = options.gridfs_set.split(',')
+    else:
+        gridfs_set = []
 
     key = None
     if options.auth_file is not None:
@@ -701,7 +719,8 @@ def main():
         fields=fields,
         dest_mapping=dest_mapping,
         auto_commit_interval=options.commit_interval,
-        continue_on_error=options.continue_on_error
+        continue_on_error=options.continue_on_error,
+        gridfs_set=gridfs_set
     )
     connector.start()
 
