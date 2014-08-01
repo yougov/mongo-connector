@@ -464,7 +464,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
         # Same should hold for the doc manager
-        time.sleep(1)
         docman_docs = [d for d in self.opman1.doc_managers[0]._search()
                        if d["i"] < 1000]
         self.assertEqual(len(docman_docs), 1)

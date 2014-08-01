@@ -423,7 +423,7 @@ class OplogThread(threading.Thread):
                         query, tailable=True, await_data=True)
                     # Applying 8 as the mask to the cursor enables OplogReplay
                     cursor.add_option(8)
-                return cursor
+                return cursor, cursor.count()
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
@@ -637,16 +637,14 @@ class OplogThread(threading.Thread):
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
-                cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, util.retry_until_ok(cursor.count)
+                return self.get_oplog_cursor()
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
-        cursor = self.get_oplog_cursor(timestamp)
-        cursor_len = util.retry_until_ok(cursor.count)
+        cursor, cursor_len = self.get_oplog_cursor(timestamp)
 
         if cursor_len == 0:
             # rollback, update checkpoint, and retry
