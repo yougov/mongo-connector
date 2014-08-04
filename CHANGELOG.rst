@@ -18,6 +18,23 @@ Breaking Changes
 - The DocManagerBase class moved from mongo_connector.doc_managers to mongo_connector.doc_managers.doc_manager_base
 - The exception_wrapper function moved from mongo_connector.doc_managers to mongo_connector.util
 
+Version 1.3
+-----------
+
+Version 1.3 fixes many issues and adds a couple minor features. Highlights include:
+
+- Use proper updates instead of upserting the most recent version of a document.
+
+.. Warning:: Update operations require ``_source`` field to be enabled in Elasticsearch.
+
+- Fix many issues relating to sending BSON types to external drivers, such as for Elasticsearch and Solr.
+- Fix several issues related to using a unique key other than ``_id``.
+- Support all UTF8 database and collection names.
+- Keep namespace and timestamp metadata in a separate Elasticsearch index.
+- Documentation overhaul for using Mongo Connector with Elasticsearch.
+- New ``--continue-on-error`` flag for collection dumps.
+- ``_id`` is no longer duplicated in ``_source`` field in Elasticsearch.
+
 Version 1.2.1
 -------------
 
