@@ -49,7 +49,7 @@ class ElasticsearchTestCase(unittest.TestCase):
 
     def setUp(self):
         # Create target index in elasticsearch
-        self.elastic_conn.indices.create(index='test.test')
+        self.elastic_conn.indices.create(index='test.test', ignore=400)
         self.elastic_conn.cluster.health(wait_for_status='yellow',
                                          index='test.test')
 
