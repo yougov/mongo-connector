@@ -191,7 +191,10 @@ class OplogThread(threading.Thread):
                         operation = entry['op']
                         ns = entry['ns']
 
-                        db, coll = ns.split('.', 1)
+                        if '.' not in ns:
+                            continue
+
+                        coll = ns.split('.', 1)[1]
                         if coll.startswith("system."):
                             continue
 
