@@ -50,7 +50,7 @@ except IOError:
     pass        # Install without README.rst
 
 setup(name='mongo-connector',
-      version="1.3",
+      version="1.3.dev0",
       author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
