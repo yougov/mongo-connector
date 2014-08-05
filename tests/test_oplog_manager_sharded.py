@@ -193,10 +193,16 @@ class TestOplogManagerSharded(unittest.TestCase):
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
 
-        # timestamp is None - all oplog entries are returned.
-        cursor = self.opman.get_oplog_cursor(None)
-        self.assertEqual(cursor.count(),
-                         self.primary_conn["local"]["oplog.rs"].count())
+        # timestamp = None
+        cursor1 = self.opman1.get_oplog_cursor(None)
+        oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
+            {'ns': {'$in': self.opman1.namespace_set}})
+        self.assertEqual(list(cursor1), list(oplog1))
+
+        cursor2 = self.opman2.get_oplog_cursor(None)
+        oplog2 = self.shard2_conn["local"]["oplog.rs"].find(
+            {'ns': {'$in': self.opman2.namespace_set}})
+        self.assertEqual(list(cursor2), list(oplog2))
 
         # earliest entry is the only one at/after timestamp
         doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
@@ -468,11 +474,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find(query).count(), 1)
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
-        # Same should hold for the doc manager
-        docman_docs = [d for d in self.opman1.doc_managers[0]._search()
-                       if d["i"] < 1000]
-        self.assertEqual(len(docman_docs), 1)
-        self.assertEqual(docman_docs[0]["i"], 0)
+        def check_docman_rollback():
+            docman_docs = [d for d in self.opman1.doc_managers[0]._search()
+                           if d["i"] < 1000]
+            return len(docman_docs) == 1 and docman_docs[0]["i"] == 0
+        assert_soon(check_docman_rollback,
+                    "doc manager did not roll back")
 
         # Wait for previous rollback to complete
         def rollback_done():
