@@ -24,6 +24,7 @@ else:
 
 sys.path[0:0] = [""]
 
+from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from pymongo import MongoClient
 
@@ -271,6 +272,38 @@ class MongoDocManagerTester(unittest.TestCase):
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["ns"], self.namespaces_inc[0])
         self.assertEqual(last_doc["_id"], 98)
+
+    def test_commands(self):
+        self.MongoDoc.command_helper = CommandHelper()
+
+        # create test thing, assert
+        self.MongoDoc.handle_command({
+            'db': 'test',
+            'create': 'test'
+        })
+        self.assertIn('test', self.mongo_conn['test'].collection_names())
+
+        self.MongoDoc.handle_command({
+            'db': 'admin',
+            'renameCollection': 'test.test',
+            'to': 'test.test2'
+        })
+        self.assertNotIn('test', self.mongo_conn['test'].collection_names())
+        self.assertIn('test2', self.mongo_conn['test'].collection_names())
+
+        self.MongoDoc.handle_command({
+            'db': 'test',
+            'drop': 'test2'
+        })
+        self.assertNotIn('test2', self.mongo_conn['test'].collection_names())
+
+        self.assertIn('test', self.mongo_conn.database_names())
+        self.MongoDoc.handle_command({
+            'db': 'test',
+            'dropDatabase': 1
+        })
+        self.assertNotIn('test', self.mongo_conn.database_names())
+
 
 if __name__ == '__main__':
     unittest.main()

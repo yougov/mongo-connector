@@ -38,7 +38,8 @@ from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 wrap_exceptions = exception_wrapper({
     es_exceptions.ConnectionError: errors.ConnectionFailed,
     es_exceptions.TransportError: errors.OperationFailed,
-    es_exceptions.NotFoundError: errors.OperationFailed})
+    es_exceptions.NotFoundError: errors.OperationFailed,
+    es_exceptions.RequestError: errors.OperationFailed})
 
 LOG = logging.getLogger(__name__)
 
@@ -76,6 +77,35 @@ class DocManager(DocManagerBase):
             # Don't try to add ns and _ts fields back in from doc
             return update_spec
         return super(DocManager, self).apply_update(doc, update_spec)
+
+    def get_indices(self):
+        return list(self.elastic.indices.stats()['indices'].keys())
+
+    @wrap_exceptions
+    def handle_command(self, doc):
+        if doc.get('dropDatabase'):
+            dbs = self.command_helper.map_db(doc['db'])
+            for index in self.get_indices():
+                if index.split('.')[0] in dbs:
+                    self.elastic.indices.delete(index=index)
+
+        if doc.get('renameCollection'):
+            raise OperationFailed(
+                "elastic_doc_manager does not support renaming an index.")
+
+        if doc.get('create'):
+            db, coll = self.command_helper.map_collection(
+                doc['db'], doc['create'])
+            if db:
+                self.elastic.indices.create(
+                    index=db + '.' + coll)
+
+        if doc.get('drop'):
+            db, coll = self.command_helper.map_collection(
+                doc['db'], doc['drop'])
+            if db:
+                self.elastic.indices.delete(
+                    db + '.' + coll)
 
     @wrap_exceptions
     def update(self, doc, update_spec):

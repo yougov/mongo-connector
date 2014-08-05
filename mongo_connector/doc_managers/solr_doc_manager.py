@@ -152,6 +152,29 @@ class DocManager(DocManagerBase):
         """
         pass
 
+    @wrap_exceptions
+    def handle_command(self, doc):
+        if doc.get('dropDatabase'):
+            for db in self.command_helper.map_db(doc['db']):
+                self.solr.delete(q="ns:%s.*" % db,
+                                 commit=(self.auto_commit_interval == 0))
+
+        if doc.get('renameCollection'):
+            raise OperationFailed(
+                "solr_doc_manager does not support replication of "
+                " renameCollection")
+
+        if doc.get('create'):
+            # nothing to do
+            pass
+
+        if doc.get('drop'):
+            db, coll = self.command_helper.map_collection(
+                doc['db'], doc['drop'])
+            if db:
+                self.solr.delete(q="ns:%s.%s" % (db, coll),
+                                 commit=(self.auto_commit_interval == 0))
+
     def apply_update(self, doc, update_spec):
         """Override DocManagerBase.apply_update to have flat documents."""
         # Replace a whole document

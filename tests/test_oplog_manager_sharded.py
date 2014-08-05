@@ -193,11 +193,6 @@ class TestOplogManagerSharded(unittest.TestCase):
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
 
-        # timestamp is None - all oplog entries are returned.
-        cursor = self.opman.get_oplog_cursor(None)
-        self.assertEqual(cursor.count(),
-                         self.primary_conn["local"]["oplog.rs"].count())
-
         # earliest entry is the only one at/after timestamp
         doc = {"ts": bson.Timestamp(1000, 0), "i": 1}
         self.mongos_conn["test"]["mcsharded"].insert(doc)

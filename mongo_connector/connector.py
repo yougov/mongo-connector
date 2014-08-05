@@ -31,6 +31,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
+from mongo_connector.command_helper import CommandHelper
 
 from pymongo import MongoClient
 
@@ -97,6 +98,11 @@ class Connector(threading.Thread):
 
         # List of fields to export
         self.fields = fields
+
+        # Initialize and set the command helper
+        command_helper = CommandHelper(self.ns_set, self.dest_mapping)
+        for dm in self.doc_managers:
+            dm.command_helper = command_helper
 
         if self.oplog_checkpoint is not None:
             if not os.path.exists(self.oplog_checkpoint):

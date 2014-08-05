@@ -87,7 +87,6 @@ class OplogThread(threading.Thread):
 
         #The set of gridfs namespaces to process from the mongo cluster
         self.gridfs_set = gridfs_set
-        self.gridfs_files_set = [ns + '.files' for ns in self.gridfs_set]
 
         #The dict of source namespaces to destination namespaces
         self.dest_mapping = dest_mapping
@@ -135,6 +134,48 @@ class OplogThread(threading.Thread):
             self._fields.add('_id')
         else:
             self._fields = None
+
+    @property
+    def namespace_set(self):
+        return self._namespace_set
+
+    @namespace_set.setter
+    def namespace_set(self, namespace_set):
+        self._namespace_set = namespace_set
+        self.update_oplog_ns_set()
+
+    @property
+    def gridfs_set(self):
+        return self._gridfs_set
+
+    @gridfs_set.setter
+    def gridfs_set(self, gridfs_set):
+        self._gridfs_set = gridfs_set
+        self._gridfs_files_set = [ns + '.files' for ns in gridfs_set]
+        self.update_oplog_ns_set()
+
+    @property
+    def gridfs_files_set(self):
+        try:
+            return self._gridfs_files_set
+        except AttributeError:
+            return []
+
+    @property
+    def oplog_ns_set(self):
+        try:
+            return self._oplog_ns_set
+        except AttributeError:
+            return []
+
+    def update_oplog_ns_set(self):
+        self._oplog_ns_set = []
+        if self.namespace_set:
+            self._oplog_ns_set.extend(self.namespace_set)
+            self._oplog_ns_set.extend(self.gridfs_files_set)
+            self._oplog_ns_set.extend(set(
+                ns.split('.', 1)[0] + '.$cmd' for ns in self.namespace_set))
+            self._oplog_ns_set.append("admin.$cmd")
 
     def run(self):
         """Start the oplog worker.
@@ -216,7 +257,7 @@ class OplogThread(threading.Thread):
                                 continue
 
                         # use namespace mapping if one exists
-                        ns = self.dest_mapping.get(entry['ns'], ns)
+                        ns = self.dest_mapping.get(ns, ns)
 
                         for docman in self.doc_managers:
                             try:
@@ -229,6 +270,7 @@ class OplogThread(threading.Thread):
                                     entry['ns'] = ns
                                     docman.remove(entry)
                                     remove_inc += 1
+
                                 # Insert
                                 elif operation == 'i':  # Insert
                                     # Retrieve inserted document from
@@ -244,6 +286,7 @@ class OplogThread(threading.Thread):
                                     else:
                                         docman.upsert(doc)
                                     upsert_inc += 1
+
                                 # Update
                                 elif operation == 'u':
                                     doc = {"_id": entry['o2']['_id'],
@@ -253,6 +296,15 @@ class OplogThread(threading.Thread):
                                     # 'o' field contains the update spec
                                     docman.update(doc, entry.get('o', {}))
                                     update_inc += 1
+
+                                # Command
+                                elif operation == 'c':
+                                    # use unmapped namespace
+                                    db = entry['ns'].split('.', 1)[0]
+                                    doc = entry.get('o')
+                                    doc['db'] = db
+                                    docman.handle_command(doc)
+
                             except errors.OperationFailed:
                                 LOG.exception(
                                     "Unable to process oplog document %r"
@@ -355,9 +407,9 @@ class OplogThread(threading.Thread):
         while (True):
             try:
                 query = {}
-                if self.namespace_set:
+                if self.oplog_ns_set:
                     query['ns'] = {
-                        '$in': self.namespace_set + self.gridfs_files_set
+                        '$in': self.oplog_ns_set
                     }
 
                 if timestamp is None:
@@ -549,13 +601,13 @@ class OplogThread(threading.Thread):
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
-        if not self.namespace_set:
+        if not self.oplog_ns_set:
             curr = self.oplog.find().sort(
                 '$natural', pymongo.DESCENDING
             ).limit(1)
         else:
             curr = self.oplog.find(
-                {'ns': {'$in': self.namespace_set + self.gridfs_files_set}}
+                {'ns': {'$in': self.oplog_ns_set}}
             ).sort('$natural', pymongo.DESCENDING).limit(1)
 
         if curr.count(with_limit_and_skip=True) == 0:

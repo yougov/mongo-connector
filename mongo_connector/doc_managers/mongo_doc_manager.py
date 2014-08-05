@@ -91,6 +91,31 @@ class DocManager(DocManagerBase):
         )
 
     @wrap_exceptions
+    def handle_command(self, doc):
+        if doc.get('dropDatabase'):
+            for db in self.command_helper.map_db(doc['db']):
+                self.mongo.drop_database(db)
+
+        if doc.get('renameCollection'):
+            a = self.command_helper.map_namespace(doc['renameCollection'])
+            b = self.command_helper.map_namespace(doc['to'])
+            if a and b:
+                self.mongo.admin.command(
+                    "renameCollection", a, to=b)
+
+        if doc.get('create'):
+            db, coll = self.command_helper.map_collection(
+                doc['db'], doc['create'])
+            if db:
+                self.mongo[db].create_collection(coll)
+
+        if doc.get('drop'):
+            db, coll = self.command_helper.map_collection(
+                doc['db'], doc['drop'])
+            if db:
+                self.mongo[db].drop_collection(coll)
+
+    @wrap_exceptions
     def update(self, doc, update_spec):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
