@@ -77,3 +77,13 @@ def retry_until_ok(func, *args, **kwargs):
                               'retry_until_ok', func)
                 raise
             time.sleep(1)
+
+
+def log_fatal_exceptions(func):
+    def wrapped(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception:
+            LOG.error("Fatal Exception")
+            raise
+    return wrapped

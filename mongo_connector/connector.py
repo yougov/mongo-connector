@@ -30,6 +30,7 @@ from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
+from mongo_connector.util import log_fatal_exceptions
 
 from pymongo import MongoClient
 
@@ -59,10 +60,10 @@ class Connector(threading.Thread):
         # The set of relevant namespaces to consider
         self.ns_set = ns_set
 
-        #The set of gridfs namespaces to consider
+        # The set of gridfs namespaces to consider
         self.gridfs_set = gridfs_set
 
-        #The dict of source namespace to destination namespace
+        # The dict of source namespace to destination namespace
         self.dest_mapping = dest_mapping
 
         # Whether the collection dump gracefully handles exceptions
@@ -196,8 +197,9 @@ class Connector(threading.Thread):
             oplog_str = data[count]
             time_stamp = data[count + 1]
             oplog_dict[oplog_str] = util.long_to_bson_ts(time_stamp)
-            #stored as bson_ts
+            # stored as bson_ts
 
+    @log_fatal_exceptions
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
@@ -215,7 +217,7 @@ class Connector(threading.Thread):
         if conn_type == "REPLSET":
             # Make sure we are connected to a replica set
             is_master = main_conn.admin.command("isMaster")
-            if not "setName" in is_master:
+            if "setName" not in is_master:
                 LOG.error(
                     'No replica set at "%s"! A replica set is required '
                     'to run mongo-connector. Shutting down...' % self.address
@@ -229,7 +231,7 @@ class Connector(threading.Thread):
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
-            #non sharded configuration
+            # non sharded configuration
             oplog_coll = main_conn['local']['oplog.rs']
 
             oplog = OplogThread(
@@ -413,7 +415,8 @@ def get_config_options():
         if cli_values['verbose']:
             option.value = 1
         if option.value < 0:
-            raise errors.InvalidConfiguration("verbosity must be non-negative.")
+            raise errors.InvalidConfiguration(
+                "verbosity must be non-negative.")
 
     verbosity = add_option(
         config_key="verbosity",
@@ -809,6 +812,7 @@ def get_config_options():
     return result
 
 
+@log_fatal_exceptions
 def main():
     """ Starts the mongo connector (assuming CLI)
     """

@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# mongo-connector               Start Mongo Connector
+#
+# chkconfig: 345 90 25
+# description: Mongo Connector replicates data from MongoDB to external
+#              database systems.
+
+### BEGIN INIT INFO
+# Provides: mongo-connector
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 6
+# Required-Start:
+# Required-Stop:
+# Short-Description: Start up Mongo Connector
+# Description: Mongo Connector replicates data from MongoDB to external
+#              database systems.
+### END INIT INFO
+
+# source function library
+DEBIAN=
+if [ -f /lib/lsb/init-functions ]; then
+    DEBIAN=1
+    . /lib/lsb/init-functions
+else
+    . /etc/rc.d/init.d/functions
+fi
+
+RETVAL=0
+
+pidfile=/var/run/mongo-connector.pid
+config=/etc/mongo-connector.json
+error=/var/log/mongo-connector/mongo-connector.err
+
+mc="/usr/bin/python -m mongo_connector.connector \
+    -c $config >/dev/null 2> $error & \
+    echo "'$!'" > $pidfile"
+
+start()
+{
+    echo "starting mongo-connector "
+    if [ "$DEBIAN" ]; then
+	/sbin/start-stop-daemon --start --exec /bin/sh -p $pidfile -- -c "$mc"
+    else
+	daemon --pidfile $pidfile "$mc"
+    fi
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+        echo "done."
+    else
+        echo "failed. Please check exit code and logs for more information"
+    fi
+
+    return $RETVAL
+}
+
+stop()
+{
+    echo "stopping mongo-connector: "
+    killproc -p $pidfile
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+        echo "done."
+        rm -f $lockfile
+    else
+        echo "failed. Please check exit code and logs for more information"
+    fi
+    return $RETVAL
+}
+
+restart() {
+    $0 stop
+    $0 start
+}
+
+check_status() {
+    if [ "$DEBIAN" ]; then
+	echo -n "mongo-connector "
+	status_of_proc -p $pidfile mongo-connector
+    else
+	status -p $pidfile mongo-connector
+    fi
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        restart
+        ;;
+    status)
+	check_status
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|status}"
+        RETVAL=2
+esac
+exit $RETVAL

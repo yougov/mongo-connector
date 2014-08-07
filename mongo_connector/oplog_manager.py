@@ -29,7 +29,7 @@ import traceback
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
-from mongo_connector.util import retry_until_ok
+from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 
 from pymongo import MongoClient
 
@@ -177,6 +177,7 @@ class OplogThread(threading.Thread):
                 ns.split('.', 1)[0] + '.$cmd' for ns in self.namespace_set))
             self._oplog_ns_set.append("admin.$cmd")
 
+    @log_fatal_exceptions
     def run(self):
         """Start the oplog worker.
         """
