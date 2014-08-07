@@ -30,6 +30,11 @@ class OperationFailed(MongoConnectorError):
     """
 
 
+class InvalidConfiguration(MongoConnectorError):
+    """Raised when the user specifies an invalid configuration
+    """
+
+
 class EmptyDocsError(MongoConnectorError):
     """Raised on attempts to upsert empty sequences of documents
     """

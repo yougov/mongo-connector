@@ -1,0 +1,45 @@
+{
+    "__comment__": "Configuration options starting with '__' are disabled",
+    "__comment__": "To enable them, remove the preceding '__'",
+
+    "mainAddress": "localhost:27017",
+    "oplogFile": "oplog.timestamp",
+    "noDump": false,
+    "batchSize": -1,
+    "verbosity": 0,
+    "continueOnError": false,
+
+    "logging": {
+        "__type": "file",
+        "__filename": "mongo-connector.log",
+
+        "__type": "syslog",
+        "__host": "localhost:512"
+    },
+
+    "authentication": {
+        "__adminUsername": "username",
+        "__password": "password",
+        "__passwordFile": "mongo-connector.pwd"
+    },
+
+    "__fields": ["field1", "field2", "field3"],
+
+    "namespaces": {
+        "__include": ["db.source1", "db.source2"],
+        "__mapping": {
+            "db.source1": "db.dest1",
+            "db.source2": "db.dest2"
+        }
+	"__gridfs": ["db.fs"]
+    },
+
+    "docManagers": [
+        {
+            "docManager": "elastic_doc_manager",
+            "targetURL": "localhost:9200",
+            "__uniqueKey": "_id",
+            "__autoCommitInterval": null
+        }
+    ]
+}
