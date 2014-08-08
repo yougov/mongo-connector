@@ -21,6 +21,8 @@ Please look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
 
+import itertools
+
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers import DocManagerBase
 
@@ -42,6 +44,7 @@ class DocManager(DocManagerBase):
         """
         self.unique_key = unique_key
         self.doc_dict = {}
+        self.removed_dict = {}
         self.url = url
 
     def stop(self):
@@ -68,7 +71,10 @@ class DocManager(DocManagerBase):
         if doc.get('_upsert_exception'):
             raise Exception("upsert exception")
 
-        self.doc_dict[doc["_id"]] = doc
+        doc_id = doc["_id"]
+        self.doc_dict[doc_id] = doc
+        if doc_id in self.removed_dict:
+            del self.removed_dict[doc_id]
 
     def remove(self, doc):
         """Removes the document from the doc dict.
@@ -76,12 +82,17 @@ class DocManager(DocManagerBase):
         doc_id = doc["_id"]
         try:
             del self.doc_dict[doc_id]
+            self.removed_dict[doc_id] = {
+                '_id': doc_id,
+                'ns': doc['ns'],
+                '_ts': doc['_ts']
+            }
         except KeyError:
             raise OperationFailed("Document does not exist: %s" % str(doc))
 
     def search(self, start_ts, end_ts):
-        """Searches through all documents and finds all documents within the
-        range.
+        """Searches through all documents and finds all documents that were
+        modified or deleted within the range.
 
         Since we have very few documents in the doc dict when this is called,
         linear search is fine. This method is only used by rollbacks to query
@@ -91,13 +102,12 @@ class DocManager(DocManagerBase):
         of the last oplog entry after a rollback. The end_ts is the timestamp
         of the last document committed to the backend.
         """
-        ret_list = []
-        for stored_doc in self.doc_dict.values():
-            time_stamp = stored_doc['_ts']
-            if time_stamp <= end_ts or time_stamp >= start_ts:
-                ret_list.append(stored_doc)
-
-        return ret_list
+        docs = itertools.chain(self.doc_dict.values(),
+                               self.removed_dict.values())
+        for doc in docs:
+            ts = doc['_ts']
+            if ts <= end_ts or ts >= start_ts:
+                yield doc
 
     def commit(self):
         """Simply passes since we're not using an engine that needs commiting.
@@ -105,20 +115,11 @@ class DocManager(DocManagerBase):
         pass
 
     def get_last_doc(self):
-        """Searches through the doc dict to find the document with the latest
-            timestamp.
-        """
-
-        last_doc = None
-        last_ts = None
-
-        for stored_doc in self.doc_dict.values():
-            time_stamp = stored_doc['_ts']
-            if last_ts is None or time_stamp >= last_ts:
-                last_doc = stored_doc
-                last_ts = time_stamp
-
-        return last_doc
+        """Searches through the doc dict to find the document that was
+        modified or deleted most recently."""
+        docs = itertools.chain(self.doc_dict.values(),
+                               self.removed_dict.values())
+        return max(docs, key=lambda x: x["_ts"])
 
     def _search(self):
         """Returns all documents in the doc dict.

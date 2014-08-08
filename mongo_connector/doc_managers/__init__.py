@@ -129,7 +129,7 @@ class DocManagerBase(object):
         raise NotImplementedError
 
     def search(self, start_ts, end_ts):
-        """Get an iterable of documents that were inserted or updated
+        """Get an iterable of documents that were inserted, updated, or deleted
         between ``start_ts`` and ``end_ts``.
         """
         raise NotImplementedError
@@ -139,7 +139,7 @@ class DocManagerBase(object):
         raise NotImplementedError
 
     def get_last_doc(self):
-        """Get the document that was modified most recently."""
+        """Get the document that was modified or deleted most recently."""
         raise NotImplementedError
 
     def stop(self):

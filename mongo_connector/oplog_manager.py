@@ -210,6 +210,8 @@ class OplogThread(threading.Thread):
                                 if operation == 'd':
                                     entry['_id'] = entry['o']['_id']
                                     entry['ns'] = ns
+                                    entry['_ts'] = util.bson_ts_to_long(
+                                        entry['ts'])
                                     docman.remove(entry)
                                     remove_inc += 1
                                 # Insert
