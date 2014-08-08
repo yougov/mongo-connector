@@ -92,8 +92,7 @@ class TestRollbacks(unittest.TestCase):
         kill_mongo_proc(self.primary_p, destroy=False)
 
         # Wait for the secondary to be promoted
-        while not secondary["admin"].command("isMaster")["ismaster"]:
-            time.sleep(1)
+        assert_soon(lambda: secondary["admin"].command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
         retry_until_ok(self.main_conn["test"]["mc"].insert, {"i": 1})
@@ -178,10 +177,19 @@ class TestRollbacks(unittest.TestCase):
 
         # Remove some documents from the doc managers to simulate
         # uneven replication
+        ts = self.opman.doc_managers[0].get_last_doc()['_ts']
         for id in secondary_ids[8:]:
-            self.opman.doc_managers[1].remove({"_id": id})
+            self.opman.doc_managers[1].remove({
+                "_id": id,
+                "ns": "test.mc",
+                "_ts": ts
+            })
         for id in secondary_ids[2:]:
-            self.opman.doc_managers[2].remove({"_id": id})
+            self.opman.doc_managers[2].remove({
+                "_id": id,
+                "ns": "test.mc",
+                "_ts": ts
+            })
 
         # Kill the new primary
         kill_mongo_proc(self.secondary_p, destroy=False)
@@ -210,5 +218,53 @@ class TestRollbacks(unittest.TestCase):
         for dm in self.opman.doc_managers:
             self.assertEqual(len(dm._search()), 1)
             self.assertEqual(dm._search()[0]["i"], 0)
+
+        self.opman.join()
+
+    def test_deletions(self):
+        """Test rolling back 'd' operations"""
+
+        self.opman.start()
+
+        # Insert a document, wait till it replicates to secondary
+        self.main_conn["test"]["mc"].insert({"i": 0})
+        self.main_conn["test"]["mc"].insert({"i": 1})
+        self.assertEqual(self.primary_conn["test"]["mc"].find().count(), 2)
+        assert_soon(lambda: self.secondary_conn["test"]["mc"].count() == 2,
+                    "first write didn't replicate to secondary")
+
+        # Kill the primary, wait for secondary to be promoted
+        kill_mongo_proc(self.primary_p, destroy=False)
+        assert_soon(lambda: self.secondary_conn["admin"]
+                    .command("isMaster")["ismaster"])
+
+        # Delete first document
+        retry_until_ok(self.main_conn["test"]["mc"].remove, {"i": 0})
+        self.assertEqual(self.secondary_conn["test"]["mc"].count(), 1)
+
+        # Wait for replication to doc manager
+        assert_soon(lambda: len(self.opman.doc_managers[0]._search()) == 1,
+                    "delete was not replicated to doc manager")
+
+        # Kill the new primary
+        kill_mongo_proc(self.secondary_p, destroy=False)
+
+        # Start both servers back up
+        restart_mongo_proc(self.primary_p)
+        primary_admin = self.primary_conn["admin"]
+        assert_soon(lambda: primary_admin.command("isMaster")["ismaster"],
+                    "restarted primary never resumed primary status")
+        restart_mongo_proc(self.secondary_p)
+        assert_soon(lambda: retry_until_ok(self.secondary_conn.admin.command,
+                                           'replSetGetStatus')['myState'] == 2,
+                    "restarted secondary never resumed secondary status")
+
+        # Both documents should exist in mongo
+        assert_soon(lambda: retry_until_ok(
+            self.main_conn["test"]["mc"].count) == 2)
+
+        # Both document should exist in doc manager
+        doc_manager = self.opman.doc_managers[0]
+        self.assertEqual(len(doc_manager._search()), 2)
 
         self.opman.join()
