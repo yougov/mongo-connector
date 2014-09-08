@@ -15,13 +15,6 @@
 """Test replication of commands
 """
 
-import sys
-import time
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-
 import pymongo
 
 from mongo_connector import errors
@@ -29,7 +22,7 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from tests import mongo_host
+from tests import mongo_host, unittest
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set)
 from tests.util import assert_soon

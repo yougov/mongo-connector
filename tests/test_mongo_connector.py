@@ -21,15 +21,11 @@ import sys
 sys.path[0:0] = [""]
 
 
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 import time
 import json
 
 from mongo_connector.connector import Connector
-from tests import mongo_host
+from tests import mongo_host, unittest
 from tests.setup_cluster import start_replica_set, kill_replica_set
 from bson.timestamp import Timestamp
 from mongo_connector.util import long_to_bson_ts

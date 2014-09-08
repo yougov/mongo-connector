@@ -15,16 +15,13 @@
 import datetime
 import time
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
 sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from pysolr import Solr
+from tests import unittest
 from tests.test_gridfs_file import MockGridFSFile
 
 

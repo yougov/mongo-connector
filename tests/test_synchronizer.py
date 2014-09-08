@@ -22,11 +22,7 @@ sys.path[0:0] = [""]
 from pymongo import MongoClient
 
 import time
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-from tests import mongo_host
+from tests import mongo_host, unittest
 from tests.setup_cluster import (start_replica_set,
                                  kill_all)
 from tests.util import assert_soon

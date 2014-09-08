@@ -16,11 +16,8 @@
 import base64
 import time
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-from tests import elastic_pair
+
+from tests import elastic_pair, unittest
 from tests.test_elastic import ElasticsearchTestCase
 from tests.test_gridfs_file import MockGridFSFile
 
@@ -28,6 +25,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
+
 
 class ElasticDocManagerTester(ElasticsearchTestCase):
     """Unit tests for the Elastic DocManager."""

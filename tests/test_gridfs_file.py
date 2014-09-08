@@ -13,12 +13,6 @@
 # limitations under the License.
 
 import sys
-import time
-
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
 import gridfs
 
@@ -26,14 +20,13 @@ from tests import mongo_host
 from pymongo import MongoClient
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
+from tests import unittest
 from tests.setup_cluster import (
     start_replica_set,
     kill_replica_set
 )
 
 sys.path[0:0] = [""]
-
-from mongo_connector.gridfs_file import GridFSFile
 
 
 class MockGridFSFile:

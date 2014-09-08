@@ -17,10 +17,6 @@
 
 import time
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
 sys.path[0:0] = [""]
 
@@ -28,7 +24,7 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from pymongo import MongoClient
 
-from tests import mongo_host
+from tests import mongo_host, unittest
 from tests.test_gridfs_file import MockGridFSFile
 from tests.setup_cluster import start_mongo_proc, kill_mongo_proc
 

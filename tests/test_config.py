@@ -13,15 +13,11 @@
 # limitations under the License.
 
 import json
-import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
-from mongo_connector import config, constants, errors
+from mongo_connector import config, errors
 from mongo_connector.connector import get_config_options
 from mongo_connector.doc_managers import doc_manager_simulator
+from tests import unittest
 
 
 class TestConfig(unittest.TestCase):

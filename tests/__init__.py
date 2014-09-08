@@ -17,6 +17,13 @@ import sys
 if sys.version_info[0] == 3:
     unicode = str
 
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+    from unittest2.case import SkipTest
+else:
+    import unittest
+    from unittest.case import SkipTest
+
 # Configurable hosts and ports used in the tests
 mongo_host = unicode(os.environ.get("MONGO_HOST", 'localhost'))
 mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))

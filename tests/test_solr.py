@@ -18,27 +18,23 @@ import logging
 import os
 import time
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
 sys.path[0:0] = [""]
 
 from gridfs import GridFS
 from pymongo import MongoClient
+from pymongo.errors import OperationFailure, AutoReconnect
+from pysolr import Solr, SolrError
 
-from tests import solr_pair, mongo_host, STRESS_COUNT
+from tests import solr_pair, mongo_host, STRESS_COUNT, unittest
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,
                                  restart_mongo_proc,
                                  kill_mongo_proc)
 from tests.util import assert_soon
-from pysolr import Solr, SolrError
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from mongo_connector.util import retry_until_ok
-from pymongo.errors import OperationFailure, AutoReconnect
 
 
 class TestSynchronizer(unittest.TestCase):

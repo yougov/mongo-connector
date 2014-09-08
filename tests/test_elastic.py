@@ -17,10 +17,6 @@ import base64
 import os
 import sys
 import time
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 
 sys.path[0:0] = [""]
 
@@ -38,6 +34,7 @@ from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import assert_soon
+from tests import unittest
 
 
 class ElasticsearchTestCase(unittest.TestCase):
