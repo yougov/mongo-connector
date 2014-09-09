@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+
 import gridfs
 
-from tests import mongo_host
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
+
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
+from tests import mongo_host
 from tests import unittest
 from tests.setup_cluster import (
     start_replica_set,

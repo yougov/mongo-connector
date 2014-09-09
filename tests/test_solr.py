@@ -17,7 +17,6 @@
 import logging
 import os
 import time
-import sys
 
 from gridfs import GridFS
 from pymongo import MongoClient
@@ -34,17 +33,30 @@ from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from mongo_connector.util import retry_until_ok
 
 
-class TestSynchronizer(unittest.TestCase):
+class SolrTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        conn_str = "http://%s/solr" % solr_pair
+        cls.solr_conn = Solr(conn_str)
+        cls.docman = DocManager(conn_str, auto_commit_interval=0)
+
+    def _search(self, query):
+        return self.docman._stream_search(query)
+
+    def _remove(self):
+        self.solr_conn.delete(q="*:*", commit=True)
+
+
+class TestSolr(SolrTestCase):
     """ Tests Solr
     """
 
     @classmethod
     def setUpClass(cls):
+        SolrTestCase.setUpClass()
         _, cls.secondary_p, cls.primary_p = start_replica_set('test-solr')
         cls.conn = MongoClient(mongo_host, cls.primary_p,
                                replicaSet='test-solr')
-        cls.solr_conn = Solr('http://%s/solr' % solr_pair)
-        cls.solr_conn.delete(q='*:*')
 
     @classmethod
     def tearDownClass(cls):
@@ -53,6 +65,7 @@ class TestSynchronizer(unittest.TestCase):
         kill_replica_set('test-solr')
 
     def setUp(self):
+        self._remove()
         try:
             os.unlink("config.txt")
         except OSError:
@@ -139,7 +152,7 @@ class TestSynchronizer(unittest.TestCase):
 
         # Insert
         self.conn.test.test.insert({"a": 0})
-        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search("*:*")) == 1)
 
         def check_update(update_spec):
             updated = self.conn.test.test.find_and_modify(
@@ -153,7 +166,7 @@ class TestSynchronizer(unittest.TestCase):
             updated = docman._clean_doc(updated)
             # Allow some time for update to propagate
             time.sleep(1)
-            replicated = list(docman._search("a:0"))[0]
+            replicated = list(self._search("a:0"))[0]
             # Remove add'l fields until these are stored in a separate Solr core
             replicated.pop("_ts")
             replicated.pop("ns")
@@ -239,10 +252,10 @@ class TestSynchronizer(unittest.TestCase):
         )
 
         docman = self.connector.doc_managers[0]
-        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) > 0)
+        assert_soon(lambda: sum(1 for _ in self._search("*:*")) > 0)
         result = docman.get_last_doc()
         self.assertIn('popularity', result)
-        self.assertEqual(sum(1 for _ in docman._search(
+        self.assertEqual(sum(1 for _ in self._search(
             "name=test_valid")), 1)
 
     def test_invalid_fields(self):
@@ -256,11 +269,11 @@ class TestSynchronizer(unittest.TestCase):
         )
 
         docman = self.connector.doc_managers[0]
-        assert_soon(lambda: sum(1 for _ in docman._search("*:*")) > 0)
+        assert_soon(lambda: sum(1 for _ in self._search("*:*")) > 0)
 
         result = docman.get_last_doc()
         self.assertNotIn('break_this_test', result)
-        self.assertEqual(sum(1 for _ in docman._search(
+        self.assertEqual(sum(1 for _ in self._search(
             "name=test_invalid")), 1)
 
     def test_dynamic_fields(self):

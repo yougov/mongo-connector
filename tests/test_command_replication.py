@@ -15,6 +15,10 @@
 """Test replication of commands
 """
 
+import sys
+
+sys.path[0:0] = [""]
+
 import pymongo
 
 from mongo_connector import errors

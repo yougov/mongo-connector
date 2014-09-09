@@ -17,11 +17,10 @@
 
 import time
 
-from mongo_connector.command_helper import CommandHelper
-from mongo_connector.doc_managers.mongo_doc_manager import DocManager
-from mongo_connector.util import retry_until_ok
 from pymongo import MongoClient
 
+from mongo_connector.command_helper import CommandHelper
+from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from tests import mongo_host, unittest
 from tests.test_gridfs_file import MockGridFSFile
 from tests.test_mongo import MongoTestCase
@@ -151,8 +150,7 @@ class MongoDocManagerTester(MongoTestCase):
             'md5': 'test_md5'
         }
 
-        retry_until_ok(self.mongo_doc.insert_file,
-                       MockGridFSFile(docc, test_data))
+        self.mongo_doc.insert_file(MockGridFSFile(docc, test_data))
         res = list(self._search())
         self.assertEqual(len(res), 1)
 

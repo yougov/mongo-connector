@@ -297,12 +297,6 @@ class DocManager(DocManagerBase):
                          commit=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
-    def _remove(self):
-        """Removes everything
-        """
-        self.solr.delete(q='*:*', commit=(self.auto_commit_interval == 0))
-
-    @wrap_exceptions
     def _stream_search(self, query):
         """Helper method for iterating over Solr search results."""
         for doc in self.solr.search(query, rows=100000000):
@@ -314,13 +308,6 @@ class DocManager(DocManagerBase):
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range."""
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self._stream_search(query)
-
-    @wrap_exceptions
-    def _search(self, query):
-        """For test purposes only. Performs search on Solr with given query
-            Does not have to be implemented.
-        """
         return self._stream_search(query)
 
     def commit(self):
