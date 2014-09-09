@@ -119,9 +119,6 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: self._count() == 0)
 
-    def test_shard_length(self):
-        self.assertEqual(len(self.connector.shard_set), 1)
-
     def test_insert(self):
         """Test insert operations."""
         self.conn['test']['test'].insert({'name': 'paulie'})

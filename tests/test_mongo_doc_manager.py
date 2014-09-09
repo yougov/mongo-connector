@@ -171,25 +171,6 @@ class MongoDocManagerTester(unittest.TestCase):
         res = list(self.MongoDoc._search())
         self.assertEqual(len(res), 0)
 
-    def test_full_search(self):
-        """Query Mongo for all docs via API and via DocManager's
-        _search(), compare.
-        """
-
-        docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
-                '_ts': 5767301236327972865}
-        self.MongoDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul', 'ns': 'test.test',
-                '_ts': 5767301236327972865}
-        self.MongoDoc.upsert(docc)
-        self.MongoDoc.commit()
-        search = list(self.MongoDoc._search())
-        search2 = list(self.mongo.find())
-        self.assertEqual(len(search), len(search2))
-        self.assertNotEqual(len(search), 0)
-        self.assertTrue(all(x in search for x in search2) and
-                        all(y in search2 for y in search))
-
     def test_search(self):
         """Query Mongo for docs in a timestamp range.
 

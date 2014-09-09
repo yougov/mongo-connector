@@ -81,13 +81,6 @@ class TestSynchronizer(unittest.TestCase):
         self.conn['test']['test.chunks'].remove()
         assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
 
-    def test_shard_length(self):
-        """Tests the shard_length to see if the shard set was recognized
-            properly
-        """
-
-        self.assertEqual(len(self.connector.shard_set), 1)
-
     def test_insert(self):
         """Tests insert
         """

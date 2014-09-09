@@ -170,21 +170,6 @@ class SolrDocManagerTester(unittest.TestCase):
         res = self.solr.search('*:*')
         self.assertEqual(len(res), 0)
 
-    def test_full_search(self):
-        """Query Solr for all docs via API and via DocManager's _search()
-        """
-        #test _search
-        docc = {'_id': '1', 'name': 'John'}
-        self.SolrDoc.upsert(docc)
-        docc = {'_id': '2', 'name': 'Paul'}
-        self.SolrDoc.upsert(docc)
-        search = list(self.SolrDoc._search('*:*'))
-        search2 = list(self.solr.search('*:*'))
-        self.assertTrue(len(search) == len(search2))
-        self.assertTrue(len(search) != 0)
-        self.assertTrue(all(x in search for x in search2) and
-                        all(y in search2 for y in search))
-
     def test_search(self):
         """Query Solr for docs in a timestamp range.
 

@@ -80,12 +80,6 @@ class TestSynchronizer(unittest.TestCase):
     def tearDown(self):
         self.connector.join()
 
-    def test_shard_length(self):
-        """Tests the shard_length to see if the shard set was recognized
-        """
-
-        self.assertEqual(len(self.connector.shard_set), 1)
-
     def test_insert(self):
         """Tests insert
         """
