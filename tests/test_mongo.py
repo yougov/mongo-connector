@@ -19,8 +19,6 @@ import time
 import os
 import sys
 
-sys.path[0:0] = [""]
-
 from gridfs import GridFS
 from pymongo import MongoClient
 from tests import mongo_host

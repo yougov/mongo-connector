@@ -19,8 +19,6 @@ import os
 import time
 import sys
 
-sys.path[0:0] = [""]
-
 from gridfs import GridFS
 from pymongo import MongoClient
 from pysolr import Solr, SolrError

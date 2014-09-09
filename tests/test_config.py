@@ -239,7 +239,6 @@ class TestConfig(unittest.TestCase):
                               '-a': 'username'
                           })
 
-
         # can't specify password and password file
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_options, {

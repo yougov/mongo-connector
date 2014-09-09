@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
 import gridfs
 
 from tests import mongo_host
@@ -25,8 +23,6 @@ from tests.setup_cluster import (
     start_replica_set,
     kill_replica_set
 )
-
-sys.path[0:0] = [""]
 
 
 class MockGridFSFile:
@@ -60,6 +56,7 @@ class MockGridFSFile:
         s = self.data[self.pos:self.pos+n]
         self.pos += n
         return s
+
 
 class TestGridFSFile(unittest.TestCase):
 
@@ -134,7 +131,7 @@ class TestGridFSFile(unittest.TestCase):
         id = self.fs.put(data)
         f = self.get_file(id)
 
-        result = self.main_connection['test']['fs.chunks'].remove({
+        self.main_connection['test']['fs.chunks'].remove({
             'files_id': id
         })
 

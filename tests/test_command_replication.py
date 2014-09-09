@@ -146,7 +146,7 @@ class TestCommandReplication(unittest.TestCase):
 
     def test_drop_database(self):
         self.initOplogThread()
-        coll = pymongo.collection.Collection(
+        pymongo.collection.Collection(
             self.primary_conn['test'], 'test', create=True)
         self.primary_conn.drop_database('test')
         assert_soon(lambda: len(self.docman.commands) == 2)

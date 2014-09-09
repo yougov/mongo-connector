@@ -15,13 +15,10 @@
 """Unit tests for the Elastic DocManager."""
 import base64
 import time
-import sys
 
 from tests import elastic_pair, unittest
 from tests.test_elastic import ElasticsearchTestCase
 from tests.test_gridfs_file import MockGridFSFile
-
-sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager

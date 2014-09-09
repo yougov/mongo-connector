@@ -15,18 +15,15 @@
 """Test synchronizer using DocManagerSimulator
 """
 import os
-import sys
-
-sys.path[0:0] = [""]
+import time
 
 from pymongo import MongoClient
 
-import time
+from mongo_connector.connector import Connector
 from tests import mongo_host, unittest
 from tests.setup_cluster import (start_replica_set,
                                  kill_all)
 from tests.util import assert_soon
-from mongo_connector.connector import Connector
 
 
 class TestSynchronizer(unittest.TestCase):
