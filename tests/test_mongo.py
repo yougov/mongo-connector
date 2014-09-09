@@ -36,7 +36,41 @@ from tests import unittest
 from tests.util import assert_soon
 
 
-class TestSynchronizer(unittest.TestCase):
+class MongoTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.standalone_port = start_mongo_proc(options=['--nojournal',
+                                                        '--noprealloc'])
+        cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
+        # aka cls/self.MongoDoc
+        cls.mongo_doc = DocManager(cls.standalone_pair)
+        cls.mongo_conn = MongoClient(cls.standalone_pair)
+        cls.mongo = cls.mongo_conn['test']['test']
+
+    @classmethod
+    def tearDownClass(cls):
+        kill_mongo_proc(cls.standalone_port)
+
+    def _search(self):
+        for doc in self.mongo.find():
+            yield doc
+
+        fs = GridFS(self.mongo_conn['test'], 'test')
+        for doc in self.mongo_conn['__mongo_connector']['test.test'].find():
+            if doc.get('gridfs_id'):
+                for f in fs.find({'_id': doc['gridfs_id']}):
+                    doc['filename'] = f.filename
+                    doc['content'] = f.read()
+                    yield doc
+
+    def _remove(self):
+        self.mongo_conn['test']['test'].drop()
+        self.mongo_conn['test']['test.files'].drop()
+        self.mongo_conn['test']['test.chunks'].drop()
+
+
+class TestSynchronizer(MongoTestCase):
     """ Tests the mongo instance
     """
 
@@ -47,10 +81,7 @@ class TestSynchronizer(unittest.TestCase):
         except OSError:
             pass
         open("config.txt", "w").close()
-        cls.standalone_port = start_mongo_proc(options=['--nojournal',
-                                                        '--noprealloc'])
-        cls.mongo_doc = DocManager('%s:%d' % (mongo_host, cls.standalone_port))
-        cls.mongo_doc._remove()
+        MongoTestCase.setUpClass()
         _, cls.secondary_p, cls.primary_p = start_replica_set('test-mongo')
         cls.conn = MongoClient(mongo_host, cls.primary_p,
                                replicaSet='test-mongo')
@@ -59,13 +90,14 @@ class TestSynchronizer(unittest.TestCase):
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_mongo_proc(cls.standalone_port)
+        MongoTestCase.tearDownClass()
         kill_replica_set('test-mongo')
 
     def tearDown(self):
         self.connector.join()
 
     def setUp(self):
+        self._remove()
         self.connector = Connector(
             address='%s:%s' % (mongo_host, self.primary_p),
             oplog_checkpoint="config.txt",
@@ -76,18 +108,15 @@ class TestSynchronizer(unittest.TestCase):
         )
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
-        self.conn['test']['test'].remove()
-        self.conn['test']['test.files'].remove()
-        self.conn['test']['test.chunks'].remove()
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 0)
 
     def test_insert(self):
         """Tests insert
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
-        result_set_1 = self.mongo_doc._search()
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+        result_set_1 = self._search()
         self.assertEqual(sum(1 for _ in result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
         for item in result_set_1:
@@ -99,10 +128,10 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) != 1)
-        self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
+        assert_soon(lambda: sum(1 for _ in self._search()) != 1)
+        self.assertEqual(sum(1 for _ in self._search()), 0)
 
     def test_insert_file(self):
         """Tests inserting a gridfs file
@@ -110,9 +139,9 @@ class TestSynchronizer(unittest.TestCase):
         fs = GridFS(self.conn['test'], 'test')
         test_data = "test_insert_file test file"
         id = fs.put(test_data, filename="test.txt")
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) > 0)
+        assert_soon(lambda: sum(1 for _ in self._search()) > 0)
 
-        res = list(self.mongo_doc._search())
+        res = list(self._search())
         self.assertEqual(len(res), 1)
         doc = res[0]
         self.assertEqual(doc['filename'], 'test.txt')
@@ -122,15 +151,15 @@ class TestSynchronizer(unittest.TestCase):
     def test_remove_file(self):
         fs = GridFS(self.conn['test'], 'test')
         id = fs.put("test file", filename="test.txt")
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
         fs.delete(id)
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 0)
 
     def test_update(self):
         """Test update operations."""
         # Insert
         self.conn.test.test.insert({"a": 0})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         def check_update(update_spec):
             updated = self.conn.test.test.find_and_modify(
@@ -174,7 +203,7 @@ class TestSynchronizer(unittest.TestCase):
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         kill_mongo_proc(self.primary_p, destroy=False)
         new_primary_conn = MongoClient(mongo_host, self.secondary_p)
@@ -184,8 +213,8 @@ class TestSynchronizer(unittest.TestCase):
 
         retry_until_ok(self.conn.test.test.insert,
                        {'name': 'pauline'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 2)
-        result_set_1 = list(self.mongo_doc._search())
+        assert_soon(lambda: sum(1 for _ in self._search()) == 2)
+        result_set_1 = list(self._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
         #make sure pauline is there
@@ -201,7 +230,7 @@ class TestSynchronizer(unittest.TestCase):
         restart_mongo_proc(self.secondary_p)
 
         time.sleep(2)
-        result_set_1 = list(self.mongo_doc._search())
+        result_set_1 = list(self._search())
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['name'], 'paul')

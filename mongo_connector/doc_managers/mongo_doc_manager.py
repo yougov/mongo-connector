@@ -203,27 +203,3 @@ class DocManager(DocManagerBase):
                     yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x: x["_ts"])
-
-    @wrap_exceptions
-    def _remove(self):
-        """For test purposes only. Removes all documents in test.test
-        """
-        self.mongo['test']['test'].remove()
-        self.mongo['test']['test.files'].remove()
-        self.mongo['test']['test.chunks'].remove()
-
-    @wrap_exceptions
-    def _search(self):
-        """For test purposes only. Performs search on MongoDB with empty query.
-        Does not have to be implemented.
-        """
-        for doc in self.mongo['test']['test'].find():
-            yield doc
-
-        fs = GridFS(self.mongo['test'], 'test')
-        for doc in self.mongo['__mongo_connector']['test.test'].find():
-            if doc.get('gridfs_id'):
-                for f in fs.find({'_id': doc['gridfs_id']}):
-                    doc['filename'] = f.filename
-                    doc['content'] = f.read()
-                    yield doc

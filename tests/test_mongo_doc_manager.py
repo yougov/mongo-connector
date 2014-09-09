@@ -22,26 +22,21 @@ sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
+from mongo_connector.util import retry_until_ok
 from pymongo import MongoClient
 
 from tests import mongo_host, unittest
 from tests.test_gridfs_file import MockGridFSFile
-from tests.setup_cluster import start_mongo_proc, kill_mongo_proc
+from tests.test_mongo import MongoTestCase
 
 
-class MongoDocManagerTester(unittest.TestCase):
+class MongoDocManagerTester(MongoTestCase):
     """Test class for MongoDocManager
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.standalone_port = start_mongo_proc(options=['--nojournal',
-                                                        '--noprealloc'])
-        cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
-        cls.MongoDoc = DocManager(cls.standalone_pair)
-        cls.mongo_conn = MongoClient(cls.standalone_pair)
-        cls.mongo = cls.mongo_conn['test']['test']
-
+        MongoTestCase.setUpClass()
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
         cls.choosy_docman = DocManager(
@@ -49,16 +44,12 @@ class MongoDocManagerTester(unittest.TestCase):
             namespace_set=MongoDocManagerTester.namespaces_inc
         )
 
-    @classmethod
-    def tearDownClass(cls):
-        kill_mongo_proc(cls.standalone_port)
-
     def setUp(self):
         """Empty Mongo at the start of every test
         """
 
         self.mongo_conn.drop_database("__mongo_connector")
-        self.MongoDoc._remove()
+        self._remove()
 
         conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
         for ns in self.namespaces_inc + self.namespaces_exc:
@@ -99,18 +90,18 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
                 '_ts': 5767301236327972865}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         time.sleep(3)
-        res = list(self.MongoDoc._search())
+        res = list(self._search())
         self.assertEqual(len(res), 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
         docc = {'_id': '1', 'name': 'Paul', 'ns': 'test.test',
                 '_ts': 5767301236327972865}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         time.sleep(1)
-        res = list(self.MongoDoc._search())
+        res = list(self._search())
         self.assertEqual(len(res), 1)
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
@@ -121,16 +112,16 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', 'ns': 'test.test',
                 '_ts': 5767301236327972865}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         time.sleep(3)
-        res = list(self.MongoDoc._search())
+        res = list(self._search())
         self.assertEqual(len(res), 1)
         if "ns" not in docc:
             docc["ns"] = 'test.test'
 
-        self.MongoDoc.remove(docc)
+        self.mongo_doc.remove(docc)
         time.sleep(1)
-        res = list(self.MongoDoc._search())
+        res = list(self._search())
         self.assertEqual(len(res), 0)
 
     def test_insert_file(self):
@@ -143,8 +134,8 @@ class MongoDocManagerTester(unittest.TestCase):
             'upload_date': 5,
             'md5': 'test_md5'
         }
-        self.MongoDoc.insert_file(MockGridFSFile(docc, test_data))
-        res = self.MongoDoc._search()
+        self.mongo_doc.insert_file(MockGridFSFile(docc, test_data))
+        res = self._search()
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
             self.assertEqual(doc['_ts'], docc['_ts'])
@@ -163,12 +154,13 @@ class MongoDocManagerTester(unittest.TestCase):
             'md5': 'test_md5'
         }
 
-        self.MongoDoc.insert_file(MockGridFSFile(docc, test_data))
-        res = list(self.MongoDoc._search())
+        retry_until_ok(self.mongo_doc.insert_file,
+                       MockGridFSFile(docc, test_data))
+        res = list(self._search())
         self.assertEqual(len(res), 1)
 
-        self.MongoDoc.remove(docc)
-        res = list(self.MongoDoc._search())
+        self.mongo_doc.remove(docc)
+        res = list(self._search())
         self.assertEqual(len(res), 0)
 
     def test_search(self):
@@ -179,15 +171,15 @@ class MongoDocManagerTester(unittest.TestCase):
 
         docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865,
                 'ns': 'test.test'}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         docc2 = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866,
                  'ns': 'test.test'}
-        self.MongoDoc.upsert(docc2)
+        self.mongo_doc.upsert(docc2)
         docc3 = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870,
                  'ns': 'test.test'}
-        self.MongoDoc.upsert(docc3)
-        search = list(self.MongoDoc.search(5767301236327972865,
-                                           5767301236327972866))
+        self.mongo_doc.upsert(docc3)
+        search = list(self.mongo_doc.search(5767301236327972865,
+                                            5767301236327972866))
         self.assertEqual(len(search), 2)
         result_id = [result.get("_id") for result in search]
         self.assertIn('1', result_id)
@@ -211,18 +203,18 @@ class MongoDocManagerTester(unittest.TestCase):
             the latest timestamp.
         """
         docc = {'_id': '4', 'name': 'Hare', '_ts': 3, 'ns': 'test.test'}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         docc = {'_id': '5', 'name': 'Tortoise', '_ts': 2, 'ns': 'test.test'}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         docc = {'_id': '6', 'name': 'Mr T.', '_ts': 1, 'ns': 'test.test'}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         time.sleep(1)
-        doc = self.MongoDoc.get_last_doc()
+        doc = self.mongo_doc.get_last_doc()
         self.assertEqual(doc['_id'], '4')
         docc = {'_id': '6', 'name': 'HareTwin', '_ts': 4, 'ns': 'test.test'}
-        self.MongoDoc.upsert(docc)
+        self.mongo_doc.upsert(docc)
         time.sleep(3)
-        doc = self.MongoDoc.get_last_doc()
+        doc = self.mongo_doc.get_last_doc()
         self.assertEqual(doc['_id'], '6')
 
     def test_get_last_doc_namespaces(self):
@@ -251,16 +243,16 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertEqual(last_doc["_id"], 98)
 
     def test_commands(self):
-        self.MongoDoc.command_helper = CommandHelper()
+        self.mongo_doc.command_helper = CommandHelper()
 
         # create test thing, assert
-        self.MongoDoc.handle_command({
+        self.mongo_doc.handle_command({
             'db': 'test',
             'create': 'test'
         })
         self.assertIn('test', self.mongo_conn['test'].collection_names())
 
-        self.MongoDoc.handle_command({
+        self.mongo_doc.handle_command({
             'db': 'admin',
             'renameCollection': 'test.test',
             'to': 'test.test2'
@@ -268,14 +260,14 @@ class MongoDocManagerTester(unittest.TestCase):
         self.assertNotIn('test', self.mongo_conn['test'].collection_names())
         self.assertIn('test2', self.mongo_conn['test'].collection_names())
 
-        self.MongoDoc.handle_command({
+        self.mongo_doc.handle_command({
             'db': 'test',
             'drop': 'test2'
         })
         self.assertNotIn('test2', self.mongo_conn['test'].collection_names())
 
         self.assertIn('test', self.mongo_conn.database_names())
-        self.MongoDoc.handle_command({
+        self.mongo_doc.handle_command({
             'db': 'test',
             'dropDatabase': 1
         })
