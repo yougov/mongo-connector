@@ -24,7 +24,7 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 
 
-class ElasticDocManagerTester(ElasticsearchTestCase):
+class TestElasticDocManager(ElasticsearchTestCase):
     """Unit tests for the Elastic DocManager."""
 
     def put_metadata(self, d):

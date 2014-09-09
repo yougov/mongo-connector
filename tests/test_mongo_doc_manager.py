@@ -26,7 +26,7 @@ from tests.test_gridfs_file import MockGridFSFile
 from tests.test_mongo import MongoTestCase
 
 
-class MongoDocManagerTester(MongoTestCase):
+class TestMongoDocManager(MongoTestCase):
     """Test class for MongoDocManager
     """
 
@@ -37,7 +37,7 @@ class MongoDocManagerTester(MongoTestCase):
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
         cls.choosy_docman = DocManager(
             cls.standalone_pair,
-            namespace_set=MongoDocManagerTester.namespaces_inc
+            namespace_set=TestMongoDocManager.namespaces_inc
         )
 
     def setUp(self):

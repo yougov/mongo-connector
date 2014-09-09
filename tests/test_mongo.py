@@ -17,7 +17,6 @@
 """
 import time
 import os
-import sys
 
 from gridfs import GridFS
 from pymongo import MongoClient
@@ -68,7 +67,7 @@ class MongoTestCase(unittest.TestCase):
         self.mongo_conn['test']['test.chunks'].drop()
 
 
-class TestSynchronizer(MongoTestCase):
+class TestMongo(MongoTestCase):
     """ Tests the mongo instance
     """
 

@@ -23,7 +23,7 @@ from tests.test_gridfs_file import MockGridFSFile
 from tests.test_solr import SolrTestCase
 
 
-class SolrDocManagerTester(SolrTestCase):
+class TestSolrDocManager(SolrTestCase):
     """Test class for SolrDocManager
     """
 

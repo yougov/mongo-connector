@@ -35,7 +35,7 @@ def err_func():
 err_func.counter = 0
 
 
-class UtilTester(unittest.TestCase):
+class TestUtil(unittest.TestCase):
     """ Tests the utils
     """
 
