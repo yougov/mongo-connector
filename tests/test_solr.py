@@ -23,10 +23,9 @@ sys.path[0:0] = [""]
 
 from gridfs import GridFS
 from pymongo import MongoClient
-from pymongo.errors import OperationFailure, AutoReconnect
 from pysolr import Solr, SolrError
 
-from tests import solr_pair, mongo_host, STRESS_COUNT, unittest
+from tests import solr_pair, mongo_host, unittest
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,
                                  restart_mongo_proc,
@@ -236,84 +235,6 @@ class TestSynchronizer(unittest.TestCase):
         self.assertEqual(sum(1 for _ in result_set_1), 0)
         result_set_2 = self.solr_conn.search('paul')
         self.assertEqual(sum(1 for _ in result_set_2), 1)
-
-    def test_stress(self):
-        """Test stress by inserting and removing a large amount of docs.
-        """
-        #stress test
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-        time.sleep(5)
-        assert_soon(
-            lambda: sum(1 for _ in self.solr_conn.search(
-                '*:*', rows=STRESS_COUNT)) == STRESS_COUNT)
-        for i in range(0, STRESS_COUNT):
-            result_set_1 = self.solr_conn.search('Paul ' + str(i))
-            for item in result_set_1:
-                self.assertEqual(item['_id'], item['_id'])
-
-    def test_stressed_rollback(self):
-        """Test stressed rollback with a large number of documents"""
-
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert(
-                {'name': 'Paul ' + str(i)})
-
-        assert_soon(
-            lambda: sum(1 for _ in self.solr_conn.search(
-                '*:*', rows=STRESS_COUNT)) == STRESS_COUNT)
-        primary_conn = MongoClient(mongo_host, self.primary_p)
-        kill_mongo_proc(self.primary_p, destroy=False)
-
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
-        admin_db = new_primary_conn['admin']
-
-        while admin_db.command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-        time.sleep(5)
-        count = -1
-        while count + 1 < STRESS_COUNT:
-            try:
-                count += 1
-                self.conn['test']['test'].insert(
-                    {'name': 'Pauline ' + str(count)})
-
-            except (OperationFailure, AutoReconnect):
-                time.sleep(1)
-
-        collection_size = self.conn['test']['test'].find().count()
-        assert_soon(
-            lambda: sum(1 for _ in self.solr_conn.search(
-                '*:*', rows=STRESS_COUNT * 2)) == collection_size)
-        result_set_1 = self.solr_conn.search(
-            'Pauline',
-            rows=STRESS_COUNT * 2, sort='_id asc'
-        )
-        for item in result_set_1:
-            result_set_2 = self.conn['test']['test'].find_one(
-                {'name': item['name']})
-            self.assertEqual(item['_id'], str(result_set_2['_id']))
-
-        kill_mongo_proc(self.secondary_p, destroy=False)
-        restart_mongo_proc(self.primary_p)
-
-        while primary_conn['admin'].command("isMaster")['ismaster'] is False:
-            time.sleep(1)
-
-        restart_mongo_proc(self.secondary_p)
-
-        assert_soon(lambda: sum(1 for _ in self.solr_conn.search(
-            'Pauline', rows=STRESS_COUNT * 2)) == 0)
-        result_set_1 = list(self.solr_conn.search(
-            'Pauline',
-            rows=STRESS_COUNT * 2
-        ))
-        self.assertEqual(len(result_set_1), 0)
-        result_set_2 = list(self.solr_conn.search(
-            'Paul',
-            rows=STRESS_COUNT * 2
-        ))
-        self.assertEqual(len(result_set_2), STRESS_COUNT)
 
     def test_valid_fields(self):
         """ Tests documents with field definitions

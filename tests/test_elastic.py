@@ -24,7 +24,7 @@ from elasticsearch import Elasticsearch
 from gridfs import GridFS
 from pymongo import MongoClient
 
-from tests import elastic_pair, mongo_host, STRESS_COUNT
+from tests import elastic_pair, mongo_host
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,
                                  restart_mongo_proc,
@@ -32,7 +32,6 @@ from tests.setup_cluster import (start_replica_set,
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import assert_soon
 from tests import unittest
 
@@ -253,69 +252,6 @@ class TestElastic(ElasticsearchTestCase):
             self.assertEqual(item['name'], 'paul')
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
-
-    def test_stress(self):
-        """Stress test for inserting and removing many documents."""
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-        time.sleep(5)
-        condition = lambda: self._count() == STRESS_COUNT
-        assert_soon(condition)
-        self.assertEqual(
-            set('Paul ' + str(i) for i in range(STRESS_COUNT)),
-            set(item['name'] for item in self._search())
-        )
-
-    def test_stressed_rollback(self):
-        """Stress test for a rollback with many documents."""
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-
-        condition = lambda: self._count() == STRESS_COUNT
-        assert_soon(condition)
-        primary_conn = MongoClient(mongo_host, self.primary_p)
-        kill_mongo_proc(self.primary_p, destroy=False)
-
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
-
-        admin = new_primary_conn['admin']
-        assert_soon(lambda: admin.command("isMaster")['ismaster'])
-
-        time.sleep(5)
-        count = -1
-        while count + 1 < STRESS_COUNT:
-            try:
-                count += 1
-                self.conn['test']['test'].insert(
-                    {'name': 'Pauline ' + str(count)})
-            except (OperationFailure, AutoReconnect):
-                time.sleep(1)
-        assert_soon(lambda: self._count()
-                    == self.conn['test']['test'].find().count())
-        result_set_1 = self._search()
-        for item in result_set_1:
-            if 'Pauline' in item['name']:
-                result_set_2 = self.conn['test']['test'].find_one(
-                    {'name': item['name']})
-                self.assertEqual(item['_id'], str(result_set_2['_id']))
-
-        kill_mongo_proc(self.secondary_p, destroy=False)
-
-        restart_mongo_proc(self.primary_p)
-        db_admin = primary_conn["admin"]
-        assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
-        restart_mongo_proc(self.secondary_p)
-
-        search = self._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
-        assert_soon(condition)
-
-        result_set_1 = list(self._search())
-        self.assertEqual(len(result_set_1), STRESS_COUNT)
-        for item in result_set_1:
-            self.assertTrue('Paul' in item['name'])
-        find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), STRESS_COUNT)
 
 
 if __name__ == '__main__':

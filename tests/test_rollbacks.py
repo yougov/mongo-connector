@@ -14,7 +14,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.oplog_manager import OplogThread
 
-from tests import mongo_host, unittest
+from tests import mongo_host, unittest, STRESS_COUNT
 from tests.util import assert_soon
 from tests.setup_cluster import (
     start_replica_set,
@@ -261,5 +261,47 @@ class TestRollbacks(unittest.TestCase):
         # Both document should exist in doc manager
         doc_manager = self.opman.doc_managers[0]
         self.assertEqual(len(doc_manager._search()), 2)
+
+        self.opman.join()
+
+    def test_stressed_rollback(self):
+        """Stress test for a rollback with many documents."""
+        self.opman.start()
+
+        c = self.main_conn.test.mc
+        docman = self.opman.doc_managers[0]
+
+        c.insert({'i': i} for i in range(STRESS_COUNT))
+        assert_soon(lambda: c.count() == STRESS_COUNT)
+        condition = lambda: len(docman._search()) == STRESS_COUNT
+        assert_soon(condition, ("Was expecting %d documents in DocManager, "
+                                "but %d found instead."
+                                % (STRESS_COUNT, len(docman._search()))))
+
+        primary_conn = MongoClient(mongo_host, self.primary_p)
+        kill_mongo_proc(self.primary_p, destroy=False)
+        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+
+        admin = new_primary_conn.admin
+        assert_soon(
+            lambda: retry_until_ok(admin.command, "isMaster")['ismaster'])
+
+        retry_until_ok(c.insert,
+                       [{'i': str(STRESS_COUNT + i)}
+                        for i in range(STRESS_COUNT)])
+        assert_soon(lambda: len(docman._search()) == c.count())
+
+        kill_mongo_proc(self.secondary_p, destroy=False)
+
+        restart_mongo_proc(self.primary_p)
+        admin = primary_conn.admin
+        assert_soon(
+            lambda: retry_until_ok(admin.command, "isMaster")['ismaster'])
+        restart_mongo_proc(self.secondary_p)
+
+        assert_soon(lambda: retry_until_ok(c.count) == STRESS_COUNT)
+        assert_soon(condition, ("Was expecting %d documents in DocManager, "
+                                "but %d found instead."
+                                % (STRESS_COUNT, len(docman._search()))))
 
         self.opman.join()
