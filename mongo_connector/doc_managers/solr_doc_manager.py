@@ -182,6 +182,7 @@ class DocManager(DocManagerBase):
             # update spec contains the new document
             update_spec['_ts'] = doc['_ts']
             update_spec['ns'] = doc['ns']
+            update_spec['_id'] = doc['_id']
             return update_spec
         for to_set in update_spec.get("$set", []):
             value = update_spec['$set'][to_set]
