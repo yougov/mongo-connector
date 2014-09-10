@@ -15,10 +15,13 @@
 """Test oplog manager methods
 """
 
+import sys
 import time
 
 import bson
 import pymongo
+
+sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict

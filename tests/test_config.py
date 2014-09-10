@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import json
+import sys
+
+sys.path[0:0] = [""]
 
 from mongo_connector import config, errors
 from mongo_connector.connector import get_config_options

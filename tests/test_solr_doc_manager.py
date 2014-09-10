@@ -13,7 +13,10 @@
 # limitations under the License.
 
 import datetime
+import sys
 import time
+
+sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager

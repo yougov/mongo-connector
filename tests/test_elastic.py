@@ -15,11 +15,14 @@
 """Integration tests for mongo-connector + Elasticsearch."""
 import base64
 import os
+import sys
 import time
 
 from elasticsearch import Elasticsearch
 from gridfs import GridFS
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
 
 from tests import elastic_pair, mongo_host
 from tests.setup_cluster import (start_replica_set,

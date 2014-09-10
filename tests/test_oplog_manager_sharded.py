@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
 import threading
 import time
-import os
 
 import bson
 import pymongo
 from pymongo import MongoClient
 from pymongo.read_preferences import ReadPreference
+
+sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict

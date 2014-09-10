@@ -14,7 +14,10 @@
 
 """Unit tests for the Elastic DocManager."""
 import base64
+import sys
 import time
+
+sys.path[0:0] = [""]
 
 from tests import elastic_pair, unittest
 from tests.test_elastic import ElasticsearchTestCase

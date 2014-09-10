@@ -14,8 +14,12 @@
 
 """Tests methods in util.py
 """
+import sys
 
 from bson import timestamp
+
+sys.path[0:0] = [""]
+
 from mongo_connector.util import (bson_ts_to_long,
                                   long_to_bson_ts,
                                   retry_until_ok)

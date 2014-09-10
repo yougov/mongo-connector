@@ -15,11 +15,15 @@
 """Test mongo using the synchronizer, i.e. as it would be used by an
     user
 """
-import time
 import os
+import sys
+import time
 
 from gridfs import GridFS
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
+
 from tests import mongo_host
 from tests.setup_cluster import (start_replica_set,
                                  kill_replica_set,

@@ -16,11 +16,14 @@
     """
 import logging
 import os
+import sys
 import time
 
 from gridfs import GridFS
 from pymongo import MongoClient
 from pysolr import Solr, SolrError
+
+sys.path[0:0] = [""]
 
 from tests import solr_pair, mongo_host, unittest
 from tests.setup_cluster import (start_replica_set,

@@ -15,15 +15,18 @@
 """Tests methods for mongo_connector
 """
 
-import os
-
-import time
 import json
+import os
+import sys
+import time
+
+from bson.timestamp import Timestamp
+
+sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
 from tests import mongo_host, unittest
 from tests.setup_cluster import start_replica_set, kill_replica_set
-from bson.timestamp import Timestamp
 from mongo_connector.util import long_to_bson_ts
 
 

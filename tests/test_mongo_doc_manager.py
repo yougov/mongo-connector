@@ -15,9 +15,12 @@
 """Tests each of the functions in mongo_doc_manager
 """
 
+import sys
 import time
 
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager

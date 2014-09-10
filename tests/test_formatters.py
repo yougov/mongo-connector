@@ -1,8 +1,11 @@
 import datetime
 import re
+import sys
 import uuid
 
 import bson
+
+sys.path[0:0] = [""]
 
 from mongo_connector.compat import PY3
 from mongo_connector.doc_managers.formatters import (

@@ -4,10 +4,13 @@ experiencing a rollback.
 """
 
 import os
+import sys
 import time
 
 from pymongo.read_preferences import ReadPreference
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
 
 from mongo_connector.util import retry_until_ok
 from mongo_connector.locking_dict import LockingDict
