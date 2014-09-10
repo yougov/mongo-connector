@@ -196,7 +196,13 @@ class DocManager(DocManagerBase):
                 doc.pop(key)
             doc[to_set] = value
         for to_unset in update_spec.get("$unset", []):
-            doc.pop(to_unset)
+            # MongoDB < 2.5.2 reports $unset for fields that don't exist within
+            # the document being updated.
+            if to_unset in doc:
+                doc.pop(to_unset)
+            else:
+                raise errors.UpdateDoesNotApply("Cannot apply update %r to %r"
+                                                % (update_spec, doc))
         return doc
 
     @wrap_exceptions
