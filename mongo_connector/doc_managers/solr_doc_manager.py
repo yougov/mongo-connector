@@ -199,11 +199,13 @@ class DocManager(DocManagerBase):
         for to_unset in update_spec.get("$unset", []):
             # MongoDB < 2.5.2 reports $unset for fields that don't exist within
             # the document being updated.
-            if to_unset in doc:
-                doc.pop(to_unset)
-            else:
-                raise errors.UpdateDoesNotApply("Cannot apply update %r to %r"
-                                                % (update_spec, doc))
+            keys_to_pop = []
+            for key in doc:
+                if key.startswith(to_unset):
+                    if key == to_unset or key[len(to_unset)] == '.':
+                        keys_to_pop.append(key)
+            for key in keys_to_pop:
+                doc.pop(key)
         return doc
 
     @wrap_exceptions
@@ -212,6 +214,9 @@ class DocManager(DocManagerBase):
         matches that of doc.
 
         """
+        # Commit outstanding changes so that the document to be updated is the
+        # same version to which the changes apply.
+        self.commit()
         query = "%s:%s" % (self.unique_key, str(doc['_id']))
         results = self.solr.search(query)
         if not len(results):
