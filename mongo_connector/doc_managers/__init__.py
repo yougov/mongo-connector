@@ -81,7 +81,13 @@ class DocManagerBase(object):
                     if '.' in to_set:
                         path = to_set.split(".")
                         where = _retrieve_path(doc, path[:-1], create=True)
-                        where[_convert_or_raise(where, path[-1])] = value
+                        if isinstance(where, list):
+                            if _convert_or_raise(where, path[-1]) >= len(where):
+                                where.append(value)
+                            else:
+                                where[_convert_or_raise(where, path[-1])] = value
+                        else:
+                            where[_convert_or_raise(where, path[-1])] = value
                     else:
                         doc[to_set] = value
 
