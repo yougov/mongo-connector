@@ -36,7 +36,9 @@ from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
 
 wrap_exceptions = exception_wrapper({
     es_exceptions.ConnectionError: errors.ConnectionFailed,
-    es_exceptions.TransportError: errors.OperationFailed})
+    es_exceptions.TransportError: errors.OperationFailed,
+    es_exceptions.RequestError: errors.OperationFailed
+})
 
 
 class DocManager(DocManagerBase):
