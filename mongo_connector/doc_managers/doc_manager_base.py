@@ -45,7 +45,8 @@ class DocManagerBase(object):
                     index = int(part)
                     if create and len(looking_at) < index:
                         looking_at.extend(
-                            [None] * (len(looking_at) - index - 1))
+                            [None] * (index + 1 - len(looking_at)))
+                        # Sub-doc, not list, is created if no object at index
                         looking_at.append({})
                     looking_at = looking_at[index]
                 else:
@@ -66,7 +67,11 @@ class DocManagerBase(object):
                     if '.' in to_set:
                         path = to_set.split(".")
                         where = _retrieve_path(doc, path[:-1], create=True)
-                        where[_convert_or_raise(where, path[-1])] = value
+                        wl = len(where)
+                        index = _convert_or_raise(where, path[-1])
+                        if isinstance(where, list) and index >= wl:
+                            where.extend([None] * (index + 1 - wl))
+                        where[index] = value
                     else:
                         doc[to_set] = value
 

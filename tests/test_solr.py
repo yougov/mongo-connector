@@ -146,6 +146,7 @@ class TestSynchronizer(unittest.TestCase):
         <field name="b.0.e" type="int" indexed="true" stored="true" />
         <field name="b.1.d" type="int" indexed="true" stored="true" />
         <field name="b.1.f" type="int" indexed="true" stored="true" />
+        <field name="b.2.e" type="int" indexed="true" stored="true" />
         """
         docman = self.connector.doc_managers[0]
 
@@ -182,6 +183,9 @@ class TestSynchronizer(unittest.TestCase):
 
         # Update by changing the value within an array
         check_update({"$inc": {"b.1.f": 12}})
+
+        # Update by adding new bucket to list
+        check_update({"$push": {"b": {"e": 12}}})
 
         # Update by replacing an entire sub-document
         check_update({"$set": {"b.0": {"e": 4}}})
