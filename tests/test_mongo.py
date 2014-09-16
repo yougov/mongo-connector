@@ -139,6 +139,9 @@ class TestSynchronizer(unittest.TestCase):
         # Update by changing the value within an array
         check_update({"$inc": {"b.1.f": 12}})
 
+        # Update by adding new bucket to list
+        check_update({"$push": {"b": {"e": 12}}})
+
         # Update by changing an entire sub-document
         check_update({"$set": {"b.0": {"e": 4}}})
 
