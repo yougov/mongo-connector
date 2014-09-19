@@ -117,6 +117,7 @@ def start_replica_set(set_name, num_members=3, num_arbiters=1):
     # Start members
     repl_ports = [start_mongo_proc(options=["--replSet", set_name,
                                             "--noprealloc",
+                                            "--smallfiles",
                                             "--nojournal"])
                   for i in range(num_members)]
     # Initialize set
@@ -162,6 +163,7 @@ def start_cluster(num_shards=2):
     # Config
     config_port = start_mongo_proc(options=["--configsvr",
                                             "--noprealloc",
+                                            "--smallfiles",
                                             "--nojournal"])
 
     # Mongos
