@@ -235,14 +235,14 @@ class TestElasticDocManager(ElasticsearchTestCase):
             'create': 'test2'
         })
         time.sleep(1)
-        self.assertIn('test.test', self.elastic_doc.get_indices())
+        self.assertIn('test.test', self.elastic_doc._get_indices())
 
         self.elastic_doc.handle_command({
             'db': 'test',
             'drop': 'test2'
         })
         time.sleep(1)
-        self.assertNotIn('test', self.elastic_doc.get_indices())
+        self.assertNotIn('test', self.elastic_doc._get_indices())
 
         self.elastic_doc.handle_command({
             'db': 'test',
@@ -258,8 +258,8 @@ class TestElasticDocManager(ElasticsearchTestCase):
             'dropDatabase': 1
         })
         time.sleep(1)
-        self.assertNotIn('test.test2', self.elastic_doc.get_indices())
-        self.assertNotIn('test.test3', self.elastic_doc.get_indices())
+        self.assertNotIn('test.test2', self.elastic_doc._get_indices())
+        self.assertNotIn('test.test3', self.elastic_doc._get_indices())
 
 
 if __name__ == '__main__':

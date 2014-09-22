@@ -78,14 +78,15 @@ class DocManager(DocManagerBase):
             return update_spec
         return super(DocManager, self).apply_update(doc, update_spec)
 
-    def get_indices(self):
+    def _get_indices(self):
         return list(self.elastic.indices.stats()['indices'].keys())
 
     @wrap_exceptions
     def handle_command(self, doc):
         if doc.get('dropDatabase'):
-            dbs = self.command_helper.map_db(doc['db'])
-            for index in self.get_indices():
+            to_lower = lambda s: s.lower()
+            dbs = map(to_lower, self.command_helper.map_db(doc['db']))
+            for index in self._get_indices():
                 if index.split('.')[0] in dbs:
                     self.elastic.indices.delete(index=index)
 
@@ -98,14 +99,14 @@ class DocManager(DocManagerBase):
                 doc['db'], doc['create'])
             if db:
                 self.elastic.indices.create(
-                    index=db + '.' + coll)
+                    index=db.lower() + '.' + coll)
 
         if doc.get('drop'):
             db, coll = self.command_helper.map_collection(
                 doc['db'], doc['drop'])
             if db:
                 self.elastic.indices.delete(
-                    db + '.' + coll)
+                    db.lower() + '.' + coll)
 
     @wrap_exceptions
     def update(self, doc, update_spec):
@@ -113,7 +114,8 @@ class DocManager(DocManagerBase):
         matches that of doc.
         """
         self.commit()
-        document = self.elastic.get(index=doc['ns'],
+        index = doc['ns'].lower()
+        document = self.elastic.get(index=index,
                                     id=str(doc['_id']))
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
@@ -121,7 +123,7 @@ class DocManager(DocManagerBase):
         # Add metadata fields back into updated, for the purposes of
         # calling upsert(). Need to do this until these become separate
         # arguments in 2.x
-        updated['ns'] = doc['ns']
+        updated['ns'] = index
         updated['_ts'] = doc['_ts']
         self.upsert(updated)
         # upsert() strips metadata, so only _id + fields in _source still here
@@ -138,11 +140,11 @@ class DocManager(DocManagerBase):
             "ns": index,
             "_ts": doc.pop("_ts")
         }
-        # Index the source document
-        self.elastic.index(index=index, doc_type=doc_type,
+        # Index the source document, using lowercase namespace as index name.
+        self.elastic.index(index=index.lower(), doc_type=doc_type,
                            body=self._formatter.format_document(doc), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
-        # Index document metadata
+        # Index document metadata with original namespace (mixed upper/lower).
         self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
                            body=bson.json_util.dumps(metadata), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
@@ -160,7 +162,7 @@ class DocManager(DocManagerBase):
                 doc_id = str(doc.pop("_id"))
                 timestamp = doc.pop("_ts")
                 document_action = {
-                    "_index": index,
+                    "_index": index.lower(),
                     "_type": self.doc_type,
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
@@ -215,7 +217,7 @@ class DocManager(DocManagerBase):
                     self.attachment_field: {"type": "attachment"}
                 }
             }
-            self.elastic.indices.put_mapping(index=index,
+            self.elastic.indices.put_mapping(index=index.lower(),
                                              doc_type=doc_type,
                                              body=body)
             self.has_attachment_mapping = True
@@ -228,7 +230,7 @@ class DocManager(DocManagerBase):
         doc = self._formatter.format_document(doc)
         doc[self.attachment_field] = base64.b64encode(f.read()).decode()
 
-        self.elastic.index(index=index, doc_type=doc_type,
+        self.elastic.index(index=index.lower(), doc_type=doc_type,
                            body=doc, id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
         self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
@@ -238,7 +240,7 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def remove(self, doc):
         """Remove a document from Elasticsearch."""
-        self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
+        self.elastic.delete(index=doc['ns'].lower(), doc_type=self.doc_type,
                             id=str(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
         self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,
