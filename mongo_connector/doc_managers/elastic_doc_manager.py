@@ -56,7 +56,6 @@ class DocManager(DocManagerBase):
                  attachment_field="content", **kwargs):
         self.elastic = Elasticsearch(hosts=[url])
         self.auto_commit_interval = auto_commit_interval
-        self.doc_type = 'string'  # default type is string, change if needed
         self.meta_index_name = meta_index_name
         self.meta_type = meta_type
         self.unique_key = unique_key
@@ -86,9 +85,8 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def handle_command(self, doc):
         if doc.get('dropDatabase'):
-            to_lower = lambda s: s.lower()
-            dbs = map(to_lower, self.command_helper.map_db(doc['db']))
-            self.elastic.indices.delete(index=dbs[0])
+            dbs = self.command_helper.map_db(doc['db'])
+            self.elastic.indices.delete(index=dbs[0].lower())
 
         if doc.get('renameCollection'):
             raise errors.OperationFailed(
