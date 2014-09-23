@@ -25,7 +25,6 @@ from threading import Timer
 import bson.json_util
 
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from elasticsearch.client import IndicesClient
 from elasticsearch.helpers import scan, streaming_bulk
 
 from mongo_connector import errors
@@ -42,6 +41,7 @@ wrap_exceptions = exception_wrapper({
     es_exceptions.RequestError: errors.OperationFailed})
 
 LOG = logging.getLogger(__name__)
+
 
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
@@ -68,6 +68,11 @@ class DocManager(DocManagerBase):
         self.has_attachment_mapping = False
         self.attachment_field = attachment_field
 
+    def _index_and_mapping(self, namespace):
+        """Helper method for getting the index and type from a namespace."""
+        index, doc_type = namespace.split('.', 1)
+        return index.lower(), doc_type
+
     def stop(self):
         """Stop the auto-commit thread."""
         self.auto_commit_interval = None
@@ -78,35 +83,33 @@ class DocManager(DocManagerBase):
             return update_spec
         return super(DocManager, self).apply_update(doc, update_spec)
 
-    def _get_indices(self):
-        return list(self.elastic.indices.stats()['indices'].keys())
-
     @wrap_exceptions
     def handle_command(self, doc):
         if doc.get('dropDatabase'):
             to_lower = lambda s: s.lower()
             dbs = map(to_lower, self.command_helper.map_db(doc['db']))
-            for index in self._get_indices():
-                if index.split('.')[0] in dbs:
-                    self.elastic.indices.delete(index=index)
+            self.elastic.indices.delete(index=dbs[0])
 
         if doc.get('renameCollection'):
-            raise OperationFailed(
-                "elastic_doc_manager does not support renaming an index.")
+            raise errors.OperationFailed(
+                "elastic_doc_manager does not support renaming a mapping.")
 
         if doc.get('create'):
             db, coll = self.command_helper.map_collection(
                 doc['db'], doc['create'])
-            if db:
-                self.elastic.indices.create(
-                    index=db.lower() + '.' + coll)
+            if db and coll:
+                self.elastic.indices.put_mapping(
+                    index=db.lower(), doc_type=coll,
+                    body={
+                        "_source": {"enabled": True}
+                    })
 
         if doc.get('drop'):
             db, coll = self.command_helper.map_collection(
                 doc['db'], doc['drop'])
-            if db:
-                self.elastic.indices.delete(
-                    db.lower() + '.' + coll)
+            if db and coll:
+                self.elastic.indices.delete_mapping(index=db.lower(),
+                                                    doc_type=coll)
 
     @wrap_exceptions
     def update(self, doc, update_spec):
@@ -114,8 +117,8 @@ class DocManager(DocManagerBase):
         matches that of doc.
         """
         self.commit()
-        index = doc['ns'].lower()
-        document = self.elastic.get(index=index,
+        index, doc_type = self._index_and_mapping(doc['ns'])
+        document = self.elastic.get(index=index, doc_type=doc_type,
                                     id=str(doc['_id']))
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
@@ -123,7 +126,7 @@ class DocManager(DocManagerBase):
         # Add metadata fields back into updated, for the purposes of
         # calling upsert(). Need to do this until these become separate
         # arguments in 2.x
-        updated['ns'] = index
+        updated['ns'] = doc['ns']
         updated['_ts'] = doc['_ts']
         self.upsert(updated)
         # upsert() strips metadata, so only _id + fields in _source still here
@@ -132,16 +135,16 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def upsert(self, doc):
         """Insert a document into Elasticsearch."""
-        doc_type = self.doc_type
-        index = doc.pop('ns')
+        namespace = doc.pop('ns')
+        index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
         doc_id = str(doc.pop("_id"))
         metadata = {
-            "ns": index,
+            "ns": namespace,
             "_ts": doc.pop("_ts")
         }
         # Index the source document, using lowercase namespace as index name.
-        self.elastic.index(index=index.lower(), doc_type=doc_type,
+        self.elastic.index(index=index, doc_type=doc_type,
                            body=self._formatter.format_document(doc), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
         # Index document metadata with original namespace (mixed upper/lower).
@@ -158,12 +161,13 @@ class DocManager(DocManagerBase):
             doc = None
             for doc in docs:
                 # Remove metadata and redundant _id
-                index = doc.pop("ns")
+                namespace = doc.pop("ns")
+                index, doc_type = self._index_and_mapping(namespace)
                 doc_id = str(doc.pop("_id"))
                 timestamp = doc.pop("_ts")
                 document_action = {
-                    "_index": index.lower(),
-                    "_type": self.doc_type,
+                    "_index": index,
+                    "_type": doc_type,
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
                 }
@@ -207,8 +211,8 @@ class DocManager(DocManagerBase):
     def insert_file(self, f):
         doc = f.get_metadata()
         doc_id = str(doc.pop('_id'))
-        doc_type = self.doc_type
-        index = doc.pop('ns')
+        namespace = doc.pop('ns')
+        index, doc_type = self._index_and_mapping(namespace)
 
         # make sure that elasticsearch treats it like a file
         if not self.has_attachment_mapping:
@@ -217,20 +221,20 @@ class DocManager(DocManagerBase):
                     self.attachment_field: {"type": "attachment"}
                 }
             }
-            self.elastic.indices.put_mapping(index=index.lower(),
+            self.elastic.indices.put_mapping(index=index,
                                              doc_type=doc_type,
                                              body=body)
             self.has_attachment_mapping = True
 
         metadata = {
-            'ns': index,
+            'ns': namespace,
             '_ts': doc.pop('_ts')
         }
 
         doc = self._formatter.format_document(doc)
         doc[self.attachment_field] = base64.b64encode(f.read()).decode()
 
-        self.elastic.index(index=index.lower(), doc_type=doc_type,
+        self.elastic.index(index=index, doc_type=doc_type,
                            body=doc, id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
         self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
@@ -240,7 +244,8 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def remove(self, doc):
         """Remove a document from Elasticsearch."""
-        self.elastic.delete(index=doc['ns'].lower(), doc_type=self.doc_type,
+        index, doc_type = self._index_and_mapping(doc['ns'])
+        self.elastic.delete(index=index, doc_type=doc_type,
                             id=str(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
         self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,

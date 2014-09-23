@@ -47,29 +47,37 @@ class ElasticsearchTestCase(unittest.TestCase):
 
     def setUp(self):
         # Create target index in elasticsearch
-        self.elastic_conn.indices.create(index='test.test', ignore=400)
+        self.elastic_conn.indices.create(index='test', ignore=400)
         self.elastic_conn.cluster.health(wait_for_status='yellow',
-                                         index='test.test')
+                                         index='test')
 
     def tearDown(self):
-        self.elastic_conn.indices.delete(index='test.test', ignore=404)
+        self.elastic_conn.indices.delete(index='test', ignore=404)
 
     def _search(self, query=None):
         query = query or {"match_all": {}}
         return self.elastic_doc._stream_search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": query}
         )
 
     def _count(self):
-        return self.elastic_conn.count(index='test.test')['count']
+        return self.elastic_conn.count(index='test')['count']
 
     def _remove(self):
         self.elastic_conn.indices.delete_mapping(
-            index="test.test",
-            doc_type=self.elastic_doc.doc_type
+            index="test", doc_type='test'
         )
-        self.elastic_conn.indices.refresh(index="test.test")
+        self.elastic_conn.indices.refresh(index="test")
+
+    def _mappings(self, index='_all'):
+        mappings = self.elastic_conn.indices.get_mapping(index=index)
+        if index in mappings:
+            return list(mappings[index]['mappings'].keys())
+        return []
+
+    def _indices(self):
+        return list(self.elastic_conn.indices.stats()['indices'].keys())
 
 
 class TestElastic(ElasticsearchTestCase):

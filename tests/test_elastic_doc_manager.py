@@ -17,6 +17,8 @@ import base64
 import sys
 import time
 
+import elasticsearch
+
 sys.path[0:0] = [""]
 
 from tests import elastic_pair, unittest
@@ -59,7 +61,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         docc = {'_id': '1', 'name': 'John'}
         self.elastic_doc.upsert(self.put_metadata(docc))
         res = self.elastic_conn.search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": {"match_all": {}}}
         )["hits"]["hits"]
         for doc in res:
@@ -74,7 +76,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         self.elastic_doc.bulk_upsert(docs)
         self.elastic_doc.commit()
         res = self.elastic_conn.search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": {"match_all": {}}},
             size=1001
         )["hits"]["hits"]
@@ -88,7 +90,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         self.elastic_doc.bulk_upsert(docs)
 
         res = self.elastic_conn.search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": {"match_all": {}}},
             size=1001
         )["hits"]["hits"]
@@ -102,7 +104,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         docc = {'_id': '1', 'name': 'John'}
         self.elastic_doc.upsert(self.put_metadata(docc))
         res = self.elastic_conn.search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": {"match_all": {}}}
         )["hits"]["hits"]
         res = [x["_source"] for x in res]
@@ -110,7 +112,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
 
         self.elastic_doc.remove(self.put_metadata(docc))
         res = self.elastic_conn.search(
-            index="test.test",
+            index="test", doc_type='test',
             body={"query": {"match_all": {}}}
         )["hits"]["hits"]
         res = [x["_source"] for x in res]
@@ -216,7 +218,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         self.elastic_doc.upsert(docc)
 
         self.assertEqual(
-            self.elastic_doc.elastic.count(index="test.test")['count'], 3)
+            self.elastic_doc.elastic.count(index="test")['count'], 3)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '4')
 
@@ -225,7 +227,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '6')
         self.assertEqual(
-            self.elastic_doc.elastic.count(index="test.test")['count'], 3)
+            self.elastic_doc.elastic.count(index="test")['count'], 3)
 
     def test_commands(self):
         self.elastic_doc.command_helper = CommandHelper()
@@ -235,14 +237,14 @@ class TestElasticDocManager(ElasticsearchTestCase):
             'create': 'test2'
         })
         time.sleep(1)
-        self.assertIn('test.test', self.elastic_doc._get_indices())
+        self.assertIn('test2', self._mappings('test'))
 
         self.elastic_doc.handle_command({
             'db': 'test',
             'drop': 'test2'
         })
         time.sleep(1)
-        self.assertNotIn('test', self.elastic_doc._get_indices())
+        self.assertNotIn('test2', self._mappings('test'))
 
         self.elastic_doc.handle_command({
             'db': 'test',
@@ -258,8 +260,9 @@ class TestElasticDocManager(ElasticsearchTestCase):
             'dropDatabase': 1
         })
         time.sleep(1)
-        self.assertNotIn('test.test2', self.elastic_doc._get_indices())
-        self.assertNotIn('test.test3', self.elastic_doc._get_indices())
+        self.assertNotIn('test', self._indices())
+        self.assertNotIn('test2', self._mappings())
+        self.assertNotIn('test3', self._mappings())
 
 
 if __name__ == '__main__':
