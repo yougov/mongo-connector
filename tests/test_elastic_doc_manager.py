@@ -17,8 +17,6 @@ import base64
 import sys
 import time
 
-import elasticsearch
-
 sys.path[0:0] = [""]
 
 from tests import elastic_pair, unittest
