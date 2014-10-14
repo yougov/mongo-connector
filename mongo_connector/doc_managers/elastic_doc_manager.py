@@ -174,8 +174,8 @@ class DocManager(DocManagerBase):
                     "_type": self.meta_type,
                     "_id": doc_id,
                     "_source": {
-                        "_ns": index,
-                        "ts": timestamp
+                        "ns": index,
+                        "_ts": timestamp
                     }
                 }
                 yield document_action
