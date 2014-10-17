@@ -160,7 +160,7 @@ class DocManager(DocManagerBase):
                                  commit=(self.auto_commit_interval == 0))
 
         if doc.get('renameCollection'):
-            raise OperationFailed(
+            raise errors.OperationFailed(
                 "solr_doc_manager does not support replication of "
                 " renameCollection")
 
