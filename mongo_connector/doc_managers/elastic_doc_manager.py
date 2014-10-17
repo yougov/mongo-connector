@@ -86,7 +86,8 @@ class DocManager(DocManagerBase):
     def handle_command(self, doc):
         if doc.get('dropDatabase'):
             dbs = self.command_helper.map_db(doc['db'])
-            self.elastic.indices.delete(index=dbs[0].lower())
+            for db in dbs:
+                self.elastic.indices.delete(index=db.lower())
 
         if doc.get('renameCollection'):
             raise errors.OperationFailed(
