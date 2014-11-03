@@ -42,7 +42,7 @@ class Connector(threading.Thread):
                  collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
                  fields=None, dest_mapping={},
                  auto_commit_interval=constants.DEFAULT_COMMIT_INTERVAL,
-                 continue_on_error=False):
+                 continue_on_error=False, tz_aware=False):
 
         if target_url and not doc_manager:
             raise errors.ConnectorError("Cannot create a Connector with a "
@@ -129,6 +129,9 @@ class Connector(threading.Thread):
 
         # List of fields to export
         self.fields = fields
+
+        # Timezone awareness
+        self.tz_aware = tz_aware
 
         try:
             docman_kwargs = {"unique_key": u_key,
@@ -266,7 +269,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(self.address)
+        main_conn = MongoClient(self.address, tz_aware=self.tz_aware)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -290,7 +293,8 @@ class Connector(threading.Thread):
             # Establish a connection to the replica set as a whole
             main_conn.disconnect()
             main_conn = MongoClient(self.address,
-                                    replicaSet=is_master['setName'])
+                                    replicaSet=is_master['setName'],
+                                    tz_aware=self.tz_aware)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
@@ -361,7 +365,8 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = MongoClient(hosts, replicaSet=repl_set)
+                    shard_conn = MongoClient(hosts, replicaSet=repl_set,
+                                             tz_aware=self.tz_aware)
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
@@ -612,6 +617,11 @@ def main():
                       help=("Log all output to a file rather than stream to "
                             "stderr.   Omit to stream to stderr."))
 
+    # --tz-aware enables timezone-aware datetime objects.
+    parser.add_option("--tz-aware", dest="tz_aware", action="store_true",
+                      default=False,
+                      help="Make all dates and times timezone-aware.")
+
     (options, args) = parser.parse_args()
 
     logger = logging.getLogger()
@@ -717,7 +727,8 @@ def main():
         fields=fields,
         dest_mapping=dest_mapping,
         auto_commit_interval=options.commit_interval,
-        continue_on_error=options.continue_on_error
+        continue_on_error=options.continue_on_error,
+        tz_aware=options.tz_aware
     )
     connector.start()
 
