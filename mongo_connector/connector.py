@@ -43,8 +43,8 @@ class Connector(threading.Thread):
     def __init__(self, address, oplog_checkpoint, ns_set,
                  auth_key, doc_managers=None, auth_username=None,
                  collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
-                 fields=None, dest_mapping={},
-                 continue_on_error=False, gridfs_set=[]):
+                 fields=None, dest_mapping={}, continue_on_error=False,
+                 gridfs_set=[], tz_aware=False):
 
         super(Connector, self).__init__()
 
@@ -97,6 +97,9 @@ class Connector(threading.Thread):
 
         # List of fields to export
         self.fields = fields
+
+        # Timezone awareness
+        self.tz_aware = tz_aware
 
         # Initialize and set the command helper
         command_helper = CommandHelper(self.ns_set, self.dest_mapping)
@@ -203,7 +206,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(self.address)
+        main_conn = MongoClient(self.address, tz_aware=self.tz_aware)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -226,8 +229,9 @@ class Connector(threading.Thread):
 
             # Establish a connection to the replica set as a whole
             main_conn.disconnect()
-            main_conn = MongoClient(self.address,
-                                    replicaSet=is_master['setName'])
+            main_conn = MongoClient(
+                self.address, replicaSet=is_master['setName'],
+                tz_aware=self.tz_aware)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
@@ -299,7 +303,9 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = MongoClient(hosts, replicaSet=repl_set)
+                    shard_conn = MongoClient(
+                        hosts, replicaSet=repl_set,
+                        tz_aware=self.tz_aware)
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
@@ -809,6 +815,12 @@ def get_config_options():
         "Specify a JSON file to load configurations from. You can find"
         " an example config file at mongo-connector/config.json")
 
+    tz_aware = add_option(
+        config_key="timezoneAware", default=False, type=bool)
+    tz_aware.add_cli(
+        "--tz-aware", dest="tz_aware", action="store_true",
+        help="Make all dates and times timezone-aware.")
+
     return result
 
 
@@ -877,7 +889,8 @@ def main():
         ns_set=conf['namespaces.include'],
         dest_mapping=conf['namespaces.mapping'],
         doc_managers=conf['docManagers'],
-        gridfs_set=conf['namespaces.gridfs']
+        gridfs_set=conf['namespaces.gridfs'],
+        tz_aware=conf['timezoneAware']
     )
     connector.start()
 
