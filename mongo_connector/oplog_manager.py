@@ -342,13 +342,14 @@ class OplogThread(threading.Thread):
         if timestamp is None:
             cursor = self.oplog.find(
                 query,
-                tailable=True, await_data=True)
+                tailable=True, await_data=True, timeout=False)
         else:
             query['ts'] = {'$gte': timestamp}
             cursor = self.oplog.find(
-                query, tailable=True, await_data=True)
+                query, tailable=True, await_data=True, timeout=False)
             # Applying 8 as the mask to the cursor enables OplogReplay
             cursor.add_option(8)
+
         return cursor
 
     def dump_collection(self):
@@ -395,15 +396,20 @@ class OplogThread(threading.Thread):
                         cursor = util.retry_until_ok(
                             target_coll.find,
                             fields=self._fields,
-                            sort=[("_id", pymongo.ASCENDING)]
+                            sort=[("_id", pymongo.ASCENDING)],
+                            timeout=False
                         )
                     else:
                         cursor = util.retry_until_ok(
                             target_coll.find,
                             {"_id": {"$gt": last_id}},
                             fields=self._fields,
-                            sort=[("_id", pymongo.ASCENDING)]
+                            sort=[("_id", pymongo.ASCENDING)],
+                            timeout=False
                         )
+                    if not self.is_sharded:
+                        # exhaust
+                        cursor.add_option(64)
                     try:
                         for doc in cursor:
                             if not self.running:
@@ -689,8 +695,12 @@ class OplogThread(threading.Thread):
                 to_update = util.retry_until_ok(
                     self.main_connection[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    fields=self._fields
+                    fields=self._fields,
+                    timeout=False
                 )
+                if not self.is_sharded:
+                    # exhaust
+                    to_update.add_option(64)
                 #doc list are docs in target system, to_update are
                 #docs in mongo
                 doc_hash = {}  # hash by _id
