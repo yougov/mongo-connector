@@ -149,20 +149,22 @@ class Connector(threading.Thread):
         # for each of the threads write to file
         with open(self.oplog_checkpoint, 'w') as dest:
             with self.oplog_progress as oplog_prog:
-
                 oplog_dict = oplog_prog.get_dict()
-                for oplog, time_stamp in oplog_dict.items():
-                    oplog_str = str(oplog)
-                    timestamp = util.bson_ts_to_long(time_stamp)
-                    json_str = json.dumps([oplog_str, timestamp])
-                    try:
-                        dest.write(json_str)
-                    except IOError:
-                        # Basically wipe the file, copy from backup
-                        dest.truncate()
-                        with open(backup_file, 'r') as backup:
-                            shutil.copyfile(backup, dest)
-                        break
+                items = [[name, util.bson_ts_to_long(oplog_dict[name])]
+                         for name in oplog_dict]
+                if len(items) == 1:
+                    # Write 1-dimensional array, as in previous versions.
+                    json_str = json.dumps(items[0])
+                else:
+                    # Write a 2d array to support sharded clusters.
+                    json_str = json.dumps(items)
+                try:
+                    dest.write(json_str)
+                except IOError:
+                    # Basically wipe the file, copy from backup
+                    dest.truncate()
+                    with open(backup_file, 'r') as backup:
+                        shutil.copyfile(backup, dest)
 
         os.remove(self.oplog_checkpoint + '.backup')
 
@@ -182,25 +184,32 @@ class Connector(threading.Thread):
         except OSError:
             return None
 
-        source = open(self.oplog_checkpoint, 'r')
-        try:
-            data = json.load(source)
-        except ValueError:       # empty file
-            reason = "It may be empty or corrupt."
-            LOG.info("MongoConnector: Can't read oplog progress file. %s" %
-                     (reason))
-            source.close()
-            return None
-
-        source.close()
-
-        count = 0
-        oplog_dict = self.oplog_progress.get_dict()
-        for count in range(0, len(data), 2):
-            oplog_str = data[count]
-            time_stamp = data[count + 1]
-            oplog_dict[oplog_str] = util.long_to_bson_ts(time_stamp)
-            # stored as bson_ts
+        with open(self.oplog_checkpoint, 'r') as progress_file:
+            try:
+                data = json.load(progress_file)
+            except ValueError:
+                LOG.exception(
+                    'Cannot read oplog progress file "%s". '
+                    'It may be corrupt after Mongo Connector was shut down'
+                    'uncleanly. You can try to recover from a backup file '
+                    '(may be called "%s.backup") or create a new progress file '
+                    'starting at the current moment in time by running '
+                    'mongo-connector --no-dump <other options>. '
+                    'You may also be trying to read an oplog progress file '
+                    'created with the old format for sharded clusters. '
+                    'See https://github.com/10gen-labs/mongo-connector/wiki'
+                    '/Oplog-Progress-File for complete documentation.'
+                    % (self.oplog_checkpoint, self.oplog_checkpoint))
+                return
+            # data format:
+            # [name, timestamp] = replica set
+            # [[name, timestamp], [name, timestamp], ...] = sharded cluster
+            if not isinstance(data[0], list):
+                data = [data]
+            with self.oplog_progress:
+                self.oplog_progress.dict = dict(
+                    (name, util.long_to_bson_ts(timestamp))
+                    for name, timestamp in data)
 
     @log_fatal_exceptions
     def run(self):
