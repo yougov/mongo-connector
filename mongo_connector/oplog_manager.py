@@ -392,24 +392,22 @@ class OplogThread(threading.Thread):
                 # Loop to handle possible AutoReconnect
                 while attempts < 60:
                     target_coll = self.main_connection[database][coll]
+                    find_kwargs = {
+                        'fields': self._fields,
+                        'sort': [('_id', pymongo.ASCENDING)],
+                        'timeout': False
+                    }
+                    if not self.is_sharded:
+                        find_kwargs['exhaust'] = True
                     if not last_id:
                         cursor = util.retry_until_ok(
-                            target_coll.find,
-                            fields=self._fields,
-                            sort=[("_id", pymongo.ASCENDING)],
-                            timeout=False
-                        )
+                            target_coll.find, **find_kwargs)
                     else:
                         cursor = util.retry_until_ok(
                             target_coll.find,
                             {"_id": {"$gt": last_id}},
-                            fields=self._fields,
-                            sort=[("_id", pymongo.ASCENDING)],
-                            timeout=False
+                            **find_kwargs
                         )
-                    if not self.is_sharded:
-                        # exhaust
-                        cursor.add_option(64)
                     try:
                         for doc in cursor:
                             if not self.running:
@@ -692,15 +690,17 @@ class OplogThread(threading.Thread):
                 obj_id = bson.objectid.ObjectId
                 bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
 
+                find_kwargs = {
+                    'fields': self._fields,
+                    'timeout': False
+                }
+                if not self.is_sharded:
+                    find_kwargs['exhaust'] = True
                 to_update = util.retry_until_ok(
                     self.main_connection[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    fields=self._fields,
-                    timeout=False
+                    **find_kwargs
                 )
-                if not self.is_sharded:
-                    # exhaust
-                    to_update.add_option(64)
                 #doc list are docs in target system, to_update are
                 #docs in mongo
                 doc_hash = {}  # hash by _id
