@@ -163,6 +163,7 @@ class TestMongoConnector(unittest.TestCase):
 
         conn.read_oplog_progress()
 
+        oplog_dict = conn.oplog_progress.get_dict()
         self.assertTrue('oplog1' in oplog_dict.keys())
         self.assertTrue(oplog_dict['oplog1'], Timestamp(12, 34))
 
