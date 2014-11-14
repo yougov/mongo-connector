@@ -22,10 +22,15 @@ def exception_wrapper(mapping):
         def wrapped(*args, **kwargs):
             try:
                 return f(*args, **kwargs)
-            except:
+            except Exception as e:
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 new_type = mapping.get(exc_type)
                 if new_type is None:
+                    # Look for a superclass of the Exception.
+                    for exc_class in mapping:
+                        if isinstance(e, exc_class):
+                            reraise(mapping[exc_class], exc_value, exc_tb)
+                    # Otherwise raise the original Exception.
                     raise
                 reraise(new_type, exc_value, exc_tb)
         return wrapped
