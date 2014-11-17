@@ -263,7 +263,9 @@ class TestRollbacks(unittest.TestCase):
 
         # Both document should exist in doc manager
         doc_manager = self.opman.doc_managers[0]
-        self.assertEqual(len(doc_manager._search()), 2)
+        docs = list(doc_manager._search())
+        self.assertEqual(len(docs), 2,
+                         "Expected two documents, but got %r" % docs)
 
         self.opman.join()
 

@@ -15,6 +15,7 @@
 """Test oplog manager methods
 """
 
+import itertools
 import sys
 import time
 
@@ -157,10 +158,11 @@ class TestOplogManager(unittest.TestCase):
         last_ts = self.opman.get_last_oplog_timestamp()
         self.assertEqual(last_ts, self.opman.dump_collection())
         docs = self.opman.doc_managers[0]._search()
-        docs.sort()
+        docs.sort(key=lambda doc: doc['a'])
 
         self.assertEqual(len(docs), 90)
-        for doc, correct_a in zip(docs, range(0, 50) + range(60, 100)):
+        expected_a = itertools.chain(range(0, 50), range(60, 100))
+        for doc, correct_a in zip(docs, expected_a):
             self.assertEquals(doc['a'], correct_a)
 
     def test_init_cursor(self):

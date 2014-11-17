@@ -492,7 +492,8 @@ class OplogThread(threading.Thread):
                             last_id = doc["_id"]
                             yield doc
                         break
-                    except pymongo.errors.AutoReconnect:
+                    except (pymongo.errors.AutoReconnect,
+                            pymongo.errors.OperationFailure):
                         attempts += 1
                         time.sleep(1)
 
