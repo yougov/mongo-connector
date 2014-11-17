@@ -57,8 +57,8 @@ class Connector(threading.Thread):
         def load_doc_manager(path):
             name, _ = os.path.splitext(os.path.basename(path))
             try:
-                import importlib.machinery
-                loader = importlib.machinery.SourceFileLoader(name, path)
+                from importlib.machinery import SourceFileLoader
+                loader = SourceFileLoader(name, path)
                 module = loader.load_module(name)
             except ImportError:
                 module = imp.load_source(name, path)
