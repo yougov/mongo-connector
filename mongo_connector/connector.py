@@ -152,6 +152,8 @@ class Connector(threading.Thread):
                 oplog_dict = oplog_prog.get_dict()
                 items = [[name, util.bson_ts_to_long(oplog_dict[name])]
                          for name in oplog_dict]
+                if not items:
+                    return
                 if len(items) == 1:
                     # Write 1-dimensional array, as in previous versions.
                     json_str = json.dumps(items[0])
