@@ -25,6 +25,7 @@ import itertools
 
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
+from mongo_connector.compat import u
 
 
 class DocManager(DocManagerBase):
@@ -97,7 +98,7 @@ class DocManager(DocManagerBase):
                 '_ts': doc['_ts']
             }
         except KeyError:
-            raise OperationFailed("Document does not exist: %s" % str(doc))
+            raise OperationFailed("Document does not exist: %s" % u(doc))
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents that were

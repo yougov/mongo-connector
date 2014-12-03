@@ -16,6 +16,9 @@ if PY3:
     from urllib.error import URLError
     from urllib.error import HTTPError
 
+    def u(s):
+        return str(s)
+
 else:
     exec("""def reraise(exctype, value, trace=None):
     raise exctype, str(value), trace
@@ -28,3 +31,6 @@ else:
     from urllib2 import urlopen
     from urllib2 import URLError
     from urllib2 import HTTPError
+
+    def u(s):
+        return unicode(s)
