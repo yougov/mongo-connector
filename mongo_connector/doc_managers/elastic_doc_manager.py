@@ -27,6 +27,7 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
 
 from mongo_connector import errors
+from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
@@ -80,7 +81,7 @@ class DocManager(DocManagerBase):
         """
         self.commit()
         document = self.elastic.get(index=doc['ns'],
-                                    id=str(doc['_id']))
+                                    id=u(doc['_id']))
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
@@ -99,7 +100,7 @@ class DocManager(DocManagerBase):
         doc_type = self.doc_type
         index = doc.pop('ns')
         # No need to duplicate '_id' in source document
-        doc_id = str(doc.pop("_id"))
+        doc_id = u(doc.pop("_id"))
         metadata = {
             "ns": index,
             "_ts": doc.pop("_ts")
@@ -123,7 +124,7 @@ class DocManager(DocManagerBase):
             for doc in docs:
                 # Remove metadata and redundant _id
                 index = doc.pop("ns")
-                doc_id = str(doc.pop("_id"))
+                doc_id = u(doc.pop("_id"))
                 timestamp = doc.pop("_ts")
                 document_action = {
                     "_index": index,
@@ -171,10 +172,10 @@ class DocManager(DocManagerBase):
     def remove(self, doc):
         """Remove a document from Elasticsearch."""
         self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
-                            id=str(doc["_id"]),
+                            id=u(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
         self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,
-                            id=str(doc["_id"]),
+                            id=u(doc["_id"]),
                             refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions

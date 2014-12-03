@@ -26,6 +26,7 @@ import json
 from pysolr import Solr, SolrError
 
 from mongo_connector import errors
+from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
 from mongo_connector.util import retry_until_ok
@@ -188,7 +189,7 @@ class DocManager(DocManagerBase):
         # Commit outstanding changes so that the document to be updated is the
         # same version to which the changes apply.
         self.commit()
-        query = "%s:%s" % (self.unique_key, str(doc['_id']))
+        query = "%s:%s" % (self.unique_key, u(doc['_id']))
         results = self.solr.search(query)
         if not len(results):
             # Document may not be retrievable yet
@@ -213,7 +214,7 @@ class DocManager(DocManagerBase):
         if self.auto_commit_interval is not None:
             self.solr.add([self._clean_doc(doc)],
                           commit=(self.auto_commit_interval == 0),
-                          commitWithin=str(self.auto_commit_interval))
+                          commitWithin=u(self.auto_commit_interval))
         else:
             self.solr.add([self._clean_doc(doc)], commit=False)
 
@@ -247,7 +248,7 @@ class DocManager(DocManagerBase):
 
         The input is a python dictionary that represents a mongo document.
         """
-        self.solr.delete(id=str(doc["_id"]),
+        self.solr.delete(id=u(doc["_id"]),
                          commit=(self.auto_commit_interval == 0))
 
     @wrap_exceptions

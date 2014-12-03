@@ -725,14 +725,14 @@ class OplogThread(threading.Thread):
                     try:
                         dm.remove(doc)
                         remov_inc += 1
-                        logging.debug("OplogThread: Rollback, removed %s " %
-                                      str(doc))
+                        logging.debug(
+                            "OplogThread: Rollback, removed %r " % doc)
                     except errors.OperationFailed:
                         logging.warning(
-                            "Could not delete document during rollback: %s "
+                            "Could not delete document during rollback: %r "
                             "This can happen if this document was already "
                             "removed by another rollback happening at the "
-                            "same time." % str(doc)
+                            "same time." % doc
                         )
 
                 logging.debug("OplogThread: Rollback, removed %d docs." %
@@ -749,11 +749,10 @@ class OplogThread(threading.Thread):
                     try:
                         insert_inc += 1
                         dm.upsert(doc)
-                    except errors.OperationFailed as e:
+                    except errors.OperationFailed:
                         fail_insert_inc += 1
-                        logging.error("OplogThread: Rollback, Unable to "
-                                      "insert %s with exception %s"
-                                      % (doc, str(e)))
+                        logging.exception("OplogThread: Rollback, Unable to "
+                                          "insert %r" % doc)
 
         logging.debug("OplogThread: Rollback, Successfully inserted %d "
                       " documents and failed to insert %d"
