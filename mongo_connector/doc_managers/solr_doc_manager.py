@@ -131,7 +131,7 @@ class DocManager(DocManagerBase):
         # _id may not exist in the doc, if we retrieved it from Solr
         # as part of update.
         if '_id' in doc:
-            doc[self.unique_key] = str(doc.pop("_id"))
+            doc[self.unique_key] = u(doc.pop("_id"))
 
         # SOLR cannot index fields within sub-documents, so flatten documents
         # with the dot-separated path to each value as the respective key
