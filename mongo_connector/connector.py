@@ -177,33 +177,34 @@ class Connector(threading.Thread):
         if self.oplog_checkpoint is None:
             return None
 
+        with self.oplog_progress as oplog_prog:
+            oplog_dict = oplog_prog.get_dict()
+        items = [[name, util.bson_ts_to_long(oplog_dict[name])]
+                 for name in oplog_dict]
+        if not items:
+            return
+
         # write to temp file
         backup_file = self.oplog_checkpoint + '.backup'
         os.rename(self.oplog_checkpoint, backup_file)
 
         # for each of the threads write to file
         with open(self.oplog_checkpoint, 'w') as dest:
-            with self.oplog_progress as oplog_prog:
-                oplog_dict = oplog_prog.get_dict()
-                items = [[name, util.bson_ts_to_long(oplog_dict[name])]
-                         for name in oplog_dict]
-                if not items:
-                    return
-                if len(items) == 1:
-                    # Write 1-dimensional array, as in previous versions.
-                    json_str = json.dumps(items[0])
-                else:
-                    # Write a 2d array to support sharded clusters.
-                    json_str = json.dumps(items)
-                try:
-                    dest.write(json_str)
-                except IOError:
-                    # Basically wipe the file, copy from backup
-                    dest.truncate()
-                    with open(backup_file, 'r') as backup:
-                        shutil.copyfile(backup, dest)
+            if len(items) == 1:
+                # Write 1-dimensional array, as in previous versions.
+                json_str = json.dumps(items[0])
+            else:
+                # Write a 2d array to support sharded clusters.
+                json_str = json.dumps(items)
+            try:
+                dest.write(json_str)
+            except IOError:
+                # Basically wipe the file, copy from backup
+                dest.truncate()
+                with open(backup_file, 'r') as backup:
+                    shutil.copyfile(backup, dest)
 
-        os.remove(self.oplog_checkpoint + '.backup')
+        os.remove(backup_file)
 
     def read_oplog_progress(self):
         """Reads oplog progress from file provided by user.
