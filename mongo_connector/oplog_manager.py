@@ -655,7 +655,7 @@ class OplogThread(threading.Thread):
 
             # try to get the first oplog entry
             try:
-                first_oplog_entry = next(cursor)
+                first_oplog_entry = retry_until_ok(next, cursor)
             except StopIteration:
                 # It's possible for the cursor to become invalid
                 # between the cursor.count() call and now
