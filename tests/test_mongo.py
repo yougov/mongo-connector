@@ -44,7 +44,6 @@ class MongoTestCase(unittest.TestCase):
         cls.standalone_port = start_mongo_proc(options=['--nojournal',
                                                         '--noprealloc'])
         cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
-        # aka cls/self.MongoDoc
         cls.mongo_doc = DocManager(cls.standalone_pair)
         cls.mongo_conn = MongoClient(cls.standalone_pair)
         cls.mongo = cls.mongo_conn['test']['test']
@@ -77,11 +76,6 @@ class TestMongo(MongoTestCase):
 
     @classmethod
     def setUpClass(cls):
-        try:
-            os.unlink("config.txt")
-        except OSError:
-            pass
-        open("config.txt", "w").close()
         MongoTestCase.setUpClass()
         _, cls.secondary_p, cls.primary_p = start_replica_set('test-mongo')
         cls.conn = MongoClient(mongo_host, cls.primary_p,
@@ -98,15 +92,22 @@ class TestMongo(MongoTestCase):
         self.connector.join()
 
     def setUp(self):
+        try:
+            os.unlink("oplog.timestamp")
+        except OSError:
+            pass
         self._remove()
         self.connector = Connector(
-            address='%s:%s' % (mongo_host, self.primary_p),
-            oplog_checkpoint="config.txt",
+            mongo_address='%s:%s' % (mongo_host, self.primary_p),
             ns_set=['test.test'],
-            auth_key=None,
             doc_managers=(self.mongo_doc,),
             gridfs_set=['test.test']
         )
+
+        self.conn.test.test.drop()
+        self.conn.test.test.files.drop()
+        self.conn.test.test.chunks.drop()
+
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: sum(1 for _ in self._search()) == 0)

@@ -33,8 +33,6 @@ from tests.setup_cluster import (
 class MockGridFSFile:
     def __init__(self, doc, data):
         self._id = doc['_id']
-        self._ts = doc['_ts']
-        self.ns = doc['ns']
         self.filename = doc['filename']
         self.upload_date = doc['upload_date']
         self.md5 = doc['md5']
@@ -45,8 +43,6 @@ class MockGridFSFile:
     def get_metadata(self):
         return {
             '_id': self._id,
-            '_ts': self._ts,
-            'ns': self.ns,
             'filename': self.filename,
             'upload_date': self.upload_date,
             'md5': self.md5
@@ -79,21 +75,18 @@ class TestGridFSFile(unittest.TestCase):
     def setUp(self):
         # clear existing data
         self.main_connection.drop_database("test")
-        self.fs = gridfs.GridFS(self.main_connection['test'])
+        self.collection = self.main_connection.test.fs
+        self.fs = gridfs.GridFS(self.main_connection.test)
 
-    def get_file(self, id):
-        doc = {
-            '_id': id,
-            'ns': 'test.fs',
-            '_ts': 0
-        }
-        return GridFSFile(self.main_connection, doc)
+    def get_file(self, doc):
+        return GridFSFile(self.collection, doc)
 
     def test_insert(self):
         def test_insert_file(data, filename, read_size):
             # insert file
             id = self.fs.put(data, filename=filename)
-            f = self.get_file(id)
+            doc = self.collection.files.find_one(id)
+            f = self.get_file(doc)
 
             # test metadata
             self.assertEquals(id, f._id)
@@ -125,19 +118,18 @@ class TestGridFSFile(unittest.TestCase):
         test_insert_file(bigger, "bigger.txt", 1024)
         test_insert_file(bigger, "bigger.txt", 1024 * 1024)
 
-    def test_missing_file(self):
-        data = "test data"
-        id = self.fs.put(data)
-        self.fs.delete(id)
-        self.assertRaises(errors.OperationFailed, self.get_file, id)
-
     def test_missing_chunk(self):
         data = "test data"
         id = self.fs.put(data)
-        f = self.get_file(id)
+        doc = self.collection.files.find_one(id)
+        f = self.get_file(doc)
 
         self.main_connection['test']['fs.chunks'].remove({
             'files_id': id
         })
 
         self.assertRaises(errors.OperationFailed, f.read)
+
+
+if __name__ == '__main__':
+    unittest.main()

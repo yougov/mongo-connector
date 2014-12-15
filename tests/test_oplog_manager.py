@@ -43,16 +43,9 @@ class TestOplogManager(unittest.TestCase):
         self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
-            primary_conn=self.primary_conn,
-            main_address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_coll=self.oplog_coll,
-            is_sharded=False,
+            primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_set=None,
-            auth_key=None,
-            auth_username=None,
-            repl_set='test-oplog-manager'
+            oplog_progress_dict=LockingDict()
         )
 
     def tearDown(self):
@@ -250,7 +243,7 @@ class TestOplogManager(unittest.TestCase):
 
     def test_filter_fields(self):
         docman = self.opman.doc_managers[0]
-        conn = self.opman.main_connection
+        conn = self.opman.primary_client
 
         include_fields = ["a", "b", "c"]
         exclude_fields = ["d", "e", "f"]

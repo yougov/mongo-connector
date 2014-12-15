@@ -35,10 +35,10 @@ class TestRollbacks(unittest.TestCase):
     def setUp(self):
         # Create a new oplog progress file
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
 
         # Start a replica set
         _, self.secondary_p, self.primary_p = start_replica_set('rollbacks')
@@ -60,16 +60,10 @@ class TestRollbacks(unittest.TestCase):
         doc_manager = DocManager()
         oplog_progress = LockingDict()
         self.opman = OplogThread(
-            primary_conn=self.main_conn,
-            main_address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_coll=self.main_conn["local"]["oplog.rs"],
-            is_sharded=False,
+            primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mc"],
-            auth_key=None,
-            auth_username=None,
-            repl_set="rollbacks"
+            namespace_set=["test.mc"]
         )
 
     def test_single_target(self):
@@ -122,7 +116,8 @@ class TestRollbacks(unittest.TestCase):
 
         # Same case should hold for the doc manager
         doc_manager = self.opman.doc_managers[0]
-        self.assertEqual(len(doc_manager._search()), 1)
+        assert_soon(lambda: len(doc_manager._search()) == 1,
+                    'documents never rolled back in doc manager.')
         self.assertEqual(doc_manager._search()[0]["i"], 0)
 
         # cleanup
@@ -177,17 +172,9 @@ class TestRollbacks(unittest.TestCase):
         # uneven replication
         ts = self.opman.doc_managers[0].get_last_doc()['_ts']
         for id in secondary_ids[8:]:
-            self.opman.doc_managers[1].remove({
-                "_id": id,
-                "ns": "test.mc",
-                "_ts": ts
-            })
+            self.opman.doc_managers[1].remove(id, 'test.mc', ts)
         for id in secondary_ids[2:]:
-            self.opman.doc_managers[2].remove({
-                "_id": id,
-                "ns": "test.mc",
-                "_ts": ts
-            })
+            self.opman.doc_managers[2].remove(id, 'test.mc', ts)
 
         # Kill the new primary
         kill_mongo_proc(self.secondary_p, destroy=False)

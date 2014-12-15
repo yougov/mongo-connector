@@ -40,37 +40,14 @@ LOG = logging.getLogger(__name__)
 class Connector(threading.Thread):
     """Checks the cluster for shards to tail.
     """
-    def __init__(self, address, oplog_checkpoint, ns_set,
-                 auth_key, doc_managers=None, auth_username=None,
-                 collection_dump=True, batch_size=constants.DEFAULT_BATCH_SIZE,
-                 fields=None, dest_mapping={}, continue_on_error=False,
-                 gridfs_set=[], tz_aware=False):
-
+    def __init__(self, mongo_address, doc_managers=None, **kwargs):
         super(Connector, self).__init__()
 
         # can_run is set to false when we join the thread
         self.can_run = True
 
-        # The name of the file that stores the progress of the OplogThreads
-        self.oplog_checkpoint = oplog_checkpoint
-
         # main address - either mongos for sharded setups or a primary otherwise
-        self.address = address
-
-        # The set of relevant namespaces to consider
-        self.ns_set = ns_set
-
-        # The set of gridfs namespaces to consider
-        self.gridfs_set = gridfs_set
-
-        # The dict of source namespace to destination namespace
-        self.dest_mapping = dest_mapping
-
-        # Whether the collection dump gracefully handles exceptions
-        self.continue_on_error = continue_on_error
-
-        # Password for authentication
-        self.auth_key = auth_key
+        self.address = mongo_address
 
         # List of DocManager instances
         if doc_managers:
@@ -79,30 +56,31 @@ class Connector(threading.Thread):
             LOG.info('No doc managers specified, using simulator.')
             self.doc_managers = (simulator.DocManager(),)
 
+        # Password for authentication
+        self.auth_key = kwargs.pop('auth_key', None)
+
         # Username for authentication
-        self.auth_username = auth_username
+        self.auth_username = kwargs.pop('auth_username', None)
+
+        # The name of the file that stores the progress of the OplogThreads
+        self.oplog_checkpoint = kwargs.pop('oplog_checkpoint',
+                                           'oplog.timestamp')
 
         # The set of OplogThreads created
         self.shard_set = {}
 
-        # Boolean chooses whether to dump the entire collection if no timestamp
-        # is present in the config file
-        self.collection_dump = collection_dump
-
-        # Num entries to process before updating config file with current pos
-        self.batch_size = batch_size
-
         # Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
 
-        # List of fields to export
-        self.fields = fields
-
         # Timezone awareness
-        self.tz_aware = tz_aware
+        self.tz_aware = kwargs.get('tz_aware', False)
+
+        # Save the rest of kwargs.
+        self.kwargs = kwargs
 
         # Initialize and set the command helper
-        command_helper = CommandHelper(self.ns_set, self.dest_mapping)
+        command_helper = CommandHelper(kwargs.get('ns_set', []),
+                                       kwargs.get('dest_mapping', {}))
         for dm in self.doc_managers:
             dm.command_helper = command_helper
 
@@ -126,6 +104,37 @@ class Connector(threading.Thread):
                     LOG.critical("Invalid permissions on %s! Exiting" %
                                  (self.oplog_checkpoint))
                     sys.exit(2)
+
+    @classmethod
+    def from_config(cls, config):
+        """Create a new Connector instance from a Config object."""
+        auth_key = None
+        password_file = config['authentication.passwordFile']
+        if password_file is not None:
+            try:
+                auth_key = open(config['passwordFile']).read()
+                auth_key = re.sub(r'\s', '', auth_key)
+            except IOError:
+                LOG.error('Could not load password file!')
+                sys.exit(1)
+        password = config['authentication.password']
+        if password is not None:
+            auth_key = password
+        connector = Connector(
+            mongo_address=config['mainAddress'],
+            doc_managers=config['docManagers'],
+            oplog_checkpoint=config['oplogFile'],
+            collection_dump=(not config['noDump']),
+            batch_size=config['batchSize'],
+            continue_on_error=config['continueOnError'],
+            auth_username=config['authentication.adminUsername'],
+            auth_key=auth_key,
+            fields=config['fields'],
+            ns_set=config['namespaces.include'],
+            dest_mapping=config['namespaces.mapping'],
+            gridfs_set=config['namespaces.gridfs']
+        )
+        return connector
 
     def join(self):
         """ Joins thread, stops it from running
@@ -247,26 +256,9 @@ class Connector(threading.Thread):
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
             # non sharded configuration
-            oplog_coll = main_conn['local']['oplog.rs']
-
             oplog = OplogThread(
-                primary_conn=main_conn,
-                main_address=self.address,
-                oplog_coll=oplog_coll,
-                is_sharded=False,
-                doc_managers=self.doc_managers,
-                oplog_progress_dict=self.oplog_progress,
-                namespace_set=self.ns_set,
-                auth_key=self.auth_key,
-                auth_username=self.auth_username,
-                repl_set=is_master['setName'],
-                collection_dump=self.collection_dump,
-                batch_size=self.batch_size,
-                fields=self.fields,
-                dest_mapping=self.dest_mapping,
-                continue_on_error=self.continue_on_error,
-                gridfs_set=self.gridfs_set
-            )
+                main_conn, self.doc_managers, self.oplog_progress,
+                **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
                      main_conn)
@@ -317,25 +309,9 @@ class Connector(threading.Thread):
                     shard_conn = MongoClient(
                         hosts, replicaSet=repl_set,
                         tz_aware=self.tz_aware)
-                    oplog_coll = shard_conn['local']['oplog.rs']
-
                     oplog = OplogThread(
-                        primary_conn=shard_conn,
-                        main_address=self.address,
-                        oplog_coll=oplog_coll,
-                        is_sharded=True,
-                        doc_managers=self.doc_managers,
-                        oplog_progress_dict=self.oplog_progress,
-                        namespace_set=self.ns_set,
-                        auth_key=self.auth_key,
-                        auth_username=self.auth_username,
-                        collection_dump=self.collection_dump,
-                        batch_size=self.batch_size,
-                        fields=self.fields,
-                        dest_mapping=self.dest_mapping,
-                        continue_on_error=self.continue_on_error,
-                        gridfs_set=self.gridfs_set
-                    )
+                        shard_conn, self.doc_managers, self.oplog_progress,
+                        **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -875,34 +851,7 @@ def main():
 
     LOG.info('Beginning Mongo Connector')
 
-    auth_key = None
-    password_file = conf['authentication.passwordFile']
-    if password_file is not None:
-        try:
-            auth_key = open(conf['passwordFile']).read()
-            auth_key = re.sub(r'\s', '', auth_key)
-        except IOError:
-            LOG.error('Could not load password file!')
-            sys.exit(1)
-    password = conf['authentication.password']
-    if password is not None:
-        auth_key = password
-
-    connector = Connector(
-        address=conf['mainAddress'],
-        oplog_checkpoint=conf['oplogFile'],
-        collection_dump=(not conf['noDump']),
-        batch_size=conf['batchSize'],
-        continue_on_error=conf['continueOnError'],
-        auth_username=conf['authentication.adminUsername'],
-        auth_key=auth_key,
-        fields=conf['fields'],
-        ns_set=conf['namespaces.include'],
-        dest_mapping=conf['namespaces.mapping'],
-        doc_managers=conf['docManagers'],
-        gridfs_set=conf['namespaces.gridfs'],
-        tz_aware=conf['timezoneAware']
-    )
+    connector = Connector.from_config(conf)
     connector.start()
 
     while True:

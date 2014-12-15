@@ -70,26 +70,24 @@ class TestSolr(SolrTestCase):
     def setUp(self):
         self._remove()
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
         docman = DocManager('http://%s/solr' % solr_pair,
                             auto_commit_interval=0)
         self.connector = Connector(
-            address='%s:%s' % (mongo_host, self.primary_p),
-            oplog_checkpoint='config.txt',
+            mongo_address='%s:%s' % (mongo_host, self.primary_p),
             ns_set=['test.test'],
-            auth_key=None,
             doc_managers=(docman,),
             gridfs_set=['test.test']
         )
+        retry_until_ok(self.conn.test.test.drop)
+        retry_until_ok(self.conn.test.test.files.drop)
+        retry_until_ok(self.conn.test.test.chunks.drop)
+        self._remove()
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
-        retry_until_ok(self.conn.test.test.remove)
-        retry_until_ok(self.conn.test.test.files.remove)
-        retry_until_ok(self.conn.test.test.chunks.remove)
-        assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 0)
 
     def tearDown(self):
         self.connector.join()
@@ -166,16 +164,21 @@ class TestSolr(SolrTestCase):
             # Stringify _id to match what will be retrieved from Solr
             updated['_id'] = str(updated['_id'])
             # Flatten the MongoDB document to match Solr
-            updated = docman._clean_doc(updated)
+            updated = docman._clean_doc(updated, 'dummy.namespace', 0)
             # Allow some time for update to propagate
             time.sleep(1)
             replicated = list(self._search("a:0"))[0]
+
             # Remove add'l fields until these are stored in a separate Solr core
-            replicated.pop("_ts")
-            replicated.pop("ns")
+            updated.pop('_ts')
+            replicated.pop('_ts')
+            updated.pop('ns')
+            replicated.pop('ns')
+
             # Remove field added by Solr
             replicated.pop("_version_")
-            self.assertEqual(replicated, docman._clean_doc(updated))
+
+            self.assertEqual(replicated, updated)
 
         # Update by adding a field.
         # Note that Solr can't mix types within an array

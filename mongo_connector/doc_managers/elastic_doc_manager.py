@@ -84,19 +84,19 @@ class DocManager(DocManagerBase):
         return super(DocManager, self).apply_update(doc, update_spec)
 
     @wrap_exceptions
-    def handle_command(self, doc):
+    def handle_command(self, doc, namespace, timestamp):
+        db = namespace.split('.', 1)[0]
         if doc.get('dropDatabase'):
-            dbs = self.command_helper.map_db(doc['db'])
-            for db in dbs:
-                self.elastic.indices.delete(index=db.lower())
+            dbs = self.command_helper.map_db(db)
+            for _db in dbs:
+                self.elastic.indices.delete(index=_db.lower())
 
         if doc.get('renameCollection'):
             raise errors.OperationFailed(
                 "elastic_doc_manager does not support renaming a mapping.")
 
         if doc.get('create'):
-            db, coll = self.command_helper.map_collection(
-                doc['db'], doc['create'])
+            db, coll = self.command_helper.map_collection(db, doc['create'])
             if db and coll:
                 self.elastic.indices.put_mapping(
                     index=db.lower(), doc_type=coll,
@@ -105,43 +105,36 @@ class DocManager(DocManagerBase):
                     })
 
         if doc.get('drop'):
-            db, coll = self.command_helper.map_collection(
-                doc['db'], doc['drop'])
+            db, coll = self.command_helper.map_collection(db, doc['drop'])
             if db and coll:
                 self.elastic.indices.delete_mapping(index=db.lower(),
                                                     doc_type=coll)
 
     @wrap_exceptions
-    def update(self, doc, update_spec):
+    def update(self, document_id, update_spec, namespace, timestamp):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
         """
         self.commit()
-        index, doc_type = self._index_and_mapping(doc['ns'])
+        index, doc_type = self._index_and_mapping(namespace)
         document = self.elastic.get(index=index, doc_type=doc_type,
-                                    id=u(doc['_id']))
+                                    id=u(document_id))
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        # Add metadata fields back into updated, for the purposes of
-        # calling upsert(). Need to do this until these become separate
-        # arguments in 2.x
-        updated['ns'] = doc['ns']
-        updated['_ts'] = doc['_ts']
-        self.upsert(updated)
+        self.upsert(updated, namespace, timestamp)
         # upsert() strips metadata, so only _id + fields in _source still here
         return updated
 
     @wrap_exceptions
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         """Insert a document into Elasticsearch."""
-        namespace = doc.pop('ns')
         index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
         doc_id = u(doc.pop("_id"))
         metadata = {
             "ns": namespace,
-            "_ts": doc.pop("_ts")
+            "_ts": timestamp
         }
         # Index the source document, using lowercase namespace as index name.
         self.elastic.index(index=index, doc_type=doc_type,
@@ -155,16 +148,14 @@ class DocManager(DocManagerBase):
         doc['_id'] = doc_id
 
     @wrap_exceptions
-    def bulk_upsert(self, docs):
+    def bulk_upsert(self, docs, namespace, timestamp):
         """Insert multiple documents into Elasticsearch."""
         def docs_to_upsert():
             doc = None
             for doc in docs:
                 # Remove metadata and redundant _id
-                namespace = doc.pop("ns")
                 index, doc_type = self._index_and_mapping(namespace)
                 doc_id = u(doc.pop("_id"))
-                timestamp = doc.pop("_ts")
                 document_action = {
                     "_index": index,
                     "_type": doc_type,
@@ -208,10 +199,9 @@ class DocManager(DocManagerBase):
             pass
 
     @wrap_exceptions
-    def insert_file(self, f):
+    def insert_file(self, f, namespace, timestamp):
         doc = f.get_metadata()
         doc_id = str(doc.pop('_id'))
-        namespace = doc.pop('ns')
         index, doc_type = self._index_and_mapping(namespace)
 
         # make sure that elasticsearch treats it like a file
@@ -228,7 +218,7 @@ class DocManager(DocManagerBase):
 
         metadata = {
             'ns': namespace,
-            '_ts': doc.pop('_ts')
+            '_ts': timestamp,
         }
 
         doc = self._formatter.format_document(doc)
@@ -242,14 +232,14 @@ class DocManager(DocManagerBase):
                            refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
-    def remove(self, doc):
+    def remove(self, document_id, namespace, timestamp):
         """Remove a document from Elasticsearch."""
-        index, doc_type = self._index_and_mapping(doc['ns'])
+        index, doc_type = self._index_and_mapping(namespace)
         self.elastic.delete(index=index, doc_type=doc_type,
-                            id=u(doc["_id"]),
+                            id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
         self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,
-                            id=u(doc["_id"]),
+                            id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions

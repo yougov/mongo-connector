@@ -39,3 +39,6 @@ solr_pair = '%s:%s' % (solr_host, solr_port)
 
 # Document count for stress tests
 STRESS_COUNT = 100
+
+# Test namespace, timestamp arguments
+TESTARGS = ('test.test', 1)

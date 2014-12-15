@@ -61,6 +61,9 @@ class DocManager(DocManagerBase):
         for namespace in self._namespaces():
             self.mongo["__mongo_connector"][namespace].create_index("_ts")
 
+    def _db_and_collection(self, namespace):
+        return namespace.split('.', 1)
+
     @wrap_exceptions
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
@@ -91,9 +94,10 @@ class DocManager(DocManagerBase):
         )
 
     @wrap_exceptions
-    def handle_command(self, doc):
+    def handle_command(self, doc, namespace, timestamp):
+        db, _ = self._db_and_collection(namespace)
         if doc.get('dropDatabase'):
-            for db in self.command_helper.map_db(doc['db']):
+            for new_db in self.command_helper.map_db(db):
                 self.mongo.drop_database(db)
 
         if doc.get('renameCollection'):
@@ -104,73 +108,69 @@ class DocManager(DocManagerBase):
                     "renameCollection", a, to=b)
 
         if doc.get('create'):
-            db, coll = self.command_helper.map_collection(
-                doc['db'], doc['create'])
-            if db:
-                self.mongo[db].create_collection(coll)
+            new_db, coll = self.command_helper.map_collection(
+                db, doc['create'])
+            if new_db:
+                self.mongo[new_db].create_collection(coll)
 
         if doc.get('drop'):
-            db, coll = self.command_helper.map_collection(
-                doc['db'], doc['drop'])
-            if db:
-                self.mongo[db].drop_collection(coll)
+            new_db, coll = self.command_helper.map_collection(
+                db, doc['drop'])
+            if new_db:
+                self.mongo[new_db].drop_collection(coll)
 
     @wrap_exceptions
-    def update(self, doc, update_spec):
+    def update(self, document_id, update_spec, namespace, timestamp):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
 
         """
-        db, coll = doc['ns'].split('.', 1)
+        db, coll = self._db_and_collection(namespace)
         updated = self.mongo[db][coll].find_and_modify(
-            {'_id': doc['_id']},
+            {'_id': document_id},
             update_spec,
             new=True
         )
         return updated
 
     @wrap_exceptions
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         """Update or insert a document into Mongo
         """
-        database, coll = doc['ns'].split('.', 1)
-        ts = doc.pop("_ts")
-        ns = doc.pop("ns")
+        database, coll = self._db_and_collection(namespace)
 
-        self.mongo["__mongo_connector"][ns].save({
+        self.mongo["__mongo_connector"][namespace].save({
             '_id': doc['_id'],
-            "_ts": ts,
-            "ns": ns
+            "_ts": timestamp,
+            "ns": namespace
         })
         self.mongo[database][coll].save(doc)
 
     @wrap_exceptions
-    def remove(self, doc):
+    def remove(self, document_id, namespace, timestamp):
         """Removes document from Mongo
 
         The input is a python dictionary that represents a mongo document.
         The documents has ns and _ts fields.
         """
-        database, coll = doc['ns'].split('.', 1)
+        database, coll = self._db_and_collection(namespace)
 
-        doc2 = self.mongo['__mongo_connector'][doc['ns']].find_and_modify(
-            {'_id': doc['_id']}, remove=True)
+        doc2 = self.mongo['__mongo_connector'][namespace].find_and_modify(
+            {'_id': document_id}, remove=True)
         if doc2.get('gridfs_id'):
             GridFS(self.mongo[database], coll).delete(doc2['gridfs_id'])
         else:
-            self.mongo[database][coll].remove({'_id': doc["_id"]})
+            self.mongo[database][coll].remove({'_id': document_id})
 
     @wrap_exceptions
-    def insert_file(self, f):
-        database, coll = f.ns.split('.', 1)
-        ts = f._ts
-        ns = f.ns
+    def insert_file(self, f, namespace, timestamp):
+        database, coll = self._db_and_collection(namespace)
 
         id = GridFS(self.mongo[database], coll).put(f, filename=f.filename)
-        self.mongo["__mongo_connector"][ns].save({
+        self.mongo["__mongo_connector"][namespace].save({
             '_id': f._id,
-            '_ts': ts,
-            'ns': ns,
+            '_ts': timestamp,
+            'ns': namespace,
             'gridfs_id': id
         })
 
@@ -179,7 +179,7 @@ class DocManager(DocManagerBase):
         """Called to query Mongo for documents in a time range.
         """
         for namespace in self._namespaces():
-            database, coll = namespace.split('.', 1)
+            database, coll = self._db_and_collection(namespace)
             for ts_ns_doc in self.mongo["__mongo_connector"][namespace].find(
                 {'_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
@@ -197,7 +197,7 @@ class DocManager(DocManagerBase):
         """
         def docs_by_ts():
             for namespace in self._namespaces():
-                database, coll = namespace.split('.', 1)
+                database, coll = self._db_and_collection(namespace)
                 mc_coll = self.mongo["__mongo_connector"][namespace]
                 for ts_ns_doc in mc_coll.find(limit=1).sort('_ts', -1):
                     yield ts_ns_doc

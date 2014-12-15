@@ -56,8 +56,6 @@ class DocManagerBase(object):
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:
             # update spec contains the new document in its entirety
-            update_spec['_ts'] = doc['_ts']
-            update_spec['ns'] = doc['ns']
             return update_spec
         else:
             try:
@@ -90,15 +88,15 @@ class DocManagerBase(object):
                         exc_tb)
             return doc
 
-    def bulk_upsert(self, docs):
+    def bulk_upsert(self, docs, namespace, timestamp):
         """Upsert each document in a set of documents.
 
         This method may be overridden to upsert many documents at once.
         """
         for doc in docs:
-            self.upsert(doc)
+            self.upsert(doc, namespace, timestamp)
 
-    def update(self, doc, update_spec):
+    def update(self, doc, update_spec, namespace, timestamp):
         """Update a document.
 
         ``update_spec`` is the update operation as provided by an oplog record
@@ -106,16 +104,25 @@ class DocManagerBase(object):
         """
         raise NotImplementedError
 
-    def upsert(self, document):
+    def upsert(self, document, namespace, timestamp):
         """(Re-)insert a document."""
         raise NotImplementedError
 
-    def remove(self, doc):
+    def remove(self, document_id, namespace, timestamp):
         """Remove a document.
 
-        ``doc`` is a dict that provides the namespace and id of the document
-        to be removed in its ``ns`` and ``_id`` fields, respectively.
+        ``document_id`` is a dict that provides the id of the document
+        to be removed. ``namespace`` and ``timestamp`` provide the database +
+        collection name and the timestamp from the corresponding oplog entry.
         """
+        raise NotImplementedError
+
+    def insert_file(self, f, namespace, timestamp):
+        """Insert a file from GridFS."""
+        raise NotImplementedError
+
+    def handle_command(self, command_doc, namespace, timestamp):
+        """Handle a MongoDB command."""
         raise NotImplementedError
 
     def search(self, start_ts, end_ts):

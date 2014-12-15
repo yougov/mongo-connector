@@ -38,17 +38,16 @@ class TestSynchronizer(unittest.TestCase):
         """ Initializes the cluster
         """
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
 
         _, _, cls.primary_p = start_replica_set('test-synchronizer')
         cls.conn = MongoClient('%s:%d' % (mongo_host, cls.primary_p),
                                replicaSet='test-synchronizer')
         cls.connector = Connector(
-            address='%s:%d' % (mongo_host, cls.primary_p),
-            oplog_checkpoint='config.txt',
+            mongo_address='%s:%d' % (mongo_host, cls.primary_p),
             ns_set=['test.test'],
             auth_key=None
         )

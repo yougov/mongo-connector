@@ -19,7 +19,7 @@ import time
 
 sys.path[0:0] = [""]
 
-from tests import elastic_pair, unittest
+from tests import elastic_pair, unittest, TESTARGS
 from tests.test_elastic import ElasticsearchTestCase
 from tests.test_gridfs_file import MockGridFSFile
 
@@ -30,34 +30,28 @@ from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 class TestElasticDocManager(ElasticsearchTestCase):
     """Unit tests for the Elastic DocManager."""
 
-    def put_metadata(self, d):
-        """Simulate the metadata that's included in documents passed on to
-        DocManagers from an OplogThread."""
-        d['ns'] = 'test.test'
-        d['_ts'] = 1
-        return d
-
     def test_update(self):
         """Test the update method."""
-        doc = {"_id": '1', "a": 1, "b": 2}
-        self.elastic_doc.upsert(self.put_metadata(doc))
+        doc_id = 1
+        doc = {"_id": doc_id, "a": 1, "b": 2}
+        self.elastic_doc.upsert(doc, *TESTARGS)
         # $set only
         update_spec = {"$set": {"a": 1, "b": 2}}
-        doc = self.elastic_doc.update(self.put_metadata(doc), update_spec)
+        doc = self.elastic_doc.update(doc_id, update_spec, *TESTARGS)
         self.assertEqual(doc, {"_id": '1', "a": 1, "b": 2})
         # $unset only
         update_spec = {"$unset": {"a": True}}
-        doc = self.elastic_doc.update(self.put_metadata(doc), update_spec)
+        doc = self.elastic_doc.update(doc_id, update_spec, *TESTARGS)
         self.assertEqual(doc, {"_id": '1', "b": 2})
         # mixed $set/$unset
         update_spec = {"$unset": {"b": True}, "$set": {"c": 3}}
-        doc = self.elastic_doc.update(self.put_metadata(doc), update_spec)
+        doc = self.elastic_doc.update(doc_id, update_spec, *TESTARGS)
         self.assertEqual(doc, {"_id": '1', "c": 3})
 
     def test_upsert(self):
         """Test the upsert method."""
         docc = {'_id': '1', 'name': 'John'}
-        self.elastic_doc.upsert(self.put_metadata(docc))
+        self.elastic_doc.upsert(docc, *TESTARGS)
         res = self.elastic_conn.search(
             index="test", doc_type='test',
             body={"query": {"match_all": {}}}
@@ -68,10 +62,10 @@ class TestElasticDocManager(ElasticsearchTestCase):
 
     def test_bulk_upsert(self):
         """Test the bulk_upsert method."""
-        self.elastic_doc.bulk_upsert([])
+        self.elastic_doc.bulk_upsert([], *TESTARGS)
 
-        docs = (self.put_metadata({"_id": i}) for i in range(1000))
-        self.elastic_doc.bulk_upsert(docs)
+        docs = ({"_id": i} for i in range(1000))
+        self.elastic_doc.bulk_upsert(docs, *TESTARGS)
         self.elastic_doc.commit()
         res = self.elastic_conn.search(
             index="test", doc_type='test',
@@ -83,9 +77,8 @@ class TestElasticDocManager(ElasticsearchTestCase):
         for i, r in enumerate(returned_ids):
             self.assertEqual(r, i)
 
-        docs = (self.put_metadata({"_id": i, "weight": 2*i})
-                for i in range(1000))
-        self.elastic_doc.bulk_upsert(docs)
+        docs = ({"_id": i, "weight": 2*i} for i in range(1000))
+        self.elastic_doc.bulk_upsert(docs, *TESTARGS)
 
         res = self.elastic_conn.search(
             index="test", doc_type='test',
@@ -100,7 +93,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
     def test_remove(self):
         """Test the remove method."""
         docc = {'_id': '1', 'name': 'John'}
-        self.elastic_doc.upsert(self.put_metadata(docc))
+        self.elastic_doc.upsert(docc, *TESTARGS)
         res = self.elastic_conn.search(
             index="test", doc_type='test',
             body={"query": {"match_all": {}}}
@@ -108,7 +101,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         res = [x["_source"] for x in res]
         self.assertEqual(len(res), 1)
 
-        self.elastic_doc.remove(self.put_metadata(docc))
+        self.elastic_doc.remove(docc['_id'], *TESTARGS)
         res = self.elastic_conn.search(
             index="test", doc_type='test',
             body={"query": {"match_all": {}}}
@@ -122,13 +115,12 @@ class TestElasticDocManager(ElasticsearchTestCase):
         test_data = ' '.join(str(x) for x in range(100000))
         docc = {
             '_id': 'test_id',
-            '_ts': 10,
-            'ns': 'test.test',
             'filename': 'test_filename',
             'upload_date': 5,
             'md5': 'test_md5'
         }
-        self.elastic_doc.insert_file(MockGridFSFile(docc, test_data))
+        self.elastic_doc.insert_file(
+            MockGridFSFile(docc, test_data), *TESTARGS)
         res = self._search()
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
@@ -147,11 +139,12 @@ class TestElasticDocManager(ElasticsearchTestCase):
             'md5': 'test_md5'
         }
 
-        self.elastic_doc.insert_file(MockGridFSFile(docc, test_data))
+        self.elastic_doc.insert_file(
+            MockGridFSFile(docc, test_data), *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 1)
 
-        self.elastic_doc.remove(docc)
+        self.elastic_doc.remove('test_id', *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 0)
 
@@ -160,15 +153,12 @@ class TestElasticDocManager(ElasticsearchTestCase):
 
         Make sure we can retrieve documents last modified within a time range.
         """
-        docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865,
-                'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        docc2 = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866,
-                 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc2)
-        docc3 = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870,
-                 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc3)
+        docc = {'_id': '1', 'name': 'John'}
+        self.elastic_doc.upsert(docc, 'test.test', 5767301236327972865)
+        docc2 = {'_id': '2', 'name': 'John Paul'}
+        self.elastic_doc.upsert(docc2, 'test.test', 5767301236327972866)
+        docc3 = {'_id': '3', 'name': 'Paul'}
+        self.elastic_doc.upsert(docc3, 'test.test', 5767301236327972870)
         search = list(self.elastic_doc.search(5767301236327972865,
                                               5767301236327972866))
         self.assertEqual(len(search), 2)
@@ -186,7 +176,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
         # x > 0 = commit within x seconds
         for autocommit_interval in [None, 0, 1, 2]:
             docman.auto_commit_interval = autocommit_interval
-            docman.upsert(self.put_metadata(docc))
+            docman.upsert(docc, *TESTARGS)
             if autocommit_interval is None:
                 docman.commit()
             else:
@@ -208,55 +198,41 @@ class TestElasticDocManager(ElasticsearchTestCase):
         """
         base = self.elastic_doc.get_last_doc()
         ts = base.get("_ts", 0) if base else 0
-        docc = {'_id': '4', 'name': 'Hare', '_ts': ts+3, 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        docc = {'_id': '5', 'name': 'Tortoise', '_ts': ts+2, 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
-        docc = {'_id': '6', 'name': 'Mr T.', '_ts': ts+1, 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
+        docc = {'_id': '4', 'name': 'Hare'}
+        self.elastic_doc.upsert(docc, 'test.test', ts + 3)
+        docc = {'_id': '5', 'name': 'Tortoise'}
+        self.elastic_doc.upsert(docc, 'test.test', ts + 2)
+        docc = {'_id': '6', 'name': 'Mr T.'}
+        self.elastic_doc.upsert(docc, 'test.test', ts + 1)
 
         self.assertEqual(
             self.elastic_doc.elastic.count(index="test")['count'], 3)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '4')
 
-        docc = {'_id': '6', 'name': 'HareTwin', '_ts': ts+4, 'ns': 'test.test'}
-        self.elastic_doc.upsert(docc)
+        docc = {'_id': '6', 'name': 'HareTwin'}
+        self.elastic_doc.upsert(docc, 'test.test', ts + 4)
         doc = self.elastic_doc.get_last_doc()
         self.assertEqual(doc['_id'], '6')
         self.assertEqual(
             self.elastic_doc.elastic.count(index="test")['count'], 3)
 
     def test_commands(self):
+        cmd_args = ('test.$cmd', 1)
         self.elastic_doc.command_helper = CommandHelper()
 
-        self.elastic_doc.handle_command({
-            'db': 'test',
-            'create': 'test2'
-        })
+        self.elastic_doc.handle_command({'create': 'test2'}, *cmd_args)
         time.sleep(1)
         self.assertIn('test2', self._mappings('test'))
 
-        self.elastic_doc.handle_command({
-            'db': 'test',
-            'drop': 'test2'
-        })
+        self.elastic_doc.handle_command({'drop': 'test2'}, *cmd_args)
         time.sleep(1)
         self.assertNotIn('test2', self._mappings('test'))
 
-        self.elastic_doc.handle_command({
-            'db': 'test',
-            'create': 'test2'
-        })
-        self.elastic_doc.handle_command({
-            'db': 'test',
-            'create': 'test3'
-        })
+        self.elastic_doc.handle_command({'create': 'test2'}, *cmd_args)
+        self.elastic_doc.handle_command({'create': 'test3'}, *cmd_args)
         time.sleep(1)
-        self.elastic_doc.handle_command({
-            'db': 'test',
-            'dropDatabase': 1
-        })
+        self.elastic_doc.handle_command({'dropDatabase': 1}, *cmd_args)
         time.sleep(1)
         self.assertNotIn('test', self._indices())
         self.assertNotIn('test2', self._mappings())

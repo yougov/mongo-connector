@@ -21,7 +21,7 @@ sys.path[0:0] = [""]
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 
-from tests import unittest
+from tests import unittest, TESTARGS
 from tests.test_gridfs_file import MockGridFSFile
 from tests.test_solr import SolrTestCase
 
@@ -36,14 +36,13 @@ class TestSolrDocManager(SolrTestCase):
         self._remove()
 
     def test_update(self):
-        doc = {"_id": '1', "ns": "test.test", "_ts": 1,
-               "title": "abc", "description": "def"}
-        self.docman.upsert(doc)
+        doc_id = '1'
+        doc = {"_id": doc_id, "title": "abc", "description": "def"}
+        self.docman.upsert(doc, *TESTARGS)
         # $set only
         update_spec = {"$set": {"title": "qaz", "description": "wsx"}}
-        doc = self.docman.update(doc, update_spec)
-        expected = {"_id": '1', "ns": "test.test", "_ts": 1,
-                    "title": "qaz", "description": "wsx"}
+        doc = self.docman.update(doc_id, update_spec, *TESTARGS)
+        expected = {"_id": doc_id, "title": "qaz", "description": "wsx"}
         # We can't use assertEqual here, because Solr adds some
         # additional fields like _version_ to all documents
         for k, v in expected.items():
@@ -51,9 +50,8 @@ class TestSolrDocManager(SolrTestCase):
 
         # $unset only
         update_spec = {"$unset": {"title": True}}
-        doc = self.docman.update(doc, update_spec)
-        expected = {"_id": '1', "ns": "test.test", "_ts": 1,
-                    "description": "wsx"}
+        doc = self.docman.update(doc_id, update_spec, *TESTARGS)
+        expected = {"_id": '1', "description": "wsx"}
         for k, v in expected.items():
             self.assertEqual(doc[k], v)
         self.assertNotIn("title", doc)
@@ -61,8 +59,8 @@ class TestSolrDocManager(SolrTestCase):
         # mixed $set/$unset
         update_spec = {"$unset": {"description": True},
                        "$set": {"subject": "edc"}}
-        doc = self.docman.update(doc, update_spec)
-        expected = {"_id": '1', "ns": "test.test", "_ts": 1, "subject": "edc"}
+        doc = self.docman.update(doc_id, update_spec, *TESTARGS)
+        expected = {"_id": '1', "subject": "edc"}
         for k, v in expected.items():
             self.assertEqual(doc[k], v)
         self.assertNotIn("description", doc)
@@ -72,13 +70,13 @@ class TestSolrDocManager(SolrTestCase):
         """
         #test upsert
         docc = {'_id': '1', 'name': 'John'}
-        self.docman.upsert(docc)
+        self.docman.upsert(docc, *TESTARGS)
         res = self.solr_conn.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'John')
 
         docc = {'_id': '1', 'name': 'Paul'}
-        self.docman.upsert(docc)
+        self.docman.upsert(docc, *TESTARGS)
         res = self.solr_conn.search('*:*')
         for doc in res:
             self.assertTrue(doc['_id'] == '1' and doc['name'] == 'Paul')
@@ -88,10 +86,10 @@ class TestSolrDocManager(SolrTestCase):
         Solr via DocManager
 
         """
-        self.docman.bulk_upsert([])
+        self.docman.bulk_upsert([], *TESTARGS)
 
-        docs = ({"_id": i, "ns": "test.test"} for i in range(1000))
-        self.docman.bulk_upsert(docs)
+        docs = ({"_id": i} for i in range(1000))
+        self.docman.bulk_upsert(docs, *TESTARGS)
 
         res = sorted(int(x["_id"])
                      for x in self.solr_conn.search("*:*", rows=1001))
@@ -99,9 +97,8 @@ class TestSolrDocManager(SolrTestCase):
         for i, r in enumerate(res):
             self.assertEqual(r, i)
 
-        docs = ({"_id": i, "weight": 2*i,
-                 "ns": "test.test"} for i in range(1000))
-        self.docman.bulk_upsert(docs)
+        docs = ({"_id": i, "weight": 2*i} for i in range(1000))
+        self.docman.bulk_upsert(docs, *TESTARGS)
 
         res = sorted(int(x["weight"])
                      for x in self.solr_conn.search("*:*", rows=1001))
@@ -114,11 +111,11 @@ class TestSolrDocManager(SolrTestCase):
         """
         #test remove
         docc = {'_id': '1', 'name': 'John'}
-        self.docman.upsert(docc)
+        self.docman.upsert(docc, *TESTARGS)
         res = self.solr_conn.search('*:*')
         self.assertTrue(len(res) == 1)
 
-        self.docman.remove(docc)
+        self.docman.remove(docc['_id'], *TESTARGS)
         res = self.solr_conn.search('*:*')
         self.assertTrue(len(res) == 0)
 
@@ -128,18 +125,14 @@ class TestSolrDocManager(SolrTestCase):
         test_data = ' '.join(str(x) for x in range(100000))
         docc = {
             '_id': 'test_id',
-            '_ts': 10,
-            'ns': 'test.ns',
             'filename': 'test_filename',
             'upload_date': datetime.datetime.now(),
             'md5': 'test_md5'
         }
-        self.docman.insert_file(MockGridFSFile(docc, test_data))
+        self.docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
         res = self.solr_conn.search('*:*')
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
-            self.assertEqual(doc['_ts'], docc['_ts'])
-            self.assertEqual(doc['ns'], docc['ns'])
             self.assertEqual(doc['filename'], docc['filename'])
             self.assertEqual(doc['content'][0].strip(),
                              test_data.strip())
@@ -148,18 +141,16 @@ class TestSolrDocManager(SolrTestCase):
         test_data = 'hello world'
         docc = {
             '_id': 'test_id',
-            '_ts': 10,
-            'ns': 'test.ns',
             'filename': 'test_filename',
             'upload_date': datetime.datetime.now(),
             'md5': 'test_md5'
         }
 
-        self.docman.insert_file(MockGridFSFile(docc, test_data))
+        self.docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
         res = self.solr_conn.search('*:*')
         self.assertEqual(len(res), 1)
 
-        self.docman.remove(docc)
+        self.docman.remove(docc['_id'], *TESTARGS)
         res = self.solr_conn.search('*:*')
         self.assertEqual(len(res), 0)
 
@@ -169,12 +160,12 @@ class TestSolrDocManager(SolrTestCase):
         We use API and DocManager's search(start_ts,end_ts), and then compare.
         """
         #test search
-        docc = {'_id': '1', 'name': 'John', '_ts': 5767301236327972865}
-        self.docman.upsert(docc)
-        docc = {'_id': '2', 'name': 'John Paul', '_ts': 5767301236327972866}
-        self.docman.upsert(docc)
-        docc = {'_id': '3', 'name': 'Paul', '_ts': 5767301236327972870}
-        self.docman.upsert(docc)
+        docc = {'_id': '1', 'name': 'John'}
+        self.docman.upsert(docc, 'test.test', 5767301236327972865)
+        docc = {'_id': '2', 'name': 'John Paul'}
+        self.docman.upsert(docc, 'test.test', 5767301236327972866)
+        docc = {'_id': '3', 'name': 'Paul'}
+        self.docman.upsert(docc, 'test.test', 5767301236327972870)
         search = list(self.docman.search(5767301236327972865,
                                          5767301236327972866))
         search2 = list(self.solr_conn.search('John'))
@@ -188,7 +179,6 @@ class TestSolrDocManager(SolrTestCase):
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.
         """
-        docc = {'_id': '3', 'name': 'Waldo', 'ns': 'test.test'}
         docman = DocManager("http://localhost:8983/solr")
         # test cases:
         # -1 = no autocommit
@@ -196,7 +186,7 @@ class TestSolrDocManager(SolrTestCase):
         # x > 0 = commit within x seconds
         for autocommit_interval in [None, 0, 1, 2]:
             docman.auto_commit_interval = autocommit_interval
-            docman.upsert(docc)
+            docman.upsert({'_id': '3', 'name': 'Waldo'}, *TESTARGS)
             if autocommit_interval is None:
                 docman.commit()
             else:
@@ -214,10 +204,10 @@ class TestSolrDocManager(SolrTestCase):
         """Insert documents, Verify the doc with the latest timestamp.
         """
         #test get last doc
-        docc = {'_id': '4', 'name': 'Hare', '_ts': '2'}
-        self.docman.upsert(docc)
-        docc = {'_id': '5', 'name': 'Tortoise', '_ts': '1'}
-        self.docman.upsert(docc)
+        docc = {'_id': '4', 'name': 'Hare'}
+        self.docman.upsert(docc, 'test.test', 2)
+        docc = {'_id': '5', 'name': 'Tortoise'}
+        self.docman.upsert(docc, 'test.test', 1)
         doc = self.docman.get_last_doc()
         self.assertTrue(doc['_id'] == '4')
 
@@ -231,37 +221,16 @@ class TestSolrDocManager(SolrTestCase):
         def count_ns(ns):
             return sum(1 for _ in self._search("ns:%s" % ns))
 
-        self.docman.upsert({
-            '_id': '1',
-            'test': 'data',
-            'ns': 'test.test',
-            'ts': '1'
-        })
+        self.docman.upsert({'_id': '1', 'test': 'data'}, *TESTARGS)
         self.assertEqual(count_ns("test.test"), 1)
 
-        self.docman.handle_command({
-            'db': 'test',
-            'drop': 'test'
-        })
+        self.docman.handle_command({'drop': 'test'}, *TESTARGS)
         time.sleep(1)
         self.assertEqual(count_ns("test.test"), 0)
 
-        self.docman.upsert({
-            '_id': '2',
-            'test': 'data',
-            'ns': 'test.test2',
-            'ts': '2'
-        })
-        self.docman.upsert({
-            '_id': '3',
-            'test': 'data',
-            'ns': 'test.test3',
-            'ts': '3'
-        })
-        self.docman.handle_command({
-            'db': 'test',
-            'dropDatabase': 1
-        })
+        self.docman.upsert({'_id': '2', 'test': 'data'}, 'test.test2', '2')
+        self.docman.upsert({'_id': '3', 'test': 'data'}, 'test.test3', '3')
+        self.docman.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
         time.sleep(1)
         self.assertEqual(count_ns("test.test2"), 0)
         self.assertEqual(count_ns("test.test3"), 0)

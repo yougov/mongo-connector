@@ -39,10 +39,10 @@ class TestMongoConnector(unittest.TestCase):
         """ Initializes the cluster
         """
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
         _, _, cls.primary_p = start_replica_set('test-mongo-connector')
 
     @classmethod
@@ -55,10 +55,8 @@ class TestMongoConnector(unittest.TestCase):
         """Test whether the connector initiates properly
         """
         conn = Connector(
-            address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_checkpoint='config.txt',
+            mongo_address='%s:%d' % (mongo_host, self.primary_p),
             ns_set=['test.test'],
-            auth_key=None
         )
         conn.start()
 
@@ -75,15 +73,14 @@ class TestMongoConnector(unittest.TestCase):
         """Test write_oplog_progress under several circumstances
         """
         try:
-            os.unlink("temp_config.txt")
+            os.unlink("temp_oplog.timestamp")
         except OSError:
             pass
-        open("temp_config.txt", "w").close()
+        open("temp_oplog.timestamp", "w").close()
         conn = Connector(
-            address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_checkpoint="temp_config.txt",
-            ns_set=['test.test'],
-            auth_key=None
+            mongo_address='%s:%d' % (mongo_host, self.primary_p),
+            oplog_checkpoint="temp_oplog.timestamp",
+            ns_set=['test.test']
         )
 
         #test that None is returned if there is no config file specified.
@@ -93,46 +90,45 @@ class TestMongoConnector(unittest.TestCase):
         #pretend to insert a thread/timestamp pair
         conn.write_oplog_progress()
 
-        data = json.load(open("temp_config.txt", 'r'))
+        data = json.load(open("temp_oplog.timestamp", 'r'))
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(12, 34))
 
         #ensure the temp file was deleted
-        self.assertFalse(os.path.exists("temp_config.txt" + '~'))
+        self.assertFalse(os.path.exists("temp_oplog.timestamp" + '~'))
 
         #ensure that updates work properly
         conn.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         conn.write_oplog_progress()
 
-        config_file = open("temp_config.txt", 'r')
+        config_file = open("temp_oplog.timestamp", 'r')
         data = json.load(config_file)
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
 
         config_file.close()
-        os.unlink("temp_config.txt")
+        os.unlink("temp_oplog.timestamp")
 
     def test_read_oplog_progress(self):
         """Test read_oplog_progress
         """
 
         conn = Connector(
-            address='%s:%d' % (mongo_host, self.primary_p),
+            mongo_address='%s:%d' % (mongo_host, self.primary_p),
             oplog_checkpoint=None,
-            ns_set=['test.test'],
-            auth_key=None
+            ns_set=['test.test']
         )
 
         #testing with no file
         self.assertEqual(conn.read_oplog_progress(), None)
 
         try:
-            os.unlink("temp_config.txt")
+            os.unlink("temp_oplog.timestamp")
         except OSError:
             pass
-        open("temp_config.txt", "w").close()
+        open("temp_oplog.timestamp", "w").close()
 
-        conn.oplog_checkpoint = "temp_config.txt"
+        conn.oplog_checkpoint = "temp_oplog.timestamp"
 
         #testing with empty file
         self.assertEqual(conn.read_oplog_progress(), None)
@@ -158,7 +154,7 @@ class TestMongoConnector(unittest.TestCase):
         conn.read_oplog_progress()
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
-        os.unlink("temp_config.txt")
+        os.unlink("temp_oplog.timestamp")
 
 
 if __name__ == '__main__':

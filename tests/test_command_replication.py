@@ -39,16 +39,16 @@ class CommandLoggerDocManager(DocManagerBase):
     def stop(self):
         pass
 
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         pass
 
-    def remove(self, doc):
+    def remove(self, document_id, namespace, timestamp):
         pass
 
     def commit(self):
         pass
 
-    def handle_command(self, doc):
+    def handle_command(self, doc, namespace, timestamp):
         self.commands.append(doc)
 
 
@@ -56,7 +56,6 @@ class TestCommandReplication(unittest.TestCase):
     def setUp(self):
         _, _, self.primary_p = start_replica_set('test-command-replication')
         self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
-        self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.oplog_progress = LockingDict()
         self.opman = None
 
@@ -73,17 +72,11 @@ class TestCommandReplication(unittest.TestCase):
         self.docman = CommandLoggerDocManager()
         self.docman.command_helper = CommandHelper(namespace_set, dest_mapping)
         self.opman = OplogThread(
-            primary_conn=self.primary_conn,
-            main_address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_coll=self.oplog_coll,
-            is_sharded=False,
+            primary_client=self.primary_conn,
             doc_managers=(self.docman,),
             oplog_progress_dict=self.oplog_progress,
             namespace_set=namespace_set,
             dest_mapping=dest_mapping,
-            auth_key=None,
-            auth_username=None,
-            repl_set='test-command-replication',
             collection_dump=False
         )
         self.opman.start()
@@ -120,9 +113,7 @@ class TestCommandReplication(unittest.TestCase):
         pymongo.collection.Collection(
             self.primary_conn['test'], 'test', create=True)
         assert_soon(lambda: self.docman.commands)
-        self.assertEqual(
-            self.docman.commands[0],
-            {'db': 'test', 'create': 'test'})
+        self.assertEqual(self.docman.commands[0], {'create': 'test'})
 
     def test_create_collection_skipped(self):
         self.initOplogThread(['test.test'])
@@ -134,9 +125,7 @@ class TestCommandReplication(unittest.TestCase):
 
         assert_soon(lambda: self.docman.commands)
         self.assertEqual(len(self.docman.commands), 1)
-        self.assertEqual(
-            self.docman.commands[0],
-            {'db': 'test', 'create': 'test'})
+        self.assertEqual(self.docman.commands[0], {'create': 'test'})
 
     def test_drop_collection(self):
         self.initOplogThread()
@@ -144,9 +133,7 @@ class TestCommandReplication(unittest.TestCase):
             self.primary_conn['test'], 'test', create=True)
         coll.drop()
         assert_soon(lambda: len(self.docman.commands) == 2)
-        self.assertEqual(
-            self.docman.commands[1],
-            {'db': 'test', 'drop': 'test'})
+        self.assertEqual(self.docman.commands[1], {'drop': 'test'})
 
     def test_drop_database(self):
         self.initOplogThread()
@@ -154,9 +141,7 @@ class TestCommandReplication(unittest.TestCase):
             self.primary_conn['test'], 'test', create=True)
         self.primary_conn.drop_database('test')
         assert_soon(lambda: len(self.docman.commands) == 2)
-        self.assertEqual(
-            self.docman.commands[1],
-            {'db': 'test', 'dropDatabase': 1})
+        self.assertEqual(self.docman.commands[1], {'dropDatabase': 1})
 
     def test_rename_collection(self):
         self.initOplogThread()
@@ -166,9 +151,7 @@ class TestCommandReplication(unittest.TestCase):
         assert_soon(lambda: len(self.docman.commands) == 2)
         self.assertEqual(
             self.docman.commands[1],
-            {'db': 'admin',
-             'renameCollection': 'test.test',
-             'to': 'test.test2'})
+            {'renameCollection': 'test.test', 'to': 'test.test2'})
 
 
 if __name__ == '__main__':

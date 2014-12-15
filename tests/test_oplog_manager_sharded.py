@@ -141,35 +141,27 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # create a new oplog progress file
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
 
         # Oplog threads (oplog manager) for each shard
         doc_manager = DocManager()
         oplog_progress = LockingDict()
         self.opman1 = OplogThread(
-            primary_conn=self.shard1_conn,
-            main_address='%s:%d' % (mongo_host, self.mongos_p),
-            oplog_coll=self.shard1_conn["local"]["oplog.rs"],
-            is_sharded=True,
+            primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             namespace_set=["test.mcsharded", "test.mcunsharded"],
-            auth_key=None,
-            auth_username=None
+            mongos_client=self.mongos_conn
         )
         self.opman2 = OplogThread(
-            primary_conn=self.shard2_conn,
-            main_address='%s:%d' % (mongo_host, self.mongos_p),
-            oplog_coll=self.shard2_conn["local"]["oplog.rs"],
-            is_sharded=True,
+            primary_client=self.shard2_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             namespace_set=["test.mcsharded", "test.mcunsharded"],
-            auth_key=None,
-            auth_username=None
+            mongos_client=self.mongos_conn
         )
 
     def tearDown(self):
