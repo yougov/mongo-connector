@@ -21,6 +21,7 @@ import os
 import pymongo
 import re
 import shutil
+import ssl
 import sys
 import threading
 import time
@@ -35,6 +36,12 @@ from mongo_connector.util import log_fatal_exceptions
 from pymongo import MongoClient
 
 LOG = logging.getLogger(__name__)
+
+_SSL_POLICY_MAP = {
+    'ignored': ssl.CERT_NONE,
+    'optional': ssl.CERT_OPTIONAL,
+    'required': ssl.CERT_REQUIRED
+}
 
 
 class Connector(threading.Thread):
@@ -74,6 +81,21 @@ class Connector(threading.Thread):
 
         # Timezone awareness
         self.tz_aware = kwargs.get('tz_aware', False)
+
+        # SSL keyword arguments to MongoClient.
+        ssl_certfile = kwargs.pop('ssl_certfile', None)
+        ssl_ca_certs = kwargs.pop('ssl_ca_certs', None)
+        ssl_keyfile = kwargs.pop('ssl_keyfile', None)
+        ssl_cert_reqs = kwargs.pop('ssl_cert_reqs', None)
+        self.ssl_kwargs = {}
+        if ssl_certfile:
+            self.ssl_kwargs['ssl_certfile'] = ssl_certfile
+        if ssl_ca_certs:
+            self.ssl_kwargs['ssl_ca_certs'] = ssl_ca_certs
+        if ssl_keyfile:
+            self.ssl_kwargs['ssl_keyfile'] = ssl_keyfile
+        if ssl_cert_reqs:
+            self.ssl_kwargs['ssl_cert_reqs'] = ssl_cert_reqs
 
         # Save the rest of kwargs.
         self.kwargs = kwargs
@@ -132,7 +154,11 @@ class Connector(threading.Thread):
             fields=config['fields'],
             ns_set=config['namespaces.include'],
             dest_mapping=config['namespaces.mapping'],
-            gridfs_set=config['namespaces.gridfs']
+            gridfs_set=config['namespaces.gridfs'],
+            ssl_certfile=config['ssl.sslCertfile'],
+            ssl_keyfile=config['ssl.sslKeyfile'],
+            ssl_ca_certs=config['ssl.sslCACerts'],
+            ssl_cert_reqs=config['ssl.sslCertificatePolicy']
         )
         return connector
 
@@ -226,7 +252,8 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(self.address, tz_aware=self.tz_aware)
+        main_conn = MongoClient(
+            self.address, tz_aware=self.tz_aware, **self.ssl_kwargs)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -251,7 +278,7 @@ class Connector(threading.Thread):
             main_conn.disconnect()
             main_conn = MongoClient(
                 self.address, replicaSet=is_master['setName'],
-                tz_aware=self.tz_aware)
+                tz_aware=self.tz_aware, **self.ssl_kwargs)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
@@ -307,8 +334,8 @@ class Connector(threading.Thread):
                         return
 
                     shard_conn = MongoClient(
-                        hosts, replicaSet=repl_set,
-                        tz_aware=self.tz_aware)
+                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
+                        **self.ssl_kwargs)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         **self.kwargs)
@@ -326,6 +353,7 @@ class Connector(threading.Thread):
         LOG.info('MongoConnector: Stopping all OplogThreads')
         for thread in self.shard_set.values():
             thread.join()
+
 
 def get_config_options():
     result = []
@@ -781,6 +809,54 @@ def get_config_options():
         config_key="continueOnError",
         default=False,
         type=bool)
+
+    def apply_ssl(option, cli_values):
+        option.value = option.value or {}
+        ssl_certfile = cli_values.pop('ssl_certfile')
+        ssl_keyfile = cli_values.pop('ssl_keyfile')
+        ssl_cert_reqs = cli_values.pop('ssl_cert_reqs')
+        ssl_ca_certs = (
+            cli_values.pop('ssl_ca_certs') or option.value.get('sslCACerts'))
+
+        if ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
+            raise errors.InvalidConfiguration(
+                '--ssl-ca-certs must be provided if the '
+                '--ssl-certificate-policy is not "ignored".')
+        option.value.setdefault('sslCertfile', ssl_certfile)
+        option.value.setdefault('sslCACerts', ssl_ca_certs)
+        option.value.setdefault('sslKeyfile', ssl_keyfile)
+        option.value['sslCertificatePolicy'] = _SSL_POLICY_MAP.get(
+            ssl_cert_reqs)
+    ssl = add_option(
+        config_key="ssl",
+        default=None,
+        type=dict,
+        apply_function=apply_ssl)
+    ssl.add_cli(
+        '--ssl-certfile', dest='ssl_certfile',
+        help=('Path to a certificate identifying the local connection '
+              'to MongoDB.')
+    )
+    ssl.add_cli(
+        '--ssl-keyfile', dest='ssl_keyfile',
+        help=('Path to the private key for --ssl-certfile. '
+              'Not necessary if already included in --ssl-certfile.')
+    )
+    ssl.add_cli(
+        '--ssl-certificate-policy', dest='ssl_cert_reqs',
+        choices=('required', 'optional', 'ignored'),
+        help=('Policy for validating SSL certificates provided from the other '
+              'end of the connection. There are three possible values: '
+              'required = Require and validate the remote certificate. '
+              'optional = Validate the remote certificate only if one '
+              'is provided. '
+              'ignored = Remote SSL certificates are ignored completely.')
+    )
+    ssl.add_cli(
+        '--ssl-ca-certs', dest='ssl_ca_certs',
+        help=('Path to a concatenated set of certificate authority '
+              'certificates to validate the other side of the connection. ')
+    )
 
     # --continue-on-error to continue to upsert documents during a collection
     # dump, even if the documents cannot be inserted for some reason
