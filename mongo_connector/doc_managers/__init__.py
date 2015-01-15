@@ -63,10 +63,12 @@ class DocManagerBase(object):
                     looking_at = looking_at[part]
                 elif isinstance(looking_at, list):
                     index = int(part)
-                    if create and len(looking_at) < index:
+                    # Do we need to create additional space in the array?
+                    if create and len(looking_at) <= index:
+                        # Fill buckets with None up to the index we need.
                         looking_at.extend(
-                            [None] * (index + 1 - len(looking_at)))
-                        # Sub-doc, not list, is created if no object at index
+                            [None] * (index - len(looking_at)))
+                        # Bucket we need gets the empty dictionary.
                         looking_at.append({})
                     looking_at = looking_at[index]
                 else:

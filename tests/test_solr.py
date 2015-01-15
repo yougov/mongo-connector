@@ -115,6 +115,7 @@ class TestSynchronizer(unittest.TestCase):
 
         <field name="a" type="int" indexed="true" stored="true" />
         <field name="b.0.c" type="int" indexed="true" stored="true" />
+        <field name="b.10.c" type="int" indexed="true" stored="true" />
         <field name="b.0.e" type="int" indexed="true" stored="true" />
         <field name="b.1.d" type="int" indexed="true" stored="true" />
         <field name="b.1.f" type="int" indexed="true" stored="true" />
@@ -149,6 +150,9 @@ class TestSynchronizer(unittest.TestCase):
         # Update by adding a field.
         # Note that Solr can't mix types within an array
         check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
+
+        # Update by setting an attribute of a sub-document beyond end of array.
+        check_update({"$set": {"b.10.c": 42}})
 
         # Update by changing a value within a sub-document (contains array)
         check_update({"$inc": {"b.0.c": 1}})

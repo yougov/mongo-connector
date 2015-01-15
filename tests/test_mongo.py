@@ -133,6 +133,9 @@ class TestSynchronizer(unittest.TestCase):
         # Update by adding a field
         check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
 
+        # Update by setting an attribute of a sub-document beyond end of array.
+        check_update({"$set": {"b.10.c": 42}})
+
         # Update by changing a value within a sub-document (contains array)
         check_update({"$inc": {"b.0.c": 1}})
 
