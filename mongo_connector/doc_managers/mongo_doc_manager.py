@@ -58,8 +58,6 @@ class DocManager(DocManagerBase):
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.namespace_set = kwargs.get("namespace_set")
-        for namespace in self._namespaces():
-            self.mongo["__mongo_connector"][namespace].create_index("_ts")
 
     def _db_and_collection(self, namespace):
         return namespace.split('.', 1)
@@ -89,8 +87,8 @@ class DocManager(DocManagerBase):
         """
         LOG.info(
             "Mongo DocManager Stopped: If you will not target this system "
-            "again with mongo-connector then please drop the database "
-            "__mongo_connector in order to return resources to the OS."
+            "again with mongo-connector then you may drop the database "
+            "__mongo_connector, which holds metadata for Mongo Connector."
         )
 
     @wrap_exceptions
