@@ -23,9 +23,9 @@ from pymongo import MongoClient
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import mongo_host, unittest
-from tests.setup_cluster import (start_replica_set,
-                                 kill_all)
+from tests import unittest
+from tests.setup_cluster_new import (start_replica_set,
+                                     stop_replica_set)
 from tests.util import assert_soon
 
 
@@ -43,11 +43,10 @@ class TestSynchronizer(unittest.TestCase):
             pass
         open("oplog.timestamp", "w").close()
 
-        _, _, cls.primary_p = start_replica_set('test-synchronizer')
-        cls.conn = MongoClient('%s:%d' % (mongo_host, cls.primary_p),
-                               replicaSet='test-synchronizer')
+        cls.repl_set = start_replica_set()
+        cls.conn = MongoClient(cls.repl_set.uri)
         cls.connector = Connector(
-            mongo_address='%s:%d' % (mongo_host, cls.primary_p),
+            mongo_address=cls.repl_set.uri,
             ns_set=['test.test'],
             auth_key=None
         )
@@ -60,7 +59,7 @@ class TestSynchronizer(unittest.TestCase):
         """ Tears down connector
         """
         cls.connector.join()
-        kill_all()
+        stop_replica_set(cls.repl_set)
 
     def setUp(self):
         """ Clears the db

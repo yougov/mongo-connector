@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
-from tests import mongo_host, unittest, TESTARGS
+from tests import unittest, TESTARGS
 from tests.test_gridfs_file import MockGridFSFile
 from tests.test_mongo import MongoTestCase
 
@@ -38,7 +38,7 @@ class TestMongoDocManager(MongoTestCase):
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
         cls.choosy_docman = DocManager(
-            cls.standalone_pair,
+            cls.standalone.uri,
             namespace_set=TestMongoDocManager.namespaces_inc
         )
 
@@ -49,7 +49,7 @@ class TestMongoDocManager(MongoTestCase):
         self.mongo_conn.drop_database("__mongo_connector")
         self._remove()
 
-        conn = MongoClient('%s:%d' % (mongo_host, self.standalone_port))
+        conn = MongoClient(self.standalone.uri)
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
             conn[db][coll].remove()
@@ -213,7 +213,7 @@ class TestMongoDocManager(MongoTestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        MongoClient(self.standalone_pair)[db][coll].remove({"_id": 99})
+        MongoClient(self.standalone.uri)[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["_id"], 98)
 

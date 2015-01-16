@@ -24,11 +24,11 @@ from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
-from tests import elastic_pair, mongo_host
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set,
-                                 restart_mongo_proc,
-                                 kill_mongo_proc)
+from tests import elastic_pair
+from tests.setup_cluster_new import (start_replica_set,
+                                     stop_replica_set,
+                                     start_server,
+                                     stop_server)
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -87,14 +87,13 @@ class TestElastic(ElasticsearchTestCase):
     def setUpClass(cls):
         """Start the cluster."""
         super(TestElastic, cls).setUpClass()
-        _, cls.secondary_p, cls.primary_p = start_replica_set('test-elastic')
-        cls.conn = MongoClient(mongo_host, cls.primary_p,
-                               replicaSet='test-elastic')
+        cls.repl_set = start_replica_set()
+        cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         """Kill the cluster."""
-        kill_replica_set('test-elastic')
+        stop_replica_set(cls.repl_set)
 
     def tearDown(self):
         """Stop the Connector thread."""
@@ -110,7 +109,7 @@ class TestElastic(ElasticsearchTestCase):
             pass
         docman = DocManager(elastic_pair)
         self.connector = Connector(
-            mongo_address='%s:%s' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
             doc_managers=(docman,),
             gridfs_set=['test.test']
@@ -216,7 +215,7 @@ class TestElastic(ElasticsearchTestCase):
         adding another doc, killing the new primary, and then
         restarting both.
         """
-        primary_conn = MongoClient(mongo_host, self.primary_p)
+        primary_conn = MongoClient(self.repl_set.primary.uri)
 
         self.conn['test']['test'].insert({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
@@ -225,9 +224,9 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(condition1)
         assert_soon(condition2)
 
-        kill_mongo_proc(self.primary_p, destroy=False)
+        stop_server(self.repl_set.primary, destroy=False)
 
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
@@ -242,13 +241,13 @@ class TestElastic(ElasticsearchTestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        stop_server(self.repl_set.secondary, destroy=False)
 
-        restart_mongo_proc(self.primary_p)
+        start_server(self.repl_set.primary)
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        restart_mongo_proc(self.secondary_p)
+        start_server(self.repl_set.secondary)
 
         time.sleep(2)
         result_set_1 = list(self._search())

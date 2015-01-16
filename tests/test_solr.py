@@ -25,11 +25,11 @@ from pysolr import Solr, SolrError
 
 sys.path[0:0] = [""]
 
-from tests import solr_pair, mongo_host, unittest
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set,
-                                 restart_mongo_proc,
-                                 kill_mongo_proc)
+from tests import solr_pair, unittest
+from tests.setup_cluster_new import (start_replica_set,
+                                     stop_replica_set,
+                                     start_server,
+                                     stop_server)
 from tests.util import assert_soon
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
@@ -57,15 +57,14 @@ class TestSolr(SolrTestCase):
     @classmethod
     def setUpClass(cls):
         SolrTestCase.setUpClass()
-        _, cls.secondary_p, cls.primary_p = start_replica_set('test-solr')
-        cls.conn = MongoClient(mongo_host, cls.primary_p,
-                               replicaSet='test-solr')
+        cls.repl_set = start_replica_set()
+        cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_replica_set('test-solr')
+        stop_replica_set(cls.repl_set)
 
     def setUp(self):
         self._remove()
@@ -77,7 +76,7 @@ class TestSolr(SolrTestCase):
         docman = DocManager('http://%s/solr' % solr_pair,
                             auto_commit_interval=0)
         self.connector = Connector(
-            mongo_address='%s:%s' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
             doc_managers=(docman,),
             gridfs_set=['test.test']
@@ -212,16 +211,16 @@ class TestSolr(SolrTestCase):
             restarting both the servers.
         """
 
-        primary_conn = MongoClient(mongo_host, self.primary_p)
+        primary_conn = MongoClient(self.repl_set.primary.uri)
 
         self.conn['test']['test'].insert({'name': 'paul'})
         assert_soon(
             lambda: self.conn.test.test.find({'name': 'paul'}).count() == 1)
         assert_soon(
             lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 1)
-        kill_mongo_proc(self.primary_p, destroy=False)
+        stop_server(self.repl_set.primary, destroy=False)
 
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
@@ -236,14 +235,14 @@ class TestSolr(SolrTestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        stop_server(self.repl_set.secondary, destroy=False)
 
-        restart_mongo_proc(self.primary_p)
+        start_server(self.repl_set.primary)
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        restart_mongo_proc(self.secondary_p)
+        start_server(self.repl_set.secondary)
 
         time.sleep(2)
         result_set_1 = self.solr_conn.search('pauline')

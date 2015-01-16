@@ -28,7 +28,7 @@ else:
     from unittest.case import SkipTest
 
 # Configurable hosts and ports used in the tests
-mongo_host = unicode(os.environ.get("MONGO_HOST", 'localhost'))
+mo_address = unicode(os.environ.get("MO_ADDRESS", "localhost:8889"))
 mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
 elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
 elastic_port = unicode(os.environ.get("ES_PORT", 9200))

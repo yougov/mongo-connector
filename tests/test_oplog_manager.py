@@ -27,9 +27,8 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from tests import mongo_host, unittest
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set)
+from tests import unittest
+from tests.setup_cluster_new import start_replica_set, stop_replica_set
 from tests.util import assert_soon
 
 
@@ -39,8 +38,8 @@ class TestOplogManager(unittest.TestCase):
     """
 
     def setUp(self):
-        _, _, self.primary_p = start_replica_set('test-oplog-manager')
-        self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
+        self.repl_set = start_replica_set()
+        self.primary_conn = pymongo.MongoClient(self.repl_set.primary.uri)
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_client=self.primary_conn,
@@ -54,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
         except RuntimeError:
             pass                # OplogThread may not have been started
         self.primary_conn.close()
-        kill_replica_set('test-oplog-manager')
+        stop_replica_set(self.repl_set)
 
     def test_get_oplog_cursor(self):
         '''Test the get_oplog_cursor method'''

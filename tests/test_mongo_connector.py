@@ -25,8 +25,8 @@ from bson.timestamp import Timestamp
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import mongo_host, unittest
-from tests.setup_cluster import start_replica_set, kill_replica_set
+from tests import unittest
+from tests.setup_cluster_new import start_replica_set, stop_replica_set
 from mongo_connector.util import long_to_bson_ts
 
 
@@ -43,19 +43,19 @@ class TestMongoConnector(unittest.TestCase):
         except OSError:
             pass
         open("oplog.timestamp", "w").close()
-        _, _, cls.primary_p = start_replica_set('test-mongo-connector')
+        cls.repl_set = start_replica_set()
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_replica_set('test-mongo-connector')
+        stop_replica_set(cls.repl_set)
 
     def test_connector(self):
         """Test whether the connector initiates properly
         """
         conn = Connector(
-            mongo_address='%s:%d' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
         )
         conn.start()
@@ -78,7 +78,7 @@ class TestMongoConnector(unittest.TestCase):
             pass
         open("temp_oplog.timestamp", "w").close()
         conn = Connector(
-            mongo_address='%s:%d' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             oplog_checkpoint="temp_oplog.timestamp",
             ns_set=['test.test']
         )
@@ -114,7 +114,7 @@ class TestMongoConnector(unittest.TestCase):
         """
 
         conn = Connector(
-            mongo_address='%s:%d' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             oplog_checkpoint=None,
             ns_set=['test.test']
         )

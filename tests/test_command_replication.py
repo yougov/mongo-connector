@@ -26,9 +26,8 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from tests import mongo_host, unittest
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set)
+from tests import unittest
+from tests.setup_cluster_new import start_replica_set, stop_replica_set
 from tests.util import assert_soon
 
 
@@ -54,8 +53,8 @@ class CommandLoggerDocManager(DocManagerBase):
 
 class TestCommandReplication(unittest.TestCase):
     def setUp(self):
-        _, _, self.primary_p = start_replica_set('test-command-replication')
-        self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
+        self.repl_set = start_replica_set()
+        self.primary_conn = pymongo.MongoClient(self.repl_set.uri)
         self.oplog_progress = LockingDict()
         self.opman = None
 
@@ -66,7 +65,7 @@ class TestCommandReplication(unittest.TestCase):
         except RuntimeError:
             pass
         self.primary_conn.close()
-        kill_replica_set('test-command-replication')
+        stop_replica_set(self.repl_set)
 
     def initOplogThread(self, namespace_set=[], dest_mapping={}):
         self.docman = CommandLoggerDocManager()

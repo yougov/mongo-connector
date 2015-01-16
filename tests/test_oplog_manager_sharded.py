@@ -28,13 +28,12 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import retry_until_ok
-from tests import mongo_host, unittest
-from tests.setup_cluster import (
-    kill_mongo_proc,
-    restart_mongo_proc,
-    start_cluster,
-    get_shard,
-    kill_all
+from tests import unittest
+from tests.setup_cluster_new import (
+    stop_server,
+    start_server,
+    start_sharded_cluster,
+    stop_sharded_cluster
 )
 from tests.util import assert_soon
 
@@ -53,33 +52,20 @@ class TestOplogManagerSharded(unittest.TestCase):
         Create OplogThreads
         """
         # Start the cluster with a mongos on port 27217
-        self.mongos_p = start_cluster()
+        self.cluster = start_sharded_cluster()
 
         # Connection to mongos
-        mongos_address = '%s:%d' % (mongo_host, self.mongos_p)
-        self.mongos_conn = MongoClient(mongos_address)
+        self.mongos_conn = MongoClient(self.cluster.uri)
 
         # Connections to the shards
-        shard1_ports = get_shard(self.mongos_p, 0)
-        shard2_ports = get_shard(self.mongos_p, 1)
-        self.shard1_prim_p = shard1_ports['primary']
-        self.shard1_scnd_p = shard1_ports['secondaries'][0]
-        self.shard2_prim_p = shard2_ports['primary']
-        self.shard2_scnd_p = shard2_ports['secondaries'][0]
-        self.shard1_conn = MongoClient('%s:%d'
-                                       % (mongo_host, self.shard1_prim_p),
-                                       replicaSet="demo-set-0")
-        self.shard2_conn = MongoClient('%s:%d'
-                                       % (mongo_host, self.shard2_prim_p),
-                                       replicaSet="demo-set-1")
+        self.shard1_conn = MongoClient(self.cluster.shards[0].uri)
+        self.shard2_conn = MongoClient(self.cluster.shards[1].uri)
         self.shard1_secondary_conn = MongoClient(
-            '%s:%d' % (mongo_host, self.shard1_scnd_p),
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
+            self.cluster.shards[0].secondary.uri,
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
         self.shard2_secondary_conn = MongoClient(
-            '%s:%d' % (mongo_host, self.shard2_scnd_p),
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
+            self.cluster.shards[1].secondary.uri,
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
 
         # Wipe any test data
         self.mongos_conn["test"]["mcsharded"].drop()
@@ -112,19 +98,19 @@ class TestOplogManagerSharded(unittest.TestCase):
                 "moveChunk",
                 "test.mcsharded",
                 find={"i": 1},
-                to="demo-set-0"
+                to='demo-set-0'
             )
-        except pymongo.errors.OperationFailure:
-            pass        # chunk may already be on the correct shard
+        except pymongo.errors.OperationFailure as e:
+            pass
         try:
             self.mongos_conn["admin"].command(
                 "moveChunk",
                 "test.mcsharded",
                 find={"i": 1000},
-                to="demo-set-1"
+                to='demo-set-1'
             )
-        except pymongo.errors.OperationFailure:
-            pass        # chunk may already be on the correct shard
+        except pymongo.errors.OperationFailure as e:
+            pass
 
         # Make sure chunks are distributed correctly
         self.mongos_conn["test"]["mcsharded"].insert({"i": 1})
@@ -136,7 +122,10 @@ class TestOplogManagerSharded(unittest.TestCase):
             if None in (doc1, doc2):
                 return False
             return doc1['i'] == 1 and doc2['i'] == 1000
-        assert_soon(chunks_moved)
+        assert_soon(chunks_moved, max_tries=120,
+                    message='chunks not moved? doc1=%r, doc2=%r' % (
+                        self.shard1_conn.test.mcsharded.find_one(),
+                        self.shard2_conn.test.mcsharded.find_one()))
         self.mongos_conn.test.mcsharded.remove()
 
         # create a new oplog progress file
@@ -178,7 +167,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.shard2_conn.close()
         self.shard1_secondary_conn.close()
         self.shard2_secondary_conn.close()
-        kill_all()
+        stop_sharded_cluster(self.cluster)
 
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
@@ -426,7 +415,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
 
         # Case 1: only one primary goes down, shard1 in this case
-        kill_mongo_proc(self.shard1_prim_p, destroy=False)
+        stop_server(self.cluster.shards[0].primary, destroy=False)
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -446,14 +435,14 @@ class TestOplogManagerSharded(unittest.TestCase):
                     max_tries=120)
 
         # Kill the new primary
-        kill_mongo_proc(self.shard1_scnd_p, destroy=False)
+        stop_server(self.cluster.shards[0].secondary, destroy=False)
 
         # Start both servers back up
-        restart_mongo_proc(self.shard1_prim_p)
+        start_server(self.cluster.shards[0].primary)
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        restart_mongo_proc(self.shard1_scnd_p)
+        start_server(self.cluster.shards[0].secondary)
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
@@ -482,8 +471,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         ##############################
 
         # Case 2: Primaries on both shards go down
-        kill_mongo_proc(self.shard1_prim_p, destroy=False)
-        kill_mongo_proc(self.shard2_prim_p, destroy=False)
+        stop_server(self.cluster.shards[0].primary, destroy=False)
+        stop_server(self.cluster.shards[1].primary, destroy=False)
 
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -504,23 +493,23 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
-        kill_mongo_proc(self.shard1_scnd_p, destroy=False)
-        kill_mongo_proc(self.shard2_scnd_p, destroy=False)
+        stop_server(self.cluster.shards[0].secondary, destroy=False)
+        stop_server(self.cluster.shards[1].secondary, destroy=False)
 
         # Start the servers back up...
         # Shard 1
-        restart_mongo_proc(self.shard1_prim_p)
+        start_server(self.cluster.shards[0].primary)
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        restart_mongo_proc(self.shard1_scnd_p)
+        start_server(self.cluster.shards[0].secondary)
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         # Shard 2
-        restart_mongo_proc(self.shard2_prim_p)
+        start_server(self.cluster.shards[1].primary)
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        restart_mongo_proc(self.shard2_scnd_p)
+        start_server(self.cluster.shards[1].secondary)
         secondary_admin = self.shard2_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)

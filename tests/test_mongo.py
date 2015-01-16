@@ -24,12 +24,10 @@ from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
-from tests import mongo_host
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set,
-                                 start_mongo_proc,
-                                 restart_mongo_proc,
-                                 kill_mongo_proc)
+from tests.setup_cluster_new import (start_replica_set,
+                                     stop_replica_set,
+                                     start_server,
+                                     stop_server)
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -41,16 +39,14 @@ class MongoTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.standalone_port = start_mongo_proc(options=['--nojournal',
-                                                        '--noprealloc'])
-        cls.standalone_pair = '%s:%d' % (mongo_host, cls.standalone_port)
-        cls.mongo_doc = DocManager(cls.standalone_pair)
-        cls.mongo_conn = MongoClient(cls.standalone_pair)
+        cls.standalone = start_server()
+        cls.mongo_doc = DocManager(cls.standalone.uri)
+        cls.mongo_conn = MongoClient(cls.standalone.uri)
         cls.mongo = cls.mongo_conn['test']['test']
 
     @classmethod
     def tearDownClass(cls):
-        kill_mongo_proc(cls.standalone_port)
+        stop_server(cls.standalone)
 
     def _search(self):
         for doc in self.mongo.find():
@@ -77,16 +73,15 @@ class TestMongo(MongoTestCase):
     @classmethod
     def setUpClass(cls):
         MongoTestCase.setUpClass()
-        _, cls.secondary_p, cls.primary_p = start_replica_set('test-mongo')
-        cls.conn = MongoClient(mongo_host, cls.primary_p,
-                               replicaSet='test-mongo')
+        cls.repl_set = start_replica_set()
+        cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
         MongoTestCase.tearDownClass()
-        kill_replica_set('test-mongo')
+        stop_replica_set(cls.repl_set)
 
     def tearDown(self):
         self.connector.join()
@@ -98,7 +93,7 @@ class TestMongo(MongoTestCase):
             pass
         self._remove()
         self.connector = Connector(
-            mongo_address='%s:%s' % (mongo_host, self.primary_p),
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
             doc_managers=(self.mongo_doc,),
             gridfs_set=['test.test']
@@ -203,15 +198,15 @@ class TestMongo(MongoTestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = MongoClient(mongo_host, self.primary_p)
+        primary_conn = MongoClient(self.repl_set.primary.uri)
         self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
-        kill_mongo_proc(self.primary_p, destroy=False)
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+        stop_server(self.repl_set.primary, destroy=False)
+        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
@@ -226,13 +221,13 @@ class TestMongo(MongoTestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        stop_server(self.repl_set.secondary, destroy=False)
 
-        restart_mongo_proc(self.primary_p)
+        start_server(self.repl_set.primary)
         assert_soon(
             lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
-        restart_mongo_proc(self.secondary_p)
+        start_server(self.repl_set.secondary)
 
         time.sleep(2)
         result_set_1 = list(self._search())
