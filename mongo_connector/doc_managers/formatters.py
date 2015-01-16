@@ -87,6 +87,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
             return value
         elif isinstance(value, datetime.datetime):
             return value
+        elif value is None:
+            return value
         # Default
         return unicode(value)
 
