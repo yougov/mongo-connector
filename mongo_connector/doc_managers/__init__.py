@@ -1,5 +1,8 @@
 # Copyright 2013-2014 MongoDB, Inc.
 #
+# Portions related to handle_command are copyrighted to:
+# Copyright (c) 2015, NetIQ Corporation.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -145,3 +148,8 @@ class DocManagerBase(object):
     def stop(self):
         """Stop all threads started by this DocManager."""
         raise NotImplementedError
+
+    def handle_command(self, doc):
+	"""Handle replication, db/collection commands."""
+	raise NotImplementedError
+

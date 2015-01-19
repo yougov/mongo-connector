@@ -1,5 +1,9 @@
 # Copyright 2013-2014 MongoDB, Inc.
 #
+# Portions related to handling command entries and oplog_namepace set
+# are copyrighted to:
+# Copyright (c) 2015, NetIQ Corporation.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -224,6 +228,11 @@ class OplogThread(threading.Thread):
                                     # 'o' field contains the update spec
                                     docman.update(doc, entry.get('o', {}))
                                     update_inc += 1
+				# Command
+				elif operation == 'c':
+				    doc = entry.get('o')
+				    doc['ns'] = ns
+				    docman.handle_command(doc, self.namespace_set)
                             except errors.OperationFailed:
                                 logging.exception(
                                     "Unable to process oplog document %r"
@@ -318,6 +327,22 @@ class OplogThread(threading.Thread):
 
         return entry
 
+    def get_oplog_namespace_set(self):
+	"""Get a new namespace_set to handle "c" operations corresponding to existing namespace_set"""
+        dump_set = self.namespace_set
+        cmd_coll = "$cmd"
+        oplog_cmd_ns_set = []
+        if not dump_set:
+            return oplog_cmd_ns_set
+        
+        for namespace in dump_set:
+            database, coll = namespace.split('.', 1)
+            cmd_ns = "%s.%s" % (database, cmd_coll)
+            oplog_cmd_ns_set.append(namespace)
+            oplog_cmd_ns_set.append(cmd_ns)
+
+        return oplog_cmd_ns_set
+
     def get_oplog_cursor(self, timestamp):
         """Move cursor to the proper place in the oplog.
         """
@@ -339,9 +364,12 @@ class OplogThread(threading.Thread):
                         tailable=True, await_data=True
                     )
                 else:
+                    oplog_ns_set = self.get_oplog_namespace_set()
+                    logging.debug("OplogThread: Dumping set of collections %s " % oplog_ns_set)
+
                     cursor = self.oplog.find(
                         {'ts': {'$gte': timestamp},
-                         'ns': {'$in': self.namespace_set}},
+                         'ns': {'$in': oplog_ns_set}},
                         tailable=True, await_data=True
                     )
                 # Applying 8 as the mask to the cursor enables OplogReplay
@@ -549,7 +577,7 @@ class OplogThread(threading.Thread):
             ).limit(1)
         else:
             curr = self.oplog.find(
-                {'ns': {'$in': self.namespace_set}}
+                {'ns': {'$in': self.get_oplog_namespace_set()}}
             ).sort('$natural', pymongo.DESCENDING).limit(1)
 
         if curr.count(with_limit_and_skip=True) == 0:

@@ -1,5 +1,8 @@
 # Copyright 2013-2014 MongoDB, Inc.
 #
+# Portions related to handle_command are copyrighted to:
+# Copyright (c) 2015, NetIQ Corporation.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -59,26 +62,29 @@ class DocManager(DocManagerBase):
         self.auto_commit_interval = None
 
     @wrap_exceptions
+    def handle_command(self, doc, namespace_set):
+        """Handle database and other command operations"""
+        logging.debug ("ES:handle_command")
+	
+        if namespace_set:
+            db, cmd_ns = doc['ns'].split(".", 1)
+            coll = doc['drop']
+            if coll not in [None, ""]:
+                index = db+"."+coll
+                if index in namespace_set:
+                    logging.debug ("ES: received drop for " + index)
+                    self.elastic.indices.delete(index)
+	
+    @wrap_exceptions
     def update(self, doc, update_spec):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
-	TODO: We should be able to do an intial get and figure out whether
-        _source is enabled or not.  If _source is enabled, we can avoid a get call 
-        which will improve update performance.
         """
         document = self.elastic.get(index=doc['ns'],
                                     id=str(doc['_id']))
-        update = None
-        if not "_source" in document:
-            updated = self.apply_update(document, update_spec)
-            updated['ns'] = doc['ns']
-            updated['_ts'] = doc['_ts']
-        else:
-            updated = self.apply_update(document['_source'], update_spec)
-	    updated['_doc_op_'] = 'u'
+        updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-
         self.upsert(updated)
         return updated
 
@@ -89,24 +95,9 @@ class DocManager(DocManagerBase):
         index = doc['ns']
         # No need to duplicate '_id' in source document
         doc_id = str(doc.pop("_id"))
-        
-        # check for operation
-        operation = None
-        if not "_doc_op_" in doc:
-            operation = 'i'
-        else:
-            operation = doc.pop("_doc_op_")
-
-	updbody = {}
-        if operation == 'u':
-            updbody['doc']=self._formatter.format_document(doc)
-            self.elastic.update(index=index, doc_type=doc_type, id=doc_id,
-                                body=updbody,
-                                refresh=(self.auto_commit_interval == 0))
-        else:
-            self.elastic.index(index=index, doc_type=doc_type,
-                               body=self._formatter.format_document(doc), id=doc_id,
-                               refresh=(self.auto_commit_interval == 0))
+        self.elastic.index(index=index, doc_type=doc_type,
+                           body=self._formatter.format_document(doc), id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
         # Don't mutate doc argument
         doc['_id'] = doc_id
 
