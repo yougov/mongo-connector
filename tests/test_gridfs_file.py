@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
 from tests import unittest
-from tests.setup_cluster_new import start_replica_set, stop_replica_set
+from tests.setup_cluster import start_replica_set, stop_replica_set
 
 
 class MockGridFSFile:

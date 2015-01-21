@@ -29,7 +29,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import retry_until_ok
 from tests import unittest
-from tests.setup_cluster_new import (
+from tests.setup_cluster import (
     stop_server,
     start_server,
     start_sharded_cluster,

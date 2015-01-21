@@ -19,7 +19,7 @@ from mongo_connector.oplog_manager import OplogThread
 
 from tests import unittest, STRESS_COUNT
 from tests.util import assert_soon
-from tests.setup_cluster_new import (
+from tests.setup_cluster import (
     start_replica_set,
     stop_replica_set,
     start_server,

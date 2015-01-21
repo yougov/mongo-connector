@@ -15,6 +15,8 @@ import logging
 import os
 import sys
 
+from tests.setup_cluster import kill_all
+
 logging.basicConfig(stream=sys.stdout)
 
 if sys.version_info[0] == 3:
@@ -28,8 +30,6 @@ else:
     from unittest.case import SkipTest
 
 # Configurable hosts and ports used in the tests
-mo_address = unicode(os.environ.get("MO_ADDRESS", "localhost:8889"))
-mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
 elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
 elastic_port = unicode(os.environ.get("ES_PORT", 9200))
 elastic_pair = '%s:%s' % (elastic_host, elastic_port)
@@ -42,3 +42,6 @@ STRESS_COUNT = 100
 
 # Test namespace, timestamp arguments
 TESTARGS = ('test.test', 1)
+
+# Ensure that Mongo Orchestration doesn't have any MongoDB processes running.
+kill_all()
