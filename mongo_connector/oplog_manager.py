@@ -107,10 +107,10 @@ class OplogThread(threading.Thread):
         logging.info('OplogThread: Initializing oplog thread')
 
         if is_sharded:
-            self.main_connection = MongoClient(main_address)
+            self.main_connection = MongoClient(main_address, tz_aware=True)
         else:
             self.main_connection = MongoClient(main_address,
-                                               replicaSet=repl_set)
+                                               replicaSet=repl_set, tz_aware=True)
             self.oplog = self.main_connection['local']['oplog.rs']
 
         if auth_key is not None:

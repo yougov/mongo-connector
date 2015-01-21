@@ -266,7 +266,7 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(self.address)
+        main_conn = MongoClient(self.address, tz_aware=True)
         if self.auth_key is not None:
             main_conn['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
@@ -290,7 +290,8 @@ class Connector(threading.Thread):
             # Establish a connection to the replica set as a whole
             main_conn.disconnect()
             main_conn = MongoClient(self.address,
-                                    replicaSet=is_master['setName'])
+                                    replicaSet=is_master['setName'], 
+                                    tz_aware=True)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
@@ -361,7 +362,7 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = MongoClient(hosts, replicaSet=repl_set)
+                    shard_conn = MongoClient(hosts, replicaSet=repl_set, tz_aware=True)
                     oplog_coll = shard_conn['local']['oplog.rs']
 
                     oplog = OplogThread(
