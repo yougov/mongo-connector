@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import itertools
 import os
 
@@ -138,6 +139,7 @@ def stop_sharded_cluster(cluster):
     requests.delete(_mo_url('sharded_clusters', cluster.id))
 
 
+@atexit.register
 def kill_all():
     clusters = requests.get(_mo_url('sharded_clusters')).json()
     repl_sets = requests.get(_mo_url('replica_sets')).json()
@@ -148,6 +150,3 @@ def kill_all():
         requests.delete(_mo_url('relica_sets', rs['id']))
     for server in servers['servers']:
         requests.delete(_mo_url('servers', server['id']))
-
-
-kill_all()

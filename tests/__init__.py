@@ -15,8 +15,6 @@ import logging
 import os
 import sys
 
-from tests.setup_cluster import kill_all
-
 logging.basicConfig(stream=sys.stdout)
 
 if sys.version_info[0] == 3:
@@ -42,6 +40,3 @@ STRESS_COUNT = 100
 
 # Test namespace, timestamp arguments
 TESTARGS = ('test.test', 1)
-
-# Ensure that Mongo Orchestration doesn't have any MongoDB processes running.
-kill_all()
