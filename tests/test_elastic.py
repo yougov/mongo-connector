@@ -25,10 +25,7 @@ from pymongo import MongoClient
 sys.path[0:0] = [""]
 
 from tests import elastic_pair
-from tests.setup_cluster import (start_replica_set,
-                                 stop_replica_set,
-                                 start_server,
-                                 stop_server)
+from tests.setup_cluster import ReplicaSet
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -87,13 +84,13 @@ class TestElastic(ElasticsearchTestCase):
     def setUpClass(cls):
         """Start the cluster."""
         super(TestElastic, cls).setUpClass()
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
         cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         """Kill the cluster."""
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def tearDown(self):
         """Stop the Connector thread."""
@@ -224,7 +221,7 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(condition1)
         assert_soon(condition2)
 
-        stop_server(self.repl_set.primary, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
 
         new_primary_conn = MongoClient(self.repl_set.secondary.uri)
 
@@ -241,13 +238,13 @@ class TestElastic(ElasticsearchTestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
-        stop_server(self.repl_set.secondary, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
-        start_server(self.repl_set.primary)
+        self.repl_set.primary.start()
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_server(self.repl_set.secondary)
+        self.repl_set.secondary.start()
 
         time.sleep(2)
         result_set_1 = list(self._search())

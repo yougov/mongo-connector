@@ -29,12 +29,7 @@ from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import retry_until_ok
 from tests import unittest
-from tests.setup_cluster import (
-    stop_server,
-    start_server,
-    start_sharded_cluster,
-    stop_sharded_cluster
-)
+from tests.setup_cluster import ShardedCluster
 from tests.util import assert_soon
 
 
@@ -52,7 +47,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Create OplogThreads
         """
         # Start the cluster with a mongos on port 27217
-        self.cluster = start_sharded_cluster()
+        self.cluster = ShardedCluster().start()
 
         # Connection to mongos
         self.mongos_conn = MongoClient(self.cluster.uri)
@@ -100,7 +95,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                 find={"i": 1},
                 to='demo-set-0'
             )
-        except pymongo.errors.OperationFailure as e:
+        except pymongo.errors.OperationFailure:
             pass
         try:
             self.mongos_conn["admin"].command(
@@ -109,7 +104,7 @@ class TestOplogManagerSharded(unittest.TestCase):
                 find={"i": 1000},
                 to='demo-set-1'
             )
-        except pymongo.errors.OperationFailure as e:
+        except pymongo.errors.OperationFailure:
             pass
 
         # Make sure chunks are distributed correctly
@@ -167,7 +162,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.shard2_conn.close()
         self.shard1_secondary_conn.close()
         self.shard2_secondary_conn.close()
-        stop_sharded_cluster(self.cluster)
+        self.cluster.stop()
 
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
@@ -415,7 +410,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
 
         # Case 1: only one primary goes down, shard1 in this case
-        stop_server(self.cluster.shards[0].primary, destroy=False)
+        self.cluster.shards[0].primary.stop(destroy=False)
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -435,14 +430,14 @@ class TestOplogManagerSharded(unittest.TestCase):
                     max_tries=120)
 
         # Kill the new primary
-        stop_server(self.cluster.shards[0].secondary, destroy=False)
+        self.cluster.shards[0].secondary.stop(destroy=False)
 
         # Start both servers back up
-        start_server(self.cluster.shards[0].primary)
+        self.cluster.shards[0].primary.start()
         primary_admin = self.shard1_conn["admin"]
         c = lambda: primary_admin.command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        start_server(self.cluster.shards[0].secondary)
+        self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
@@ -471,8 +466,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         ##############################
 
         # Case 2: Primaries on both shards go down
-        stop_server(self.cluster.shards[0].primary, destroy=False)
-        stop_server(self.cluster.shards[1].primary, destroy=False)
+        self.cluster.shards[0].primary.stop(destroy=False)
+        self.cluster.shards[1].primary.stop(destroy=False)
 
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
@@ -493,23 +488,23 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
-        stop_server(self.cluster.shards[0].secondary, destroy=False)
-        stop_server(self.cluster.shards[1].secondary, destroy=False)
+        self.cluster.shards[0].secondary.stop(destroy=False)
+        self.cluster.shards[1].secondary.stop(destroy=False)
 
         # Start the servers back up...
         # Shard 1
-        start_server(self.cluster.shards[0].primary)
+        self.cluster.shards[0].primary.start()
         c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        start_server(self.cluster.shards[0].secondary)
+        self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         # Shard 2
-        start_server(self.cluster.shards[1].primary)
+        self.cluster.shards[1].primary.start()
         c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
-        start_server(self.cluster.shards[1].secondary)
+        self.cluster.shards[1].secondary.start()
         secondary_admin = self.shard2_secondary_conn["admin"]
         c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)

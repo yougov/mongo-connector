@@ -24,7 +24,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
 from tests import unittest
-from tests.setup_cluster import start_replica_set, stop_replica_set
+from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
 
 
@@ -42,7 +42,7 @@ class TestSynchronizer(unittest.TestCase):
             pass
         open("oplog.timestamp", "w").close()
 
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
         cls.conn = MongoClient(cls.repl_set.uri)
         cls.connector = Connector(
             mongo_address=cls.repl_set.uri,
@@ -58,7 +58,7 @@ class TestSynchronizer(unittest.TestCase):
         """ Tears down connector
         """
         cls.connector.join()
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def setUp(self):
         """ Clears the db

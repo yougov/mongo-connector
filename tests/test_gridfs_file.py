@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
 from tests import unittest
-from tests.setup_cluster import start_replica_set, stop_replica_set
+from tests.setup_cluster import ReplicaSet
 
 
 class MockGridFSFile:
@@ -60,13 +60,13 @@ class TestGridFSFile(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Start up a replica set and connect to it
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
         cls.main_connection = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         cls.main_connection.close()
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def setUp(self):
         # clear existing data

@@ -26,10 +26,7 @@ from pysolr import Solr, SolrError
 sys.path[0:0] = [""]
 
 from tests import solr_pair, unittest
-from tests.setup_cluster import (start_replica_set,
-                                 stop_replica_set,
-                                 start_server,
-                                 stop_server)
+from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
@@ -57,14 +54,14 @@ class TestSolr(SolrTestCase):
     @classmethod
     def setUpClass(cls):
         SolrTestCase.setUpClass()
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
         cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def setUp(self):
         self._remove()
@@ -218,7 +215,7 @@ class TestSolr(SolrTestCase):
             lambda: self.conn.test.test.find({'name': 'paul'}).count() == 1)
         assert_soon(
             lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 1)
-        stop_server(self.repl_set.primary, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
 
         new_primary_conn = MongoClient(self.repl_set.secondary.uri)
         admin_db = new_primary_conn['admin']
@@ -235,14 +232,14 @@ class TestSolr(SolrTestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['_id'], str(result_set_2['_id']))
-        stop_server(self.repl_set.secondary, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
-        start_server(self.repl_set.primary)
+        self.repl_set.primary.start()
 
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        start_server(self.repl_set.secondary)
+        self.repl_set.secondary.start()
 
         time.sleep(2)
         result_set_1 = self.solr_conn.search('pauline')

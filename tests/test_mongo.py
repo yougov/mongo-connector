@@ -24,10 +24,7 @@ from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
-from tests.setup_cluster import (start_replica_set,
-                                 stop_replica_set,
-                                 start_server,
-                                 stop_server)
+from tests.setup_cluster import ReplicaSet, Server
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
@@ -39,14 +36,14 @@ class MongoTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.standalone = start_server()
+        cls.standalone = Server().start()
         cls.mongo_doc = DocManager(cls.standalone.uri)
         cls.mongo_conn = MongoClient(cls.standalone.uri)
         cls.mongo = cls.mongo_conn['test']['test']
 
     @classmethod
     def tearDownClass(cls):
-        stop_server(cls.standalone)
+        cls.standalone.stop()
 
     def _search(self):
         for doc in self.mongo.find():
@@ -73,7 +70,7 @@ class TestMongo(MongoTestCase):
     @classmethod
     def setUpClass(cls):
         MongoTestCase.setUpClass()
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
         cls.conn = MongoClient(cls.repl_set.uri)
 
     @classmethod
@@ -81,7 +78,7 @@ class TestMongo(MongoTestCase):
         """ Kills cluster instance
         """
         MongoTestCase.tearDownClass()
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def tearDown(self):
         self.connector.join()
@@ -205,7 +202,7 @@ class TestMongo(MongoTestCase):
         assert_soon(condition)
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
-        stop_server(self.repl_set.primary, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
         new_primary_conn = MongoClient(self.repl_set.secondary.uri)
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
@@ -221,13 +218,13 @@ class TestMongo(MongoTestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        stop_server(self.repl_set.secondary, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
-        start_server(self.repl_set.primary)
+        self.repl_set.primary.start()
         assert_soon(
             lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
-        start_server(self.repl_set.secondary)
+        self.repl_set.secondary.start()
 
         time.sleep(2)
         result_set_1 = list(self._search())

@@ -26,7 +26,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
 from tests import unittest
-from tests.setup_cluster import start_replica_set, stop_replica_set
+from tests.setup_cluster import ReplicaSet
 from mongo_connector.util import long_to_bson_ts
 
 
@@ -43,13 +43,13 @@ class TestMongoConnector(unittest.TestCase):
         except OSError:
             pass
         open("oplog.timestamp", "w").close()
-        cls.repl_set = start_replica_set()
+        cls.repl_set = ReplicaSet().start()
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        stop_replica_set(cls.repl_set)
+        cls.repl_set.stop()
 
     def test_connector(self):
         """Test whether the connector initiates properly
