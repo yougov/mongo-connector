@@ -41,11 +41,11 @@ except ImportError:
     use_setuptools()
     from setuptools import setup
 
-extra_opts = {"test_suite": "tests"}
+extra_opts = {"test_suite": "tests", "tests_require": ["mongo-orchestration"]}
 
 if sys.version_info[:2] == (2, 6):
     # Need unittest2 to run unittests in Python 2.6
-    extra_opts["tests_require"] = "unittest2"
+    extra_opts["tests_require"].append("unittest2")
     extra_opts["test_suite"] = "unittest2.collector"
 
 try:
