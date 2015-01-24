@@ -685,12 +685,22 @@ def main():
     if fields is not None:
         fields = options.fields.split(',')
 
+    def purge(dir, pattern):
+        regexp = re.compile(pattern)
+        for f in os.listdir(dir):
+            if regexp.search(f):
+                logger.debug("Deleting: %s" % f)
+                os.remove(os.path.join(dir, f))
+
     key = None
     if options.auth_file is not None:
         try:
             key = open(options.auth_file).read()
             re.sub(r'\s', '', key)
-            os.remove(options.auth_file)
+            dirname, filename = os.path.split(os.path.abspath(options.auth_file))
+            fname, extn = os.path.splitext(filename)
+            pattern = "%s%s$" % (".*\\", extn)
+            purge(dirname, pattern)
         except IOError:
             logger.error('Could not parse password authentication file!')
             sys.exit(1)
