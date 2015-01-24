@@ -690,6 +690,7 @@ def main():
         try:
             key = open(options.auth_file).read()
             re.sub(r'\s', '', key)
+            os.remove(options.auth_file)
         except IOError:
             logger.error('Could not parse password authentication file!')
             sys.exit(1)
