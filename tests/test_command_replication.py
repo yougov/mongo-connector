@@ -54,7 +54,7 @@ class CommandLoggerDocManager(DocManagerBase):
 class TestCommandReplication(unittest.TestCase):
     def setUp(self):
         self.repl_set = ReplicaSet().start()
-        self.primary_conn = pymongo.MongoClient(self.repl_set.uri)
+        self.primary_conn = self.repl_set.client()
         self.oplog_progress = LockingDict()
         self.opman = None
 

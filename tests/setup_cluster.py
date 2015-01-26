@@ -16,7 +16,10 @@ import atexit
 import itertools
 import os
 
+import pymongo
 import requests
+
+from tests import db_user, db_password
 
 _mo_address = os.environ.get("MO_ADDRESS", "localhost:8889")
 _mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
@@ -28,6 +31,11 @@ DEFAULT_OPTIONS = {
 }
 
 
+_post_request_template = {}
+if db_user and db_password:
+    _post_request_template = {'login': db_user, 'password': db_password}
+
+
 def _proc_params(mongos=False):
     params = dict(port=next(_free_port), **DEFAULT_OPTIONS)
     if not mongos:
@@ -36,28 +44,6 @@ def _proc_params(mongos=False):
         params['nojournal'] = True
 
     return params
-
-
-def _replica_set_config():
-    return {
-        'members': [
-            {'procParams': _proc_params()},
-            {'procParams': _proc_params()},
-            {'rsParams': {'arbiterOnly': True},
-             'procParams': _proc_params()}
-        ]
-    }
-
-
-def _sharded_cluster_config():
-    return {
-        'shards': [
-            {'id': 'demo-set-0', 'shardParams': _replica_set_config()},
-            {'id': 'demo-set-1', 'shardParams': _replica_set_config()}
-        ],
-        'routers': [_proc_params(mongos=True)],
-        'configsvrs': [_proc_params()]
-    }
 
 
 def _mo_url(resource, *args):
@@ -77,20 +63,43 @@ def kill_all():
         requests.delete(_mo_url('servers', server['id']))
 
 
-class Server(object):
+class MCTestObject(object):
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def _make_post_request(self):
+        config = _post_request_template.copy()
+        config.update(self.get_config())
+        return requests.post(
+            _mo_url(self._resource), timeout=None, json=config).json()
+
+    def client(self, **kwargs):
+        client = pymongo.MongoClient(self.uri, **kwargs)
+        if db_user:
+            client.admin.authenticate(db_user, db_password)
+        return client
+
+    def stop(self):
+        requests.delete(_mo_url(self._resource, self.id))
+
+
+class Server(MCTestObject):
+
+    _resource = 'servers'
 
     def __init__(self, id=None, uri=None):
         self.id = id
         self.uri = uri
 
+    def get_config(self):
+        return {'name': 'mongod', 'procParams': _proc_params()}
+
     def start(self):
         if self.id is None:
-            response = requests.post(_mo_url('servers'), timeout=None, json={
-                'name': 'mongod',
-                'procParams': _proc_params()
-            }).json()
+            response = self._make_post_request()
             self.id = response['id']
-            self.uri = response['mongodb_uri']
+            self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
         else:
             requests.post(
                 _mo_url('servers', self.id), timeout=None,
@@ -100,13 +109,15 @@ class Server(object):
 
     def stop(self, destroy=True):
         if destroy:
-            requests.delete(_mo_url('servers', self.id))
+            super(Server, self).stop()
         else:
             requests.post(_mo_url('servers', self.id), timeout=None,
                           json={'action': 'stop'})
 
 
-class ReplicaSet(object):
+class ReplicaSet(MCTestObject):
+
+    _resource = 'replica_sets'
 
     def __init__(self, id=None, uri=None, primary=None, secondary=None):
         self.id = id
@@ -114,9 +125,19 @@ class ReplicaSet(object):
         self.primary = primary
         self.secondary = secondary
 
+    def get_config(self):
+        return {
+            'members': [
+                {'procParams': _proc_params()},
+                {'procParams': _proc_params()},
+                {'rsParams': {'arbiterOnly': True},
+                 'procParams': _proc_params()}
+            ]
+        }
+
     def _init_from_response(self, response):
         self.id = response['id']
-        self.uri = response['mongodb_uri']
+        self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
         for member in response['members']:
             if member['state'] == 1:
                 self.primary = Server(member['server_id'], member['host'])
@@ -126,42 +147,40 @@ class ReplicaSet(object):
 
     def start(self):
         # We never need to restart a replica set, only start new ones.
-        response = requests.post(
-            _mo_url('replica_sets'), timeout=None, json=_replica_set_config())
-        self._init_from_response(response.json())
-        return self
-
-    def stop(self):
-        # We never need only to stop a replica set. We want to blow it up.
-        requests.delete(_mo_url('replica_sets', self.id))
+        return self._init_from_response(self._make_post_request())
 
 
-class ShardedCluster(object):
+class ShardedCluster(MCTestObject):
+
+    _resource = 'sharded_clusters'
 
     def __init__(self):
         self.id = None
         self.uri = None
         self.shards = []
 
+    def get_config(self):
+        return {
+            'shards': [
+                {'id': 'demo-set-0', 'shardParams': ReplicaSet().get_config()},
+                {'id': 'demo-set-1', 'shardParams': ReplicaSet().get_config()}
+            ],
+            'routers': [_proc_params(mongos=True)],
+            'configsvrs': [_proc_params()]
+        }
+
     def start(self):
         # We never need to restart a sharded cluster, only start new ones.
-        response = requests.post(
-            _mo_url('sharded_clusters'), timeout=None,
-            json=_sharded_cluster_config())
-        content = response.json()
-        for shard in content['shards']:
+        response = self._make_post_request()
+        for shard in response['shards']:
             if shard['id'] == 'demo-set-0':
                 repl1_id = shard['_id']
             elif shard['id'] == 'demo-set-1':
                 repl2_id = shard['_id']
         shard1 = requests.get(_mo_url('replica_sets', repl1_id)).json()
         shard2 = requests.get(_mo_url('replica_sets', repl2_id)).json()
-        self.id = content['id']
-        self.uri = content['mongodb_uri']
+        self.id = response['id']
+        self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
         self.shards = [ReplicaSet()._init_from_response(resp)
                        for resp in (shard1, shard2)]
         return self
-
-    def stop(self):
-        # We never need only to stop a sharded cluster. We want to blow it up.
-        requests.delete(_mo_url('sharded_clusters', self.id))

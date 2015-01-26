@@ -17,8 +17,6 @@
 
 import sys
 
-from pymongo import MongoClient
-
 sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
@@ -49,7 +47,7 @@ class TestMongoDocManager(MongoTestCase):
         self.mongo_conn.drop_database("__mongo_connector")
         self._remove()
 
-        conn = MongoClient(self.standalone.uri)
+        conn = self.standalone.client()
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
             conn[db][coll].remove()
@@ -213,7 +211,7 @@ class TestMongoDocManager(MongoTestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        MongoClient(self.standalone.uri)[db][coll].remove({"_id": 99})
+        self.standalone.client()[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc["_id"], 98)
 

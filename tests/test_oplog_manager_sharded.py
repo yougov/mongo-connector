@@ -19,7 +19,6 @@ import time
 
 import bson
 import pymongo
-from pymongo import MongoClient
 from pymongo.read_preferences import ReadPreference
 
 sys.path[0:0] = [""]
@@ -46,21 +45,19 @@ class TestOplogManagerSharded(unittest.TestCase):
         Create and shard test collections
         Create OplogThreads
         """
-        # Start the cluster with a mongos on port 27217
         self.cluster = ShardedCluster().start()
 
         # Connection to mongos
-        self.mongos_conn = MongoClient(self.cluster.uri)
+        self.mongos_conn = self.cluster.client()
 
         # Connections to the shards
-        self.shard1_conn = MongoClient(self.cluster.shards[0].uri)
-        self.shard2_conn = MongoClient(self.cluster.shards[1].uri)
-        self.shard1_secondary_conn = MongoClient(
-            self.cluster.shards[0].secondary.uri,
-            read_preference=ReadPreference.SECONDARY_PREFERRED)
-        self.shard2_secondary_conn = MongoClient(
-            self.cluster.shards[1].secondary.uri,
-            read_preference=ReadPreference.SECONDARY_PREFERRED)
+        self.shard1_conn = self.cluster.shards[0].client()
+        self.shard2_conn = self.cluster.shards[1].client()
+        self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
+            readPreference=ReadPreference.SECONDARY_PREFERRED)
+        self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
+            readPreference=ReadPreference.SECONDARY_PREFERRED
+        )
 
         # Wipe any test data
         self.mongos_conn["test"]["mcsharded"].drop()

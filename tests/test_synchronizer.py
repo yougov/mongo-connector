@@ -18,12 +18,10 @@ import os
 import sys
 import time
 
-from pymongo import MongoClient
-
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import unittest
+from tests import unittest, connector_opts
 from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
 
@@ -43,11 +41,11 @@ class TestSynchronizer(unittest.TestCase):
         open("oplog.timestamp", "w").close()
 
         cls.repl_set = ReplicaSet().start()
-        cls.conn = MongoClient(cls.repl_set.uri)
+        cls.conn = cls.repl_set.client()
         cls.connector = Connector(
             mongo_address=cls.repl_set.uri,
             ns_set=['test.test'],
-            auth_key=None
+            **connector_opts
         )
         cls.synchronizer = cls.connector.doc_managers[0]
         cls.connector.start()

@@ -39,7 +39,7 @@ class TestOplogManager(unittest.TestCase):
 
     def setUp(self):
         self.repl_set = ReplicaSet().start()
-        self.primary_conn = pymongo.MongoClient(self.repl_set.primary.uri)
+        self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_client=self.primary_conn,

@@ -55,7 +55,7 @@ class TestSolr(SolrTestCase):
     def setUpClass(cls):
         SolrTestCase.setUpClass()
         cls.repl_set = ReplicaSet().start()
-        cls.conn = MongoClient(cls.repl_set.uri)
+        cls.conn = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):
@@ -208,7 +208,7 @@ class TestSolr(SolrTestCase):
             restarting both the servers.
         """
 
-        primary_conn = MongoClient(self.repl_set.primary.uri)
+        primary_conn = self.repl_set.primary.client()
 
         self.conn['test']['test'].insert({'name': 'paul'})
         assert_soon(
@@ -217,7 +217,7 @@ class TestSolr(SolrTestCase):
             lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 1)
         self.repl_set.primary.stop(destroy=False)
 
-        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
+        new_primary_conn = self.repl_set.secondary.client()
         admin_db = new_primary_conn['admin']
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)

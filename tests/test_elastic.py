@@ -20,7 +20,6 @@ import time
 
 from elasticsearch import Elasticsearch
 from gridfs import GridFS
-from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
@@ -85,7 +84,7 @@ class TestElastic(ElasticsearchTestCase):
         """Start the cluster."""
         super(TestElastic, cls).setUpClass()
         cls.repl_set = ReplicaSet().start()
-        cls.conn = MongoClient(cls.repl_set.uri)
+        cls.conn = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):
@@ -212,7 +211,7 @@ class TestElastic(ElasticsearchTestCase):
         adding another doc, killing the new primary, and then
         restarting both.
         """
-        primary_conn = MongoClient(self.repl_set.primary.uri)
+        primary_conn = self.repl_set.primary.client()
 
         self.conn['test']['test'].insert({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
@@ -223,7 +222,7 @@ class TestElastic(ElasticsearchTestCase):
 
         self.repl_set.primary.stop(destroy=False)
 
-        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
+        new_primary_conn = self.repl_set.secondary.client()
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])

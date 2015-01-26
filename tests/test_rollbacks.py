@@ -38,14 +38,12 @@ class TestRollbacks(unittest.TestCase):
         # Start a replica set
         self.repl_set = ReplicaSet().start()
         # Connection to the replica set as a whole
-        self.main_conn = MongoClient(self.repl_set.uri)
+        self.main_conn = self.repl_set.client()
         # Connection to the primary specifically
-        self.primary_conn = MongoClient(self.repl_set.primary.uri)
+        self.primary_conn = self.repl_set.primary.client()
         # Connection to the secondary specifically
-        self.secondary_conn = MongoClient(
-            self.repl_set.secondary.uri,
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
+        self.secondary_conn = self.repl_set.secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
 
         # Wipe any test data
         self.main_conn["test"]["mc"].drop()
@@ -264,9 +262,9 @@ class TestRollbacks(unittest.TestCase):
                                 "but %d found instead."
                                 % (STRESS_COUNT, len(docman._search()))))
 
-        primary_conn = MongoClient(self.repl_set.primary.uri)
+        primary_conn = self.repl_set.primary.client()
         self.repl_set.primary.stop(destroy=False)
-        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
+        new_primary_conn = self.repl_set.secondary.client()
 
         admin = new_primary_conn.admin
         assert_soon(

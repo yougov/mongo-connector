@@ -16,8 +16,6 @@ import sys
 
 import gridfs
 
-from pymongo import MongoClient
-
 sys.path[0:0] = [""]
 
 from mongo_connector.gridfs_file import GridFSFile
@@ -61,7 +59,7 @@ class TestGridFSFile(unittest.TestCase):
     def setUpClass(cls):
         # Start up a replica set and connect to it
         cls.repl_set = ReplicaSet().start()
-        cls.main_connection = MongoClient(cls.repl_set.uri)
+        cls.main_connection = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):

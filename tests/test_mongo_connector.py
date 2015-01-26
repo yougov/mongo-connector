@@ -25,7 +25,7 @@ from bson.timestamp import Timestamp
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import unittest
+from tests import unittest, connector_opts
 from tests.setup_cluster import ReplicaSet
 from mongo_connector.util import long_to_bson_ts
 
@@ -57,6 +57,7 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
+            **connector_opts
         )
         conn.start()
 
@@ -80,7 +81,8 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             mongo_address=self.repl_set.uri,
             oplog_checkpoint="temp_oplog.timestamp",
-            ns_set=['test.test']
+            ns_set=['test.test'],
+            **connector_opts
         )
 
         #test that None is returned if there is no config file specified.
@@ -116,7 +118,8 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             mongo_address=self.repl_set.uri,
             oplog_checkpoint=None,
-            ns_set=['test.test']
+            ns_set=['test.test'],
+            **connector_opts
         )
 
         #testing with no file

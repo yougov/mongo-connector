@@ -20,7 +20,6 @@ import sys
 import time
 
 from gridfs import GridFS
-from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
@@ -28,7 +27,7 @@ from tests.setup_cluster import ReplicaSet, Server
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from tests import unittest
+from tests import unittest, connector_opts
 from tests.util import assert_soon
 
 
@@ -38,7 +37,7 @@ class MongoTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.standalone = Server().start()
         cls.mongo_doc = DocManager(cls.standalone.uri)
-        cls.mongo_conn = MongoClient(cls.standalone.uri)
+        cls.mongo_conn = cls.standalone.client()
         cls.mongo = cls.mongo_conn['test']['test']
 
     @classmethod
@@ -71,7 +70,7 @@ class TestMongo(MongoTestCase):
     def setUpClass(cls):
         MongoTestCase.setUpClass()
         cls.repl_set = ReplicaSet().start()
-        cls.conn = MongoClient(cls.repl_set.uri)
+        cls.conn = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):
@@ -93,7 +92,8 @@ class TestMongo(MongoTestCase):
             mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
             doc_managers=(self.mongo_doc,),
-            gridfs_set=['test.test']
+            gridfs_set=['test.test'],
+            **connector_opts
         )
 
         self.conn.test.test.drop()
@@ -195,7 +195,7 @@ class TestMongo(MongoTestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = MongoClient(self.repl_set.primary.uri)
+        primary_conn = self.repl_set.primary.client()
         self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
@@ -203,7 +203,7 @@ class TestMongo(MongoTestCase):
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         self.repl_set.primary.stop(destroy=False)
-        new_primary_conn = MongoClient(self.repl_set.secondary.uri)
+        new_primary_conn = self.repl_set.secondary.client()
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
