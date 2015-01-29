@@ -627,33 +627,41 @@ def main():
                       help=("Log all output to a file rather than stream to "
                             "stderr.   Omit to stream to stderr."))
 
-    #--logfile-when specifies the type of interval of the rotating file (seconds, minutes, hours...)
+    #--logfile-when specifies the type of interval of the rotating file
+    #(seconds, minutes, hours...)
     parser.add_option("--logfile-when", action="store",
                       dest="logfile_when", type="string",
                       default=constants.DEFAULT_LOGFILE_WHEN,
-                      help="Define the type of interval for the rotating"
-                      " file (seconds, minutes, hours...)."
-                      " cf. TimedRotatingFileHandler for more informations"
-                      " Works only with the --logfile option.")
+                      help="The type of interval for rotating"
+                      " the log file. Should be one of "
+                      "'S' (seconds), 'M' (minutes), 'H' (hours), "
+                      "'D' (days), 'W0' - 'W6' (days of the week 0 - 6), "
+                      "or 'midnight' (the default). See the Python "
+                      "documentation for "
+                      "'logging.handlers.TimedRotatingFileHandler' "
+                      "for more details.")
 
     #--logfile-interval specifies when create a new log file
     parser.add_option("--logfile-interval", action="store",
                       dest="logfile_interval", type="int",
                       default=constants.DEFAULT_LOGFILE_INTERVAL,
-                      help="Define when create a new log file"
-                      " according to the logfile-when parameter"
-                      " Example for a new file each hour: "
-                      " --logfile-when = h, --logfile-interval = 1"
-                      " cf. TimedRotatingFileHandler for more informations"
-                      " Works only with the --logfile option.")
+                      help="How frequently to rotate the log file, "
+                      "specifically, how many units of --logfile-when "
+                      "should pass before rotation occurs. For example,"
+                      " to create a new file each hour: "
+                      " '--logfile-when=H --logfile-interval=1'. "
+                      "Defaults to 1. "
+                      "See the Python documentation for "
+                      "'logging.handlers.TimedRotatingFileHandler' "
+                      "for more details.")
 
     #--logfile-backupcount specifies how many files will be kept
-    parser.add_option("--logfile-backupcount", action="store",
-                      dest="logfile_backupcount", type="int",
+    parser.add_option("--logfile-backups", action="store",
+                      dest="logfile_backups", type="int",
                       default=constants.DEFAULT_LOGFILE_BACKUPCOUNT,
-                      help="Define how many files will be kept"
-                      " cf. TimedRotatingFileHandler for more informations"
-                      " Works only with the --logfile option.")
+                      help="How many log files will be kept after rotation. "
+                      "If set to zero, then no log files will be deleted. "
+                      "Defaults to 7.")
 
     # --tz-aware enables timezone-aware datetime objects.
     parser.add_option("--tz-aware", dest="tz_aware", action="store_true",

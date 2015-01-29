@@ -23,7 +23,8 @@ DEFAULT_COMMIT_INTERVAL = None
 # requests.
 DEFAULT_MAX_BULK = 500
 # ROTATING LOGFILE
-# The type of interval (seconds, minutes, hours... cf TimedRotatingFileHandler class)
+# The type of interval
+# (seconds, minutes, hours... c.f. logging.handlers.TimedRotatingFileHandler)
 DEFAULT_LOGFILE_WHEN = "midnight"
 # The rollover interval
 DEFAULT_LOGFILE_INTERVAL = 1
