@@ -573,8 +573,9 @@ def main():
     #--syslog-host is to specify the syslog host.
     parser.add_option("--syslog-host", action="store", type="string",
                       dest="syslog_host", default="localhost:514", help=
-                      """Used to specify the syslog host."""
-                      """ The default is 'localhost:514'""")
+                      """The syslog host, which may be an address like """
+                      """'localhost:514' or, on Unix/Linux, the path to a """
+                      """Unix domain socket such as '/dev/log'.""")
 
     #--syslog-facility is to specify the syslog facility.
     parser.add_option("--syslog-facility", action="store", type="string",
@@ -682,29 +683,26 @@ def main():
         sys.exit(1)
 
     if options.enable_syslog:
-        syslog_info = options.syslog_host.split(":")
-        syslog_host = logging.handlers.SysLogHandler(
-            address=(syslog_info[0], int(syslog_info[1])),
+        syslog_info = options.syslog_host
+        if ':' in syslog_info:
+            log_host, log_port = syslog_info.split(':')
+            syslog_info = (log_host, int(log_port))
+        log_handler = logging.handlers.SysLogHandler(
+            address=syslog_info,
             facility=options.syslog_facility
         )
-        syslog_host.setLevel(loglevel)
-        logger.addHandler(syslog_host)
     elif options.logfile is not None:
-        logfileWhen = options.logfile_when
-        logfileInterval = options.logfile_interval
-        logfileBackupcount = options.logfile_backupcount
-
-        log_out = TimedRotatingFileHandler(options.logfile, when=logfileWhen, interval=logfileInterval, backupCount=logfileBackupcount)
-        log_out.setLevel(loglevel)
-        log_out.setFormatter(logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'))
-        logger.addHandler(log_out)
+        log_handler = TimedRotatingFileHandler(
+            options.logfile,
+            when=options.logfile_when,
+            interval=options.logfile_interval,
+            backupCount=options.logfile_backups)
     else:
-        log_out = logging.StreamHandler()
-        log_out.setLevel(loglevel)
-        log_out.setFormatter(logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'))
-        logger.addHandler(log_out)
+        log_handler = logging.StreamHandler()
+    log_handler.setLevel(loglevel)
+    log_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(log_handler)
 
     logger.info('Beginning Mongo Connector')
 
