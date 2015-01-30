@@ -1,5 +1,10 @@
 # Copyright 2013-2014 MongoDB, Inc.
 #
+# Portions related to enabling timezone awareness flag and purging 
+# the password files to avoid a possible security risk scenario.
+# are copyrighted to:
+# Copyright (c) 2015, NetIQ Corporation.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
