@@ -819,7 +819,7 @@ def get_config_options():
         ssl_ca_certs = (
             cli_values.pop('ssl_ca_certs') or option.value.get('sslCACerts'))
 
-        if ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
+        if ssl_cert_reqs and ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
             raise errors.InvalidConfiguration(
                 '--ssl-ca-certs must be provided if the '
                 '--ssl-certificate-policy is not "ignored".')
