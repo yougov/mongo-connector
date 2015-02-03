@@ -1,3 +1,5 @@
+For complete documentation, check out the `Mongo Connector Wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
+
 DISCLAIMER
 ----------
 
@@ -58,7 +60,7 @@ simplest invocation resembles the following::
 
   mongo-connector -m <mongodb server hostname>:<replica set port> \
                   -t <replication endpoint URL, e.g. http://localhost:8983/solr> \
-                  -d <path to DocManager, e.g. doc_managers/solr_doc_manager.py>
+                  -d <name of doc manager, e.g., solr_doc_manager>
 
 mongo-connector has many other options besides those demonstrated above.
 To get a full listing with descriptions, try ``mongo-connector --help``.
