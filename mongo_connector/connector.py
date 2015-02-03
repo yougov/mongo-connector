@@ -642,7 +642,7 @@ def main():
                       "'logging.handlers.TimedRotatingFileHandler' "
                       "for more details.")
 
-    #--logfile-interval specifies when create a new log file
+    #--logfile-interval specifies when to create a new log file
     parser.add_option("--logfile-interval", action="store",
                       dest="logfile_interval", type="int",
                       default=constants.DEFAULT_LOGFILE_INTERVAL,
@@ -651,7 +651,8 @@ def main():
                       "should pass before rotation occurs. For example,"
                       " to create a new file each hour: "
                       " '--logfile-when=H --logfile-interval=1'. "
-                      "Defaults to 1. "
+                      "Defaults to 1. You may not use this option if "
+                      "--logfile-when is set to a weekday (W0 - W6). "
                       "See the Python documentation for "
                       "'logging.handlers.TimedRotatingFileHandler' "
                       "for more details.")
@@ -692,6 +693,11 @@ def main():
             facility=options.syslog_facility
         )
     elif options.logfile is not None:
+        if (options.logfile_when.startswith('W') and
+                options.logfile_interval != constants.DEFAULT_LOGFILE_INTERVAL):
+            print("You cannot specify a log rotation interval when rotating "
+                  "based on a weekday (W0 - W6).")
+            sys.exit(1)
         log_handler = TimedRotatingFileHandler(
             options.logfile,
             when=options.logfile_when,
