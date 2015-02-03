@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import imp
+from logging.handlers import TimedRotatingFileHandler
 from mongo_connector import constants, errors, util
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
@@ -616,15 +617,43 @@ def main():
                       " set of documents due to errors may cause undefined"
                       " behavior. Use this flag to dump only.")
 
-    #-v enables vebose logging
+    #-v enables verbose logging
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False,
                       help="Sets verbose logging to be on.")
 
-    #-w enable logging to a file
+    #-w enables logging to a file
     parser.add_option("-w", "--logfile", dest="logfile",
                       help=("Log all output to a file rather than stream to "
                             "stderr.   Omit to stream to stderr."))
+
+    #--logfile-when specifies the type of interval of the rotating file (seconds, minutes, hours...)
+    parser.add_option("--logfile-when", action="store",
+                      dest="logfile_when", type="string",
+                      default=constants.DEFAULT_LOGFILE_WHEN,
+                      help="Define the type of interval for the rotating"
+                      " file (seconds, minutes, hours...)."
+                      " cf. TimedRotatingFileHandler for more informations"
+                      " Works only with the --logfile option.")
+
+    #--logfile-interval specifies when create a new log file
+    parser.add_option("--logfile-interval", action="store",
+                      dest="logfile_interval", type="int",
+                      default=constants.DEFAULT_LOGFILE_INTERVAL,
+                      help="Define when create a new log file"
+                      " according to the logfile-when parameter"
+                      " Example for a new file each hour: "
+                      " --logfile-when = h, --logfile-interval = 1"
+                      " cf. TimedRotatingFileHandler for more informations"
+                      " Works only with the --logfile option.")
+
+    #--logfile-backupcount specifies how many files will be kept
+    parser.add_option("--logfile-backupcount", action="store",
+                      dest="logfile_backupcount", type="int",
+                      default=constants.DEFAULT_LOGFILE_BACKUPCOUNT,
+                      help="Define how many files will be kept"
+                      " cf. TimedRotatingFileHandler for more informations"
+                      " Works only with the --logfile option.")
 
     # --tz-aware enables timezone-aware datetime objects.
     parser.add_option("--tz-aware", dest="tz_aware", action="store_true",
@@ -653,7 +682,11 @@ def main():
         syslog_host.setLevel(loglevel)
         logger.addHandler(syslog_host)
     elif options.logfile is not None:
-        log_out = logging.FileHandler(options.logfile)
+        logfileWhen = options.logfile_when
+        logfileInterval = options.logfile_interval
+        logfileBackupcount = options.logfile_backupcount
+
+        log_out = TimedRotatingFileHandler(options.logfile, when=logfileWhen, interval=logfileInterval, backupCount=logfileBackupcount)
         log_out.setLevel(loglevel)
         log_out.setFormatter(logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s'))

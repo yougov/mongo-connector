@@ -22,3 +22,10 @@ DEFAULT_COMMIT_INTERVAL = None
 # DocManager. This only affects DocManagers that cannot stream their
 # requests.
 DEFAULT_MAX_BULK = 500
+# ROTATING LOGFILE
+# The type of interval (seconds, minutes, hours... cf TimedRotatingFileHandler class)
+DEFAULT_LOGFILE_WHEN = "midnight"
+# The rollover interval
+DEFAULT_LOGFILE_INTERVAL = 1
+# Number of log file to keep
+DEFAULT_LOGFILE_BACKUPCOUNT = 7
