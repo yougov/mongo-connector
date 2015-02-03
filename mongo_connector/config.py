@@ -11,13 +11,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import json
 import logging
 import optparse
 import sys
 
-from mongo_connector import compat, constants, errors
+from mongo_connector import compat, errors
 from mongo_connector.compat import reraise
 
 

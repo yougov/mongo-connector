@@ -27,8 +27,6 @@ import time
 import threading
 import traceback
 
-from gridfs import GridFS
-
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
