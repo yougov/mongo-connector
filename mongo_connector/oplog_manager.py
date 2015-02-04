@@ -36,7 +36,9 @@ LOG = logging.getLogger(__name__)
 
 
 class OplogThread(threading.Thread):
-    """OplogThread gathers the updates for a single oplog.
+    """Thread that tails an oplog.
+
+    Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
     def __init__(self, primary_client, doc_managers,
                  oplog_progress_dict, mongos_client=None, **kwargs):

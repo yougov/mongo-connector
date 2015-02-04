@@ -45,7 +45,9 @@ _SSL_POLICY_MAP = {
 
 
 class Connector(threading.Thread):
-    """Checks the cluster for shards to tail.
+    """Thread that monitors a replica set or sharded cluster.
+
+    Creates, runs, and monitors an OplogThread for each replica set found.
     """
     def __init__(self, mongo_address, doc_managers=None, **kwargs):
         super(Connector, self).__init__()
