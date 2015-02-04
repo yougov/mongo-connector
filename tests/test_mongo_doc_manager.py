@@ -110,7 +110,7 @@ class TestMongoDocManager(MongoTestCase):
     def test_insert_file(self):
         # Drop database, so that mongo_doc's client refreshes its index cache.
         self.mongo_doc.mongo.drop_database('test')
-        test_data = ' '.join(str(x) for x in range(100000))
+        test_data = ' '.join(str(x) for x in range(100000)).encode('utf8')
         docc = {
             '_id': 'test_id',
             'filename': 'test_filename',
@@ -127,7 +127,7 @@ class TestMongoDocManager(MongoTestCase):
     def test_remove_file(self):
         # Drop database, so that mongo_doc's client refreshes its index cache.
         self.mongo_doc.mongo.drop_database('test')
-        test_data = 'hello world'
+        test_data = b'hello world'
         docc = {
             '_id': 'test_id',
             'filename': 'test_filename',

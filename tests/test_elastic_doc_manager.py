@@ -112,7 +112,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
     def test_insert_file(self):
         """Ensure we can properly insert a file into ElasticSearch
         """
-        test_data = ' '.join(str(x) for x in range(100000))
+        test_data = ' '.join(str(x) for x in range(100000)).encode('utf8')
         docc = {
             '_id': 'test_id',
             'filename': 'test_filename',
@@ -129,7 +129,7 @@ class TestElasticDocManager(ElasticsearchTestCase):
                              test_data.strip())
 
     def test_remove_file(self):
-        test_data = 'hello world'
+        test_data = b'hello world'
         docc = {
             '_id': 'test_id',
             '_ts': 10,

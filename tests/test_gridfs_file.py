@@ -78,27 +78,27 @@ class TestGridFSFile(unittest.TestCase):
     def test_insert(self):
         def test_insert_file(data, filename, read_size):
             # insert file
-            id = self.fs.put(data, filename=filename)
+            id = self.fs.put(data, filename=filename, encoding='utf8')
             doc = self.collection.files.find_one(id)
             f = self.get_file(doc)
 
             # test metadata
-            self.assertEquals(id, f._id)
-            self.assertEquals(filename, f.filename)
+            self.assertEqual(id, f._id)
+            self.assertEqual(filename, f.filename)
 
             # test data
             result = []
             while True:
                 s = f.read(read_size)
                 if len(s) > 0:
-                    result.append(s)
+                    result.append(s.decode('utf8'))
                     if read_size >= 0:
                         self.assertLessEqual(len(s), read_size)
                 else:
                     break
             result = "".join(result)
-            self.assertEquals(f.length, len(result))
-            self.assertEquals(data, result)
+            self.assertEqual(f.length, len(result))
+            self.assertEqual(data, result)
 
         # test with 1-chunk files
         test_insert_file("hello world", "hello.txt", -1)
@@ -114,7 +114,7 @@ class TestGridFSFile(unittest.TestCase):
 
     def test_missing_chunk(self):
         data = "test data"
-        id = self.fs.put(data)
+        id = self.fs.put(data, encoding='utf8')
         doc = self.collection.files.find_one(id)
         f = self.get_file(doc)
 

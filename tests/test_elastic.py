@@ -142,8 +142,8 @@ class TestElastic(ElasticsearchTestCase):
         """Tests inserting a gridfs file
         """
         fs = GridFS(self.conn['test'], 'test')
-        test_data = "test_insert_file test file"
-        id = fs.put(test_data, filename="test.txt")
+        test_data = b"test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt", encoding='utf8')
         assert_soon(lambda: self._count() > 0)
 
         query = {"match": {"_all": "test_insert_file"}}
@@ -156,7 +156,7 @@ class TestElastic(ElasticsearchTestCase):
 
     def test_remove_file(self):
         fs = GridFS(self.conn['test'], 'test')
-        id = fs.put("test file", filename="test.txt")
+        id = fs.put("test file", filename="test.txt", encoding='utf8')
         assert_soon(lambda: self._count() == 1)
         fs.delete(id)
         assert_soon(lambda: self._count() == 0)

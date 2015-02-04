@@ -131,8 +131,8 @@ class TestMongo(MongoTestCase):
         """Tests inserting a gridfs file
         """
         fs = GridFS(self.conn['test'], 'test')
-        test_data = "test_insert_file test file"
-        id = fs.put(test_data, filename="test.txt")
+        test_data = b"test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self._search()) > 0)
 
         res = list(self._search())
@@ -144,7 +144,7 @@ class TestMongo(MongoTestCase):
 
     def test_remove_file(self):
         fs = GridFS(self.conn['test'], 'test')
-        id = fs.put("test file", filename="test.txt")
+        id = fs.put("test file", filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
         fs.delete(id)
         assert_soon(lambda: sum(1 for _ in self._search()) == 0)

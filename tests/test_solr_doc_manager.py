@@ -122,7 +122,7 @@ class TestSolrDocManager(SolrTestCase):
     def test_insert_file(self):
         """Ensure we can properly insert a file into Solr via DocManager.
         """
-        test_data = ' '.join(str(x) for x in range(100000))
+        test_data = ' '.join(str(x) for x in range(100000)).encode('utf8')
         docc = {
             '_id': 'test_id',
             'filename': 'test_filename',
@@ -134,11 +134,11 @@ class TestSolrDocManager(SolrTestCase):
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
             self.assertEqual(doc['filename'], docc['filename'])
-            self.assertEqual(doc['content'][0].strip(),
+            self.assertEqual(doc['content'][0].strip().encode('utf8'),
                              test_data.strip())
 
     def test_remove_file(self):
-        test_data = 'hello world'
+        test_data = b'hello world'
         docc = {
             '_id': 'test_id',
             'filename': 'test_filename',

@@ -16,7 +16,7 @@
 """
 
 import logging
-import errors
+import mongo_connector.errors
 
 LOG = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class CommandHelper(object):
             if dest in targets:
                 dbs = [src2 for src2, dest2 in db_pairs
                        if dest == dest2]
-                raise errors.MongoConnectorError(
+                raise mongo_connector.errors.MongoConnectorError(
                     "Database mapping is not one-to-one."
                     " %s %s have collections mapped to %s"
                     % (", ".join(dbs),

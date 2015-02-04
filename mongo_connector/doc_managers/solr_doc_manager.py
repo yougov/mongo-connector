@@ -24,7 +24,6 @@ import json
 import logging
 import os
 import re
-import urllib
 
 from pysolr import Solr, SolrError
 
@@ -32,7 +31,8 @@ from mongo_connector import errors
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
-from mongo_connector.compat import Request, urlopen, URLError, HTTPError
+from mongo_connector.compat import (
+    Request, urlopen, urlencode, URLError, HTTPError)
 from mongo_connector.util import exception_wrapper, retry_until_ok
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DocumentFlattener
@@ -295,10 +295,10 @@ class DocManager(DocManagerBase):
             params['commit'] = 'true'
 
         request = Request(os.path.join(
-            self.url, "update/extract?%s" % urllib.urlencode(params)))
+            self.url, "update/extract?%s" % urlencode(params)))
 
         request.add_header("Content-type", "application/octet-stream")
-        request.add_data(f)
+        request.data = f
         response = urlopen(request)
         logging.debug(response.read())
 

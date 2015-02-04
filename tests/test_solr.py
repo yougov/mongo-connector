@@ -114,7 +114,7 @@ class TestSolr(SolrTestCase):
         """
         fs = GridFS(self.conn['test'], 'test')
         test_data = "test_insert_file test file"
-        id = fs.put(test_data, filename="test.txt")
+        id = fs.put(test_data, filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
 
         res = list(self.solr_conn.search('test_insert_file'))
@@ -128,7 +128,7 @@ class TestSolr(SolrTestCase):
         """Tests removing a gridfs file
         """
         fs = GridFS(self.conn['test'], 'test')
-        id = fs.put("test file", filename="test.txt")
+        id = fs.put("test file", filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 1)
         fs.delete(id)
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 0)
@@ -224,8 +224,7 @@ class TestSolr(SolrTestCase):
         time.sleep(5)
         retry_until_ok(self.conn.test.test.insert,
                        {'name': 'pauline'})
-        assert_soon(
-            lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 2)
+        assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 2)
 
         result_set_1 = list(self.solr_conn.search('pauline'))
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
