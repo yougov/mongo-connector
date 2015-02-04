@@ -496,12 +496,13 @@ class OplogThread(threading.Thread):
                     upsert_each(dm)
 
                 # Dump GridFS files
-                for gridfs_ns in self.gridfs_files_set:
+                for gridfs_ns in self.gridfs_set:
                     db, coll = gridfs_ns.split('.', 1)
                     mongo_coll = self.primary_client[db][coll]
-                    for doc in docs_to_dump(gridfs_ns):
+                    dest_ns = self.dest_mapping.get(gridfs_ns, gridfs_ns)
+                    for doc in docs_to_dump(gridfs_ns + '.files'):
                         gridfile = GridFSFile(mongo_coll, doc)
-                        dm.insert_file(gridfile, gridfs_ns, long_ts)
+                        dm.insert_file(gridfile, dest_ns, long_ts)
             except:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,
