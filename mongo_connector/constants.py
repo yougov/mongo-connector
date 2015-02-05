@@ -15,18 +15,20 @@
 # Maximum # of documents to process before recording timestamp
 # default = -1 (no maximum)
 DEFAULT_BATCH_SIZE = -1
+
 # Interval in seconds between doc manager flushes (i.e. auto commit)
 # default = None (never auto commit)
 DEFAULT_COMMIT_INTERVAL = None
+
 # Maximum # of documents to send in a single bulk request through a
 # DocManager. This only affects DocManagers that cannot stream their
 # requests.
 DEFAULT_MAX_BULK = 500
-# ROTATING LOGFILE
-# The type of interval
-# (seconds, minutes, hours... c.f. logging.handlers.TimedRotatingFileHandler)
-DEFAULT_LOGFILE_WHEN = "midnight"
-# The rollover interval
-DEFAULT_LOGFILE_INTERVAL = 1
-# Number of log file to keep
-DEFAULT_LOGFILE_BACKUPCOUNT = 7
+
+# The default MongoDB field that will serve as the unique key for the
+# target system.
+DEFAULT_UNIQUE_KEY = "_id"
+
+# Default host and facility for logging to the syslog.
+DEFAULT_SYSLOG_HOST = "localhost:512"
+DEFAULT_SYSLOG_FACILITY = "user"

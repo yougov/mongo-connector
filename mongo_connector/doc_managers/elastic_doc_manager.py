@@ -17,6 +17,7 @@
 Receives documents from an OplogThread and takes the appropriate actions on
 Elasticsearch.
 """
+import base64
 import logging
 
 from threading import Timer
@@ -30,16 +31,17 @@ from mongo_connector import errors
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
-from mongo_connector.util import retry_until_ok
-from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.util import exception_wrapper, retry_until_ok
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
-
 
 wrap_exceptions = exception_wrapper({
     es_exceptions.ConnectionError: errors.ConnectionFailed,
     es_exceptions.TransportError: errors.OperationFailed,
-    es_exceptions.RequestError: errors.OperationFailed
-})
+    es_exceptions.NotFoundError: errors.OperationFailed,
+    es_exceptions.RequestError: errors.OperationFailed})
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManager(DocManagerBase):
@@ -52,10 +54,9 @@ class DocManager(DocManagerBase):
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  meta_index_name="mongodb_meta", meta_type="mongodb_meta",
-                 **kwargs):
+                 attachment_field="content", **kwargs):
         self.elastic = Elasticsearch(hosts=[url])
         self.auto_commit_interval = auto_commit_interval
-        self.doc_type = 'string'  # default type is string, change if needed
         self.meta_index_name = meta_index_name
         self.meta_type = meta_type
         self.unique_key = unique_key
@@ -63,6 +64,14 @@ class DocManager(DocManagerBase):
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
         self._formatter = DefaultDocumentFormatter()
+
+        self.has_attachment_mapping = False
+        self.attachment_field = attachment_field
+
+    def _index_and_mapping(self, namespace):
+        """Helper method for getting the index and type from a namespace."""
+        index, doc_type = namespace.split('.', 1)
+        return index.lower(), doc_type
 
     def stop(self):
         """Stop the auto-commit thread."""
@@ -75,41 +84,63 @@ class DocManager(DocManagerBase):
         return super(DocManager, self).apply_update(doc, update_spec)
 
     @wrap_exceptions
-    def update(self, doc, update_spec):
+    def handle_command(self, doc, namespace, timestamp):
+        db = namespace.split('.', 1)[0]
+        if doc.get('dropDatabase'):
+            dbs = self.command_helper.map_db(db)
+            for _db in dbs:
+                self.elastic.indices.delete(index=_db.lower())
+
+        if doc.get('renameCollection'):
+            raise errors.OperationFailed(
+                "elastic_doc_manager does not support renaming a mapping.")
+
+        if doc.get('create'):
+            db, coll = self.command_helper.map_collection(db, doc['create'])
+            if db and coll:
+                self.elastic.indices.put_mapping(
+                    index=db.lower(), doc_type=coll,
+                    body={
+                        "_source": {"enabled": True}
+                    })
+
+        if doc.get('drop'):
+            db, coll = self.command_helper.map_collection(db, doc['drop'])
+            if db and coll:
+                self.elastic.indices.delete_mapping(index=db.lower(),
+                                                    doc_type=coll)
+
+    @wrap_exceptions
+    def update(self, document_id, update_spec, namespace, timestamp):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
         """
         self.commit()
-        document = self.elastic.get(index=doc['ns'],
-                                    id=u(doc['_id']))
+        index, doc_type = self._index_and_mapping(namespace)
+        document = self.elastic.get(index=index, doc_type=doc_type,
+                                    id=u(document_id))
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        # Add metadata fields back into updated, for the purposes of
-        # calling upsert(). Need to do this until these become separate
-        # arguments in 2.x
-        updated['ns'] = doc['ns']
-        updated['_ts'] = doc['_ts']
-        self.upsert(updated)
+        self.upsert(updated, namespace, timestamp)
         # upsert() strips metadata, so only _id + fields in _source still here
         return updated
 
     @wrap_exceptions
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         """Insert a document into Elasticsearch."""
-        doc_type = self.doc_type
-        index = doc.pop('ns')
+        index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
         doc_id = u(doc.pop("_id"))
         metadata = {
-            "ns": index,
-            "_ts": doc.pop("_ts")
+            "ns": namespace,
+            "_ts": timestamp
         }
-        # Index the source document
+        # Index the source document, using lowercase namespace as index name.
         self.elastic.index(index=index, doc_type=doc_type,
                            body=self._formatter.format_document(doc), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
-        # Index document metadata
+        # Index document metadata with original namespace (mixed upper/lower).
         self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
                            body=bson.json_util.dumps(metadata), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
@@ -117,18 +148,17 @@ class DocManager(DocManagerBase):
         doc['_id'] = doc_id
 
     @wrap_exceptions
-    def bulk_upsert(self, docs):
+    def bulk_upsert(self, docs, namespace, timestamp):
         """Insert multiple documents into Elasticsearch."""
         def docs_to_upsert():
             doc = None
             for doc in docs:
                 # Remove metadata and redundant _id
-                index = doc.pop("ns")
+                index, doc_type = self._index_and_mapping(namespace)
                 doc_id = u(doc.pop("_id"))
-                timestamp = doc.pop("_ts")
                 document_action = {
                     "_index": index,
-                    "_type": self.doc_type,
+                    "_type": doc_type,
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
                 }
@@ -158,7 +188,7 @@ class DocManager(DocManagerBase):
 
             for ok, resp in responses:
                 if not ok:
-                    logging.error(
+                    LOG.error(
                         "Could not bulk-upsert document "
                         "into ElasticSearch: %r" % resp)
             if self.auto_commit_interval == 0:
@@ -169,13 +199,47 @@ class DocManager(DocManagerBase):
             pass
 
     @wrap_exceptions
-    def remove(self, doc):
+    def insert_file(self, f, namespace, timestamp):
+        doc = f.get_metadata()
+        doc_id = str(doc.pop('_id'))
+        index, doc_type = self._index_and_mapping(namespace)
+
+        # make sure that elasticsearch treats it like a file
+        if not self.has_attachment_mapping:
+            body = {
+                "properties": {
+                    self.attachment_field: {"type": "attachment"}
+                }
+            }
+            self.elastic.indices.put_mapping(index=index,
+                                             doc_type=doc_type,
+                                             body=body)
+            self.has_attachment_mapping = True
+
+        metadata = {
+            'ns': namespace,
+            '_ts': timestamp,
+        }
+
+        doc = self._formatter.format_document(doc)
+        doc[self.attachment_field] = base64.b64encode(f.read()).decode()
+
+        self.elastic.index(index=index, doc_type=doc_type,
+                           body=doc, id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
+        self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
+                           body=bson.json_util.dumps(metadata), id=doc_id,
+                           refresh=(self.auto_commit_interval == 0))
+
+    @wrap_exceptions
+    def remove(self, document_id, namespace, timestamp):
         """Remove a document from Elasticsearch."""
-        self.elastic.delete(index=doc['ns'], doc_type=self.doc_type,
-                            id=u(doc["_id"]),
+        index, doc_type = self._index_and_mapping(namespace)
+        self.elastic.delete(index=index, doc_type=doc_type,
+                            id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
         self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,
-                            id=u(doc["_id"]),
+                            id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions

@@ -3,16 +3,14 @@ import re
 import sys
 import uuid
 
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-
 import bson
+
+sys.path[0:0] = [""]
 
 from mongo_connector.compat import PY3
 from mongo_connector.doc_managers.formatters import (
     DefaultDocumentFormatter, DocumentFlattener)
+from tests import unittest
 
 
 class TestFormatters(unittest.TestCase):

@@ -15,88 +15,102 @@
 """Test mongo using the synchronizer, i.e. as it would be used by an
     user
 """
-import time
 import os
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
+import time
+
+from gridfs import GridFS
 
 sys.path[0:0] = [""]
 
-from pymongo import MongoClient
-from tests import mongo_host, STRESS_COUNT
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set,
-                                 start_mongo_proc,
-                                 restart_mongo_proc,
-                                 kill_mongo_proc)
+from tests.setup_cluster import ReplicaSet, Server
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from pymongo.errors import OperationFailure, AutoReconnect
+from tests import unittest, connector_opts
 from tests.util import assert_soon
 
 
-class TestSynchronizer(unittest.TestCase):
+class MongoTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.standalone = Server().start()
+        cls.mongo_doc = DocManager(cls.standalone.uri)
+        cls.mongo_conn = cls.standalone.client()
+        cls.mongo = cls.mongo_conn['test']['test']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.standalone.stop()
+
+    def _search(self):
+        for doc in self.mongo.find():
+            yield doc
+
+        fs = GridFS(self.mongo_conn['test'], 'test')
+        for doc in self.mongo_conn['__mongo_connector']['test.test'].find():
+            if doc.get('gridfs_id'):
+                for f in fs.find({'_id': doc['gridfs_id']}):
+                    doc['filename'] = f.filename
+                    doc['content'] = f.read()
+                    yield doc
+
+    def _remove(self):
+        self.mongo_conn['test']['test'].drop()
+        self.mongo_conn['test']['test.files'].drop()
+        self.mongo_conn['test']['test.chunks'].drop()
+
+
+class TestMongo(MongoTestCase):
     """ Tests the mongo instance
     """
 
     @classmethod
     def setUpClass(cls):
-        try:
-            os.unlink("config.txt")
-        except OSError:
-            pass
-        open("config.txt", "w").close()
-        cls.standalone_port = start_mongo_proc(options=['--nojournal',
-                                                        '--noprealloc'])
-        cls.mongo_doc = DocManager('%s:%d' % (mongo_host, cls.standalone_port))
-        cls.mongo_doc._remove()
-        _, cls.secondary_p, cls.primary_p = start_replica_set('test-mongo')
-        cls.conn = MongoClient(mongo_host, cls.primary_p,
-                               replicaSet='test-mongo')
+        MongoTestCase.setUpClass()
+        cls.repl_set = ReplicaSet().start()
+        cls.conn = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):
         """ Kills cluster instance
         """
-        kill_mongo_proc(cls.standalone_port)
-        kill_replica_set('test-mongo')
+        MongoTestCase.tearDownClass()
+        cls.repl_set.stop()
 
     def tearDown(self):
         self.connector.join()
 
     def setUp(self):
+        try:
+            os.unlink("oplog.timestamp")
+        except OSError:
+            pass
+        self._remove()
         self.connector = Connector(
-            address='%s:%s' % (mongo_host, self.primary_p),
-            oplog_checkpoint="config.txt",
-            target_url='%s:%d' % (mongo_host, self.standalone_port),
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
-            u_key='_id',
-            auth_key=None,
-            doc_manager='mongo_connector/doc_managers/mongo_doc_manager.py'
+            doc_managers=(self.mongo_doc,),
+            gridfs_set=['test.test'],
+            **connector_opts
         )
+
+        self.conn.test.test.drop()
+        self.conn.test.test.files.drop()
+        self.conn.test.test.chunks.drop()
+
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
-        self.conn['test']['test'].remove()
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 0)
-
-    def test_shard_length(self):
-        """Tests the shard_length to see if the shard set was recognized
-            properly
-        """
-
-        self.assertEqual(len(self.connector.shard_set), 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 0)
 
     def test_insert(self):
         """Tests insert
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
-        result_set_1 = self.mongo_doc._search()
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+        result_set_1 = self._search()
         self.assertEqual(sum(1 for _ in result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
         for item in result_set_1:
@@ -108,16 +122,38 @@ class TestSynchronizer(unittest.TestCase):
         """
 
         self.conn['test']['test'].insert({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
         self.conn['test']['test'].remove({'name': 'paulie'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) != 1)
-        self.assertEqual(sum(1 for _ in self.mongo_doc._search()), 0)
+        assert_soon(lambda: sum(1 for _ in self._search()) != 1)
+        self.assertEqual(sum(1 for _ in self._search()), 0)
+
+    def test_insert_file(self):
+        """Tests inserting a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        test_data = b"test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt", encoding='utf8')
+        assert_soon(lambda: sum(1 for _ in self._search()) > 0)
+
+        res = list(self._search())
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc['filename'], 'test.txt')
+        self.assertEqual(doc['_id'], id)
+        self.assertEqual(doc['content'], test_data)
+
+    def test_remove_file(self):
+        fs = GridFS(self.conn['test'], 'test')
+        id = fs.put("test file", filename="test.txt", encoding='utf8')
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+        fs.delete(id)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 0)
 
     def test_update(self):
         """Test update operations."""
         # Insert
         self.conn.test.test.insert({"a": 0})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         def check_update(update_spec):
             updated = self.conn.test.test.find_and_modify(
@@ -159,118 +195,44 @@ class TestSynchronizer(unittest.TestCase):
             primary, adding another doc, killing the new primary, and then
             restarting both.
         """
-        primary_conn = MongoClient(mongo_host, self.primary_p)
+        primary_conn = self.repl_set.primary.client()
         self.conn['test']['test'].insert({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 1)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
-        kill_mongo_proc(self.primary_p, destroy=False)
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+        self.repl_set.primary.stop(destroy=False)
+        new_primary_conn = self.repl_set.secondary.client()
         admin = new_primary_conn['admin']
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
 
         retry_until_ok(self.conn.test.test.insert,
                        {'name': 'pauline'})
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search()) == 2)
-        result_set_1 = list(self.mongo_doc._search())
+        assert_soon(lambda: sum(1 for _ in self._search()) == 2)
+        result_set_1 = list(self._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
         #make sure pauline is there
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
-        restart_mongo_proc(self.primary_p)
+        self.repl_set.primary.start()
         assert_soon(
             lambda: primary_conn['admin'].command("isMaster")['ismaster'])
 
-        restart_mongo_proc(self.secondary_p)
+        self.repl_set.secondary.start()
 
         time.sleep(2)
-        result_set_1 = list(self.mongo_doc._search())
+        result_set_1 = list(self._search())
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item['name'], 'paul')
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
-
-    def test_stress(self):
-        """Test stress by inserting and removing the number of documents
-            specified in global
-            variable
-        """
-
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-        time.sleep(5)
-        search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
-        assert_soon(condition)
-        for i in range(0, STRESS_COUNT):
-            result_set_1 = self.mongo_doc._search()
-            for item in result_set_1:
-                if(item['name'] == 'Paul' + str(i)):
-                    self.assertEqual(item['_id'], item['_id'])
-
-    def test_stressed_rollback(self):
-        """Test stressed rollback with number of documents equal to specified
-            in global variable. Strategy for rollback is the same as before.
-        """
-
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-
-        search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
-        assert_soon(condition)
-        primary_conn = MongoClient(mongo_host, self.primary_p)
-
-        kill_mongo_proc(self.primary_p, destroy=False)
-
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
-
-        admin = new_primary_conn['admin']
-        assert_soon(lambda: admin.command("isMaster")['ismaster'])
-
-        time.sleep(5)
-        count = -1
-        while count + 1 < STRESS_COUNT:
-            try:
-                count += 1
-                self.conn['test']['test'].insert(
-                    {'name': 'Pauline ' + str(count)})
-            except (OperationFailure, AutoReconnect):
-                time.sleep(1)
-        assert_soon(lambda: sum(1 for _ in self.mongo_doc._search())
-                    == self.conn['test']['test'].find().count())
-        result_set_1 = self.mongo_doc._search()
-        for item in result_set_1:
-            if 'Pauline' in item['name']:
-                result_set_2 = self.conn['test']['test'].find_one(
-                    {'name': item['name']})
-                self.assertEqual(item['_id'], result_set_2['_id'])
-
-        kill_mongo_proc(self.secondary_p, destroy=False)
-
-        restart_mongo_proc(self.primary_p)
-        db_admin = primary_conn['admin']
-        assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
-        restart_mongo_proc(self.secondary_p)
-
-        search = self.mongo_doc._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
-        assert_soon(condition)
-
-        result_set_1 = list(self.mongo_doc._search())
-        self.assertEqual(len(result_set_1), STRESS_COUNT)
-        for item in result_set_1:
-            self.assertTrue('Paul' in item['name'])
-        find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), STRESS_COUNT)
 
 
 if __name__ == '__main__':

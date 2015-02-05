@@ -1,4 +1,4 @@
-# Copyright 2013-2014 MongoDB, Inc.
+# Copyright 2015 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,207 +12,175 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Utilities for spawning and killing mongodb clusters for use with the tests
-"""
-
-from itertools import count
+import atexit
+import itertools
 import os
-import shutil
-import socket
-import subprocess
-import time
 
-from pymongo import MongoClient
-from tests import mongo_host, mongo_start_port
-from tests.util import assert_soon
+import pymongo
+import requests
 
-free_port = count(mongo_start_port)
-nodes = {}
+from tests import db_user, db_password
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.join(HERE, "data")
-LOG_ROOT = os.path.join(HERE, "logs")
-KEY_FILE = os.environ.get("KEY_FILE")
+_mo_address = os.environ.get("MO_ADDRESS", "localhost:8889")
+_mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
+_free_port = itertools.count(_mongo_start_port)
+
+DEFAULT_OPTIONS = {
+    'logappend': True,
+    'setParameter': {'enableTestCommands': 1}
+}
 
 
-def create_dir(dir_path):
-    """Create a directory and its parents, if necessary."""
-    try:
-        os.makedirs(dir_path)
-    except OSError:     # directory may exist already
-        pass
+_post_request_template = {}
+if db_user and db_password:
+    _post_request_template = {'login': db_user, 'password': db_password}
 
 
-def wait_for_proc(proc, port):
-    """Wait for a mongo process to start on a given port."""
-    attempts = 0
-    while proc.poll() is None and attempts < 160:
-        attempts += 1
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            try:
-                s.connect((mongo_host, port))
-                return True
-            except (IOError, socket.error):
-                time.sleep(0.25)
-        finally:
-            s.close()
-    kill_all()
-    return False
+def _proc_params(mongos=False):
+    params = dict(port=next(_free_port), **DEFAULT_OPTIONS)
+    if not mongos:
+        params['smallfiles'] = True
+        params['noprealloc'] = True
+        params['nojournal'] = True
+
+    return params
 
 
-def start_mongo_proc(proc="mongod", options=[]):
-    """Start a single mongod or mongos process.
-    Returns the port on which the process was started.
-
-    """
-    # Build command
-    next_free_port = next(free_port)
-    dbpath = os.path.join(DATA_ROOT, str(next_free_port))
-    logpath = os.path.join(LOG_ROOT, "%d.log" % next_free_port)
-    cmd = [proc, "--port", next_free_port,
-           "--logpath", logpath, "--logappend",
-           "--setParameter", "enableTestCommands=1"] + options
-
-    # Refresh directories
-    create_dir(os.path.dirname(logpath))
-    if proc == 'mongod':
-        cmd.extend(['--dbpath', dbpath])
-        shutil.rmtree(dbpath, ignore_errors=True)
-        create_dir(dbpath)
-
-    # Start the process
-    cmd = list(map(str, cmd))
-    mongo = subprocess.Popen(cmd,
-                             stdout=open(os.devnull, 'w'),
-                             stderr=subprocess.STDOUT)
-    nodes[next_free_port] = {"proc": mongo, "cmd": cmd}
-    # Wait until a connection can be established
-    assert(wait_for_proc(mongo, next_free_port))
-    return next_free_port
+def _mo_url(resource, *args):
+    return 'http://' + '/'.join([_mo_address, resource] + list(args))
 
 
-def restart_mongo_proc(port):
-    """Restart a mongo process by port number that was killed."""
-    mongo = subprocess.Popen(nodes[port]['cmd'],
-                             stdout=open(os.devnull, 'w'),
-                             stderr=subprocess.STDOUT)
-    nodes[port]['proc'] = mongo
-    assert(wait_for_proc(mongo, port))
-    return port
+@atexit.register
+def kill_all():
+    clusters = requests.get(_mo_url('sharded_clusters')).json()
+    repl_sets = requests.get(_mo_url('replica_sets')).json()
+    servers = requests.get(_mo_url('servers')).json()
+    for cluster in clusters['sharded_clusters']:
+        requests.delete(_mo_url('sharded_clusters', cluster['id']))
+    for rs in repl_sets['replica_sets']:
+        requests.delete(_mo_url('relica_sets', rs['id']))
+    for server in servers['servers']:
+        requests.delete(_mo_url('servers', server['id']))
 
 
-def kill_mongo_proc(port, destroy=True):
-    """Kill a mongod or mongos process by port number."""
-    nodes[port]['proc'].terminate()
-    if destroy:
-        shutil.rmtree(os.path.join(DATA_ROOT, str(port)), ignore_errors=True)
-        os.unlink(os.path.join(LOG_ROOT, "%d.log" % port))
-        nodes.pop(port)
+class MCTestObject(object):
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def _make_post_request(self):
+        config = _post_request_template.copy()
+        config.update(self.get_config())
+        return requests.post(
+            _mo_url(self._resource), timeout=None, json=config).json()
+
+    def client(self, **kwargs):
+        client = pymongo.MongoClient(self.uri, **kwargs)
+        if db_user:
+            client.admin.authenticate(db_user, db_password)
+        return client
+
+    def stop(self):
+        requests.delete(_mo_url(self._resource, self.id))
 
 
-def start_replica_set(set_name, num_members=3, num_arbiters=1):
-    """Start a replica set with a given name."""
-    # Start members
-    repl_ports = [start_mongo_proc(options=["--replSet", set_name,
-                                            "--noprealloc",
-                                            "--nojournal"])
-                  for i in range(num_members)]
-    # Initialize set
-    client = MongoClient(mongo_host, repl_ports[-1])
-    client.admin.command(
-        'replSetInitiate',
-        {
-            '_id': set_name, 'members': [
-                {
-                    '_id': i,
-                    'host': '%s:%d' % (mongo_host, p),
-                    'arbiterOnly': (i < num_arbiters)
-                }
-                for i, p in enumerate(repl_ports)
+class Server(MCTestObject):
+
+    _resource = 'servers'
+
+    def __init__(self, id=None, uri=None):
+        self.id = id
+        self.uri = uri
+
+    def get_config(self):
+        return {'name': 'mongod', 'procParams': _proc_params()}
+
+    def start(self):
+        if self.id is None:
+            response = self._make_post_request()
+            self.id = response['id']
+            self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
+        else:
+            requests.post(
+                _mo_url('servers', self.id), timeout=None,
+                json={'action': 'start'}
+            )
+        return self
+
+    def stop(self, destroy=True):
+        if destroy:
+            super(Server, self).stop()
+        else:
+            requests.post(_mo_url('servers', self.id), timeout=None,
+                          json={'action': 'stop'})
+
+
+class ReplicaSet(MCTestObject):
+
+    _resource = 'replica_sets'
+
+    def __init__(self, id=None, uri=None, primary=None, secondary=None):
+        self.id = id
+        self.uri = uri
+        self.primary = primary
+        self.secondary = secondary
+
+    def get_config(self):
+        return {
+            'members': [
+                {'procParams': _proc_params()},
+                {'procParams': _proc_params()},
+                {'rsParams': {'arbiterOnly': True},
+                 'procParams': _proc_params()}
             ]
         }
-    )
-    # Wait for primary
-    assert_soon(lambda: client.admin.command("isMaster")['ismaster'])
-    # Wait for secondaries
-    for port in repl_ports[num_arbiters:-1]:
-        secondary_client = MongoClient(mongo_host, port)
-        assert_soon(
-            lambda: secondary_client.admin.command(
-                'replSetGetStatus')['myState'] == 2)
-    # Tag primary
-    nodes[client.port]['master'] = True
-    # Tag arbiters
-    for port in repl_ports[:num_arbiters]:
-        nodes[port]['arbiter'] = True
-    return repl_ports
+
+    def _init_from_response(self, response):
+        self.id = response['id']
+        self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
+        for member in response['members']:
+            if member['state'] == 1:
+                self.primary = Server(member['server_id'], member['host'])
+            elif member['state'] == 2:
+                self.secondary = Server(member['server_id'], member['host'])
+        return self
+
+    def start(self):
+        # We never need to restart a replica set, only start new ones.
+        return self._init_from_response(self._make_post_request())
 
 
-def kill_replica_set(set_name):
-    """Kill a replica set by name."""
-    for port, proc_doc in list(nodes.items()):
-        if set_name in proc_doc['cmd']:
-            kill_mongo_proc(port)
+class ShardedCluster(MCTestObject):
 
+    _resource = 'sharded_clusters'
 
-def start_cluster(num_shards=2):
-    """Start a sharded cluster. Returns the port of the mongos."""
-    # Config
-    config_port = start_mongo_proc(options=["--configsvr",
-                                            "--noprealloc",
-                                            "--nojournal"])
+    def __init__(self):
+        self.id = None
+        self.uri = None
+        self.shards = []
 
-    # Mongos
-    mongos_port = start_mongo_proc(proc="mongos", options=[
-        "--configdb", "%s:%d" % (mongo_host, config_port)
-    ])
-    nodes[mongos_port]['config'] = config_port
+    def get_config(self):
+        return {
+            'shards': [
+                {'id': 'demo-set-0', 'shardParams': ReplicaSet().get_config()},
+                {'id': 'demo-set-1', 'shardParams': ReplicaSet().get_config()}
+            ],
+            'routers': [_proc_params(mongos=True)],
+            'configsvrs': [_proc_params()]
+        }
 
-    # Shards
-    client = MongoClient(mongo_host, mongos_port)
-    for shard in range(num_shards):
-        shard_name = "demo-set-%d" % shard
-        repl_ports = start_replica_set(shard_name)
-        nodes[mongos_port].setdefault("shards", []).append(shard_name)
-        shard_str = "%s/%s" % (shard_name, ",".join("%s:%d" % (mongo_host, port)
-                                                    for port in repl_ports))
-        client.admin.command("addShard", shard_str)
-    return mongos_port
-
-
-def get_shard(mongos_port, index):
-    """Return a document containing the primary and secondaries of a replica
-    set shard by mongos port and shard index:
-
-    {'primary': 12345, 'secondaries': [12121], 'arbiters': [23232]}
-
-    """
-    repl = nodes[mongos_port]['shards'][index]
-    doc = {}
-    for port, node in nodes.items():
-        if repl in node['cmd']:
-            if node.get('master'):
-                doc['primary'] = port
-            elif node.get('arbiter'):
-                doc.setdefault('arbiters', []).append(port)
-            else:
-                doc.setdefault('secondaries', []).append(port)
-    return doc
-
-
-def kill_cluster(mongos_port):
-    """Kill mongod and mongos processes in a sharded cluster by mongos port."""
-    for shard in nodes[mongos_port].get("shards", []):
-        kill_replica_set(shard)
-    kill_mongo_proc(nodes[mongos_port]['config'])
-    kill_mongo_proc(mongos_port)
-
-
-def kill_all():
-    """Kill all mongod and mongos instances."""
-    for port in list(nodes.keys()):
-        kill_mongo_proc(port)
-    shutil.rmtree(LOG_ROOT, ignore_errors=True)
-    shutil.rmtree(DATA_ROOT, ignore_errors=True)
+    def start(self):
+        # We never need to restart a sharded cluster, only start new ones.
+        response = self._make_post_request()
+        for shard in response['shards']:
+            if shard['id'] == 'demo-set-0':
+                repl1_id = shard['_id']
+            elif shard['id'] == 'demo-set-1':
+                repl2_id = shard['_id']
+        shard1 = requests.get(_mo_url('replica_sets', repl1_id)).json()
+        shard2 = requests.get(_mo_url('replica_sets', repl2_id)).json()
+        self.id = response['id']
+        self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
+        self.shards = [ReplicaSet()._init_from_response(resp)
+                       for resp in (shard1, shard2)]
+        return self

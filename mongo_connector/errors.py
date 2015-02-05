@@ -30,14 +30,13 @@ class OperationFailed(MongoConnectorError):
     """
 
 
-class EmptyDocsError(MongoConnectorError):
-    """Raised on attempts to upsert empty sequences of documents
+class InvalidConfiguration(MongoConnectorError):
+    """Raised when the user specifies an invalid configuration
     """
 
 
-class ConnectorError(MongoConnectorError):
-    """Raised when creating a mongo_connector.Connector object with
-    nonsensical parameters
+class EmptyDocsError(MongoConnectorError):
+    """Raised on attempts to upsert empty sequences of documents
     """
 
 

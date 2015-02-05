@@ -1,14 +1,42 @@
 Changelog
 =========
 
-Version 1.3.1
--------------
+Version 2.0.dev0
+----------------
 
-Version 1.3.1 contains mostly bug fixes and adds timezone-aware timestamp support. Bugs fixed include:
+Version 2.0.dev0 is a development version that will become version 2.0.
 
-- Fixes for update operations to Solr.
-- Re-insert documents that were deleted before a rollback.
-- Catch a few additional exceptions sometimes thrown by the Elasticsearch Python driver.
+Improvements
+~~~~~~~~~~~~
+
+- SSL certificates may now be given to Mongo Connector to validate connections to MongoDB.
+- A new JSON configuration file makes configuring and starting Mongo Connector as a system service much easier.
+- The `setup.py` file can now install Mongo Connector as a service automatically.
+- Support for replicating files in GridFS.
+- Allow DocManagers to be distributed as separate packages, rather than needing a fork or pull request.
+- DocManagers may handle arbitrary database commands in the oplog.
+
+Bug Fixes
+~~~~~~~~~
+
+- Adding an element beyond the end of an array in MongoDB no longer throws an exception.
+- All errors that cause Mongo Connector to exit are written to the log.
+- Automatically use all-lowercase index names when targeting Elasticsearch.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+
+- The constructor signatures for OplogThread and Connector have changed:
+        - The `u_key` and `target_url` keyword arguments have been removed from the constructor for Connector.
+        - `target_url` is gone from the OplogThread constructor.
+        - The `doc_manager` keyword argument in the constructors for Connector and OplogThread is now called `doc_managers`.
+        - The `doc_managers` keyword argument in Connector takes a list of **instances** of `DocManager`, rather that a list of strings corresponding to files that define DocManagers.
+- ConnectorError has been removed. Exceptions that occur when constructing Connector will be passed on to the caller.
+- The DocManagerBase class moved from mongo_connector.doc_managers to mongo_connector.doc_managers.doc_manager_base
+- The exception_wrapper function moved from mongo_connector.doc_managers to mongo_connector.util
+- The arguments to many DocManager methods have changed. For an up-to-date overview of how to write a custom DocManager, see the `Writing Your Own DocManager wiki page <https://github.com/10gen-labs/mongo-connector/wiki/Writing-Your-Own-DocManager>`__. A synopsis:
+        - The `remove` method now takes a document id, namespace, and a timestamp instead of a whole document.
+        - The `upsert`, `bulk_upsert`, and `update` methods all take two additional arguments: namespace and timestamp.
 
 Version 1.3
 -----------

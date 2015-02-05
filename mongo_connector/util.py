@@ -15,10 +15,29 @@
 """A set of utilities used throughout the mongo-connector
 """
 
-import time
 import logging
+import sys
+import time
 
 from bson.timestamp import Timestamp
+from mongo_connector.compat import reraise
+
+LOG = logging.getLogger(__name__)
+
+
+def exception_wrapper(mapping):
+    def decorator(f):
+        def wrapped(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                new_type = mapping.get(exc_type)
+                if new_type is None:
+                    raise
+                reraise(new_type, exc_value, exc_tb)
+        return wrapped
+    return decorator
 
 
 def bson_ts_to_long(timestamp):
@@ -54,7 +73,17 @@ def retry_until_ok(func, *args, **kwargs):
         except Exception:
             count += 1
             if count > 60:
-                logging.error('Call to %s failed too many times in '
+                LOG.exception('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
             time.sleep(1)
+
+
+def log_fatal_exceptions(func):
+    def wrapped(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception:
+            LOG.error("Fatal Exception")
+            raise
+    return wrapped

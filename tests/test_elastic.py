@@ -13,29 +13,23 @@
 # limitations under the License.
 
 """Integration tests for mongo-connector + Elasticsearch."""
-import time
+import base64
 import os
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
+import time
+
+from elasticsearch import Elasticsearch
+from gridfs import GridFS
 
 sys.path[0:0] = [""]
 
-from elasticsearch import Elasticsearch
-from pymongo import MongoClient
-
-from tests import elastic_pair, mongo_host, STRESS_COUNT
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set,
-                                 restart_mongo_proc,
-                                 kill_mongo_proc)
+from tests import elastic_pair
+from tests.setup_cluster import ReplicaSet
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from pymongo.errors import OperationFailure, AutoReconnect
 from tests.util import assert_soon
+from tests import unittest
 
 
 class ElasticsearchTestCase(unittest.TestCase):
@@ -49,28 +43,37 @@ class ElasticsearchTestCase(unittest.TestCase):
 
     def setUp(self):
         # Create target index in elasticsearch
-        self.elastic_conn.indices.create(index='test.test', ignore=400)
+        self.elastic_conn.indices.create(index='test', ignore=400)
         self.elastic_conn.cluster.health(wait_for_status='yellow',
-                                         index='test.test')
+                                         index='test')
 
     def tearDown(self):
-        self.elastic_conn.indices.delete(index='test.test', ignore=404)
+        self.elastic_conn.indices.delete(index='test', ignore=404)
 
-    def _search(self):
+    def _search(self, query=None):
+        query = query or {"match_all": {}}
         return self.elastic_doc._stream_search(
-            index="test.test",
-            body={"query": {"match_all": {}}}
+            index="test", doc_type='test',
+            body={"query": query}
         )
 
     def _count(self):
-        return self.elastic_conn.count(index='test.test')['count']
+        return self.elastic_conn.count(index='test')['count']
 
     def _remove(self):
         self.elastic_conn.indices.delete_mapping(
-            index="test.test",
-            doc_type=self.elastic_doc.doc_type
+            index="test", doc_type='test'
         )
-        self.elastic_conn.indices.refresh(index="test.test")
+        self.elastic_conn.indices.refresh(index="test")
+
+    def _mappings(self, index='_all'):
+        mappings = self.elastic_conn.indices.get_mapping(index=index)
+        if index in mappings:
+            return list(mappings[index]['mappings'].keys())
+        return []
+
+    def _indices(self):
+        return list(self.elastic_conn.indices.stats()['indices'].keys())
 
 
 class TestElastic(ElasticsearchTestCase):
@@ -80,14 +83,13 @@ class TestElastic(ElasticsearchTestCase):
     def setUpClass(cls):
         """Start the cluster."""
         super(TestElastic, cls).setUpClass()
-        _, cls.secondary_p, cls.primary_p = start_replica_set('test-elastic')
-        cls.conn = MongoClient(mongo_host, cls.primary_p,
-                               replicaSet='test-elastic')
+        cls.repl_set = ReplicaSet().start()
+        cls.conn = cls.repl_set.client()
 
     @classmethod
     def tearDownClass(cls):
         """Kill the cluster."""
-        kill_replica_set('test-elastic')
+        cls.repl_set.stop()
 
     def tearDown(self):
         """Stop the Connector thread."""
@@ -98,28 +100,24 @@ class TestElastic(ElasticsearchTestCase):
         """Start a new Connector for each test."""
         super(TestElastic, self).setUp()
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        docman = DocManager(elastic_pair)
         self.connector = Connector(
-            address='%s:%s' % (mongo_host, self.primary_p),
-            oplog_checkpoint='config.txt',
-            target_url=elastic_pair,
+            mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
-            u_key='_id',
-            auth_key=None,
-            doc_manager='mongo_connector/doc_managers/elastic_doc_manager.py',
-            auto_commit_interval=0
+            doc_managers=(docman,),
+            gridfs_set=['test.test']
         )
 
         self.conn.test.test.drop()
+        self.conn.test.test.files.drop()
+        self.conn.test.test.chunks.drop()
+
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: self._count() == 0)
-
-    def test_shard_length(self):
-        self.assertEqual(len(self.connector.shard_set), 1)
 
     def test_insert(self):
         """Test insert operations."""
@@ -139,6 +137,29 @@ class TestElastic(ElasticsearchTestCase):
         self.conn['test']['test'].remove({'name': 'paulie'})
         assert_soon(lambda: self._count() != 1)
         self.assertEqual(self._count(), 0)
+
+    def test_insert_file(self):
+        """Tests inserting a gridfs file
+        """
+        fs = GridFS(self.conn['test'], 'test')
+        test_data = b"test_insert_file test file"
+        id = fs.put(test_data, filename="test.txt", encoding='utf8')
+        assert_soon(lambda: self._count() > 0)
+
+        query = {"match": {"_all": "test_insert_file"}}
+        res = list(self._search(query))
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc['filename'], 'test.txt')
+        self.assertEqual(doc['_id'], str(id))
+        self.assertEqual(base64.b64decode(doc['content']), test_data)
+
+    def test_remove_file(self):
+        fs = GridFS(self.conn['test'], 'test')
+        id = fs.put("test file", filename="test.txt", encoding='utf8')
+        assert_soon(lambda: self._count() == 1)
+        fs.delete(id)
+        assert_soon(lambda: self._count() == 0)
 
     def test_update(self):
         """Test update operations."""
@@ -190,7 +211,7 @@ class TestElastic(ElasticsearchTestCase):
         adding another doc, killing the new primary, and then
         restarting both.
         """
-        primary_conn = MongoClient(mongo_host, self.primary_p)
+        primary_conn = self.repl_set.primary.client()
 
         self.conn['test']['test'].insert({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
@@ -199,9 +220,9 @@ class TestElastic(ElasticsearchTestCase):
         assert_soon(condition1)
         assert_soon(condition2)
 
-        kill_mongo_proc(self.primary_p, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
 
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
+        new_primary_conn = self.repl_set.secondary.client()
 
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
@@ -216,13 +237,13 @@ class TestElastic(ElasticsearchTestCase):
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], str(result_set_2['_id']))
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
-        restart_mongo_proc(self.primary_p)
+        self.repl_set.primary.start()
         while primary_conn['admin'].command("isMaster")['ismaster'] is False:
             time.sleep(1)
 
-        restart_mongo_proc(self.secondary_p)
+        self.repl_set.secondary.start()
 
         time.sleep(2)
         result_set_1 = list(self._search())
@@ -231,69 +252,6 @@ class TestElastic(ElasticsearchTestCase):
             self.assertEqual(item['name'], 'paul')
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
-
-    def test_stress(self):
-        """Stress test for inserting and removing many documents."""
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-        time.sleep(5)
-        condition = lambda: self._count() == STRESS_COUNT
-        assert_soon(condition)
-        self.assertEqual(
-            set('Paul ' + str(i) for i in range(STRESS_COUNT)),
-            set(item['name'] for item in self._search())
-        )
-
-    def test_stressed_rollback(self):
-        """Stress test for a rollback with many documents."""
-        for i in range(0, STRESS_COUNT):
-            self.conn['test']['test'].insert({'name': 'Paul ' + str(i)})
-
-        condition = lambda: self._count() == STRESS_COUNT
-        assert_soon(condition)
-        primary_conn = MongoClient(mongo_host, self.primary_p)
-        kill_mongo_proc(self.primary_p, destroy=False)
-
-        new_primary_conn = MongoClient(mongo_host, self.secondary_p)
-
-        admin = new_primary_conn['admin']
-        assert_soon(lambda: admin.command("isMaster")['ismaster'])
-
-        time.sleep(5)
-        count = -1
-        while count + 1 < STRESS_COUNT:
-            try:
-                count += 1
-                self.conn['test']['test'].insert(
-                    {'name': 'Pauline ' + str(count)})
-            except (OperationFailure, AutoReconnect):
-                time.sleep(1)
-        assert_soon(lambda: self._count()
-                    == self.conn['test']['test'].find().count())
-        result_set_1 = self._search()
-        for item in result_set_1:
-            if 'Pauline' in item['name']:
-                result_set_2 = self.conn['test']['test'].find_one(
-                    {'name': item['name']})
-                self.assertEqual(item['_id'], str(result_set_2['_id']))
-
-        kill_mongo_proc(self.secondary_p, destroy=False)
-
-        restart_mongo_proc(self.primary_p)
-        db_admin = primary_conn["admin"]
-        assert_soon(lambda: db_admin.command("isMaster")['ismaster'])
-        restart_mongo_proc(self.secondary_p)
-
-        search = self._search
-        condition = lambda: sum(1 for _ in search()) == STRESS_COUNT
-        assert_soon(condition)
-
-        result_set_1 = list(self._search())
-        self.assertEqual(len(result_set_1), STRESS_COUNT)
-        for item in result_set_1:
-            self.assertTrue('Paul' in item['name'])
-        find_cursor = retry_until_ok(self.conn['test']['test'].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), STRESS_COUNT)
 
 
 if __name__ == '__main__':

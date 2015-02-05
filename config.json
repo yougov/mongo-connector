@@ -1,0 +1,53 @@
+{
+    "__comment__": "Configuration options starting with '__' are disabled",
+    "__comment__": "To enable them, remove the preceding '__'",
+
+    "mainAddress": "localhost:27017",
+    "oplogFile": "/var/log/mongo-connector/oplog.timestamp",
+    "noDump": false,
+    "batchSize": -1,
+    "verbosity": 0,
+    "continueOnError": false,
+
+    "logging": {
+        "type": "file",
+        "filename": "/var/log/mongo-connector/mongo-connector.log",
+
+        "__type": "syslog",
+        "__host": "localhost:512"
+    },
+
+    "authentication": {
+        "__adminUsername": "username",
+        "__password": "password",
+        "__passwordFile": "mongo-connector.pwd"
+    },
+
+    "__comment__": "For more information about SSL with MongoDB, please see http://docs.mongodb.org/manual/tutorial/configure-ssl-clients/",
+    "__ssl": {
+        "__sslCertfile": "Path to certificate to identify the local connection against MongoDB",
+        "__sslKeyfile": "Path to the private key for sslCertfile. Not necessary if already included in sslCertfile.",
+        "__sslCACerts": "Path to concatenated set of certificate authority certificates to validate the other side of the connection"
+        "__sslCertificatePolicy": "Policy for validating SSL certificates provided from the other end of the connection. Possible values are 'required' (require and validate certificates), 'optional' (validate but don't require a certificate), and 'ignored' (ignore certificates)."
+    },
+
+    "__fields": ["field1", "field2", "field3"],
+
+    "namespaces": {
+        "__include": ["db.source1", "db.source2"],
+        "__mapping": {
+            "db.source1": "db.dest1",
+            "db.source2": "db.dest2"
+        }
+	"__gridfs": ["db.fs"]
+    },
+
+    "docManagers": [
+        {
+            "docManager": "elastic_doc_manager",
+            "targetURL": "localhost:9200",
+            "__uniqueKey": "_id",
+            "__autoCommitInterval": null
+        }
+    ]
+}

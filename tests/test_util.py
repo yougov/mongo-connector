@@ -14,19 +14,16 @@
 
 """Tests methods in util.py
 """
-
 import sys
+
+from bson import timestamp
 
 sys.path[0:0] = [""]
 
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-from bson import timestamp
 from mongo_connector.util import (bson_ts_to_long,
                                   long_to_bson_ts,
                                   retry_until_ok)
+from tests import unittest
 
 
 def err_func():
@@ -42,7 +39,7 @@ def err_func():
 err_func.counter = 0
 
 
-class UtilTester(unittest.TestCase):
+class TestUtil(unittest.TestCase):
     """ Tests the utils
     """
 

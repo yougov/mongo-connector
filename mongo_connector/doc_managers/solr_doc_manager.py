@@ -20,8 +20,10 @@ is that this file can be used as an example to add on different backends.
 To extend this to other systems, simply implement the exact same class and
 replace the method definitions with API calls for the desired backend.
 """
-import re
 import json
+import logging
+import os
+import re
 
 from pysolr import Solr, SolrError
 
@@ -29,14 +31,17 @@ from mongo_connector import errors
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK)
-from mongo_connector.util import retry_until_ok
-from mongo_connector.doc_managers import DocManagerBase, exception_wrapper
+from mongo_connector.compat import (
+    Request, urlopen, urlencode, URLError, HTTPError)
+from mongo_connector.util import exception_wrapper, retry_until_ok
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DocumentFlattener
 
-
-# pysolr only has 1 exception: SolrError
 wrap_exceptions = exception_wrapper({
-    SolrError: errors.OperationFailed})
+    SolrError: errors.OperationFailed,
+    URLError: errors.ConnectionFailed,
+    HTTPError: errors.ConnectionFailed
+})
 
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
 
@@ -56,6 +61,7 @@ class DocManager(DocManagerBase):
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK, **kwargs):
         """Verify Solr URL and establish a connection.
         """
+        self.url = url
         self.solr = Solr(url)
         self.unique_key = unique_key
         # pysolr does things in milliseconds
@@ -97,7 +103,7 @@ class DocManager(DocManagerBase):
                 self._dynamic_field_regexes.append(
                     re.compile("\A%s.*" % wc_pattern[:-1]))
 
-    def _clean_doc(self, doc):
+    def _clean_doc(self, doc, namespace, timestamp):
         """Reformats the given document before insertion into Solr.
 
         This method reformats the document in the following ways:
@@ -105,6 +111,8 @@ class DocManager(DocManagerBase):
           - unwinds arrays in order to find and later flatten sub-documents
           - flattens the document so that there are no sub-documents, and every
             value is associated with its dot-separated path of keys
+          - inserts namespace and timestamp metadata into the document in order
+            to handle rollbacks
 
         An example:
           {"a": 2,
@@ -127,6 +135,14 @@ class DocManager(DocManagerBase):
         if '_id' in doc:
             doc[self.unique_key] = u(doc.pop("_id"))
 
+        # Update namespace and timestamp metadata
+        if 'ns' in doc or '_ts' in doc:
+            raise errors.OperationFailed(
+                'Need to set "ns" and "_ts" fields, but these fields already '
+                'exist in the document %r!' % doc)
+        doc['ns'] = namespace
+        doc['_ts'] = timestamp
+
         # SOLR cannot index fields within sub-documents, so flatten documents
         # with the dot-separated path to each value as the respective key
         flat_doc = self._formatter.format_document(doc)
@@ -147,13 +163,34 @@ class DocManager(DocManagerBase):
         """
         pass
 
+    @wrap_exceptions
+    def handle_command(self, doc, namespace, timestamp):
+        db, _ = namespace.split('.', 1)
+        if doc.get('dropDatabase'):
+            for new_db in self.command_helper.map_db(db):
+                self.solr.delete(q="ns:%s.*" % new_db,
+                                 commit=(self.auto_commit_interval == 0))
+
+        if doc.get('renameCollection'):
+            raise errors.OperationFailed(
+                "solr_doc_manager does not support replication of "
+                " renameCollection")
+
+        if doc.get('create'):
+            # nothing to do
+            pass
+
+        if doc.get('drop'):
+            new_db, coll = self.command_helper.map_collection(db, doc['drop'])
+            if new_db:
+                self.solr.delete(q="ns:%s.%s" % (new_db, coll),
+                                 commit=(self.auto_commit_interval == 0))
+
     def apply_update(self, doc, update_spec):
         """Override DocManagerBase.apply_update to have flat documents."""
         # Replace a whole document
         if not '$set' in update_spec and not '$unset' in update_spec:
             # update spec contains the new document
-            update_spec['_ts'] = doc['_ts']
-            update_spec['ns'] = doc['ns']
             update_spec['_id'] = doc['_id']
             return update_spec
         for to_set in update_spec.get("$set", []):
@@ -181,7 +218,7 @@ class DocManager(DocManagerBase):
         return doc
 
     @wrap_exceptions
-    def update(self, doc, update_spec):
+    def update(self, document_id, update_spec, namespace, timestamp):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
 
@@ -189,7 +226,7 @@ class DocManager(DocManagerBase):
         # Commit outstanding changes so that the document to be updated is the
         # same version to which the changes apply.
         self.commit()
-        query = "%s:%s" % (self.unique_key, u(doc['_id']))
+        query = "%s:%s" % (self.unique_key, u(document_id))
         results = self.solr.search(query)
         if not len(results):
             # Document may not be retrievable yet
@@ -197,14 +234,17 @@ class DocManager(DocManagerBase):
             results = self.solr.search(query)
         # Results is an iterable containing only 1 result
         for doc in results:
+            # Remove metadata previously stored by Mongo Connector.
+            doc.pop('ns')
+            doc.pop('_ts')
             updated = self.apply_update(doc, update_spec)
             # A _version_ of 0 will always apply the update
             updated['_version_'] = 0
-            self.upsert(updated)
+            self.upsert(updated, namespace, timestamp)
             return updated
 
     @wrap_exceptions
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         """Update or insert a document into Solr
 
         This method should call whatever add/insert/update method exists for
@@ -212,14 +252,15 @@ class DocManager(DocManagerBase):
         always be one mongo document, represented as a Python dictionary.
         """
         if self.auto_commit_interval is not None:
-            self.solr.add([self._clean_doc(doc)],
+            self.solr.add([self._clean_doc(doc, namespace, timestamp)],
                           commit=(self.auto_commit_interval == 0),
                           commitWithin=u(self.auto_commit_interval))
         else:
-            self.solr.add([self._clean_doc(doc)], commit=False)
+            self.solr.add([self._clean_doc(doc, namespace, timestamp)],
+                          commit=False)
 
     @wrap_exceptions
-    def bulk_upsert(self, docs):
+    def bulk_upsert(self, docs, namespace, timestamp):
         """Update or insert multiple documents into Solr
 
         docs may be any iterable
@@ -232,7 +273,7 @@ class DocManager(DocManagerBase):
         else:
             add_kwargs = {"commit": False}
 
-        cleaned = (self._clean_doc(d) for d in docs)
+        cleaned = (self._clean_doc(d, namespace, timestamp) for d in docs)
         if self.chunk_size > 0:
             batch = list(next(cleaned) for i in range(self.chunk_size))
             while batch:
@@ -243,19 +284,32 @@ class DocManager(DocManagerBase):
             self.solr.add(cleaned, **add_kwargs)
 
     @wrap_exceptions
-    def remove(self, doc):
+    def insert_file(self, f, namespace, timestamp):
+        params = self._formatter.format_document(f.get_metadata())
+        params[self.unique_key] = params.pop('_id')
+        params['ns'] = namespace
+        params['_ts'] = timestamp
+        params = dict(('literal.' + k, v) for k, v in params.items())
+
+        if self.auto_commit_interval == 0:
+            params['commit'] = 'true'
+
+        request = Request(os.path.join(
+            self.url, "update/extract?%s" % urlencode(params)))
+
+        request.add_header("Content-type", "application/octet-stream")
+        request.data = f
+        response = urlopen(request)
+        logging.debug(response.read())
+
+    @wrap_exceptions
+    def remove(self, document_id, namespace, timestamp):
         """Removes documents from Solr
 
         The input is a python dictionary that represents a mongo document.
         """
-        self.solr.delete(id=u(doc["_id"]),
+        self.solr.delete(id=u(document_id),
                          commit=(self.auto_commit_interval == 0))
-
-    @wrap_exceptions
-    def _remove(self):
-        """Removes everything
-        """
-        self.solr.delete(q='*:*', commit=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
     def _stream_search(self, query):
@@ -269,13 +323,6 @@ class DocManager(DocManagerBase):
     def search(self, start_ts, end_ts):
         """Called to query Solr for documents in a time range."""
         query = '_ts: [%s TO %s]' % (start_ts, end_ts)
-        return self._stream_search(query)
-
-    @wrap_exceptions
-    def _search(self, query):
-        """For test purposes only. Performs search on Solr with given query
-            Does not have to be implemented.
-        """
         return self._stream_search(query)
 
     def commit(self):

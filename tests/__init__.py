@@ -11,21 +11,38 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import os
 import sys
+
+logging.basicConfig(stream=sys.stdout)
 
 if sys.version_info[0] == 3:
     unicode = str
 
+if sys.version_info[:2] == (2, 6):
+    import unittest2 as unittest
+    from unittest2.case import SkipTest
+else:
+    import unittest
+    from unittest.case import SkipTest
+
 # Configurable hosts and ports used in the tests
-mongo_host = unicode(os.environ.get("MONGO_HOST", 'localhost'))
-mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
 elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
 elastic_port = unicode(os.environ.get("ES_PORT", 9200))
 elastic_pair = '%s:%s' % (elastic_host, elastic_port)
 solr_host = unicode(os.environ.get("SOLR_HOST", 'localhost'))
 solr_port = unicode(os.environ.get("SOLR_PORT", 8983))
 solr_pair = '%s:%s' % (solr_host, solr_port)
+db_user = unicode(os.environ.get("DB_USER", ""))
+db_password = unicode(os.environ.get("DB_PASSWORD", ""))
+# Extra keyword options to provide to Connector.
+connector_opts = {}
+if db_user:
+    connector_opts = {'auth_username': db_user, 'auth_key': db_password}
 
 # Document count for stress tests
 STRESS_COUNT = 100
+
+# Test namespace, timestamp arguments
+TESTARGS = ('test.test', 1)

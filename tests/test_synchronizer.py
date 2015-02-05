@@ -16,21 +16,14 @@
 """
 import os
 import sys
+import time
 
 sys.path[0:0] = [""]
 
-from pymongo import MongoClient
-
-import time
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
-from tests import mongo_host
-from tests.setup_cluster import (start_replica_set,
-                                 kill_all)
-from tests.util import assert_soon
 from mongo_connector.connector import Connector
+from tests import unittest, connector_opts
+from tests.setup_cluster import ReplicaSet
+from tests.util import assert_soon
 
 
 class TestSynchronizer(unittest.TestCase):
@@ -42,21 +35,17 @@ class TestSynchronizer(unittest.TestCase):
         """ Initializes the cluster
         """
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
 
-        _, _, cls.primary_p = start_replica_set('test-synchronizer')
-        cls.conn = MongoClient('%s:%d' % (mongo_host, cls.primary_p),
-                               replicaSet='test-synchronizer')
+        cls.repl_set = ReplicaSet().start()
+        cls.conn = cls.repl_set.client()
         cls.connector = Connector(
-            address='%s:%d' % (mongo_host, cls.primary_p),
-            oplog_checkpoint='config.txt',
-            target_url=None,
+            mongo_address=cls.repl_set.uri,
             ns_set=['test.test'],
-            u_key='_id',
-            auth_key=None
+            **connector_opts
         )
         cls.synchronizer = cls.connector.doc_managers[0]
         cls.connector.start()
@@ -67,7 +56,7 @@ class TestSynchronizer(unittest.TestCase):
         """ Tears down connector
         """
         cls.connector.join()
-        kill_all()
+        cls.repl_set.stop()
 
     def setUp(self):
         """ Clears the db

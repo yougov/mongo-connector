@@ -5,55 +5,45 @@ experiencing a rollback.
 
 import os
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 import time
 
 from pymongo.read_preferences import ReadPreference
 from pymongo import MongoClient
+
+sys.path[0:0] = [""]
 
 from mongo_connector.util import retry_until_ok
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.oplog_manager import OplogThread
 
-from tests import mongo_host
+from tests import unittest, STRESS_COUNT
 from tests.util import assert_soon
-from tests.setup_cluster import (
-    start_replica_set,
-    kill_all,
-    kill_mongo_proc,
-    restart_mongo_proc,
-)
+from tests.setup_cluster import ReplicaSet
 
 
 class TestRollbacks(unittest.TestCase):
 
     def tearDown(self):
-        kill_all()
+        self.repl_set.stop()
 
     def setUp(self):
         # Create a new oplog progress file
         try:
-            os.unlink("config.txt")
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
-        open("config.txt", "w").close()
+        open("oplog.timestamp", "w").close()
 
         # Start a replica set
-        _, self.secondary_p, self.primary_p = start_replica_set('rollbacks')
+        self.repl_set = ReplicaSet().start()
         # Connection to the replica set as a whole
-        self.main_conn = MongoClient('%s:%d' % (mongo_host, self.primary_p),
-                                     replicaSet='rollbacks')
+        self.main_conn = self.repl_set.client()
         # Connection to the primary specifically
-        self.primary_conn = MongoClient('%s:%d' % (mongo_host, self.primary_p))
+        self.primary_conn = self.repl_set.primary.client()
         # Connection to the secondary specifically
-        self.secondary_conn = MongoClient(
-            '%s:%d' % (mongo_host, self.secondary_p),
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
+        self.secondary_conn = self.repl_set.secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
 
         # Wipe any test data
         self.main_conn["test"]["mc"].drop()
@@ -62,16 +52,10 @@ class TestRollbacks(unittest.TestCase):
         doc_manager = DocManager()
         oplog_progress = LockingDict()
         self.opman = OplogThread(
-            primary_conn=self.main_conn,
-            main_address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_coll=self.main_conn["local"]["oplog.rs"],
-            is_sharded=False,
-            doc_manager=doc_manager,
+            primary_client=self.main_conn,
+            doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mc"],
-            auth_key=None,
-            auth_username=None,
-            repl_set="rollbacks"
+            namespace_set=["test.mc"]
         )
 
     def test_single_target(self):
@@ -89,7 +73,7 @@ class TestRollbacks(unittest.TestCase):
                     "first write didn't replicate to secondary")
 
         # Kill the primary
-        kill_mongo_proc(self.primary_p, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
 
         # Wait for the secondary to be promoted
         assert_soon(lambda: secondary["admin"].command("isMaster")["ismaster"])
@@ -103,14 +87,14 @@ class TestRollbacks(unittest.TestCase):
                     "not all writes were replicated to doc manager")
 
         # Kill the new primary
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
         # Start both servers back up
-        restart_mongo_proc(self.primary_p)
+        self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(lambda: primary_admin.command("isMaster")["ismaster"],
                     "restarted primary never resumed primary status")
-        restart_mongo_proc(self.secondary_p)
+        self.repl_set.secondary.start()
         assert_soon(lambda: retry_until_ok(secondary.admin.command,
                                            'replSetGetStatus')['myState'] == 2,
                     "restarted secondary never resumed secondary status")
@@ -124,7 +108,8 @@ class TestRollbacks(unittest.TestCase):
 
         # Same case should hold for the doc manager
         doc_manager = self.opman.doc_managers[0]
-        self.assertEqual(len(doc_manager._search()), 1)
+        assert_soon(lambda: len(doc_manager._search()) == 1,
+                    'documents never rolled back in doc manager.')
         self.assertEqual(doc_manager._search()[0]["i"], 0)
 
         # cleanup
@@ -149,7 +134,7 @@ class TestRollbacks(unittest.TestCase):
                     "first write didn't replicate to secondary")
 
         # Kill the primary
-        kill_mongo_proc(self.primary_p, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
 
         # Wait for the secondary to be promoted
         assert_soon(lambda: secondary.admin.command("isMaster")['ismaster'],
@@ -179,27 +164,19 @@ class TestRollbacks(unittest.TestCase):
         # uneven replication
         ts = self.opman.doc_managers[0].get_last_doc()['_ts']
         for id in secondary_ids[8:]:
-            self.opman.doc_managers[1].remove({
-                "_id": id,
-                "ns": "test.mc",
-                "_ts": ts
-            })
+            self.opman.doc_managers[1].remove(id, 'test.mc', ts)
         for id in secondary_ids[2:]:
-            self.opman.doc_managers[2].remove({
-                "_id": id,
-                "ns": "test.mc",
-                "_ts": ts
-            })
+            self.opman.doc_managers[2].remove(id, 'test.mc', ts)
 
         # Kill the new primary
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
         # Start both servers back up
-        restart_mongo_proc(self.primary_p)
+        self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(lambda: primary_admin.command("isMaster")['ismaster'],
                     'restarted primary never resumed primary status')
-        restart_mongo_proc(self.secondary_p)
+        self.repl_set.secondary.start()
         assert_soon(lambda: retry_until_ok(secondary.admin.command,
                                            'replSetGetStatus')['myState'] == 2,
                     "restarted secondary never resumed secondary status")
@@ -234,7 +211,7 @@ class TestRollbacks(unittest.TestCase):
                     "first write didn't replicate to secondary")
 
         # Kill the primary, wait for secondary to be promoted
-        kill_mongo_proc(self.primary_p, destroy=False)
+        self.repl_set.primary.stop(destroy=False)
         assert_soon(lambda: self.secondary_conn["admin"]
                     .command("isMaster")["ismaster"])
 
@@ -247,14 +224,14 @@ class TestRollbacks(unittest.TestCase):
                     "delete was not replicated to doc manager")
 
         # Kill the new primary
-        kill_mongo_proc(self.secondary_p, destroy=False)
+        self.repl_set.secondary.stop(destroy=False)
 
         # Start both servers back up
-        restart_mongo_proc(self.primary_p)
+        self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(lambda: primary_admin.command("isMaster")["ismaster"],
                     "restarted primary never resumed primary status")
-        restart_mongo_proc(self.secondary_p)
+        self.repl_set.secondary.start()
         assert_soon(lambda: retry_until_ok(self.secondary_conn.admin.command,
                                            'replSetGetStatus')['myState'] == 2,
                     "restarted secondary never resumed secondary status")
@@ -268,5 +245,47 @@ class TestRollbacks(unittest.TestCase):
         docs = list(doc_manager._search())
         self.assertEqual(len(docs), 2,
                          "Expected two documents, but got %r" % docs)
+
+        self.opman.join()
+
+    def test_stressed_rollback(self):
+        """Stress test for a rollback with many documents."""
+        self.opman.start()
+
+        c = self.main_conn.test.mc
+        docman = self.opman.doc_managers[0]
+
+        c.insert({'i': i} for i in range(STRESS_COUNT))
+        assert_soon(lambda: c.count() == STRESS_COUNT)
+        condition = lambda: len(docman._search()) == STRESS_COUNT
+        assert_soon(condition, ("Was expecting %d documents in DocManager, "
+                                "but %d found instead."
+                                % (STRESS_COUNT, len(docman._search()))))
+
+        primary_conn = self.repl_set.primary.client()
+        self.repl_set.primary.stop(destroy=False)
+        new_primary_conn = self.repl_set.secondary.client()
+
+        admin = new_primary_conn.admin
+        assert_soon(
+            lambda: retry_until_ok(admin.command, "isMaster")['ismaster'])
+
+        retry_until_ok(c.insert,
+                       [{'i': str(STRESS_COUNT + i)}
+                        for i in range(STRESS_COUNT)])
+        assert_soon(lambda: len(docman._search()) == c.count())
+
+        self.repl_set.secondary.stop(destroy=False)
+
+        self.repl_set.primary.start()
+        admin = primary_conn.admin
+        assert_soon(
+            lambda: retry_until_ok(admin.command, "isMaster")['ismaster'])
+        self.repl_set.secondary.start()
+
+        assert_soon(lambda: retry_until_ok(c.count) == STRESS_COUNT)
+        assert_soon(condition, ("Was expecting %d documents in DocManager, "
+                                "but %d found instead."
+                                % (STRESS_COUNT, len(docman._search()))))
 
         self.opman.join()

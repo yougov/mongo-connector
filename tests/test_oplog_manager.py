@@ -17,21 +17,18 @@
 
 import itertools
 import sys
-if sys.version_info[:2] == (2, 6):
-    import unittest2 as unittest
-else:
-    import unittest
 import time
 
 import bson
 import pymongo
 
+sys.path[0:0] = [""]
+
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from tests import mongo_host
-from tests.setup_cluster import (start_replica_set,
-                                 kill_replica_set)
+from tests import unittest
+from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
 
 
@@ -41,20 +38,13 @@ class TestOplogManager(unittest.TestCase):
     """
 
     def setUp(self):
-        _, _, self.primary_p = start_replica_set('test-oplog-manager')
-        self.primary_conn = pymongo.MongoClient(mongo_host, self.primary_p)
+        self.repl_set = ReplicaSet().start()
+        self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
-            primary_conn=self.primary_conn,
-            main_address='%s:%d' % (mongo_host, self.primary_p),
-            oplog_coll=self.oplog_coll,
-            is_sharded=False,
-            doc_manager=DocManager(),
-            oplog_progress_dict=LockingDict(),
-            namespace_set=None,
-            auth_key=None,
-            auth_username=None,
-            repl_set='test-oplog-manager'
+            primary_client=self.primary_conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict()
         )
 
     def tearDown(self):
@@ -63,7 +53,7 @@ class TestOplogManager(unittest.TestCase):
         except RuntimeError:
             pass                # OplogThread may not have been started
         self.primary_conn.close()
-        kill_replica_set('test-oplog-manager')
+        self.repl_set.stop()
 
     def test_get_oplog_cursor(self):
         '''Test the get_oplog_cursor method'''
@@ -252,7 +242,7 @@ class TestOplogManager(unittest.TestCase):
 
     def test_filter_fields(self):
         docman = self.opman.doc_managers[0]
-        conn = self.opman.main_connection
+        conn = self.opman.primary_client
 
         include_fields = ["a", "b", "c"]
         exclude_fields = ["d", "e", "f"]

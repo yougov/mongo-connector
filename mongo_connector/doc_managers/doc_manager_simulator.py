@@ -21,11 +21,52 @@ Please look at the Solr and ElasticSearch doc manager classes for a sample
 implementation with real systems.
 """
 
-import itertools
+from threading import RLock
 
 from mongo_connector.errors import OperationFailed
-from mongo_connector.doc_managers import DocManagerBase
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.compat import u
+
+
+class DocumentStore(dict):
+
+    def __init__(self):
+        self._lock = RLock()
+
+    def __getitem__(self, key):
+        with self._lock:
+            return super(DocumentStore, self).__getitem__(key)
+
+    def __setitem__(self, key, value):
+        with self._lock:
+            return super(DocumentStore, self).__setitem__(key, value)
+
+    def __iter__(self):
+        def __myiter__():
+            with self._lock:
+                for item in super(DocumentStore, self).__iter__():
+                    yield item
+        return __myiter__()
+
+
+class Entry(object):
+
+    def __init__(self, doc, ns, ts):
+        self.doc, self.ns, self.ts = doc, ns, ts
+        self._id = self.doc['_id']
+
+    @property
+    def meta_dict(self):
+        return {'_id': self._id, 'ns': self.ns, '_ts': self.ts}
+
+    @property
+    def merged_dict(self):
+        d = self.doc.copy()
+        d.update(**self.meta_dict)
+        return d
+
+    def update(self, ns, ts):
+        self.ns, self.ts = ns, ts
 
 
 class DocManager(DocManagerBase):
@@ -39,13 +80,14 @@ class DocManager(DocManagerBase):
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, unique_key='_id', **kwargs):
+    def __init__(self, url=None, unique_key='_id',
+                 auto_commit_interval=None, **kwargs):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
         """
         self.unique_key = unique_key
-        self.doc_dict = {}
-        self.removed_dict = {}
+        self.auto_commit_interval = auto_commit_interval
+        self.doc_dict = DocumentStore()
         self.url = url
 
     def stop(self):
@@ -53,18 +95,18 @@ class DocManager(DocManagerBase):
         """
         pass
 
-    def update(self, doc, update_spec):
+    def update(self, document_id, update_spec, namespace, timestamp):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
 
         """
-        document = self.doc_dict[doc["_id"]]
+        document = self.doc_dict[document_id].doc
         updated = self.apply_update(document, update_spec)
         updated[self.unique_key] = updated.pop("_id")
-        self.upsert(updated)
+        self.upsert(updated, namespace, timestamp)
         return updated
 
-    def upsert(self, doc):
+    def upsert(self, doc, namespace, timestamp):
         """Adds a document to the doc dict.
         """
 
@@ -73,23 +115,25 @@ class DocManager(DocManagerBase):
             raise Exception("upsert exception")
 
         doc_id = doc["_id"]
-        self.doc_dict[doc_id] = doc
-        if doc_id in self.removed_dict:
-            del self.removed_dict[doc_id]
+        self.doc_dict[doc_id] = Entry(doc=doc, ns=namespace, ts=timestamp)
 
-    def remove(self, doc):
+    def insert_file(self, f, namespace, timestamp):
+        """Inserts a file to the doc dict.
+        """
+        doc = f.get_metadata()
+        doc['content'] = f.read()
+        self.doc_dict[f._id] = Entry(doc=doc, ns=namespace, ts=timestamp)
+
+    def remove(self, document_id, namespace, timestamp):
         """Removes the document from the doc dict.
         """
-        doc_id = doc["_id"]
         try:
-            del self.doc_dict[doc_id]
-            self.removed_dict[doc_id] = {
-                '_id': doc_id,
-                'ns': doc['ns'],
-                '_ts': doc['_ts']
-            }
+            entry = self.doc_dict[document_id]
+            entry.doc = None
+            entry.update(namespace, timestamp)
         except KeyError:
-            raise OperationFailed("Document does not exist: %s" % u(doc))
+            raise OperationFailed("Document does not exist: %s"
+                                  % u(document_id))
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents that were
@@ -103,12 +147,10 @@ class DocManager(DocManagerBase):
         of the last oplog entry after a rollback. The end_ts is the timestamp
         of the last document committed to the backend.
         """
-        docs = itertools.chain(self.doc_dict.values(),
-                               self.removed_dict.values())
-        for doc in docs:
-            ts = doc['_ts']
-            if ts <= end_ts or ts >= start_ts:
-                yield doc
+        for _id in self.doc_dict:
+            entry = self.doc_dict[_id]
+            if entry.ts <= end_ts or entry.ts >= start_ts:
+                yield entry.meta_dict
 
     def commit(self):
         """Simply passes since we're not using an engine that needs commiting.
@@ -118,9 +160,7 @@ class DocManager(DocManagerBase):
     def get_last_doc(self):
         """Searches through the doc dict to find the document that was
         modified or deleted most recently."""
-        docs = itertools.chain(self.doc_dict.values(),
-                               self.removed_dict.values())
-        return max(docs, key=lambda x: x["_ts"])
+        return max(self.doc_dict.values(), key=lambda x: x.ts).meta_dict
 
     def _search(self):
         """Returns all documents in the doc dict.
@@ -128,12 +168,12 @@ class DocManager(DocManagerBase):
         This function is not a part of the DocManager API, and is only used
         to simulate searching all documents from a backend.
         """
-
-        ret_list = []
-        for doc in self.doc_dict.values():
-            ret_list.append(doc)
-
-        return ret_list
+        results = []
+        for _id in self.doc_dict:
+            entry = self.doc_dict[_id]
+            if entry.doc is not None:
+                results.append(entry.merged_dict)
+        return results
 
     def _delete(self):
         """Deletes all documents.
