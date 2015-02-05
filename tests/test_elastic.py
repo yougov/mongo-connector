@@ -248,6 +248,7 @@ class TestElastic(ElasticsearchTestCase):
         time.sleep(2)
         result_set_1 = list(self._search())
         self.assertEqual(len(result_set_1), 1)
+
         for item in result_set_1:
             self.assertEqual(item['name'], 'paul')
         find_cursor = retry_until_ok(self.conn['test']['test'].find)

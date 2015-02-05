@@ -731,7 +731,7 @@ class OplogThread(threading.Thread):
                 to_update = util.retry_until_ok(
                     client[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    **find_kwargs
+                    fields=self.fields
                 )
                 #doc list are docs in target system, to_update are
                 #docs in mongo

@@ -41,7 +41,8 @@ except ImportError:
     use_setuptools()
     from setuptools import setup
 
-extra_opts = {"test_suite": "tests", "tests_require": ["mongo-orchestration"]}
+extra_opts = {"test_suite": "tests",
+              "tests_require": ["mongo-orchestration", "requests>=2.5.1"]}
 
 if sys.version_info[:2] == (2, 6):
     # Need unittest2 to run unittests in Python 2.6
