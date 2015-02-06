@@ -463,7 +463,7 @@ def get_config_options():
         if cli_values['logfile']:
             when = cli_values['logfile_when']
             interval = cli_values['logfile_interval']
-            if (when.startswith('W') and
+            if (when and when.startswith('W') and
                     interval != constants.DEFAULT_LOGFILE_INTERVAL):
                 raise errors.InvalidConfiguration(
                     "You cannot specify a log rotation interval when rotating "

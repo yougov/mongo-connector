@@ -64,6 +64,9 @@ class TestConfig(unittest.TestCase):
             'logging': {
                 'type': 'file',
                 'filename': 'testFilename',
+                'rotationWhen': 'midnight',
+                'rotationInterval': 1,
+                'rotationBackups': 7,
                 'host': 'testHost',
                 'facility': 'testFacility'
             },
@@ -102,6 +105,9 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(self.conf['logging'], {
             'type': 'syslog',
             'filename': 'testFilename',
+            'rotationWhen': 'midnight',
+            'rotationInterval': 1,
+            'rotationBackups': 7,
             'host': 'testHost2',
             'facility': 'testFacility'
         })
