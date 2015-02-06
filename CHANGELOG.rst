@@ -38,6 +38,16 @@ Breaking Changes
         - The `remove` method now takes a document id, namespace, and a timestamp instead of a whole document.
         - The `upsert`, `bulk_upsert`, and `update` methods all take two additional arguments: namespace and timestamp.
 
+Version 1.3.1
+-------------
+
+Version 1.3.1 contains mostly bug fixes and adds timezone-aware timestamp support. Bugs fixed include:
+
+- Fixes for update operations to Solr.
+- Re-insert documents that were deleted before a rollback.
+- Catch a few additional exceptions sometimes thrown by the Elasticsearch Python driver.
+
+
 Version 1.3
 -----------
 
