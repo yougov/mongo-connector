@@ -64,17 +64,17 @@ simplest invocation resembles the following::
 
 mongo-connector has many other options besides those demonstrated above.
 To get a full listing with descriptions, try ``mongo-connector --help``.
-You can also use mongo-connector with a [configuration file](https://github.com/10gen-labs/mongo-connector/wiki/Configuration-File).
+You can also use mongo-connector with a `configuration file <https://github.com/10gen-labs/mongo-connector/wiki/Configuration-File>`__.
 
 If you want to jump-start into using mongo-connector with a another particular system, check out:
 
-- [Usage with Solr](https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20Solr)
-- [Usage with Elasticsearch](https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch)
-- [Usage with MongoDB](https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20MongoDB)
+- `Usage with Solr <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20Solr>`__
+- `Usage with Elasticsearch <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
+- `Usage with MongoDB <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
 
 Troubleshooting/Questions
 -------------------------
 
 Having trouble with installation? Have a question about Mongo Connector?
-Your question or problem may be answered in the [FAQ](https://github.com/10gen-labs/mongo-connector/wiki/FAQ) or in the [wiki](https://github.com/10gen-labs/mongo-connector/wiki).
-If you can't find the answer to your question or problem there, feel free to [open an issue](https://github.com/10gen-labs/mongo-connector/issues) on Mongo Connector's Github page.
+Your question or problem may be answered in the `FAQ <https://github.com/10gen-labs/mongo-connector/wiki/FAQ>`__ or in the `wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
+If you can't find the answer to your question or problem there, feel free to `open an issue <https://github.com/10gen-labs/mongo-connector/issues>`__ on Mongo Connector's Github page.
