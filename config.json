@@ -12,6 +12,9 @@
     "logging": {
         "type": "file",
         "filename": "/var/log/mongo-connector/mongo-connector.log",
+        "__rotationWhen": "D",
+        "__rotationInterval": 1,
+        "__rotationBackups": 10,
 
         "__type": "syslog",
         "__host": "localhost:512"

@@ -32,3 +32,12 @@ DEFAULT_UNIQUE_KEY = "_id"
 # Default host and facility for logging to the syslog.
 DEFAULT_SYSLOG_HOST = "localhost:512"
 DEFAULT_SYSLOG_FACILITY = "user"
+
+# ROTATING LOGFILE
+# The type of interval
+# (seconds, minutes, hours... c.f. logging.handlers.TimedRotatingFileHandler)
+DEFAULT_LOGFILE_WHEN = "midnight"
+# The rollover interval
+DEFAULT_LOGFILE_INTERVAL = 1
+# Number of log files to keep
+DEFAULT_LOGFILE_BACKUPCOUNT = 7

@@ -461,8 +461,22 @@ def get_config_options():
                 " please choose the logging method you would prefer.")
 
         if cli_values['logfile']:
+            when = cli_values['logfile_when']
+            interval = cli_values['logfile_interval']
+            if (when.startswith('W') and
+                    interval != constants.DEFAULT_LOGFILE_INTERVAL):
+                raise errors.InvalidConfiguration(
+                    "You cannot specify a log rotation interval when rotating "
+                    "based on a weekday (W0 - W6).")
+
             option.value['type'] = 'file'
             option.value['filename'] = cli_values['logfile']
+            if when:
+                option.value['rotationWhen'] = when
+            if interval:
+                option.value['rotationInterval'] = interval
+            if cli_values['logfile_backups']:
+                option.value['rotationBackups'] = cli_values['logfile_backups']
 
         if cli_values['enable_syslog']:
             option.value['type'] = 'syslog'
@@ -474,6 +488,11 @@ def get_config_options():
             option.value['facility'] = cli_values['syslog_facility']
 
     default_logging = {
+        'type': 'file',
+        'filename': 'mongo-connector.log',
+        'rotationInterval': constants.DEFAULT_LOGFILE_INTERVAL,
+        'rotationBackups': constants.DEFAULT_LOGFILE_BACKUPCOUNT,
+        'rotationWhen': constants.DEFAULT_LOGFILE_WHEN,
         'host': constants.DEFAULT_SYSLOG_HOST,
         'facility': constants.DEFAULT_SYSLOG_FACILITY
     }
@@ -484,7 +503,7 @@ def get_config_options():
         type=dict,
         apply_function=apply_logging)
 
-    # -w enable logging to a file
+    # -w enables logging to a file
     logging.add_cli(
         "-w", "--logfile", dest="logfile", help=
         "Log all output to a file rather than stream to "
@@ -494,8 +513,8 @@ def get_config_options():
     logging.add_cli(
         "-s", "--enable-syslog", action="store_true",
         dest="enable_syslog", help=
-        "Used to enable logging to syslog."
-        " Use -l to specify syslog host.")
+        "The syslog host, which may be an address like 'localhost:514' or, "
+        "on Unix/Linux, the path to a Unix domain socket such as '/dev/log'.")
 
     # --syslog-host is to specify the syslog host.
     logging.add_cli(
@@ -508,6 +527,39 @@ def get_config_options():
         "--syslog-facility", dest="syslog_facility", help=
         "Used to specify the syslog facility."
         " The default is 'user'")
+
+    # --logfile-when specifies the type of interval of the rotating file
+    # (seconds, minutes, hours)
+    logging.add_cli("--logfile-when", action="store", dest="logfile_when",
+                    type="string",
+                    help="The type of interval for rotating the log file. "
+                    "Should be one of "
+                    "'S' (seconds), 'M' (minutes), 'H' (hours), "
+                    "'D' (days), 'W0' - 'W6' (days of the week 0 - 6), "
+                    "or 'midnight' (the default). See the Python documentation "
+                    "for 'logging.handlers.TimedRotatingFileHandler' for more "
+                    "details.")
+
+    # --logfile-interval specifies when to create a new log file
+    logging.add_cli("--logfile-interval", action="store",
+                    dest="logfile_interval", type="int",
+                    help="How frequently to rotate the log file, "
+                    "specifically, how many units of the rotation interval "
+                    "should pass before the rotation occurs. For example, "
+                    "to create a new file each hour: "
+                    " '--logfile-when=H --logfile-interval=1'. "
+                    "Defaults to 1. You may not use this option if "
+                    "--logfile-when is set to a weekday (W0 - W6). "
+                    "See the Python documentation for "
+                    "'logging.handlers.TimedRotatingFileHandler' for more "
+                    "details. ")
+
+    # --logfile-backups specifies how many log files will be kept.
+    logging.add_cli("--logfile-backups", action="store",
+                    dest="logfile_backups", type="int",
+                    help="How many log files will be kept after rotation. "
+                    "If set to zero, then no log files will be deleted. "
+                    "Defaults to 7.")
 
     def apply_authentication(option, cli_values):
         if cli_values['admin_username']:
@@ -907,26 +959,31 @@ def main():
     root_logger.setLevel(loglevel)
 
     if conf['logging.type'] == 'file':
-        log_out = logging.FileHandler(conf['logging.filename'])
-        log_out.setLevel(loglevel)
-        log_out.setFormatter(formatter)
-        root_logger.addHandler(log_out)
+        log_out = logging.handlers.TimedRotatingFileHandler(
+            conf['logging.filename'],
+            when=conf['logging.rotationWhen'],
+            interval=conf['logging.rotationInterval'],
+            backupCount=conf['logging.rotationBackups']
+        )
+        print("Logging to %s." % conf['logging.filename'])
 
-    if conf['logging.type'] == 'syslog':
-        syslog_info = conf['logging.host'].split(":")
+    elif conf['logging.type'] == 'syslog':
+        syslog_info = conf['logging.host']
+        if ':' in syslog_info:
+            log_host, log_port = syslog_info.split(':')
+            syslog_info = (log_host, int(log_port))
         log_out = logging.handlers.SysLogHandler(
-            address=(syslog_info[0], int(syslog_info[1])),
+            address=syslog_info,
             facility=conf['logging.facility']
         )
-        log_out.setLevel(loglevel)
-        log_out.setFormatter(formatter)
-        root_logger.addHandler(log_out)
+        print("Logging to system log at %s" % conf['logging.host'])
 
-    if conf['logging.type'] is None:
+    elif conf['logging.type'] is None:
         log_out = logging.StreamHandler()
-        log_out.setLevel(loglevel)
-        log_out.setFormatter(formatter)
-        root_logger.addHandler(log_out)
+
+    log_out.setLevel(loglevel)
+    log_out.setFormatter(formatter)
+    root_logger.addHandler(log_out)
 
     LOG.info('Beginning Mongo Connector')
 
