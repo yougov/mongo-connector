@@ -1,10 +1,10 @@
 Changelog
 =========
 
-Version 2.0.dev0
+Version 2.0
 ----------------
 
-Version 2.0.dev0 is a development version that will become version 2.0.
+Version 2.0 is a major version of Mongo Connector and includes breaking changes, new features, and bug fixes.
 
 Improvements
 ~~~~~~~~~~~~
