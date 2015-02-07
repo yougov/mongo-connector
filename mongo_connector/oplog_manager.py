@@ -70,7 +70,7 @@ class OplogThread(threading.Thread):
         self.oplog_progress = oplog_progress_dict
 
         # The set of namespaces to process from the mongo cluster.
-        self.namespace_set = kwargs.get('namespace_set', [])
+        self.namespace_set = kwargs.get('ns_set', [])
 
         # The set of gridfs namespaces to process from the mongo cluster
         self.gridfs_set = kwargs.get('gridfs_set', [])
