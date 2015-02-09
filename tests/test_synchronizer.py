@@ -77,6 +77,12 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(item['_id'], result_set_2['_id'])
             self.assertEqual(item['name'], result_set_2['name'])
 
+    def test_ns_set(self):
+        self.conn.test.other.insert({"replicated": False})
+        results = self.synchronizer._search()
+        self.assertEqual(len(results), 0,
+                         "Should not replicate outside of test.test namespace")
+
     def test_remove(self):
         """Tests remove
         """
