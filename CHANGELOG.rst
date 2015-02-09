@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 2.0.1
+-------------
+
+Version 2.0.1 fixes filtering by namespace (--namespace-set, namespaces.include).
+
 Version 2.0
 ----------------
 
