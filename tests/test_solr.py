@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 # Copyright 2013-2014 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,6 +29,7 @@ sys.path[0:0] = [""]
 from tests import solr_pair, unittest
 from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
+from mongo_connector.compat import u
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from mongo_connector.util import retry_until_ok
@@ -148,8 +150,8 @@ class TestSolr(SolrTestCase):
         """
         docman = self.connector.doc_managers[0]
 
-        # Insert
-        self.conn.test.test.insert({"a": 0})
+        # Use diabolical value for _id to test string escaping as well.
+        self.conn.test.test.insert({"_id": u'+-&え|!(){}[]^"~*?:\\/', "a": 0})
         assert_soon(lambda: sum(1 for _ in self._search("*:*")) == 1)
 
         def check_update(update_spec):
@@ -159,7 +161,7 @@ class TestSolr(SolrTestCase):
                 new=True
             )
             # Stringify _id to match what will be retrieved from Solr
-            updated['_id'] = str(updated['_id'])
+            updated['_id'] = u(updated['_id'])
             # Flatten the MongoDB document to match Solr
             updated = docman._clean_doc(updated, 'dummy.namespace', 0)
             # Allow some time for update to propagate

@@ -44,6 +44,8 @@ wrap_exceptions = exception_wrapper({
 })
 
 ADMIN_URL = 'admin/luke?show=schema&wt=json'
+# From the documentation of Solr 4.0 "classic" query parser.
+ESCAPE_CHARACTERS = set('+-&|!(){}[]^"~*?:\\/')
 
 decoder = json.JSONDecoder()
 
@@ -226,7 +228,13 @@ class DocManager(DocManagerBase):
         # Commit outstanding changes so that the document to be updated is the
         # same version to which the changes apply.
         self.commit()
-        query = "%s:%s" % (self.unique_key, u(document_id))
+        # Need to escape special characters in the document_id.
+        document_id = ''.join(map(
+            lambda c: '\\' + c if c in ESCAPE_CHARACTERS else c,
+            u(document_id)
+        ))
+
+        query = "%s:%s" % (self.unique_key, document_id)
         results = self.solr.search(query)
         if not len(results):
             # Document may not be retrievable yet
