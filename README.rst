@@ -77,7 +77,8 @@ If you want to jump-start into using mongo-connector with a another particular s
 		e.g., export PYTHONPATH=~/splunk-sdk-python
 	3. Run the mongo-connector.
 		e.g., mongo-connector -m mongo-ip:27017 -t http://splunk-ip:8089 -d splunk_doc_manager.py
-		I have mentioned default ports for MongoDB and Splunk, you can change as required.
+
+		I have used default ports in above example for MongoDB and Splunk, you can change as required.
 
 Troubleshooting/Questions
 -------------------------
