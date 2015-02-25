@@ -72,7 +72,7 @@ If you want to jump-start into using mongo-connector with a another particular s
 - `Usage with Elasticsearch <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
 - `Usage with MongoDB <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
 - Usage with Splunk
-	1. Open mongo_connector/doc_managers/splunk_doc_manager.py then change with Splunk's username and password.
+	1. Open mongo_connector/doc_managers/splunk_doc_manager.py then change with Splunk's username and password at line 57 and 58.
 	2. Install Splunk Python SDK and set environment variable to point the SDK
 		e.g., export PYTHONPATH=~/splunk-sdk-python
 	3. Run the mongo-connector.
