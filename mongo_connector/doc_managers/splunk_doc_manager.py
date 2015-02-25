@@ -41,13 +41,6 @@ except ImportError:
     raise Exception("Add the SDK repository to your PYTHONPATH to run the examples "
                     "(e.g., export PYTHONPATH=~/splunk-sdk-python.")
 
-wrap_exceptions = exception_wrapper({
-    es_exceptions.ConnectionError: errors.ConnectionFailed,
-    es_exceptions.TransportError: errors.OperationFailed,
-    es_exceptions.RequestError: errors.OperationFailed
-})
-
-
 class DocManager(DocManagerBase):
     """Splunk implementation of the DocManager interface.
 
