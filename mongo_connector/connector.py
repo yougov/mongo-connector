@@ -160,7 +160,8 @@ class Connector(threading.Thread):
             ssl_certfile=config['ssl.sslCertfile'],
             ssl_keyfile=config['ssl.sslKeyfile'],
             ssl_ca_certs=config['ssl.sslCACerts'],
-            ssl_cert_reqs=config['ssl.sslCertificatePolicy']
+            ssl_cert_reqs=config['ssl.sslCertificatePolicy'],
+            tz_aware=config['timezoneAware']
         )
         return connector
 
