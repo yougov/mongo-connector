@@ -89,6 +89,7 @@ class DocManager(DocManagerBase):
         self.auto_commit_interval = auto_commit_interval
         self.doc_dict = DocumentStore()
         self.url = url
+        self.kwargs = kwargs
 
     def stop(self):
         """Stops any running threads in the DocManager.

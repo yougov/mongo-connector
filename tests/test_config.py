@@ -13,17 +13,25 @@
 # limitations under the License.
 
 import json
+import logging
+import os
+import re
 import sys
 
 sys.path[0:0] = [""]
 
-from mongo_connector import config, errors
-from mongo_connector.connector import get_config_options
+from mongo_connector import config, errors, connector
+from mongo_connector.connector import get_config_options, setup_logging
 from mongo_connector.doc_managers import doc_manager_simulator
 from tests import unittest
 
+from_here = lambda *paths: os.path.join(
+    os.path.abspath(os.path.dirname(__file__)), *paths)
+
 
 class TestConfig(unittest.TestCase):
+    """Test parsing a JSON config file into a Config object."""
+
     def setUp(self):
         self.reset_config()
 
@@ -285,6 +293,200 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_json, test_config)
+
+
+class TestConnectorConfig(unittest.TestCase):
+    """Test creating a Connector from a Config."""
+
+    # Configuration where every option is set to a non-default value.
+    set_everything_config = {
+        "mainAddress": "localhost:12345",
+        "oplogFile": from_here("lib", "dummy.timestamp"),
+        "noDump": True,
+        "batchSize": 3,
+        "verbosity": 1,
+        "continueOnError": True,
+        "timezoneAware": True,
+
+        "logging": {
+            "type": "file",
+            "filename": from_here("lib", "dummy-connector.log"),
+            "rotationWhen": "H",
+            "rotationInterval": 3,
+            "rotationBackups": 10
+        },
+
+        "authentication": {
+            "adminUsername": "elmo",
+            "passwordFile": from_here("lib", "dummy.pwd")
+        },
+
+        "ssl": {
+            "sslCertfile": "certfile.pem",
+            "sslKeyfile": "certfile.key",
+            "sslCACerts": "ca.pem",
+            "sslCertificatePolicy": "required"
+        },
+
+        "fields": ["field1", "field2", "field3"],
+
+        "namespaces": {
+            "include": ["db.source1", "db.source2"],
+            "mapping": {
+                "db.source1": "db.dest1",
+                "db.source2": "db.dest2"
+            },
+            "gridfs": ["db.fs"]
+        },
+
+        "docManagers": [
+            {
+                "docManager": "doc_manager_simulator",
+                "targetURL": "localhost:12345",
+                "uniqueKey": "id",
+                "autoCommitInterval": 10,
+                "args": {"key": "value"}
+            }
+        ]
+    }
+
+    # Argv that sets all possible options to a different value from the
+    # config JSON above. Some options cannot be reset, since they conflict
+    # with the JSON config and will cause an Exception to be raised.
+    # Conflicted options are already tested in the TestConfig TestCase.
+    set_everything_differently_argv = [
+        '-m', 'localhost:1000',
+        '-o', from_here('lib', 'bar.timestamp'),
+        '--batch-size', '100',
+        '--verbose',
+        '--logfile-when', 'D',
+        '--logfile-interval', '5',
+        '--logfile-backups', '10',
+        '--fields', 'fieldA,fieldB',
+        '--gridfs-set', 'db.gridfs',
+        '--unique-key', 'customer_id',
+        '--auto-commit-interval', '100',
+        '--continue-on-error',
+        '-t', 'localhost:54321',
+        '-d', 'doc_manager_simulator',
+        '-n', 'foo.bar,fiz.biz',
+        '-g', 'foo2.bar2,fiz2.biz2',
+        '--ssl-certfile', 'certfile2.pem',
+        '--ssl-ca-certs', 'ca2.pem',
+        '--ssl-certificate-policy', 'optional'
+    ]
+
+    # Set of files to keep in the 'lib' directory after each run.
+    # The Connector and OplogThread create their own files in this directory
+    # that should be cleaned out between tests.
+    files_to_keep = set(('dummy.pwd',))
+
+    def setUp(self):
+        self.config = config.Config(get_config_options())
+        # Remove all logging Handlers, since tests may create Handlers.
+        logger = logging.getLogger()
+        for handler in logger.handlers:
+            logger.removeHandler(handler)
+
+    def tearDown(self):
+        for filename in os.listdir(from_here('lib')):
+            if filename not in self.files_to_keep:
+                try:
+                    os.remove(from_here('lib', filename))
+                except OSError:
+                    pass  # File may no longer exist.
+
+    def assertConnectorState(self):
+        """Assert that a Connector is constructed from a Config properly."""
+        mc = connector.Connector.from_config(self.config)
+
+        # Test Connector options.
+        self.assertEqual(mc.address, self.config['mainAddress'])
+        self.assertIsInstance(mc.doc_managers[0],
+                              doc_manager_simulator.DocManager)
+
+        pwfile = self.config['authentication.passwordFile']
+        if pwfile:
+            with open(pwfile, 'r') as fd:
+                test_password = re.sub(r'\s', '', fd.read())
+                self.assertEqual(mc.auth_key, test_password)
+
+        self.assertEqual(mc.auth_username,
+                         self.config['authentication.adminUsername'])
+        self.assertEqual(mc.oplog_checkpoint, self.config['oplogFile'])
+        self.assertEqual(mc.tz_aware, self.config['timezoneAware'])
+        self.assertEqual(mc.ssl_kwargs.get('ssl_certfile'),
+                         self.config['ssl.sslCertfile'])
+        self.assertEqual(mc.ssl_kwargs.get('ssl_ca_certs'),
+                         self.config['ssl.sslCACerts'])
+        self.assertEqual(mc.ssl_kwargs.get('ssl_keyfile'),
+                         self.config['ssl.sslKeyfile'])
+        self.assertEqual(mc.ssl_kwargs.get('ssl_cert_reqs'),
+                         self.config['ssl.sslCertificatePolicy'])
+        command_helper = mc.doc_managers[0].command_helper
+        self.assertEqual(command_helper.namespace_set,
+                         self.config['namespaces.include'])
+        self.assertEqual(command_helper.dest_mapping,
+                         self.config['namespaces.mapping'])
+
+        # Test Logger options.
+        test_logger = setup_logging(self.config)
+        self.assertEqual(
+            test_logger.level,
+            logging.INFO if self.config['verbosity'] == 0 else logging.DEBUG)
+        test_handlers = [
+            h for h in test_logger.handlers
+            if isinstance(h, logging.handlers.TimedRotatingFileHandler)]
+        self.assertEqual(len(test_handlers), 1)
+        test_handler = test_handlers[0]
+        expected_handler = logging.handlers.TimedRotatingFileHandler(
+            'test-dummy.log',
+            when=self.config['logging.rotationWhen'],
+            interval=self.config['logging.rotationInterval'],
+            backupCount=self.config['logging.rotationBackups'])
+        self.assertEqual(test_handler.when, expected_handler.when)
+        self.assertEqual(test_handler.backupCount,
+                         expected_handler.backupCount)
+        self.assertEqual(test_handler.interval, expected_handler.interval)
+
+        # Test keyword arguments passed to OplogThread.
+        ot_kwargs = mc.kwargs
+        self.assertEqual(ot_kwargs['ns_set'], self.config['namespaces.include'])
+        self.assertEqual(ot_kwargs['collection_dump'],
+                         not self.config['noDump'])
+        self.assertEqual(ot_kwargs['gridfs_set'],
+                         self.config['namespaces.gridfs'])
+        self.assertEqual(ot_kwargs['continue_on_error'],
+                         self.config['continueOnError'])
+        self.assertEqual(ot_kwargs['fields'], self.config['fields'])
+        self.assertEqual(ot_kwargs['batch_size'], self.config['batchSize'])
+
+        # Test DocManager options.
+        for dm, dm_expected in zip(mc.doc_managers, self.config['docManagers']):
+            self.assertEqual(dm.kwargs, dm_expected.kwargs)
+            self.assertEqual(dm.auto_commit_interval,
+                             dm_expected.auto_commit_interval)
+            self.assertEqual(dm.url, dm_expected.url)
+
+    def test_connector_config_file_options(self):
+        # Test Config with only a configuration file.
+        self.config.load_json(
+            json.dumps(self.set_everything_config))
+        self.config.parse_args()
+        self.assertConnectorState()
+
+    def test_connector_with_argv(self):
+        # Test Config with arguments given on the command-line.
+        self.config.parse_args(self.set_everything_differently_argv)
+        self.assertConnectorState()
+
+    def test_override_config_with_argv(self):
+        # Override some options in the config file with given command-line
+        # options.
+        self.config.load_json(
+            json.dumps(TestConnectorConfig.set_everything_config))
+        self.config.parse_args(self.set_everything_differently_argv)
+        self.assertConnectorState()
 
 
 if __name__ == '__main__':

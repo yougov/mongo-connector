@@ -136,7 +136,7 @@ class Connector(threading.Thread):
         password_file = config['authentication.passwordFile']
         if password_file is not None:
             try:
-                auth_key = open(config['passwordFile']).read()
+                auth_key = open(config['authentication.passwordFile']).read()
                 auth_key = re.sub(r'\s', '', auth_key)
             except IOError:
                 LOG.error('Could not load password file!')
@@ -885,7 +885,7 @@ def get_config_options():
             ssl_cert_reqs)
     ssl = add_option(
         config_key="ssl",
-        default=None,
+        default={},
         type=dict,
         apply_function=apply_ssl)
     ssl.add_cli(
@@ -943,13 +943,7 @@ def get_config_options():
     return result
 
 
-@log_fatal_exceptions
-def main():
-    """ Starts the mongo connector (assuming CLI)
-    """
-    conf = config.Config(get_config_options())
-    conf.parse_args()
-
+def setup_logging(conf):
     root_logger = logging.getLogger()
     formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s")
@@ -985,7 +979,17 @@ def main():
     log_out.setLevel(loglevel)
     log_out.setFormatter(formatter)
     root_logger.addHandler(log_out)
+    return root_logger
 
+
+@log_fatal_exceptions
+def main():
+    """ Starts the mongo connector (assuming CLI)
+    """
+    conf = config.Config(get_config_options())
+    conf.parse_args()
+
+    setup_logging(conf)
     LOG.info('Beginning Mongo Connector')
 
     connector = Connector.from_config(conf)

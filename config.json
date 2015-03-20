@@ -30,7 +30,7 @@
     "__ssl": {
         "__sslCertfile": "Path to certificate to identify the local connection against MongoDB",
         "__sslKeyfile": "Path to the private key for sslCertfile. Not necessary if already included in sslCertfile.",
-        "__sslCACerts": "Path to concatenated set of certificate authority certificates to validate the other side of the connection"
+        "__sslCACerts": "Path to concatenated set of certificate authority certificates to validate the other side of the connection",
         "__sslCertificatePolicy": "Policy for validating SSL certificates provided from the other end of the connection. Possible values are 'required' (require and validate certificates), 'optional' (validate but don't require a certificate), and 'ignored' (ignore certificates)."
     },
 
@@ -41,7 +41,7 @@
         "__mapping": {
             "db.source1": "db.dest1",
             "db.source2": "db.dest2"
-        }
+        },
 	"__gridfs": ["db.fs"]
     },
 
