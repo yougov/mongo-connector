@@ -55,7 +55,7 @@ class TestRollbacks(unittest.TestCase):
             primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mc"]
+            ns_set=["test.mc"]
         )
 
     def test_single_target(self):

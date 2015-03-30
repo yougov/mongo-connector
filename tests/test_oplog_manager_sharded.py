@@ -134,14 +134,14 @@ class TestOplogManagerSharded(unittest.TestCase):
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )
         self.opman2 = OplogThread(
             primary_client=self.shard2_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            namespace_set=["test.mcsharded", "test.mcunsharded"],
+            ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )
 
