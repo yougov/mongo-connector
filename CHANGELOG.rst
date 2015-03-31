@@ -1,6 +1,16 @@
 Changelog
 =========
 
+Version 2.0.2
+-------------
+
+Version 2.0.2 fixes the following issues:
+
+- Fix configuring timezone-aware datetimes (--tz-aware).
+- Fix password file from the command line (--password-file).
+- Automatically escape certain characters from field names in documents sent to Solr.
+- Add a lot more testing around the configuration file and command-line options.
+
 Version 2.0.1
 -------------
 
