@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 2.0.3
+-------------
+
+Version 2.0.3 requires that the PyMongo version installed be in the range [2.7.2, 3.0). It also adds more fine-grained control over log levels.
+
 Version 2.0.2
 -------------
 
