@@ -21,7 +21,7 @@ sys.path[0:0] = [""]
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 
-from tests import unittest, TESTARGS
+from tests import unittest, TESTARGS, solr_url
 from tests.test_gridfs_file import MockGridFSFile
 from tests.test_solr import SolrTestCase
 
@@ -113,11 +113,11 @@ class TestSolrDocManager(SolrTestCase):
         docc = {'_id': '1', 'name': 'John'}
         self.docman.upsert(docc, *TESTARGS)
         res = self.solr_conn.search('*:*')
-        self.assertTrue(len(res) == 1)
+        self.assertEqual(len(res), 1)
 
         self.docman.remove(docc['_id'], *TESTARGS)
         res = self.solr_conn.search('*:*')
-        self.assertTrue(len(res) == 0)
+        self.assertEqual(len(res), 0)
 
     def test_insert_file(self):
         """Ensure we can properly insert a file into Solr via DocManager.
@@ -134,8 +134,8 @@ class TestSolrDocManager(SolrTestCase):
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
             self.assertEqual(doc['filename'], docc['filename'])
-            self.assertEqual(doc['content'][0].strip().encode('utf8'),
-                             test_data.strip())
+            self.assertIn(test_data.strip(),
+                          doc['content'][0].strip().encode('utf8'))
 
     def test_remove_file(self):
         test_data = b'hello world'
@@ -168,10 +168,8 @@ class TestSolrDocManager(SolrTestCase):
         self.docman.upsert(docc, 'test.test', 5767301236327972870)
         search = list(self.docman.search(5767301236327972865,
                                          5767301236327972866))
-        search2 = list(self.solr_conn.search('John'))
-        self.assertTrue(len(search) == len(search2))
-        self.assertTrue(len(search) != 0)
-
+        self.assertEqual(2, len(search),
+                         'Should find two documents in timestamp range.')
         result_names = [result.get("name") for result in search]
         self.assertIn('John', result_names)
         self.assertIn('John Paul', result_names)
@@ -179,9 +177,9 @@ class TestSolrDocManager(SolrTestCase):
     def test_solr_commit(self):
         """Test that documents get properly added to Solr.
         """
-        docman = DocManager("http://localhost:8983/solr")
+        docman = DocManager(solr_url)
         # test cases:
-        # -1 = no autocommit
+        # None = no autocommit
         # 0 = commit immediately
         # x > 0 = commit within x seconds
         for autocommit_interval in [None, 0, 1, 2]:
@@ -192,7 +190,7 @@ class TestSolrDocManager(SolrTestCase):
             else:
                 # Allow just a little extra time
                 time.sleep(autocommit_interval + 1)
-            results = list(self._search("Waldo"))
+            results = list(self._search("name:Waldo"))
             self.assertEqual(len(results), 1,
                              "should commit document with "
                              "auto_commit_interval = %s" % str(

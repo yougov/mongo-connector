@@ -26,7 +26,7 @@ from pysolr import Solr, SolrError
 
 sys.path[0:0] = [""]
 
-from tests import solr_pair, unittest
+from tests import solr_url, unittest
 from tests.setup_cluster import ReplicaSet
 from tests.util import assert_soon
 from mongo_connector.compat import u
@@ -38,9 +38,8 @@ from mongo_connector.util import retry_until_ok
 class SolrTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        conn_str = "http://%s/solr" % solr_pair
-        cls.solr_conn = Solr(conn_str)
-        cls.docman = DocManager(conn_str, auto_commit_interval=0)
+        cls.solr_conn = Solr(solr_url)
+        cls.docman = DocManager(solr_url, auto_commit_interval=0)
 
     def _search(self, query):
         return self.docman._stream_search(query)
@@ -72,8 +71,7 @@ class TestSolr(SolrTestCase):
         except OSError:
             pass
         open("oplog.timestamp", "w").close()
-        docman = DocManager('http://%s/solr' % solr_pair,
-                            auto_commit_interval=0)
+        docman = DocManager(solr_url, auto_commit_interval=0)
         self.connector = Connector(
             mongo_address=self.repl_set.uri,
             ns_set=['test.test'],
@@ -96,7 +94,7 @@ class TestSolr(SolrTestCase):
 
         self.conn['test']['test'].insert({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
-        result_set_1 = list(self.solr_conn.search('paulie'))
+        result_set_1 = list(self.solr_conn.search('name:paulie'))
         self.assertEqual(len(result_set_1), 1)
         result_set_2 = self.conn['test']['test'].find_one()
         for item in result_set_1:
@@ -118,13 +116,12 @@ class TestSolr(SolrTestCase):
         test_data = "test_insert_file test file"
         id = fs.put(test_data, filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
-
-        res = list(self.solr_conn.search('test_insert_file'))
+        res = list(self.solr_conn.search('content:*test_insert_file*'))
         self.assertEqual(len(res), 1)
         doc = res[0]
         self.assertEqual(doc['filename'], "test.txt")
         self.assertEqual(doc['_id'], str(id))
-        self.assertEqual(doc['content'][0].strip(), test_data.strip())
+        self.assertIn(test_data.strip(), doc['content'][0].strip())
 
     def test_remove_file(self):
         """Tests removing a gridfs file
@@ -228,7 +225,7 @@ class TestSolr(SolrTestCase):
                        {'name': 'pauline'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 2)
 
-        result_set_1 = list(self.solr_conn.search('pauline'))
+        result_set_1 = list(self.solr_conn.search('name:pauline'))
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
@@ -243,9 +240,9 @@ class TestSolr(SolrTestCase):
         self.repl_set.secondary.start()
 
         time.sleep(2)
-        result_set_1 = self.solr_conn.search('pauline')
+        result_set_1 = self.solr_conn.search('name:pauline')
         self.assertEqual(sum(1 for _ in result_set_1), 0)
-        result_set_2 = self.solr_conn.search('paul')
+        result_set_2 = self.solr_conn.search('name:paul')
         self.assertEqual(sum(1 for _ in result_set_2), 1)
 
     def test_valid_fields(self):
@@ -263,7 +260,7 @@ class TestSolr(SolrTestCase):
         result = docman.get_last_doc()
         self.assertIn('popularity', result)
         self.assertEqual(sum(1 for _ in self._search(
-            "name=test_valid")), 1)
+            "name:test_valid")), 1)
 
     def test_invalid_fields(self):
         """ Tests documents without field definitions
@@ -281,7 +278,7 @@ class TestSolr(SolrTestCase):
         result = docman.get_last_doc()
         self.assertNotIn('break_this_test', result)
         self.assertEqual(sum(1 for _ in self._search(
-            "name=test_invalid")), 1)
+            "name:test_invalid")), 1)
 
     def test_dynamic_fields(self):
         """ Tests dynamic field definitions
@@ -326,8 +323,8 @@ class TestSolr(SolrTestCase):
 
         The following fields are defined in the provided schema.xml:
 
-        <field name="person.address.street" type="string" ... />
-        <field name="person.address.state" type="string" ... />
+        <field name="billing.address.street" type="string" ... />
+        <field name="billing.address.state" type="string" ... />
         <dynamicField name="numbers.*" type="string" ... />
         <dynamicField name="characters.*" type="string" ... />
 

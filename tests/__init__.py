@@ -31,9 +31,7 @@ else:
 elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
 elastic_port = unicode(os.environ.get("ES_PORT", 9200))
 elastic_pair = '%s:%s' % (elastic_host, elastic_port)
-solr_host = unicode(os.environ.get("SOLR_HOST", 'localhost'))
-solr_port = unicode(os.environ.get("SOLR_PORT", 8983))
-solr_pair = '%s:%s' % (solr_host, solr_port)
+solr_url = unicode(os.environ.get('SOLR_URL', 'http://localhost:8983/solr'))
 db_user = unicode(os.environ.get("DB_USER", ""))
 db_password = unicode(os.environ.get("DB_PASSWORD", ""))
 # Extra keyword options to provide to Connector.
