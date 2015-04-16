@@ -106,7 +106,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
             new_value = self.transform_value(value)
             yield key, new_value
         except ValueError as e:
-            LOG.warn("Invalid value for key: {} as {}".format(key, e))
+            LOG.warn("Invalid value for key: %s as %s"
+                     % (key, str(e)))
 
     def format_document(self, document):
         def _kernel(doc):
