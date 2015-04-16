@@ -745,12 +745,13 @@ def get_config_options():
                 dm['targetURL'] = None
             if not dm.get('uniqueKey'):
                 dm['uniqueKey'] = constants.DEFAULT_UNIQUE_KEY
-            if not dm.get('autoCommitInterval'):
+            if dm.get('autoCommitInterval') is None:
                 dm['autoCommitInterval'] = constants.DEFAULT_COMMIT_INTERVAL
             if not dm.get('args'):
                 dm['args'] = {}
 
-            if dm['autoCommitInterval'] and dm['autoCommitInterval'] < 0:
+            aci = dm['autoCommitInterval']
+            if aci is not None and aci < 0:
                 raise errors.InvalidConfiguration(
                     "autoCommitInterval must be non-negative.")
 
