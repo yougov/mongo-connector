@@ -3,6 +3,11 @@ import datetime
 import re
 
 from uuid import UUID
+from math import isnan, isinf
+
+import logging
+LOG = logging.getLogger(__name__)
+
 
 import bson
 import bson.json_util
@@ -84,6 +89,10 @@ class DefaultDocumentFormatter(DocumentFormatter):
         elif isinstance(value, UUID):
             return value.hex
         elif isinstance(value, (int, long, float)):
+            if isnan(value):
+                raise ValueError("nan")
+            elif isinf(value):
+                raise ValueError("inf")
             return value
         elif isinstance(value, datetime.datetime):
             return value
@@ -93,7 +102,11 @@ class DefaultDocumentFormatter(DocumentFormatter):
         return unicode(value)
 
     def transform_element(self, key, value):
-        yield key, self.transform_value(value)
+        try:
+            new_value = self.transform_value(value)
+            yield key, new_value
+        except ValueError as e:
+            LOG.warn("Invalid value for key: {} as {}".format(key, e))
 
     def format_document(self, document):
         def _kernel(doc):
