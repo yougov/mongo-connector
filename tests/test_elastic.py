@@ -254,6 +254,15 @@ class TestElastic(ElasticsearchTestCase):
         find_cursor = retry_until_ok(self.conn['test']['test'].find)
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
 
+    def test_bad_int_value(self):
+        self.conn.test.test.insert({
+            'inf': float('inf'), 'nan': float('nan'),
+            'still_exists': True})
+        assert_soon(lambda: self._count() > 0)
+        for doc in self._search():
+            self.assertNotIn('inf', doc)
+            self.assertNotIn('nan', doc)
+            self.assertTrue(doc['still_exists'])
 
 if __name__ == '__main__':
     unittest.main()

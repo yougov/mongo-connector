@@ -63,6 +63,10 @@ class TestFormatters(unittest.TestCase):
         for el1, el2 in zip(self.lst, map(trans, self.lst)):
             self.assertEqual(trans(el1), el2)
 
+        # Infinity/NaN
+        self.assertRaises(ValueError, trans, float('inf'))
+        self.assertRaises(ValueError, trans, float('nan'))
+
     def test_default_formatter(self):
         formatter = DefaultDocumentFormatter()
 
