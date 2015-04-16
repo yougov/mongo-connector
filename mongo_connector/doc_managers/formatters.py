@@ -110,8 +110,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
 
     def format_document(self, document):
         def _kernel(doc):
-            for key in document:
-                value = document[key]
+            for key in doc:
+                value = doc[key]
                 for new_k, new_v in self.transform_element(key, value):
                     yield new_k, new_v
         return dict(_kernel(document))
