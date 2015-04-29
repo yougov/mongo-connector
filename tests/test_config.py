@@ -140,7 +140,7 @@ class TestConfig(unittest.TestCase):
         test_option('-o', 'oplogFile', 'testOplogFileShort')
         test_option('--batch-size', 'batchSize', 69)
         test_option('--continue-on-error', 'continueOnError', True)
-        test_option('-v', 'verbosity', 1)
+        test_option('-v', 'verbosity', 3)
 
         self.load_options({'-w': 'logFile'})
         self.assertEqual(self.conf['logging.type'], 'file')
@@ -430,10 +430,16 @@ class TestConnectorConfig(unittest.TestCase):
                          self.config['namespaces.mapping'])
 
         # Test Logger options.
+        log_levels = [
+            logging.ERROR,
+            logging.WARNING,
+            logging.INFO,
+            logging.DEBUG
+        ]
         test_logger = setup_logging(self.config)
         self.assertEqual(
-            test_logger.level,
-            logging.INFO if self.config['verbosity'] == 0 else logging.DEBUG)
+            log_levels[self.config['verbosity']],
+            test_logger.level)
         test_handlers = [
             h for h in test_logger.handlers
             if isinstance(h, logging.handlers.TimedRotatingFileHandler)]
