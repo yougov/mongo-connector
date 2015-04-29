@@ -98,6 +98,10 @@ class Config(object):
                 cli_option = parser.add_option(*args, **kwargs)
                 option.cli_names.append(cli_option.dest)
         parsed_options, args = parser.parse_args(argv)
+        if args:
+            raise errors.InvalidConfiguration(
+                'The following command line arguments are not recognized: '
+                + ', '.join(args))
 
         # load the config file
         if parsed_options.config_file:
