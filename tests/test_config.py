@@ -54,7 +54,8 @@ class TestConfig(unittest.TestCase):
         argv = []
         for k, v in d.items():
             argv.append(str(k))
-            argv.append(str(v))
+            if v is not None:
+                argv.append(str(v))
         self.conf.parse_args(argv)
 
     def test_default(self):
@@ -132,21 +133,22 @@ class TestConfig(unittest.TestCase):
 
     def test_basic_options(self):
         # Test the assignment of individual options
-        def test_option(arg_name, json_key, value):
-            self.load_options({arg_name: value})
+        def test_option(arg_name, json_key, value, append_cli=True):
+            self.load_options({arg_name: value if append_cli else None})
             self.assertEqual(self.conf[json_key], value)
 
         test_option('-m', 'mainAddress', 'testMainAddress')
         test_option('-o', 'oplogFile', 'testOplogFileShort')
         test_option('--batch-size', 'batchSize', 69)
-        test_option('--continue-on-error', 'continueOnError', True)
-        test_option('-v', 'verbosity', 3)
+        test_option('--continue-on-error', 'continueOnError', True,
+                    append_cli=False)
+        test_option('-v', 'verbosity', 3, append_cli=False)
 
         self.load_options({'-w': 'logFile'})
         self.assertEqual(self.conf['logging.type'], 'file')
         self.assertEqual(self.conf['logging.filename'], 'logFile')
 
-        self.load_options({'-s': 'true',
+        self.load_options({'-s': None,
                            '--syslog-host': 'testHost',
                            '--syslog-facility': 'testFacility'})
         self.assertEqual(self.conf['logging.type'], 'syslog')
@@ -155,6 +157,12 @@ class TestConfig(unittest.TestCase):
 
         self.load_options({'-i': 'a,b,c'})
         self.assertEqual(self.conf['fields'], ['a', 'b', 'c'])
+
+    def test_extraneous_command_line_options(self):
+        self.assertRaises(errors.InvalidConfiguration,
+                          self.load_options, {'-v': 3})
+        # No error.
+        self.load_options({'-v': None})
 
     def test_namespace_set(self):
         # test namespace_set and dest_namespace_set
