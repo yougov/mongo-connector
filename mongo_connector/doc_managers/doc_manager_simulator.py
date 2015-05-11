@@ -163,6 +163,9 @@ class DocManager(DocManagerBase):
         modified or deleted most recently."""
         return max(self.doc_dict.values(), key=lambda x: x.ts).meta_dict
 
+    def handle_command(self, command_doc, namespace, timestamp):
+        pass
+
     def _search(self):
         """Returns all documents in the doc dict.
 
