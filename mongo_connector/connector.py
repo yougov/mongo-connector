@@ -340,6 +340,8 @@ class Connector(threading.Thread):
                     shard_conn = MongoClient(
                         hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
                         **self.ssl_kwargs)
+                    if self.auth_key is not None:
+                        shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         **self.kwargs)
