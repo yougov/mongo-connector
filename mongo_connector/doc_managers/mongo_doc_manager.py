@@ -25,7 +25,7 @@ import logging
 import pymongo
 
 from gridfs import GridFS
-from mongo_connector import errors
+from mongo_connector import errors, constants
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
@@ -58,6 +58,7 @@ class DocManager(DocManagerBase):
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
         self.namespace_set = kwargs.get("namespace_set")
+        self.chunk_size = kwargs.get('chunk_size', constants.DEFAULT_MAX_BULK)
 
     def _db_and_collection(self, namespace):
         return namespace.split('.', 1)
@@ -143,6 +144,42 @@ class DocManager(DocManagerBase):
             "ns": namespace
         })
         self.mongo[database][coll].save(doc)
+
+    @wrap_exceptions
+    def bulk_upsert(self, docs, namespace, timestamp):
+        def iterate_chunks():
+            dbname, collname = self._db_and_collection(namespace)
+            collection = self.mongo[dbname][collname]
+            meta_collection = self.mongo['__mongo_connector'][namespace]
+            more_chunks = True
+            while more_chunks:
+                bulk = collection.initialize_ordered_bulk_op()
+                bulk_meta = meta_collection.initialize_ordered_bulk_op()
+                for i in range(self.chunk_size):
+                    try:
+                        doc = next(docs)
+                        selector = {'_id': doc['_id']}
+                        bulk.find(selector).upsert().replace_one(doc)
+                        bulk_meta.find(selector).upsert().replace_one({
+                            '_id': doc['_id'],
+                            'ns': namespace,
+                            '_ts': timestamp
+                        })
+                    except StopIteration:
+                        more_chunks = False
+                        if i > 0:
+                            yield bulk, bulk_meta
+                        break
+                if more_chunks:
+                    yield bulk, bulk_meta
+
+        for bulk_op, meta_bulk_op in iterate_chunks():
+            try:
+                bulk_op.execute()
+                meta_bulk_op.execute()
+            except pymongo.errors.DuplicateKeyError as e:
+                LOG.warn('Continuing after DuplicateKeyError: '
+                         + str(e))
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):

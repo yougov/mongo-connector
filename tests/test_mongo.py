@@ -44,8 +44,8 @@ class MongoTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.standalone.stop()
 
-    def _search(self):
-        for doc in self.mongo.find():
+    def _search(self, **kwargs):
+        for doc in self.mongo.find(**kwargs):
             yield doc
 
         fs = GridFS(self.mongo_conn['test'], 'test')

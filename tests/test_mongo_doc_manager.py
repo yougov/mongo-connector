@@ -97,6 +97,23 @@ class TestMongoDocManager(MongoTestCase):
             self.assertEqual(doc['_id'], '1')
             self.assertEqual(doc['name'], 'Paul')
 
+    def test_bulk_upsert(self):
+        """Test the bulk_upsert method."""
+        docs = ({"_id": i} for i in range(1000))
+        self.mongo_doc.bulk_upsert(docs, *TESTARGS)
+        res = list(self._search(sort=[('_id', 1)]))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r['_id'], i)
+
+        docs = ({"_id": i, "weight": 2*i} for i in range(1000))
+        self.mongo_doc.bulk_upsert(docs, *TESTARGS)
+
+        res = list(self._search(sort=[('_id', 1)]))
+        self.assertEqual(len(res), 1000)
+        for i, r in enumerate(res):
+            self.assertEqual(r['weight'], 2*i)
+
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
         """
