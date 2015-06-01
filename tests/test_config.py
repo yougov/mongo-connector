@@ -486,7 +486,7 @@ class TestConnectorConfig(unittest.TestCase):
         # Test Config with only a configuration file.
         self.config.load_json(
             json.dumps(self.set_everything_config))
-        self.config.parse_args()
+        self.config.parse_args(argv=[])
         self.assertConnectorState()
 
     def test_connector_with_argv(self):
