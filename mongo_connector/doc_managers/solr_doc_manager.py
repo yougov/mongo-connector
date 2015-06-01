@@ -64,7 +64,7 @@ class DocManager(DocManagerBase):
         """Verify Solr URL and establish a connection.
         """
         self.url = url
-        self.solr = Solr(url)
+        self.solr = Solr(url, **kwargs.get('clientOptions', {}))
         self.unique_key = unique_key
         # pysolr does things in milliseconds
         if auto_commit_interval is not None:

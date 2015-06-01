@@ -55,7 +55,8 @@ class DocManager(DocManagerBase):
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  meta_index_name="mongodb_meta", meta_type="mongodb_meta",
                  attachment_field="content", **kwargs):
-        self.elastic = Elasticsearch(hosts=[url])
+        self.elastic = Elasticsearch(
+            hosts=[url], **kwargs.get('clientOptions', {}))
         self.auto_commit_interval = auto_commit_interval
         self.meta_index_name = meta_index_name
         self.meta_type = meta_type
