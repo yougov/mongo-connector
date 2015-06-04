@@ -23,6 +23,7 @@ implementation with real systems.
 
 from threading import RLock
 
+from mongo_connector import constants
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.compat import u
@@ -81,7 +82,8 @@ class DocManager(DocManagerBase):
     """
 
     def __init__(self, url=None, unique_key='_id',
-                 auto_commit_interval=None, **kwargs):
+                 auto_commit_interval=None,
+                 chunk_size=constants.DEFAULT_MAX_BULK, **kwargs):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
         """
@@ -89,6 +91,7 @@ class DocManager(DocManagerBase):
         self.auto_commit_interval = auto_commit_interval
         self.doc_dict = DocumentStore()
         self.url = url
+        self.chunk_size = chunk_size
         self.kwargs = kwargs
 
     def stop(self):

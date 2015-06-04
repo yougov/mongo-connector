@@ -724,11 +724,17 @@ def get_config_options():
                     "Cannot create a Connector with a target URL"
                     " but no doc manager.")
         else:
+            if option.value is not None:
+                bulk_size = option.value[0].get(
+                    'bulkSize', constants.DEFAULT_MAX_BULK)
+            else:
+                bulk_size = constants.DEFAULT_MAX_BULK
             option.value = [{
                 'docManager': cli_values['doc_manager'],
                 'targetURL': cli_values['target_url'],
                 'uniqueKey': cli_values['unique_key'],
-                'autoCommitInterval': cli_values['auto_commit_interval']
+                'autoCommitInterval': cli_values['auto_commit_interval'],
+                'bulkSize': bulk_size
             }]
 
         if not option.value:
@@ -751,6 +757,8 @@ def get_config_options():
                 dm['autoCommitInterval'] = constants.DEFAULT_COMMIT_INTERVAL
             if not dm.get('args'):
                 dm['args'] = {}
+            if not dm.get('bulkSize'):
+                dm['bulkSize'] = constants.DEFAULT_MAX_BULK
 
             aci = dm['autoCommitInterval']
             if aci is not None and aci < 0:
@@ -781,7 +789,8 @@ def get_config_options():
             module = import_dm_by_name(dm['docManager'])
             kwargs = {
                 'unique_key': dm['uniqueKey'],
-                'auto_commit_interval': dm['autoCommitInterval']
+                'auto_commit_interval': dm['autoCommitInterval'],
+                'chunk_size': dm['bulkSize']
             }
             for k in dm['args']:
                 if k not in kwargs:

@@ -351,6 +351,7 @@ class TestConnectorConfig(unittest.TestCase):
             {
                 "docManager": "doc_manager_simulator",
                 "targetURL": "localhost:12345",
+                "bulkSize": 500,
                 "uniqueKey": "id",
                 "autoCommitInterval": 10,
                 "args": {"key": "value"}
@@ -481,6 +482,7 @@ class TestConnectorConfig(unittest.TestCase):
             self.assertEqual(dm.auto_commit_interval,
                              dm_expected.auto_commit_interval)
             self.assertEqual(dm.url, dm_expected.url)
+            self.assertEqual(dm.chunk_size, dm_expected.chunk_size)
 
     def test_connector_config_file_options(self):
         # Test Config with only a configuration file.
