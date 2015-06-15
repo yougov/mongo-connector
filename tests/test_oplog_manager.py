@@ -16,6 +16,7 @@
 """
 
 import itertools
+import re
 import sys
 import time
 
@@ -78,6 +79,8 @@ class TestOplogManager(unittest.TestCase):
         self.primary_conn["test"]["test"].insert(
             {"i": i} for i in range(2, 1002))
         oplog_cursor = self.oplog_coll.find(
+            {'op': {'$ne': 'n'},
+             'ns': {'$not': re.compile(r'\.system')}},
             sort=[("ts", pymongo.ASCENDING)]
         )
 
