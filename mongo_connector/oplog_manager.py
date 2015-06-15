@@ -341,20 +341,26 @@ class OplogThread(threading.Thread):
             for key in set(doc) - self._fields:
                 doc.pop(key)
 
+        entry_o = entry['o']
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
-            pop_excluded_fields(entry['o'])
-        # 'u' indicates an update. 'o' field is the update spec.
-        elif entry['op'] == 'u':
-            pop_excluded_fields(entry['o'].get("$set", {}))
-            pop_excluded_fields(entry['o'].get("$unset", {}))
+            pop_excluded_fields(entry_o)
+        # 'u' indicates an update. The 'o' field describes an update spec
+        # if '$set' or '$unset' are present.
+        elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
+            pop_excluded_fields(entry_o.get("$set", {}))
+            pop_excluded_fields(entry_o.get("$unset", {}))
             # not allowed to have empty $set/$unset, so remove if empty
-            if "$set" in entry['o'] and not entry['o']['$set']:
-                entry['o'].pop("$set")
-            if "$unset" in entry['o'] and not entry['o']['$unset']:
-                entry['o'].pop("$unset")
-            if not entry['o']:
+            if "$set" in entry_o and not entry_o['$set']:
+                entry_o.pop("$set")
+            if "$unset" in entry_o and not entry_o['$unset']:
+                entry_o.pop("$unset")
+            if not entry_o:
                 return None
+        # 'u' indicates an update. The 'o' field is the replacement document
+        # if no '$set' or '$unset' are present.
+        elif entry['op'] == 'u':
+            pop_excluded_fields(entry_o)
 
         return entry
 
