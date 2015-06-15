@@ -625,6 +625,17 @@ def get_config_options():
     def apply_fields(option, cli_values):
         if cli_values['fields']:
             option.value = cli_values['fields'].split(",")
+        for field in option.value:
+            if '.' in field:
+                print(
+                    "WARNING: mongo-connector can only successfully filter "
+                    "sub-document fields for inserts and updates, "
+                    "not replacements. To catch all changes on "
+                    "a sub-document field, specify the name of the "
+                    "sub-document instead. You are seeing this "
+                    "message because you passed the name of a nested field "
+                    "to the 'fields' option: %s" % field)
+                break
 
     fields = add_option(
         config_key="fields",
