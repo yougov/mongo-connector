@@ -450,5 +450,15 @@ class TestOplogManager(unittest.TestCase):
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertEqual(filtered, None)
 
+        # Case 8: update op, fields provided, replacement
+        self.opman.fields = ['a', 'b', 'c']
+        filtered = self.opman.filter_oplog_entry({
+            'op': 'u',
+            'o': {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+        })
+        self.assertEqual(
+            filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
+
+
 if __name__ == '__main__':
     unittest.main()
