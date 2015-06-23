@@ -457,11 +457,14 @@ def get_config_options():
         dest="verbose", help="Enables verbose logging.")
 
     def apply_logging(option, cli_values):
-        if cli_values['logfile'] and cli_values['enable_syslog']:
+        log_mechs_enabled = [cli_values[m]
+                             for m in ('logfile', 'enable_syslog', 'stdout')
+                             if cli_values[m]]
+        if len(log_mechs_enabled) > 1:
             raise errors.InvalidConfiguration(
-                "You cannot specify syslog and a logfile simultaneously,"
-                " please choose the logging method you would prefer.")
-
+                "You cannot specify more than one logging method "
+                "simultaneously. Please choose the logging method you "
+                "prefer. ")
         if cli_values['logfile']:
             when = cli_values['logfile_when']
             interval = cli_values['logfile_interval']
@@ -489,6 +492,9 @@ def get_config_options():
         if cli_values['syslog_facility']:
             option.value['facility'] = cli_values['syslog_facility']
 
+        if cli_values['stdout']:
+            option.value['type'] = 'stream'
+
     default_logging = {
         'type': 'file',
         'filename': 'mongo-connector.log',
@@ -508,8 +514,11 @@ def get_config_options():
     # -w enables logging to a file
     logging.add_cli(
         "-w", "--logfile", dest="logfile", help=
-        "Log all output to a file rather than stream to "
-        "stderr. Omit to stream to stderr.")
+        "Log all output to the specified file.")
+
+    logging.add_cli(
+        '--stdout', dest='stdout', action='store_true', help=
+        'Log all output to STDOUT rather than a logfile.')
 
     # -s is to enable syslog logging.
     logging.add_cli(
@@ -987,7 +996,6 @@ def setup_logging(conf):
             backupCount=conf['logging.rotationBackups']
         )
         print("Logging to %s." % conf['logging.filename'])
-
     elif conf['logging.type'] == 'syslog':
         syslog_info = conf['logging.host']
         if ':' in syslog_info:
@@ -998,10 +1006,8 @@ def setup_logging(conf):
             facility=conf['logging.facility']
         )
         print("Logging to system log at %s" % conf['logging.host'])
-
     elif conf['logging.type'] == 'stream':
         log_out = logging.StreamHandler()
-
     else:
         print("Logging type must be one of 'stream', 'syslog', or 'file', not "
               "'%s'." % conf['logging.type'])

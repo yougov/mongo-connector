@@ -258,6 +258,12 @@ class TestConfig(unittest.TestCase):
                               '-w': 'logFile', '-s': 'true'
                           })
 
+        # Can't specify --stdout and logfile
+        self.assertRaises(errors.InvalidConfiguration,
+                          self.load_options, {
+                              '--stdout': None, '-w': 'logFile'
+                          })
+
         # can't specify a username without a password
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_options, {
