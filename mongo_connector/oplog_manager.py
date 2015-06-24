@@ -25,7 +25,6 @@ import pymongo
 import sys
 import time
 import threading
-import traceback
 
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
@@ -540,9 +539,9 @@ class OplogThread(threading.Thread):
         # Print caught exceptions
         try:
             while True:
-                klass, value, trace = errors.get_nowait()
+                LOG.critical('Exception during collection dump',
+                             exc_info=errors.get_nowait())
                 dump_success = False
-                traceback.print_exception(klass, value, trace)
         except queue.Empty:
             pass
 
