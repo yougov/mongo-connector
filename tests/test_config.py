@@ -23,7 +23,8 @@ sys.path[0:0] = [""]
 from mongo_connector import config, errors, connector
 from mongo_connector.connector import get_config_options, setup_logging
 from mongo_connector.doc_managers import doc_manager_simulator
-from tests import unittest
+from tests import unittest, solr_url
+from tests.setup_cluster import ReplicaSet
 
 from_here = lambda *paths: os.path.join(
     os.path.abspath(os.path.dirname(__file__)), *paths)
@@ -512,6 +513,32 @@ class TestConnectorConfig(unittest.TestCase):
             json.dumps(TestConnectorConfig.set_everything_config))
         self.config.parse_args(self.set_everything_differently_argv)
         self.assertConnectorState()
+
+    def test_client_options(self):
+        repl_set = ReplicaSet().start()
+        try:
+            config_def = {
+                'mainAddress': repl_set.uri,
+                'oplogFile': from_here('lib', 'dummy.timestamp'),
+                'docManagers': [
+                    {
+                        'docManager': 'solr_doc_manager',
+                        'targetURL': solr_url,
+                        'args': {
+                            'clientOptions': {
+                                'timeout': 100
+                            }
+                        }
+                    }
+                ]
+            }
+            config_obj = config.Config(get_config_options())
+            config_obj.load_json(json.dumps(config_def))
+            config_obj.parse_args(argv=[])
+            conn = connector.Connector.from_config(config_obj)
+            self.assertEqual(100, conn.doc_managers[0].solr.timeout)
+        finally:
+            repl_set.stop()
 
 
 if __name__ == '__main__':
