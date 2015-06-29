@@ -80,16 +80,16 @@ class TestOplogManager(unittest.TestCase):
             {"i": i} for i in range(2, 1002))
         oplog_cursor = self.oplog_coll.find(
             {'op': {'$ne': 'n'},
-             'ns': {'$not': re.compile(r'\.system')}},
+             'ns': {'$not': re.compile(r'\.(system|\$cmd)')}},
             sort=[("ts", pymongo.ASCENDING)]
         )
 
-        # startup + insert + 1000 inserts
-        self.assertEqual(oplog_cursor.count(), 2 + 1000)
+        # initial insert + 1000 more inserts
+        self.assertEqual(oplog_cursor.count(), 1 + 1000)
         pivot = oplog_cursor.skip(400).limit(1)[0]
 
         goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
-        self.assertEqual(goc_cursor.count(), 2 + 1000 - 400)
+        self.assertEqual(goc_cursor.count(), 1 + 1000 - 400)
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""

@@ -8,7 +8,6 @@ import sys
 import time
 
 from pymongo.read_preferences import ReadPreference
-from pymongo import MongoClient
 
 sys.path[0:0] = [""]
 
@@ -242,9 +241,9 @@ class TestRollbacks(unittest.TestCase):
 
         # Both document should exist in doc manager
         doc_manager = self.opman.doc_managers[0]
-        docs = list(doc_manager._search())
-        self.assertEqual(len(docs), 2,
-                         "Expected two documents, but got %r" % docs)
+        assert_soon(lambda: len(list(doc_manager._search())) == 2,
+                    ("Expected two documents, but got: %r"
+                     % list(doc_manager._search())))
 
         self.opman.join()
 
@@ -255,7 +254,7 @@ class TestRollbacks(unittest.TestCase):
         c = self.main_conn.test.mc
         docman = self.opman.doc_managers[0]
 
-        c.insert({'i': i} for i in range(STRESS_COUNT))
+        c.insert(({'i': i} for i in range(STRESS_COUNT)), w=2)
         assert_soon(lambda: c.count() == STRESS_COUNT)
         condition = lambda: len(docman._search()) == STRESS_COUNT
         assert_soon(condition, ("Was expecting %d documents in DocManager, "
@@ -273,7 +272,6 @@ class TestRollbacks(unittest.TestCase):
         retry_until_ok(c.insert,
                        [{'i': str(STRESS_COUNT + i)}
                         for i in range(STRESS_COUNT)])
-        assert_soon(lambda: len(docman._search()) == c.count())
 
         self.repl_set.secondary.stop(destroy=False)
 

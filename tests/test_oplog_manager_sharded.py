@@ -455,7 +455,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         assert_soon(check_docman_rollback,
                     "doc manager did not roll back")
 
-        # Wait for previous rollback to complete
+        # Wait for previous rollback to complete.
+        # Insert/delete one document to jump-start replication to secondaries
+        # in MongoDB 3.x.
+        db_main.insert({'i': -1})
+        db_main.remove({'i': -1})
+
         def rollback_done():
             secondary1_count = retry_until_ok(db_secondary1.count)
             secondary2_count = retry_until_ok(db_secondary2.count)
@@ -521,8 +526,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(db_main.find_one(query2)["i"], 1000)
 
         # Same should hold for the doc manager
+        assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 2)
         i_values = [d["i"] for d in self.opman1.doc_managers[0]._search()]
-        self.assertEqual(len(i_values), 2)
         self.assertIn(0, i_values)
         self.assertIn(1000, i_values)
 
