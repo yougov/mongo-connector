@@ -158,7 +158,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(len(docs), 90)
         expected_a = itertools.chain(range(0, 50), range(60, 100))
         for doc, correct_a in zip(docs, expected_a):
-            self.assertEquals(doc['a'], correct_a)
+            self.assertEqual(doc['a'], correct_a)
 
     def test_init_cursor(self):
         """Test the init_cursor method
