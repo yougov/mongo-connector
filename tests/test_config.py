@@ -361,9 +361,11 @@ class TestConnectorConfig(unittest.TestCase):
                 "bulkSize": 500,
                 "uniqueKey": "id",
                 "autoCommitInterval": 10,
-                "args": {"key": "value"},
-                "clientOptions": {
-                    "foo": "bar"
+                "args": {
+                    "key": "value",
+                    "clientOptions": {
+                        "foo": "bar"
+                    }
                 }
             }
         ]
