@@ -1,6 +1,29 @@
 Changelog
 =========
 
+Version 2.1
+-----------
+
+Version 2.1 adds a couple minor features and fixes a few bugs.
+
+New Features
+~~~~~~~~~~~~
+
+- Bulk write support when synchronizing to MongoDB.
+- Add 'docManagers.XXX.args.clientOptions' to the config file for passing arbitrary keyword arguments to clients contained within a DocManager.
+- Add 'docManagers.XXX.bulkSize' to the config file for adjusting the size of bulk requests.
+- Add '--stdout' option to mongo-connector for printing logs to STDOUT.
+
+Bug Fixes
+~~~~~~~~~
+
+- Filter replacement documents in filter_oplog_entry.
+- Multiple improvements to the test suite to stand up better across various versions of MongoDB.
+- Authenticate to shards within a sharded cluster (thanks to Hugo Hromic!)
+- Raise InvalidConfiguration for unrecognized command-line arguments.
+- Clean out 'NaN'/'inf' from number fields in Elasticsearch (thanks to jaredkipe!)
+- Fix autoCommitInterval when set to 0.
+
 Version 2.0.3
 -------------
 
