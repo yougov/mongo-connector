@@ -279,7 +279,7 @@ class Connector(threading.Thread):
                 return
 
             # Establish a connection to the replica set as a whole
-            main_conn.disconnect()
+            main_conn.close()
             main_conn = MongoClient(
                 self.address, replicaSet=is_master['setName'],
                 tz_aware=self.tz_aware, **self.ssl_kwargs)
