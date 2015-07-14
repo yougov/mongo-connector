@@ -126,6 +126,13 @@ class DocManager(DocManagerBase):
 
         """
         db, coll = self._db_and_collection(namespace)
+        
+        self.mongo["__mongo_connector"][namespace].save({
+            '_id': document_id,
+            "_ts": timestamp,
+            "ns": namespace
+        })
+        
         updated = self.mongo[db][coll].find_and_modify(
             {'_id': document_id},
             update_spec,
