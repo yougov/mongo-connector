@@ -10,12 +10,12 @@ You are responsible for reviewing and testing any scripts you run thoroughly bef
 System Overview
 ---------------
 
-mongo-connector creates a pipeline from a MongoDB cluster to one or more
-target systems, such as Solr, Elasticsearch, or another MongoDB cluster.
-By tailing the MongoDB oplog, it replicates operations from MongoDB to
-these systems in real-time. It has been tested with Python 2.6, 2.7,
-3.3, and 3.4. Detailed documentation is available on the
-`wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
+`mongo-connector` creates a pipeline from a MongoDB cluster to one or more
+target systems, such as Solr, Elasticsearch, or another MongoDB cluster.  It
+synchronizes data in MongoDB to the target then tails the MongoDB oplog, keeping
+up with operations in MongoDB in real-time. It has been tested with Python 2.6,
+2.7, 3.3, and 3.4. Detailed documentation is available on the `wiki
+<https://github.com/10gen-labs/mongo-connector/wiki>`__.
 
 Getting Started
 ---------------
