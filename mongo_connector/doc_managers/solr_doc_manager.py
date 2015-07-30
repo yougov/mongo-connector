@@ -192,8 +192,9 @@ class DocManager(DocManagerBase):
         """Override DocManagerBase.apply_update to have flat documents."""
         # Replace a whole document
         if not '$set' in update_spec and not '$unset' in update_spec:
-            # update spec contains the new document
-			# Update the key in Solr based on the unique_key mentioned as parameter
+            # update_spec contains the new document.
+            # Update the key in Solr based on the unique_key mentioned as
+            # parameter.
             update_spec['_id'] = doc[self.unique_key]
             return update_spec
         for to_set in update_spec.get("$set", []):
