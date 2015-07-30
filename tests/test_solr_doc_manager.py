@@ -65,6 +65,15 @@ class TestSolrDocManager(SolrTestCase):
             self.assertEqual(doc[k], v)
         self.assertNotIn("description", doc)
 
+    def test_replacement_unique_key(self):
+        docman = DocManager(solr_url, unique_key='id')
+        # Document coming from Solr. 'id' is the unique key.
+        from_solr = {'id': 1, 'title': 'unique key replacement test'}
+        # Replacement coming from an oplog entry in MongoDB. Still has '_id'.
+        replacement = {'_id': 1, 'title': 'unique key replaced!'}
+        replaced = docman.apply_update(from_solr, replacement)
+        self.assertEqual('unique key replaced!', replaced['title'])
+
     def test_upsert(self):
         """Ensure we can properly insert into Solr via DocManager.
         """
