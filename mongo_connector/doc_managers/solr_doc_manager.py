@@ -193,7 +193,8 @@ class DocManager(DocManagerBase):
         # Replace a whole document
         if not '$set' in update_spec and not '$unset' in update_spec:
             # update spec contains the new document
-            update_spec['_id'] = doc['_id']
+			# Update the key in Solr based on the unique_key mentioned as parameter
+            update_spec['_id'] = doc[self.unique_key]
             return update_spec
         for to_set in update_spec.get("$set", []):
             value = update_spec['$set'][to_set]
