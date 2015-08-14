@@ -43,6 +43,18 @@ _SSL_POLICY_MAP = {
     'required': ssl.CERT_REQUIRED
 }
 
+class ConnKeeper:
+    """ Keep the reference to the mongoDB client used by the connector
+    to make it accessible to the doc managers
+    """
+    def __init__(self):
+        self.conn = None
+
+    def set(self, conn):
+        self.conn = conn
+
+    def get(self):
+        return self.conn
 
 class Connector(threading.Thread):
     """Thread that monitors a replica set or sharded cluster.
@@ -77,6 +89,9 @@ class Connector(threading.Thread):
 
         # The set of OplogThreads created
         self.shard_set = {}
+
+        # Keep the connection reference to the mongo client
+        self.main_conn = kwargs.pop('main_conn', ConnKeeper())
 
         # Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
@@ -130,7 +145,7 @@ class Connector(threading.Thread):
                     sys.exit(2)
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config, main_conn):
         """Create a new Connector instance from a Config object."""
         auth_key = None
         password_file = config['authentication.passwordFile']
@@ -161,7 +176,8 @@ class Connector(threading.Thread):
             ssl_keyfile=config['ssl.sslKeyfile'],
             ssl_ca_certs=config['ssl.sslCACerts'],
             ssl_cert_reqs=config['ssl.sslCertificatePolicy'],
-            tz_aware=config['timezoneAware']
+            tz_aware=config['timezoneAware'],
+            main_conn=main_conn
         )
         return connector
 
@@ -256,21 +272,21 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(
-            self.address, tz_aware=self.tz_aware, **self.ssl_kwargs)
+        self.main_conn.set(MongoClient(
+            self.address, tz_aware=self.tz_aware, **self.ssl_kwargs))
         if self.auth_key is not None:
-            main_conn['admin'].authenticate(self.auth_username, self.auth_key)
+            self.main_conn.get()['admin'].authenticate(self.auth_username, self.auth_key)
         self.read_oplog_progress()
         conn_type = None
 
         try:
-            main_conn.admin.command("isdbgrid")
+            self.main_conn.get().admin.command("isdbgrid")
         except pymongo.errors.OperationFailure:
             conn_type = "REPLSET"
 
         if conn_type == "REPLSET":
             # Make sure we are connected to a replica set
-            is_master = main_conn.admin.command("isMaster")
+            is_master = self.main_conn.get().admin.command("isMaster")
             if "setName" not in is_master:
                 LOG.error(
                     'No replica set at "%s"! A replica set is required '
@@ -279,20 +295,20 @@ class Connector(threading.Thread):
                 return
 
             # Establish a connection to the replica set as a whole
-            main_conn.close()
-            main_conn = MongoClient(
+            self.main_conn.get().close()
+            self.main_conn.set(MongoClient(
                 self.address, replicaSet=is_master['setName'],
-                tz_aware=self.tz_aware, **self.ssl_kwargs)
+                tz_aware=self.tz_aware, **self.ssl_kwargs))
             if self.auth_key is not None:
-                main_conn.admin.authenticate(self.auth_username, self.auth_key)
+                self.main_conn.get().admin.authenticate(self.auth_username, self.auth_key)
 
             # non sharded configuration
             oplog = OplogThread(
-                main_conn, self.doc_managers, self.oplog_progress,
+                self.main_conn.get(), self.doc_managers, self.oplog_progress,
                 **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
-                     main_conn)
+                     self.main_conn.get())
             oplog.start()
 
             while self.can_run:
@@ -311,7 +327,7 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
-                for shard_doc in main_conn['config']['shards'].find():
+                for shard_doc in self.main_conn.get()['config']['shards'].find():
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         if not self.shard_set[shard_id].running:
@@ -361,7 +377,7 @@ class Connector(threading.Thread):
             thread.join()
 
 
-def get_config_options():
+def get_config_options(main_conn):
     result = []
 
     def add_option(*args, **kwargs):
@@ -1023,13 +1039,14 @@ def setup_logging(conf):
 def main():
     """ Starts the mongo connector (assuming CLI)
     """
-    conf = config.Config(get_config_options())
+    main_conn = ConnKeeper()
+    conf = config.Config(get_config_options(main_conn))
     conf.parse_args()
 
     setup_logging(conf)
     LOG.info('Beginning Mongo Connector')
 
-    connector = Connector.from_config(conf)
+    connector = Connector.from_config(conf, main_conn)
     connector.start()
 
     while True:
