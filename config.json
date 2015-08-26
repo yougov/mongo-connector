@@ -3,6 +3,7 @@
     "__comment__": "To enable them, remove the preceding '__'",
 
     "mainAddress": "localhost:27017",
+    "readPref": "primary",
     "oplogFile": "/var/log/mongo-connector/oplog.timestamp",
     "noDump": false,
     "batchSize": -1,

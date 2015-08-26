@@ -84,6 +84,9 @@ class Connector(threading.Thread):
         # Timezone awareness
         self.tz_aware = kwargs.get('tz_aware', False)
 
+        # Read preference
+        self.read_pref = kwargs.get('read_pref', 'primary')
+
         # SSL keyword arguments to MongoClient.
         ssl_certfile = kwargs.pop('ssl_certfile', None)
         ssl_ca_certs = kwargs.pop('ssl_ca_certs', None)
@@ -161,7 +164,8 @@ class Connector(threading.Thread):
             ssl_keyfile=config['ssl.sslKeyfile'],
             ssl_ca_certs=config['ssl.sslCACerts'],
             ssl_cert_reqs=config['ssl.sslCertificatePolicy'],
-            tz_aware=config['timezoneAware']
+            tz_aware=config['timezoneAware'],
+            read_pref=config['readPref']
         )
         return connector
 
@@ -282,7 +286,8 @@ class Connector(threading.Thread):
             main_conn.close()
             main_conn = MongoClient(
                 self.address, replicaSet=is_master['setName'],
-                tz_aware=self.tz_aware, **self.ssl_kwargs)
+                tz_aware=self.tz_aware, read_preference=self.read_pref,
+                **self.ssl_kwargs)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
@@ -339,7 +344,7 @@ class Connector(threading.Thread):
 
                     shard_conn = MongoClient(
                         hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
-                        **self.ssl_kwargs)
+                        read_preference=self.read_pref, **self.ssl_kwargs)
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
                     oplog = OplogThread(
@@ -385,6 +390,12 @@ def get_config_options():
         " primary. For example, `-m localhost:27217`"
         " would be a valid argument to `-m`. Don't use"
         " quotes around the address.")
+
+    read_pref = add_option(
+        config_key="readPref",
+        default="primary",
+        type=str)
+    read_pref.add_cli("--read-pref", dest="read_pref")
 
     oplog_file = add_option(
         config_key="oplogFile",
