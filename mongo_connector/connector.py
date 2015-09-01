@@ -465,6 +465,9 @@ def get_config_options():
                 "You cannot specify more than one logging method "
                 "simultaneously. Please choose the logging method you "
                 "prefer. ")
+        if cli_values['log_format']:
+            option.value['format'] = cli_values['log_format']
+
         if cli_values['logfile']:
             when = cli_values['logfile_when']
             interval = cli_values['logfile_interval']
@@ -498,6 +501,7 @@ def get_config_options():
     default_logging = {
         'type': 'file',
         'filename': 'mongo-connector.log',
+        'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
         'rotationInterval': constants.DEFAULT_LOGFILE_INTERVAL,
         'rotationBackups': constants.DEFAULT_LOGFILE_BACKUPCOUNT,
         'rotationWhen': constants.DEFAULT_LOGFILE_WHEN,
@@ -519,6 +523,12 @@ def get_config_options():
     logging.add_cli(
         '--stdout', dest='stdout', action='store_true', help=
         'Log all output to STDOUT rather than a logfile.')
+
+    logging.add_cli(
+        "--log-format", dest="log_format", help=
+        "Define a specific format for the log file. This is based on the python logging lib. "
+        "Available parameters can be found at "
+        "https://docs.python.org/2/library/logging.html#logrecord-attributes")
 
     # -s is to enable syslog logging.
     logging.add_cli(
@@ -976,8 +986,7 @@ def get_config_options():
 
 def setup_logging(conf):
     root_logger = logging.getLogger()
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s")
+    formatter = logging.Formatter(conf['logging.format'])
 
     log_levels = [
         logging.ERROR,
