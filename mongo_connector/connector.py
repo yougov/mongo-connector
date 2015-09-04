@@ -34,6 +34,7 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions
 
 from pymongo import MongoClient
+from pymongo import MongoReplicaSetClient
 
 LOG = logging.getLogger(__name__)
 
@@ -280,7 +281,7 @@ class Connector(threading.Thread):
 
             # Establish a connection to the replica set as a whole
             main_conn.close()
-            main_conn = MongoClient(
+            main_conn = MongoReplicaSetClient(
                 self.address, replicaSet=is_master['setName'],
                 tz_aware=self.tz_aware, **self.ssl_kwargs)
             if self.auth_key is not None:
@@ -339,7 +340,7 @@ class Connector(threading.Thread):
                         return
 
                     address = 'mongodb://' + hosts + '/?' + queryStr
-                    shard_conn = MongoClient(
+                    shard_conn = MongoReplicaSetClient(
                         address, replicaSet=repl_set, tz_aware=self.tz_aware,
                         **self.ssl_kwargs)
                     if self.auth_key is not None:
