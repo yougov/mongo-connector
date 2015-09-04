@@ -309,6 +309,7 @@ class Connector(threading.Thread):
                 time.sleep(1)
 
         else:       # sharded cluster
+            queryStr = self.address.split('?')[1]
             while self.can_run is True:
 
                 for shard_doc in main_conn['config']['shards'].find():
@@ -337,8 +338,9 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
+                    address = 'mongodb://' + hosts + '/?' + queryStr
                     shard_conn = MongoClient(
-                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
+                        address, replicaSet=repl_set, tz_aware=self.tz_aware,
                         **self.ssl_kwargs)
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
