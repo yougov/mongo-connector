@@ -98,7 +98,7 @@ class DocManager(DocManagerBase):
         db, _ = self._db_and_collection(namespace)
         if doc.get('dropDatabase'):
             for new_db in self.command_helper.map_db(db):
-                self.mongo.drop_database(db)
+                self.mongo.drop_database(new_db)
 
         if doc.get('renameCollection'):
             a = self.command_helper.map_namespace(doc['renameCollection'])
