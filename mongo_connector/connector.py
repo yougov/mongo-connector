@@ -501,7 +501,7 @@ def get_config_options():
     default_logging = {
         'type': 'file',
         'filename': 'mongo-connector.log',
-        'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
+        'format': constants.DEFAULT_LOG_FORMAT,
         'rotationInterval': constants.DEFAULT_LOGFILE_INTERVAL,
         'rotationBackups': constants.DEFAULT_LOGFILE_BACKUPCOUNT,
         'rotationWhen': constants.DEFAULT_LOGFILE_WHEN,
@@ -526,7 +526,8 @@ def get_config_options():
 
     logging.add_cli(
         "--log-format", dest="log_format", help=
-        "Define a specific format for the log file. This is based on the python logging lib. "
+        "Define a specific format for the log file. "
+        "This is based on the python logging lib. "
         "Available parameters can be found at "
         "https://docs.python.org/2/library/logging.html#logrecord-attributes")
 

@@ -40,3 +40,6 @@ DEFAULT_LOGFILE_WHEN = "midnight"
 DEFAULT_LOGFILE_INTERVAL = 1
 # Number of log files to keep
 DEFAULT_LOGFILE_BACKUPCOUNT = 7
+# The log format
+DEFAULT_LOG_FORMAT = (
+    '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s')
