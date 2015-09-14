@@ -233,24 +233,44 @@ class TestMongoDocManager(MongoTestCase):
         self.assertEqual(last_doc["_id"], 98)
 
     def test_commands(self):
-        self.mongo_doc.command_helper = CommandHelper()
+        # Also test with namespace mapping.
+        # Note that mongo-connector does not currently support commands after
+        # renaming a database.
+        self.mongo_doc.command_helper = CommandHelper(
+            namespace_set=['test.test', 'test.test2', 'test.drop'],
+            dest_mapping={
+                'test.test': 'test.othertest',
+                'test.drop': 'dropped.collection'
+            })
 
-        # create test thing, assert
-        self.mongo_doc.handle_command({'create': 'test'}, *TESTARGS)
-        self.assertIn('test', self.mongo_conn['test'].collection_names())
+        try:
+            self.mongo_doc.handle_command({'create': 'test'}, *TESTARGS)
+            self.assertIn('othertest',
+                          self.mongo_conn['test'].collection_names())
+            self.mongo_doc.handle_command(
+                {'renameCollection': 'test.test', 'to': 'test.test2'},
+                'admin.$cmd', 1)
+            self.assertNotIn('othertest',
+                             self.mongo_conn['test'].collection_names())
+            self.assertIn('test2',
+                          self.mongo_conn['test'].collection_names())
 
-        self.mongo_doc.handle_command(
-            {'renameCollection': 'test.test', 'to': 'test.test2'},
-            'admin.$cmd', 1)
-        self.assertNotIn('test', self.mongo_conn['test'].collection_names())
-        self.assertIn('test2', self.mongo_conn['test'].collection_names())
+            self.mongo_doc.handle_command(
+                {'drop': 'test2'}, 'test.$cmd', 1)
+            self.assertNotIn('test2',
+                             self.mongo_conn['test'].collection_names())
 
-        self.mongo_doc.handle_command({'drop': 'test2'}, 'test.$cmd', 1)
-        self.assertNotIn('test2', self.mongo_conn['test'].collection_names())
+            self.assertIn('test', self.mongo_conn.database_names())
+            self.mongo_doc.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.assertNotIn('test', self.mongo_conn.database_names())
 
-        self.assertIn('test', self.mongo_conn.database_names())
-        self.mongo_doc.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
-        self.assertNotIn('test', self.mongo_conn.database_names())
+            # Briefly test mapped database name with dropDatabase command.
+            self.mongo_conn.dropped.collection.insert({'a': 1})
+            self.assertIn('dropped', self.mongo_conn.database_names())
+            self.mongo_doc.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.assertNotIn('dropped', self.mongo_conn.database_names())
+        finally:
+            self.mongo_conn.drop_database('test')
 
 
 if __name__ == '__main__':
