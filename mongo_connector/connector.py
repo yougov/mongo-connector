@@ -151,6 +151,7 @@ class Connector(threading.Thread):
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
+            empty_check_interval=config['emptyCheckInterval'],
             auth_username=config['authentication.adminUsername'],
             auth_key=auth_key,
             fields=config['fields'],
@@ -969,6 +970,19 @@ def get_config_options():
         "Note: Applying oplog operations to an incomplete"
         " set of documents due to errors may cause undefined"
         " behavior. Use this flag to dump only.")
+
+    empty_check_interval = add_option(
+        config_key="emptyCheckInterval",
+        default=60,
+        type=int)
+
+    empty_check_interval.add_cli(
+        "--empty-check-interval", dest="empty_check_interval",
+        help="Before a collection dump, each OplogThread"
+        " will confirm that the connected replicaset has"
+        " documents in its collections that need to be"
+        " upserted. If none are found, it will wait this"
+        " many seconds before checking again.")
 
     config_file = add_option()
     config_file.add_cli(

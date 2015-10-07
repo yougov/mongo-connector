@@ -80,6 +80,9 @@ class OplogThread(threading.Thread):
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
+        # How often to recheck a replicaset with zero matching docs
+        self.empty_check_interval = kwargs.get('empty_check_interval', 60)
+
         # Set of fields to export
         self.fields = kwargs.get('fields', [])
 
@@ -411,6 +414,21 @@ class OplogThread(threading.Thread):
                         continue
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
+
+        def has_docs_to_dump():
+            for namespace in dump_set:
+                database, coll = namespace.split('.', 1)
+                target_coll = self.primary_client[database][coll]
+                if util.retry_until_ok(target_coll.count) > 0:
+                    return True
+            return False
+
+        while not has_docs_to_dump():
+            LOG.warning("No docs matching namespace %s on %s,"
+                        " sleeping %d seconds" % (
+                        dump_set, self.primary_client,
+                        self.empty_check_interval))
+            time.sleep(self.empty_check_interval)
 
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
