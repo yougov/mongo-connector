@@ -151,6 +151,7 @@ class Connector(threading.Thread):
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
+            skip_count=config['skipCount'],
             auth_username=config['authentication.adminUsername'],
             auth_key=auth_key,
             fields=config['fields'],
@@ -969,6 +970,19 @@ def get_config_options():
         "Note: Applying oplog operations to an incomplete"
         " set of documents due to errors may cause undefined"
         " behavior. Use this flag to dump only.")
+
+    skip_count = add_option(
+        config_key="skipCount",
+        default=False,
+        type=bool)
+
+    skip_count.add_cli(
+        "--skip-count", dest="skip_count",
+        help="Skip logging the count of operations found in"
+             " the oplog cursor. This count is only calculated"
+             " when a cursor is created, but is potentially very"
+             " expensive and slow.")
+
 
     config_file = add_option()
     config_file.add_cli(
