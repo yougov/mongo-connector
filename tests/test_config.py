@@ -66,30 +66,31 @@ class TestConfig(unittest.TestCase):
     def test_parse_json(self):
         # Test for basic json parsing correctness
         test_config = {
-            'mainAddress': 'testMainAddress',
-            'oplogFile': 'testOplogFile',
+            'mainAddress': u'testMainAddress',
+            'oplogFile': u'testOplogFile',
             'noDump': True,
             'batchSize': 69,
             'verbosity': 3,
             'logging': {
-                'type': 'file',
-                'filename': 'testFilename',
-                'rotationWhen': 'midnight',
+                'type': u'file',
+                'filename': u'testFilename',
+                'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
+                'rotationWhen': u'midnight',
                 'rotationInterval': 1,
                 'rotationBackups': 7,
-                'host': 'testHost',
-                'facility': 'testFacility'
+                'host': u'testHost',
+                'facility': u'testFacility'
             },
             'authentication': {
-                'adminUsername': 'testAdminUsername',
-                'password': 'testPassword',
-                'passwordFile': 'testPasswordFile'
+                'adminUsername': u'testAdminUsername',
+                'password': u'testPassword',
+                'passwordFile': u'testPasswordFile'
             },
-            'fields': ['testFields1', 'testField2'],
+            'fields': [u'testFields1', u'testField2'],
             'namespaces': {
-                'include': ['testNamespaceSet'],
-                'mapping': {'testMapKey': 'testMapValue'},
-                'gridfs': ['testGridfsSet']
+                'include': [u'testNamespaceSet'],
+                'mapping': {'testMapKey': u'testMapValue'},
+                'gridfs': [u'testGridfsSet']
             }
         }
         self.load_json(test_config, validate=False)
@@ -113,23 +114,24 @@ class TestConfig(unittest.TestCase):
         }
         self.load_json(test_config, validate=False, reset_config=False)
         self.assertEqual(self.conf['logging'], {
-            'type': 'syslog',
-            'filename': 'testFilename',
-            'rotationWhen': 'midnight',
+            'type': u'syslog',
+            'filename': u'testFilename',
+            'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
+            'rotationWhen': u'midnight',
             'rotationInterval': 1,
             'rotationBackups': 7,
-            'host': 'testHost2',
-            'facility': 'testFacility'
+            'host': u'testHost2',
+            'facility': u'testFacility'
         })
         self.assertEqual(self.conf['authentication'], {
-            'adminUsername': 'testAdminUsername2',
-            'password': 'testPassword',
-            'passwordFile': 'testPasswordFile2'
+            'adminUsername': u'testAdminUsername2',
+            'password': u'testPassword',
+            'passwordFile': u'testPasswordFile2'
         })
         self.assertEqual(self.conf['namespaces'], {
-            'include': ['testNamespaceSet'],
+            'include': [u'testNamespaceSet'],
             'mapping': {},
-            'gridfs': ['testGridfsSet']
+            'gridfs': [u'testGridfsSet']
         })
 
     def test_basic_options(self):
