@@ -106,7 +106,9 @@ class DocManager(DocManagerBase):
         """
         document = self.doc_dict[document_id].doc
         updated = self.apply_update(document, update_spec)
-        updated[self.unique_key] = updated.pop("_id")
+        if "_id" in updated:
+            updated.pop("_id")
+        updated[self.unique_key] = document_id
         self.upsert(updated, namespace, timestamp)
         return updated
 
