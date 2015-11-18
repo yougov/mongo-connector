@@ -35,15 +35,29 @@ class TestMongoDocManager(MongoTestCase):
         MongoTestCase.setUpClass()
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
-        cls.choosy_docman = DocManager(
-            cls.standalone.uri,
-            namespace_set=TestMongoDocManager.namespaces_inc
-        )
 
     def setUp(self):
+       
+        """ setup instance variables for running doc manager test
+            using single meta collection or collection per namespace """
+        if type(self) is TestMongoDocManagerWithSingleMetaCollection:
+            self.use_single_meta_collection = True
+            self.id_field = 'doc_id'
+            self.choosy_docman = DocManager(
+                self.standalone.uri,
+                namespace_set=self.namespaces_inc,
+                use_single_meta_collection=True
+            )
+        else:
+            self.use_single_meta_collection = False
+            self.id_field = '_id'
+            self.choosy_docman = DocManager(
+                self.standalone.uri,
+                namespace_set=self.namespaces_inc
+            )
+
         """Empty Mongo at the start of every test
         """
-
         self.mongo_conn.drop_database("__mongo_connector")
         self._remove()
 
@@ -82,7 +96,7 @@ class TestMongoDocManager(MongoTestCase):
         """
 
         docc = {'_id': '1', 'name': 'John'}
-        self.mongo_doc.upsert(docc, *TESTARGS)
+        self.choosy_docman.upsert(docc, *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 1)
         for doc in res:
@@ -90,7 +104,7 @@ class TestMongoDocManager(MongoTestCase):
             self.assertEqual(doc['name'], 'John')
 
         docc = {'_id': '1', 'name': 'Paul'}
-        self.mongo_doc.upsert(docc, *TESTARGS)
+        self.choosy_docman.upsert(docc, *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 1)
         for doc in res:
@@ -100,14 +114,14 @@ class TestMongoDocManager(MongoTestCase):
     def test_bulk_upsert(self):
         """Test the bulk_upsert method."""
         docs = ({"_id": i} for i in range(1000))
-        self.mongo_doc.bulk_upsert(docs, *TESTARGS)
+        self.choosy_docman.bulk_upsert(docs, *TESTARGS)
         res = list(self._search(sort=[('_id', 1)]))
         self.assertEqual(len(res), 1000)
         for i, r in enumerate(res):
             self.assertEqual(r['_id'], i)
 
         docs = ({"_id": i, "weight": 2*i} for i in range(1000))
-        self.mongo_doc.bulk_upsert(docs, *TESTARGS)
+        self.choosy_docman.bulk_upsert(docs, *TESTARGS)
 
         res = list(self._search(sort=[('_id', 1)]))
         self.assertEqual(len(res), 1000)
@@ -119,14 +133,14 @@ class TestMongoDocManager(MongoTestCase):
         """
 
         docc = {'_id': '1', 'name': 'John'}
-        self.mongo_doc.upsert(docc, *TESTARGS)
+        self.choosy_docman.upsert(docc, *TESTARGS)
         self.assertEqual(len(list(self._search())), 1)
-        self.mongo_doc.remove(docc['_id'], *TESTARGS)
+        self.choosy_docman.remove(docc['_id'], *TESTARGS)
         self.assertEqual(len(list(self._search())), 0)
 
     def test_insert_file(self):
         # Drop database, so that mongo_doc's client refreshes its index cache.
-        self.mongo_doc.mongo.drop_database('test')
+        self.choosy_docman.mongo.drop_database('test')
         test_data = ' '.join(str(x) for x in range(100000)).encode('utf8')
         docc = {
             '_id': 'test_id',
@@ -134,16 +148,16 @@ class TestMongoDocManager(MongoTestCase):
             'upload_date': 5,
             'md5': 'test_md5'
         }
-        self.mongo_doc.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
+        self.choosy_docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
         res = self._search()
         for doc in res:
-            self.assertEqual(doc['_id'], docc['_id'])
+            self.assertEqual(doc[self.id_field], docc['_id'])
             self.assertEqual(doc['filename'], docc['filename'])
             self.assertEqual(doc['content'], test_data)
 
     def test_remove_file(self):
         # Drop database, so that mongo_doc's client refreshes its index cache.
-        self.mongo_doc.mongo.drop_database('test')
+        self.choosy_docman.mongo.drop_database('test')
         test_data = b'hello world'
         docc = {
             '_id': 'test_id',
@@ -152,11 +166,11 @@ class TestMongoDocManager(MongoTestCase):
             'md5': 'test_md5'
         }
 
-        self.mongo_doc.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
+        self.choosy_docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 1)
 
-        self.mongo_doc.remove(docc['_id'], *TESTARGS)
+        self.choosy_docman.remove(docc['_id'], *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 0)
 
@@ -167,15 +181,15 @@ class TestMongoDocManager(MongoTestCase):
         """
 
         docc = {'_id': '1', 'name': 'John'}
-        self.mongo_doc.upsert(docc, 'test.test', 5767301236327972865)
+        self.choosy_docman.upsert(docc, 'test.test_include1', 5767301236327972865)
         docc2 = {'_id': '2', 'name': 'John Paul'}
-        self.mongo_doc.upsert(docc2, 'test.test', 5767301236327972866)
+        self.choosy_docman.upsert(docc2, 'test.test_include1', 5767301236327972866)
         docc3 = {'_id': '3', 'name': 'Paul'}
-        self.mongo_doc.upsert(docc3, 'test.test', 5767301236327972870)
-        search = list(self.mongo_doc.search(5767301236327972865,
+        self.choosy_docman.upsert(docc3, 'test.test_include1', 5767301236327972870)
+        search = list(self.choosy_docman.search(5767301236327972865,
                                             5767301236327972866))
         self.assertEqual(len(search), 2)
-        result_id = [result.get("_id") for result in search]
+        result_id = [result.get(self.id_field) for result in search]
         self.assertIn('1', result_id)
         self.assertIn('2', result_id)
 
@@ -200,17 +214,17 @@ class TestMongoDocManager(MongoTestCase):
             the latest timestamp.
         """
         docc = {'_id': '4', 'name': 'Hare'}
-        self.mongo_doc.upsert(docc, 'test.test', 3)
+        self.choosy_docman.upsert(docc, 'test.test_include1', 3)
         docc = {'_id': '5', 'name': 'Tortoise'}
-        self.mongo_doc.upsert(docc, 'test.test', 2)
+        self.choosy_docman.upsert(docc, 'test.test_include1', 2)
         docc = {'_id': '6', 'name': 'Mr T.'}
-        self.mongo_doc.upsert(docc, 'test.test', 1)
-        doc = self.mongo_doc.get_last_doc()
-        self.assertEqual(doc['_id'], '4')
+        self.choosy_docman.upsert(docc, 'test.test_include1', 1)
+        doc = self.choosy_docman.get_last_doc()
+        self.assertEqual(doc[self.id_field], '4')
         docc = {'_id': '6', 'name': 'HareTwin'}
-        self.mongo_doc.upsert(docc, 'test.test', 4)
-        doc = self.mongo_doc.get_last_doc()
-        self.assertEqual(doc['_id'], '6')
+        self.choosy_docman.upsert(docc, 'test.test_include1', 4)
+        doc = self.choosy_docman.get_last_doc()
+        self.assertEqual(doc[self.id_field], '6')
 
     def test_get_last_doc_namespaces(self):
         """Ensure that get_last_doc returns the latest document in one of
@@ -223,20 +237,20 @@ class TestMongoDocManager(MongoTestCase):
             self.choosy_docman.upsert({"_id": i}, ns, i)
         last_doc = self.choosy_docman.get_last_doc()
         # Even value for _id means ns was in self.namespaces_inc.
-        self.assertEqual(last_doc["_id"], 98)
+        self.assertEqual(last_doc[self.id_field], 98)
 
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
         self.standalone.client()[db][coll].remove({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
-        self.assertEqual(last_doc["_id"], 98)
+        self.assertEqual(last_doc[self.id_field], 98)
 
     def test_commands(self):
         # Also test with namespace mapping.
         # Note that mongo-connector does not currently support commands after
         # renaming a database.
-        self.mongo_doc.command_helper = CommandHelper(
+        self.choosy_docman.command_helper = CommandHelper(
             namespace_set=['test.test', 'test.test2', 'test.drop'],
             dest_mapping={
                 'test.test': 'test.othertest',
@@ -244,10 +258,10 @@ class TestMongoDocManager(MongoTestCase):
             })
 
         try:
-            self.mongo_doc.handle_command({'create': 'test'}, *TESTARGS)
+            self.choosy_docman.handle_command({'create': 'test'}, *TESTARGS)
             self.assertIn('othertest',
                           self.mongo_conn['test'].collection_names())
-            self.mongo_doc.handle_command(
+            self.choosy_docman.handle_command(
                 {'renameCollection': 'test.test', 'to': 'test.test2'},
                 'admin.$cmd', 1)
             self.assertNotIn('othertest',
@@ -255,23 +269,25 @@ class TestMongoDocManager(MongoTestCase):
             self.assertIn('test2',
                           self.mongo_conn['test'].collection_names())
 
-            self.mongo_doc.handle_command(
+            self.choosy_docman.handle_command(
                 {'drop': 'test2'}, 'test.$cmd', 1)
             self.assertNotIn('test2',
                              self.mongo_conn['test'].collection_names())
 
             self.assertIn('test', self.mongo_conn.database_names())
-            self.mongo_doc.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.choosy_docman.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
             self.assertNotIn('test', self.mongo_conn.database_names())
 
             # Briefly test mapped database name with dropDatabase command.
             self.mongo_conn.dropped.collection.insert({'a': 1})
             self.assertIn('dropped', self.mongo_conn.database_names())
-            self.mongo_doc.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.choosy_docman.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
             self.assertNotIn('dropped', self.mongo_conn.database_names())
         finally:
             self.mongo_conn.drop_database('test')
 
+class TestMongoDocManagerWithSingleMetaCollection(TestMongoDocManager):
+    pass
 
 if __name__ == '__main__':
     unittest.main()

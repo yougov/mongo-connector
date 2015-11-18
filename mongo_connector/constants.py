@@ -43,3 +43,8 @@ DEFAULT_LOGFILE_BACKUPCOUNT = 7
 # The log format
 DEFAULT_LOG_FORMAT = (
     '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s')
+
+# If a single meta collection is used, defines the default collection name
+DEFAULT_META_COLLECTION_NAME = "__oplog"
+# If a single meta collection is used, defines the default cap size
+DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
