@@ -207,7 +207,7 @@ class TestMongoDocManager(MongoTestCase):
         results = list(self.choosy_docman.search(0, 49))
         self.assertEqual(len(results), 100)
         for r in results:
-            self.assertGreaterEqual(r['_id'], 0)
+            self.assertGreaterEqual(r[self.id_field], 0)
 
     def test_get_last_doc(self):
         """Insert documents, verify that get_last_doc() returns the one with
