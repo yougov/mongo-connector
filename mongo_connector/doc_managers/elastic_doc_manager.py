@@ -174,7 +174,7 @@ class DocManager(DocManagerBase):
                 }
                 yield document_action
                 yield document_meta
-            if not doc:
+            if doc is None:
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
