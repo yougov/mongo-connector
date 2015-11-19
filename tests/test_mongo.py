@@ -32,6 +32,8 @@ from tests.util import assert_soon
 
 
 class MongoTestCase(unittest.TestCase):
+    
+    use_single_meta_collection = False
 
     @classmethod
     def setUpClass(cls):
@@ -103,10 +105,6 @@ class TestMongo(MongoTestCase):
         self.conn.test.test.drop()
         self.conn.test.test.files.drop()
         self.conn.test.test.chunks.drop()
-
-        """ we will set this to False, as we are testing this mode 
-            in test_mongo_doc_manager """
-        self.use_single_meta_collection = False
 
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
