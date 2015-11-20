@@ -32,7 +32,7 @@ from tests.util import assert_soon
 
 
 class MongoTestCase(unittest.TestCase):
-    
+
     use_single_meta_collection = False
 
     @classmethod

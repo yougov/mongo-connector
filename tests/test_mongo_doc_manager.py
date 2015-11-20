@@ -39,14 +39,14 @@ class TestMongoDocManager(MongoTestCase):
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
 
     def setUp(self):
+        """Empty Mongo at the start of every test
+        """
 
         self.choosy_docman = DocManager(
             self.standalone.uri,
             namespace_set=self.namespaces_inc,
             use_single_meta_collection=self.use_single_meta_collection)
 
-        """Empty Mongo at the start of every test
-        """
         self.mongo_conn.drop_database("__mongo_connector")
         self._remove()
 
@@ -284,12 +284,9 @@ class TestMongoDocManager(MongoTestCase):
 
 
 class TestMongoDocManagerWithSingleMetaCollection(TestMongoDocManager):
-    """ _id field has to be unique so we let that auto increment 
-        since we will be writing data from different namespaces into
-        single collection, hence we will use a different field for 
-        storing the document id"""
     id_field = "doc_id"
     use_single_meta_collection = True
+
 
 if __name__ == '__main__':
     unittest.main()

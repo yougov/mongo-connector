@@ -70,11 +70,14 @@ class DocManager(DocManagerBase):
             'meta_collection_cap_size',
             constants.DEFAULT_META_COLLECTION_CAP_SIZE)
 
+        # The '_id' field has to be unique, so if we will be writing data from
+        # different namespaces into single collection, we use a different field
+        # for storing the document id.
         self.id_field = 'doc_id' if self.use_single_meta_collection else '_id'
         self.meta_database = self.mongo["__mongo_connector"]
 
-        """ create the meta collection as capped if a single meta collection
-            is preferred """
+        # Create the meta collection as capped if a single meta collection is
+        # preferred
         if self.use_single_meta_collection:
             if (self.meta_collection_name not in
                     self.meta_database.collection_names()):
