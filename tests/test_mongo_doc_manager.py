@@ -29,7 +29,7 @@ from tests.test_mongo import MongoTestCase
 class TestMongoDocManager(MongoTestCase):
     """Test class for MongoDocManager
     """
-   
+
     id_field = "_id"
 
     @classmethod
@@ -39,11 +39,11 @@ class TestMongoDocManager(MongoTestCase):
         cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
 
     def setUp(self):
-       
+
         self.choosy_docman = DocManager(
-                self.standalone.uri,
-                namespace_set=self.namespaces_inc,
-                use_single_meta_collection=self.use_single_meta_collection)
+            self.standalone.uri,
+            namespace_set=self.namespaces_inc,
+            use_single_meta_collection=self.use_single_meta_collection)
 
         """Empty Mongo at the start of every test
         """
@@ -109,13 +109,13 @@ class TestMongoDocManager(MongoTestCase):
         for i, r in enumerate(res):
             self.assertEqual(r['_id'], i)
 
-        docs = ({"_id": i, "weight": 2*i} for i in range(1000))
+        docs = ({"_id": i, "weight": 2 * i} for i in range(1000))
         self.choosy_docman.bulk_upsert(docs, *TESTARGS)
 
         res = list(self._search(sort=[('_id', 1)]))
         self.assertEqual(len(res), 1000)
         for i, r in enumerate(res):
-            self.assertEqual(r['weight'], 2*i)
+            self.assertEqual(r['weight'], 2 * i)
 
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
@@ -137,7 +137,8 @@ class TestMongoDocManager(MongoTestCase):
             'upload_date': 5,
             'md5': 'test_md5'
         }
-        self.choosy_docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
+        self.choosy_docman.insert_file(
+            MockGridFSFile(docc, test_data), *TESTARGS)
         res = self._search()
         for doc in res:
             self.assertEqual(doc[self.id_field], docc['_id'])
@@ -155,7 +156,8 @@ class TestMongoDocManager(MongoTestCase):
             'md5': 'test_md5'
         }
 
-        self.choosy_docman.insert_file(MockGridFSFile(docc, test_data), *TESTARGS)
+        self.choosy_docman.insert_file(
+            MockGridFSFile(docc, test_data), *TESTARGS)
         res = list(self._search())
         self.assertEqual(len(res), 1)
 
@@ -170,13 +172,16 @@ class TestMongoDocManager(MongoTestCase):
         """
 
         docc = {'_id': '1', 'name': 'John'}
-        self.choosy_docman.upsert(docc, 'test.test_include1', 5767301236327972865)
+        self.choosy_docman.upsert(
+            docc, 'test.test_include1', 5767301236327972865)
         docc2 = {'_id': '2', 'name': 'John Paul'}
-        self.choosy_docman.upsert(docc2, 'test.test_include1', 5767301236327972866)
+        self.choosy_docman.upsert(
+            docc2, 'test.test_include1', 5767301236327972866)
         docc3 = {'_id': '3', 'name': 'Paul'}
-        self.choosy_docman.upsert(docc3, 'test.test_include1', 5767301236327972870)
+        self.choosy_docman.upsert(
+            docc3, 'test.test_include1', 5767301236327972870)
         search = list(self.choosy_docman.search(5767301236327972865,
-                                            5767301236327972866))
+                                                5767301236327972866))
         self.assertEqual(len(search), 2)
         result_id = [result.get(self.id_field) for result in search]
         self.assertIn('1', result_id)
@@ -264,16 +269,19 @@ class TestMongoDocManager(MongoTestCase):
                              self.mongo_conn['test'].collection_names())
 
             self.assertIn('test', self.mongo_conn.database_names())
-            self.choosy_docman.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.choosy_docman.handle_command(
+                {'dropDatabase': 1}, 'test.$cmd', 1)
             self.assertNotIn('test', self.mongo_conn.database_names())
 
             # Briefly test mapped database name with dropDatabase command.
             self.mongo_conn.dropped.collection.insert({'a': 1})
             self.assertIn('dropped', self.mongo_conn.database_names())
-            self.choosy_docman.handle_command({'dropDatabase': 1}, 'test.$cmd', 1)
+            self.choosy_docman.handle_command(
+                {'dropDatabase': 1}, 'test.$cmd', 1)
             self.assertNotIn('dropped', self.mongo_conn.database_names())
         finally:
             self.mongo_conn.drop_database('test')
+
 
 class TestMongoDocManagerWithSingleMetaCollection(TestMongoDocManager):
     """ _id field has to be unique so we let that auto increment 

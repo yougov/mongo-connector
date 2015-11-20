@@ -61,27 +61,30 @@ class DocManager(DocManagerBase):
         self.namespace_set = kwargs.get("namespace_set")
         self.chunk_size = kwargs.get('chunk_size', constants.DEFAULT_MAX_BULK)
         self.use_single_meta_collection = kwargs.get(
-                                        'use_single_meta_collection',
-                                        False)
+            'use_single_meta_collection',
+            False)
         self.meta_collection_name = kwargs.get(
-                                        'meta_collection_name',
-                                        constants.DEFAULT_META_COLLECTION_NAME)
+            'meta_collection_name',
+            constants.DEFAULT_META_COLLECTION_NAME)
         self.meta_collection_cap_size = kwargs.get(
-                                    'meta_collection_cap_size',
-                                    constants.DEFAULT_META_COLLECTION_CAP_SIZE)
+            'meta_collection_cap_size',
+            constants.DEFAULT_META_COLLECTION_CAP_SIZE)
+
         self.id_field = 'doc_id' if self.use_single_meta_collection else '_id'
+        self.meta_database = self.mongo["__mongo_connector"]
 
         """ create the meta collection as capped if a single meta collection
             is preferred """
         if self.use_single_meta_collection:
-            if self.meta_collection_name not in \
-                    self.mongo["__mongo_connector"].collection_names():
-                self.mongo["__mongo_connector"].create_collection(
+            if (self.meta_collection_name not in
+                    self.meta_database.collection_names()):
+                self.meta_database.create_collection(
                     self.meta_collection_name,
                     capped=True,
                     size=self.meta_collection_cap_size)
-                self.mongo["__mongo_connector"][self.meta_collection_name].ensure_index(self.id_field)
-                self.mongo["__mongo_connector"][self.meta_collection_name].ensure_index([('ns', 1), ('_ts', 1)])
+                meta_collection = self.meta_database[self.meta_collection_name]
+                meta_collection.ensure_index(self.id_field)
+                meta_collection.ensure_index([('ns', 1), ('_ts', 1)])
 
     def _db_and_collection(self, namespace):
         return namespace.split('.', 1)
@@ -155,14 +158,14 @@ class DocManager(DocManagerBase):
         """
         db, coll = self._db_and_collection(namespace)
 
-        meta_collection = self._get_meta_collection(namespace)
+        meta_collection_name = self._get_meta_collection(namespace)
 
-        self.mongo["__mongo_connector"][meta_collection].save({
+        self.meta_database[meta_collection_name].save({
             self.id_field: document_id,
             "_ts": timestamp,
             "ns": namespace
         })
-        
+
         updated = self.mongo[db][coll].find_and_modify(
             {'_id': document_id},
             update_spec,
@@ -176,10 +179,10 @@ class DocManager(DocManagerBase):
         """
         database, coll = self._db_and_collection(namespace)
 
-        meta_collection = self._get_meta_collection(namespace)
+        meta_collection_name = self._get_meta_collection(namespace)
 
-        self.mongo["__mongo_connector"][meta_collection].save({
-            self.id_field : doc['_id'],
+        self.meta_database[meta_collection_name].save({
+            self.id_field: doc['_id'],
             "_ts": timestamp,
             "ns": namespace
         })
@@ -191,7 +194,7 @@ class DocManager(DocManagerBase):
             dbname, collname = self._db_and_collection(namespace)
             collection = self.mongo[dbname][collname]
             meta_collection_name = self._get_meta_collection(namespace)
-            meta_collection = self.mongo['__mongo_connector'][meta_collection_name]
+            meta_collection = self.meta_database[meta_collection_name]
             more_chunks = True
             while more_chunks:
                 bulk = collection.initialize_ordered_bulk_op()
@@ -201,9 +204,9 @@ class DocManager(DocManagerBase):
                         doc = next(docs)
                         selector = {'_id': doc['_id']}
                         bulk.find(selector).upsert().replace_one(doc)
-                        meta_selector = {self.id_field : doc['_id']}
+                        meta_selector = {self.id_field: doc['_id']}
                         bulk_meta.find(meta_selector).upsert().replace_one({
-                            self.id_field : doc['_id'],
+                            self.id_field: doc['_id'],
                             'ns': namespace,
                             '_ts': timestamp
                         })
@@ -234,8 +237,8 @@ class DocManager(DocManagerBase):
 
         meta_collection = self._get_meta_collection(namespace)
 
-        doc2 = self.mongo['__mongo_connector'][meta_collection].find_and_modify(
-            {self.id_field : document_id}, remove=True)
+        doc2 = self.meta_database[meta_collection].find_and_modify(
+            {self.id_field: document_id}, remove=True)
         if (doc2 and doc2.get('gridfs_id')):
             GridFS(self.mongo[database], coll).delete(doc2['gridfs_id'])
         else:
@@ -249,8 +252,8 @@ class DocManager(DocManagerBase):
 
         meta_collection = self._get_meta_collection(namespace)
 
-        self.mongo["__mongo_connector"][meta_collection].save({
-            self.id_field : f._id,
+        self.meta_database[meta_collection].save({
+            self.id_field: f._id,
             '_ts': timestamp,
             'ns': namespace,
             'gridfs_id': id
@@ -261,8 +264,8 @@ class DocManager(DocManagerBase):
         """Called to query Mongo for documents in a time range.
         """
         for namespace in self._namespaces():
-            meta_collection = self._get_meta_collection(namespace)
-            for ts_ns_doc in self.mongo["__mongo_connector"][meta_collection].find(
+            meta_collection_name = self._get_meta_collection(namespace)
+            for ts_ns_doc in self.meta_database[meta_collection_name].find(
                 {'ns': namespace,
                  '_ts': {'$lte': end_ts,
                          '$gte': start_ts}}
@@ -281,8 +284,9 @@ class DocManager(DocManagerBase):
         def docs_by_ts():
             for namespace in self._namespaces():
                 meta_collection = self._get_meta_collection(namespace)
-                mc_coll = self.mongo["__mongo_connector"][meta_collection]
-                for ts_ns_doc in mc_coll.find({'ns':namespace},limit=1).sort('_ts', -1):
+                mc_coll = self.meta_database[meta_collection]
+                mc_cursor = mc_coll.find({'ns': namespace}, limit=1)
+                for ts_ns_doc in mc_cursor.sort('_ts', -1):
                     yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x: x["_ts"])
