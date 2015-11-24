@@ -1018,8 +1018,15 @@ def setup_logging(conf):
         print("Logging to system log at %s" % conf['logging.host'])
     elif conf['logging.type'] == 'stream':
         log_out = logging.StreamHandler()
+    elif conf['logging.type'] == 'sentry':
+        try:
+            from raven.handlers.logging import SentryHandler
+        except Exception:
+            print("Could not import the Raven library to set up a Sentry client.")
+            sys.exit(1)
+        log_out = SentryHandler(conf['logging.dsn'])
     else:
-        print("Logging type must be one of 'stream', 'syslog', or 'file', not "
+        print("Logging type must be one of 'stream', 'syslog', 'file', or 'sentry', not "
               "'%s'." % conf['logging.type'])
         sys.exit(1)
 
