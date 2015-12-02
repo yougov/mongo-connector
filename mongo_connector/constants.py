@@ -29,7 +29,7 @@ DEFAULT_MAX_BULK = 1000
 DEFAULT_UNIQUE_KEY = "_id"
 
 # Default host and facility for logging to the syslog.
-DEFAULT_SYSLOG_HOST = "localhost:512"
+DEFAULT_SYSLOG_HOST = "localhost:514"
 DEFAULT_SYSLOG_FACILITY = "user"
 
 # ROTATING LOGFILE

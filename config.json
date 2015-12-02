@@ -18,7 +18,7 @@
         "__rotationBackups": 10,
 
         "__type": "syslog",
-        "__host": "localhost:512"
+        "__host": "localhost:514"
     },
 
     "authentication": {
