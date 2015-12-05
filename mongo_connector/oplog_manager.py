@@ -80,6 +80,9 @@ class OplogThread(threading.Thread):
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
+        # Whether to log the count of the oplog cursor or not
+        self.skip_count = kwargs.get('skip_count', False)
+
         # Set of fields to export
         self.fields = kwargs.get('fields', [])
 
@@ -153,7 +156,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_len = self.init_cursor()
+            cursor, has_new_docs = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -163,14 +166,13 @@ class OplogThread(threading.Thread):
                 self.running = False
                 continue
 
-            if cursor_len == 0:
+            if not has_new_docs:
                 LOG.debug("OplogThread: Last entry is the one we "
                           "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
                 continue
 
-            LOG.debug("OplogThread: Got the cursor, count is %d"
-                      % cursor_len)
+            LOG.debug("OplogThread: Got the cursor")
 
             last_ts = None
             remove_inc = 0
@@ -579,7 +581,7 @@ class OplogThread(threading.Thread):
         The cursor is set to either the beginning of the oplog, or
         wherever it was last left off.
 
-        Returns the cursor and the number of documents left in the cursor.
+        Returns the cursor and an indicator that new docs exist or not.
         """
         timestamp = self.read_last_checkpoint()
 
@@ -588,23 +590,32 @@ class OplogThread(threading.Thread):
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
                 if timestamp is None:
-                    return None, 0
+                    return None, False
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, retry_until_ok(cursor.count)
+                return self.init_cursor()
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
         for i in range(60):
             cursor = self.get_oplog_cursor(timestamp)
-            cursor_len = retry_until_ok(cursor.count)
 
-            if cursor_len == 0:
+            # try to get the first oplog entry
+            try:
+                first_oplog_entry = retry_until_ok(next, cursor)
+            except StopIteration:
+                # No docs
+                first_oplog_entry = None
+
+            # the timestamp corresponds with the last doc processed,
+            # so we expect at least one doc in the cursor
+            if not first_oplog_entry:
+                # no docs in the cursor from next()
                 # rollback, update checkpoint, and retry
                 LOG.debug("OplogThread: Initiating rollback from "
                           "get_oplog_cursor")
@@ -612,26 +623,38 @@ class OplogThread(threading.Thread):
                 self.update_checkpoint()
                 return self.init_cursor()
 
-            # try to get the first oplog entry
+            # try to get the second oplog entry
             try:
-                first_oplog_entry = retry_until_ok(next, cursor)
+                second_oplog_entry = retry_until_ok(next, cursor)
             except StopIteration:
-                # It's possible for the cursor to become invalid
-                # between the cursor.count() call and now
-                time.sleep(1)
-                continue
+                # No second doc
+                second_oplog_entry = None
 
-            # first entry should be last oplog entry processed
+            # rewind the cursor for the doc manager to process
+            cursor.rewind()
+            # Replace the first_oplog_entry object in case
+            # the previous one was at the very edge of the oplog
+            # and fell off between then and now.
+            first_oplog_entry = retry_until_ok(next, cursor)
+
+            # First entry should be the last one we processed.
+            # Use that fact to see if we fell behind.
             cursor_ts_long = util.bson_ts_to_long(
                 first_oplog_entry.get("ts"))
             given_ts_long = util.bson_ts_to_long(timestamp)
             if cursor_ts_long > given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
-                return None, 0
+                return None, False
 
-            # first entry has been consumed
-            return cursor, cursor_len - 1
+            # log the doc count if configured to do so
+            if not self.skip_count and LOG.getEffectiveLevel() < logging.INFO:
+                count = retry_until_ok(cursor.count)
+                LOG.info("OplogThread: cursor count is %d" % count)
+
+            has_new_docs = True if second_oplog_entry else False
+
+            return cursor, has_new_docs
 
         else:
             raise errors.MongoConnectorError(
