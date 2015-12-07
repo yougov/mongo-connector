@@ -8,6 +8,7 @@
     "batchSize": -1,
     "verbosity": 0,
     "continueOnError": false,
+    "emptyCheckInterval": 60,
 
     "logging": {
         "type": "file",
