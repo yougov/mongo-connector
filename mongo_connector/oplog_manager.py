@@ -209,6 +209,11 @@ class OplogThread(threading.Thread):
                             continue
                         coll = ns.split('.', 1)[1]
 
+                        # Ignore the collection if it is not included
+                        if ns not in self.oplog_ns_set:
+                            LOG.debug("OplogThread: Skipping the collection %s: it is not included" % ns)
+                            continue
+
                         # Ignore system collections
                         if coll.startswith("system."):
                             continue
@@ -369,8 +374,6 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {}
-        if self.oplog_ns_set:
-            query['ns'] = {'$in': self.oplog_ns_set}
 
         if timestamp is None:
             cursor = self.oplog.find(
@@ -557,14 +560,9 @@ class OplogThread(threading.Thread):
     def get_last_oplog_timestamp(self):
         """Return the timestamp of the latest entry in the oplog.
         """
-        if not self.oplog_ns_set:
-            curr = self.oplog.find().sort(
-                '$natural', pymongo.DESCENDING
-            ).limit(1)
-        else:
-            curr = self.oplog.find(
-                {'ns': {'$in': self.oplog_ns_set}}
-            ).sort('$natural', pymongo.DESCENDING).limit(1)
+        curr = self.oplog.find().sort(
+            '$natural', pymongo.DESCENDING
+        ).limit(1)
 
         if curr.count(with_limit_and_skip=True) == 0:
             return None
