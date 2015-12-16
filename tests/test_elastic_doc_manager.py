@@ -67,12 +67,8 @@ class TestElasticDocManager(ElasticsearchTestCase):
         docs = ({"_id": i} for i in range(1000))
         self.elastic_doc.bulk_upsert(docs, *TESTARGS)
         self.elastic_doc.commit()
-        res = self.elastic_conn.search(
-            index="test", doc_type='test',
-            body={"query": {"match_all": {}}},
-            size=1001
-        )["hits"]["hits"]
-        returned_ids = sorted(int(doc["_id"]) for doc in res)
+        returned_ids = sorted(int(doc["_id"]) for doc in self._search())
+        self.assertEqual(self._count(), 1000)
         self.assertEqual(len(returned_ids), 1000)
         for i, r in enumerate(returned_ids):
             self.assertEqual(r, i)
@@ -80,12 +76,8 @@ class TestElasticDocManager(ElasticsearchTestCase):
         docs = ({"_id": i, "weight": 2*i} for i in range(1000))
         self.elastic_doc.bulk_upsert(docs, *TESTARGS)
 
-        res = self.elastic_conn.search(
-            index="test", doc_type='test',
-            body={"query": {"match_all": {}}},
-            size=1001
-        )["hits"]["hits"]
-        returned_ids = sorted(int(doc["_source"]["weight"]) for doc in res)
+        returned_ids = sorted(
+            int(doc["weight"]) for doc in self._search())
         self.assertEqual(len(returned_ids), 1000)
         for i, r in enumerate(returned_ids):
             self.assertEqual(r, 2*i)
