@@ -81,7 +81,7 @@ class OplogThread(threading.Thread):
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
         # Set of fields to export
-        self.fields = kwargs.get('fields', [])
+        self.fields = kwargs.get('fields', {})
 
         LOG.info('OplogThread: Initializing oplog thread')
 
@@ -97,12 +97,19 @@ class OplogThread(threading.Thread):
 
     @fields.setter
     def fields(self, value):
-        if value:
-            self._fields = set(value)
+        self._fields = {}
+        if value and 'include' in value and value['include']:
+            self._fields['include'] = set(value['include'])
             # Always include _id field
-            self._fields.add('_id')
+            self._fields['include'].add('_id')
+        elif value and 'exclude' in value and value['exclude']:
+            self._fields['exclude'] = set(value['exclude'])
+            # Never exclude _id field
+            if('_id' in self._fields['exclude']):
+                self._fields['exclude'].remove('_id')
         else:
-            self._fields = None
+            self._fields['include'] = None
+            self._fields['exclude'] = None
 
     @property
     def namespace_set(self):
@@ -331,24 +338,28 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
+    def pop_excluded_fields(self, doc):
+        if 'exclude' in self._fields and self._fields['exclude']:
+            for key in self._fields['exclude']:
+                doc.pop(key, None)
+        elif 'include' in self._fields and self._fields['include']:
+            for key in set(doc) - set(self._fields['include']):
+                doc.pop(key, None)
+
     def filter_oplog_entry(self, entry):
         """Remove fields from an oplog entry that should not be replicated."""
-        if not self._fields:
+        if not self._fields or (not 'include' in self._fields and not 'exclude' in self._fields):
             return entry
-
-        def pop_excluded_fields(doc):
-            for key in set(doc) - self._fields:
-                doc.pop(key)
 
         entry_o = entry['o']
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
-            pop_excluded_fields(entry_o)
+            self.pop_excluded_fields(entry_o)
         # 'u' indicates an update. The 'o' field describes an update spec
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
-            pop_excluded_fields(entry_o.get("$set", {}))
-            pop_excluded_fields(entry_o.get("$unset", {}))
+            self.pop_excluded_fields(entry_o.get("$set", {}))
+            self.pop_excluded_fields(entry_o.get("$unset", {}))
             # not allowed to have empty $set/$unset, so remove if empty
             if "$set" in entry_o and not entry_o['$set']:
                 entry_o.pop("$set")
@@ -359,7 +370,7 @@ class OplogThread(threading.Thread):
         # 'u' indicates an update. The 'o' field is the replacement document
         # if no '$set' or '$unset' are present.
         elif entry['op'] == 'u':
-            pop_excluded_fields(entry_o)
+            self.pop_excluded_fields(entry_o)
 
         return entry
 
@@ -425,23 +436,27 @@ class OplogThread(threading.Thread):
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 target_coll = self.primary_client[database][coll]
+                fields_to_fetch = None
+                if 'include' in self._fields:
+                    fields_to_fetch = self._fields['include']
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
-                        fields=self._fields,
+                        fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
                     cursor = util.retry_until_ok(
                         target_coll.find,
                         {"_id": {"$gt": last_id}},
-                        fields=self._fields,
+                        fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 try:
                     for doc in cursor:
                         if not self.running:
                             raise StopIteration
+                        self.pop_excluded_fields(doc)
                         last_id = doc["_id"]
                         yield doc
                     break

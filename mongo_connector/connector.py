@@ -643,9 +643,21 @@ def get_config_options():
         " file should be the password for the admin user.")
 
     def apply_fields(option, cli_values):
-        if cli_values['fields']:
-            option.value = cli_values['fields'].split(",")
-        for field in option.value:
+        if cli_values['include_fields']:
+            option.value['include'] = cli_values['include_fields'].split(",")
+        if cli_values['exclude_fields']:
+            option.value['exclude'] = cli_values['exclude_fields'].split(",")
+        include = option.value.get('include')
+        exclude = option.value.get('exclude')
+        all_fields = []
+        if include and exclude:
+                raise errors.InvalidConfiguration(
+                    "Can't specify both include and exclude fields.")
+        elif include:
+            all_fields = include
+        elif exclude:
+            all_fields = exclude
+        for field in all_fields:
             if '.' in field:
                 print(
                     "WARNING: mongo-connector can only successfully filter "
@@ -657,17 +669,27 @@ def get_config_options():
                     "to the 'fields' option: %s" % field)
                 break
 
+    default_fields = {}
+
     fields = add_option(
         config_key="fields",
-        default=[],
-        type=list,
+        default=default_fields,
+        type=dict,
         apply_function=apply_fields)
 
     # -i to specify the list of fields to export
     fields.add_cli(
-        "-i", "--fields", dest="fields", help=
+        "-i", "--fields", dest="include_fields", help=
         "Used to specify the list of fields to export. "
         "Specify a field or fields to include in the export. "
+        "Use a comma separated list of fields to specify multiple "
+        "fields. The '_id', 'ns' and '_ts' fields are always "
+        "exported.")
+
+    fields.add_cli(
+        "-e", "--exclude-fields", dest="exclude_fields", help=
+        "Used to specify the list of fields to exclude while exporting. "
+        "Specify a field or fields to exclude from the export. "
         "Use a comma separated list of fields to specify multiple "
         "fields. The '_id', 'ns' and '_ts' fields are always "
         "exported.")
