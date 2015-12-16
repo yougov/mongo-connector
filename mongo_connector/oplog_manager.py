@@ -70,6 +70,9 @@ class OplogThread(threading.Thread):
 
         # The set of namespaces to process from the mongo cluster.
         self.namespace_set = kwargs.get('ns_set', [])
+        
+        # The dict of field namespaces to export
+        self.ns_field_set = kwargs.get('ns_field_set', {})        
 
         # The set of gridfs namespaces to process from the mongo cluster
         self.gridfs_set = kwargs.get('gridfs_set', [])
@@ -92,6 +95,20 @@ class OplogThread(threading.Thread):
             LOG.warning('%s %s' % (err_msg, self.primary_connection))
 
     @property
+    def ns_field_set(self):
+        return self._ns_field_set
+
+    @ns_field_set.setter
+    def ns_field_set(self, value):
+        if value:
+            self._ns_field_set = value
+            # Always include _id field
+            for k in self._ns_field_set.keys():
+                self._ns_field_set[k].append('_id')
+        else:
+            self._ns_field_set = set()
+            
+    @property
     def fields(self):
         return self._fields
 
@@ -102,7 +119,7 @@ class OplogThread(threading.Thread):
             # Always include _id field
             self._fields.add('_id')
         else:
-            self._fields = None
+            self._fields = set()    
 
     @property
     def namespace_set(self):
@@ -198,12 +215,12 @@ class OplogThread(threading.Thread):
                         # Take fields out of the oplog entry that
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
-                        if not self.filter_oplog_entry(entry):
+                        ns = entry['ns']
+                        if not self.filter_oplog_entry(entry, ns):
                             continue
 
                         #sync the current oplog operation
                         operation = entry['op']
-                        ns = entry['ns']
 
                         if '.' not in ns:
                             continue
@@ -331,13 +348,13 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
-    def filter_oplog_entry(self, entry):
+    def filter_oplog_entry(self, entry, ns):
         """Remove fields from an oplog entry that should not be replicated."""
-        if not self._fields:
+        if not self._fields and not self.ns_field_set:
             return entry
 
         def pop_excluded_fields(doc):
-            for key in set(doc) - self._fields:
+            for key in set(doc) - self._fields - set(self.ns_field_set[ns]):
                 doc.pop(key)
 
         entry_o = entry['o']
@@ -421,21 +438,24 @@ class OplogThread(threading.Thread):
             database, coll = namespace.split('.', 1)
             last_id = None
             attempts = 0
+            fields = set()
 
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 target_coll = self.primary_client[database][coll]
                 if not last_id:
+                    fields = (self._fields).union(set(self.ns_field_set[namespace]))
                     cursor = util.retry_until_ok(
                         target_coll.find,
-                        fields=self._fields,
+                        fields=fields,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
+                    fields = (self._fields).union(set(self.ns_field_set[namespace]))
                     cursor = util.retry_until_ok(
                         target_coll.find,
                         {"_id": {"$gt": last_id}},
-                        fields=self._fields,
+                        fields=fields,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 try:

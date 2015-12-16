@@ -155,6 +155,7 @@ class Connector(threading.Thread):
             auth_key=auth_key,
             fields=config['fields'],
             ns_set=config['namespaces.include'],
+            ns_field_set=config['namespaces.fields'],
             dest_mapping=config['namespaces.mapping'],
             gridfs_set=config['namespaces.gridfs'],
             ssl_certfile=config['ssl.sslCertfile'],
@@ -687,6 +688,15 @@ def get_config_options():
                     "Destination namespace set should be the"
                     " same length as the origin namespace set.")
             option.value['mapping'] = dict(zip(ns_set, dest_ns_set))
+        
+        if cli_values['include_field_set']:
+            ns_set = option.value['include']
+            include_field_set = cli_values['include_field_set'].split(',')
+            if len(ns_set) != len(include_field_set):
+                raise errors.InvalidConfiguration(
+                    "Destination namespace set should be the"
+                    " same length as the origin namespace set.")
+            option.value['fields'] = dict(zip(ns_set, include_field_set))        
 
         ns_set = option.value['include']
         if len(ns_set) != len(set(ns_set)):
@@ -698,6 +708,12 @@ def get_config_options():
             raise errors.InvalidConfiguration(
                 "Destination namespaces set should not"
                 " contain any duplicates.")
+        
+        ns_field_set = option.value['fields']
+        if len(ns_field_set) != len(set(ns_field_set)):
+            raise errors.InvalidConfiguration(
+                "Included fields set should not"
+                " contain any duplicates.")        
 
         gridfs_set = option.value['gridfs']
         if len(gridfs_set) != len(set(gridfs_set)):
@@ -707,7 +723,8 @@ def get_config_options():
     default_namespaces = {
         "include": [],
         "mapping": {},
-        "gridfs": []
+        "fields": {},
+        "gridfs": [],
     }
 
     namespaces = add_option(
@@ -747,6 +764,13 @@ def get_config_options():
         "consider. For example, if your metadata is stored in "
         "test.fs.files and chunks are stored in test.fs.chunks, "
         "you can use `--gridfs-set test.fs`.")
+    
+    namespaces.add_cli(
+        "--include-field-set", dest="include_field_set", help=
+        "Specify the fields to include in the export of each namespace"
+        "consider. For example, if you want to include field .username "
+        "of the namespace A, you can use `--include-field {'A':'username'}`. "
+        "Note: we do not support the subfield yet. ")    
 
     def apply_doc_managers(option, cli_values):
         if cli_values['doc_manager'] is None:
