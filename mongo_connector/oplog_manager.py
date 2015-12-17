@@ -663,7 +663,7 @@ class OplogThread(threading.Thread):
             if self.repl_set_name in oplog_dict.keys():
                 ret_val = oplog_dict[self.repl_set_name]
             # legacy support
-            if oplog_str in oplog_dict.keys():
+            if retval == None and oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
         LOG.debug("OplogThread: reading last checkpoint as %s " %
