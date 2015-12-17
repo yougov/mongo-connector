@@ -655,12 +655,16 @@ class OplogThread(threading.Thread):
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
+        oplog_str = str(self.oplog)
         ret_val = None
 
         with self.oplog_progress as oplog_prog:
             oplog_dict = oplog_prog.get_dict()
             if self.repl_set_name in oplog_dict.keys():
                 ret_val = oplog_dict[self.repl_set_name]
+            # legacy support
+            if oplog_str in oplog_dict.keys():
+                ret_val = oplog_dict[oplog_str]
 
         LOG.debug("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
