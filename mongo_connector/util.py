@@ -84,6 +84,6 @@ def log_fatal_exceptions(func):
         try:
             func(*args, **kwargs)
         except Exception:
-            LOG.error("Fatal Exception")
+            LOG.exception("Fatal Exception")
             raise
     return wrapped

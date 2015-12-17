@@ -12,12 +12,13 @@
     "logging": {
         "type": "file",
         "filename": "/var/log/mongo-connector/mongo-connector.log",
+        "__format": "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s",
         "__rotationWhen": "D",
         "__rotationInterval": 1,
         "__rotationBackups": 10,
 
         "__type": "syslog",
-        "__host": "localhost:512"
+        "__host": "localhost:514"
     },
 
     "authentication": {

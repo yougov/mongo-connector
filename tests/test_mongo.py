@@ -33,6 +33,8 @@ from tests.util import assert_soon
 
 class MongoTestCase(unittest.TestCase):
 
+    use_single_meta_collection = False
+
     @classmethod
     def setUpClass(cls):
         cls.standalone = Server().start()
@@ -49,7 +51,11 @@ class MongoTestCase(unittest.TestCase):
             yield doc
 
         fs = GridFS(self.mongo_conn['test'], 'test')
-        for doc in self.mongo_conn['__mongo_connector']['test.test'].find():
+
+        collection_name = 'test.test'
+        if self.use_single_meta_collection:
+            collection_name = '__oplog'
+        for doc in self.mongo_conn['__mongo_connector'][collection_name].find():
             if doc.get('gridfs_id'):
                 for f in fs.find({'_id': doc['gridfs_id']}):
                     doc['filename'] = f.filename

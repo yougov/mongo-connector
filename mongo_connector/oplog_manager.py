@@ -640,11 +640,14 @@ class OplogThread(threading.Thread):
     def update_checkpoint(self):
         """Store the current checkpoint in the oplog progress dictionary.
         """
-        with self.oplog_progress as oplog_prog:
-            oplog_dict = oplog_prog.get_dict()
-            oplog_dict[str(self.oplog)] = self.checkpoint
-            LOG.debug("OplogThread: oplog checkpoint updated to %s" %
-                      str(self.checkpoint))
+        if self.checkpoint is not None:
+            with self.oplog_progress as oplog_prog:
+                oplog_dict = oplog_prog.get_dict()
+                oplog_dict[str(self.oplog)] = self.checkpoint
+                LOG.debug("OplogThread: oplog checkpoint updated to %s" %
+                          str(self.checkpoint))
+        else:
+            LOG.debug("OplogThread: no checkpoint to update.")
 
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
