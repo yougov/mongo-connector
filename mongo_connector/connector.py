@@ -288,7 +288,7 @@ class Connector(threading.Thread):
 
             # non sharded configuration
             oplog = OplogThread(
-                main_conn, self.doc_managers, self.oplog_progress,
+                main_conn, is_master['setName'], self.doc_managers, self.oplog_progress,
                 **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
@@ -343,7 +343,7 @@ class Connector(threading.Thread):
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
                     oplog = OplogThread(
-                        shard_conn, self.doc_managers, self.oplog_progress,
+                        shard_conn, repl_set, self.doc_managers, self.oplog_progress,
                         **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"

@@ -39,7 +39,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
-    def __init__(self, primary_client, doc_managers,
+    def __init__(self, primary_client, repl_set_name, doc_managers,
                  oplog_progress_dict, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
@@ -47,6 +47,9 @@ class OplogThread(threading.Thread):
 
         # The connection to the primary for this replicaSet.
         self.primary_client = primary_client
+        
+        # The name of the replica set
+        self.repl_set_name = repl_set_name
 
         # The connection to the mongos, if there is one.
         self.mongos_client = mongos_client
@@ -643,7 +646,7 @@ class OplogThread(threading.Thread):
         if self.checkpoint is not None:
             with self.oplog_progress as oplog_prog:
                 oplog_dict = oplog_prog.get_dict()
-                oplog_dict[str(self.oplog)] = self.checkpoint
+                oplog_dict[self.repl_set_name] = self.checkpoint
                 LOG.debug("OplogThread: oplog checkpoint updated to %s" %
                           str(self.checkpoint))
         else:
@@ -657,7 +660,10 @@ class OplogThread(threading.Thread):
 
         with self.oplog_progress as oplog_prog:
             oplog_dict = oplog_prog.get_dict()
-            if oplog_str in oplog_dict.keys():
+            if self.repl_set_name in oplog_dict.keys():
+                ret_val = oplog_dict[self.repl_set_name]
+            # legacy support
+            if ret_val == None and oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
         LOG.debug("OplogThread: reading last checkpoint as %s " %
