@@ -86,7 +86,9 @@ class TestConfig(unittest.TestCase):
                 'password': u'testPassword',
                 'passwordFile': u'testPasswordFile'
             },
-            'fields': [u'testFields1', u'testField2'],
+            'fields': {
+                'include': [u'testFields1', u'testField2']
+            },
             'namespaces': {
                 'include': [u'testNamespaceSet'],
                 'mapping': {'testMapKey': u'testMapValue'},
@@ -159,7 +161,9 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(self.conf['logging.facility'], 'testFacility')
 
         self.load_options({'-i': 'a,b,c'})
-        self.assertEqual(self.conf['fields'], ['a', 'b', 'c'])
+        self.assertEqual(self.conf['fields']['include'], ['a', 'b', 'c'])
+        self.load_options({'-e': 'a,b,c'})
+        self.assertEqual(self.conf['fields']['exclude'], ['a', 'b', 'c'])
 
     def test_extraneous_command_line_options(self):
         self.assertRaises(errors.InvalidConfiguration,
@@ -345,7 +349,9 @@ class TestConnectorConfig(unittest.TestCase):
             "sslCertificatePolicy": "required"
         },
 
-        "fields": ["field1", "field2", "field3"],
+        "fields": {
+            'include': ["field1", "field2", "field3"]
+        },
 
         "namespaces": {
             "include": ["db.source1", "db.source2"],
