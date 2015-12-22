@@ -392,7 +392,7 @@ class OplogThread(threading.Thread):
         """
 
         dump_set = self.namespace_set or []
-        LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
+        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
 
         #no namespaces specified
         if not self.namespace_set:
@@ -441,6 +441,7 @@ class OplogThread(threading.Thread):
                 try:
                     for doc in cursor:
                         if not self.running:
+                            LOG.error("Stopped Iterating over Cursor while initial import")
                             raise StopIteration
                         last_id = doc["_id"]
                         yield doc
@@ -456,7 +457,7 @@ class OplogThread(threading.Thread):
             for namespace in dump_set:
                 for num, doc in enumerate(docs_to_dump(namespace)):
                     if num % 10000 == 0:
-                        LOG.debug("Upserted %d docs." % num)
+                        LOG.info("Upserted %d docs." % num)
                     try:
                         mapped_ns = self.dest_mapping.get(namespace, namespace)
                         dm.upsert(doc, mapped_ns, long_ts)
@@ -468,7 +469,7 @@ class OplogThread(threading.Thread):
                             num_failed += 1
                         else:
                             raise
-            LOG.debug("Upserted %d docs" % num_inserted)
+            LOG.info("Upserted %d docs" % num_inserted)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
 
