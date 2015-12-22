@@ -131,7 +131,7 @@ class TestSynchronizer(unittest.TestCase):
 
         # ensure update works when fields are given
         opthread = self.connector.shard_set[0]
-        opthread.fields = ['a', 'b', 'c']
+        opthread.fields = {'include': ['a', 'b', 'c']}
         try:
             doc = update_and_retrieve({"$set": {"d": 10}})
             self.assertEqual(self.conn.test.test.find_one(doc['_id'])['d'], 10)

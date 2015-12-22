@@ -251,7 +251,7 @@ class TestOplogManager(unittest.TestCase):
         exclude_fields = ["d", "e", "f"]
 
         # Set fields to care about
-        self.opman.fields = include_fields
+        self.opman.fields = {'include': include_fields}
         # Documents have more than just these fields
         doc = {
             "a": 1, "b": 2, "c": 3,
@@ -267,6 +267,30 @@ class TestOplogManager(unittest.TestCase):
         keys = result.keys()
         for inc, exc in zip(include_fields, exclude_fields):
             self.assertIn(inc, keys)
+            self.assertNotIn(exc, keys)
+
+    def test_filter_fields_exclude(self):
+        docman = self.opman.doc_managers[0]
+        conn = self.opman.primary_client
+
+        exclude_fields = ["d", "e", "f"]
+
+        # Set fields to care about
+        self.opman.fields = {'exclude': exclude_fields}
+        # Documents have more than just these fields
+        doc = {
+            "a": 1, "b": 2, "c": 3,
+            "d": 4, "e": 5, "f": 6,
+            "_id": 1
+        }
+        db = conn['test']['test']
+        db.insert(doc)
+        assert_soon(lambda: db.count() == 1)
+        self.opman.dump_collection()
+
+        result = docman._search()[0]
+        keys = result.keys()
+        for exc in exclude_fields:
             self.assertNotIn(exc, keys)
 
     def test_namespace_mapping(self):
@@ -412,46 +436,81 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(filtered, insert_op())
 
         # Case 1: insert op, fields provided
-        self.opman.fields = ['a', 'b']
+        self.opman.fields = {'include': ['a', 'b']}
         filtered = self.opman.filter_oplog_entry(insert_op())
         self.assertEqual(filtered['o'], {'_id': 0, 'a': 1, 'b': 2})
 
-        # Case 2: insert op, fields provided, doc becomes empty except for _id
-        self.opman.fields = ['d', 'e', 'f']
+        # Case 2: insert op, exclude fields provided
+        self.opman.fields = {'exclude': ['a', 'b']}
+        filtered = self.opman.filter_oplog_entry(insert_op())
+        self.assertEqual(filtered['o'], {'_id': 0, 'c': 3})
+
+        # Case 3: insert op, fields provided, doc becomes empty except for _id
+        self.opman.fields = {'include': ['d', 'e', 'f']}
         filtered = self.opman.filter_oplog_entry(insert_op())
         self.assertEqual(filtered['o'], {'_id': 0})
 
-        # Case 3: update op, no fields provided
+        # Case 4: insert op, exlude fields provided, full doc retained
+        self.opman.fields = {'exclude': ['d', 'e', 'f']}
+        filtered = self.opman.filter_oplog_entry(insert_op())
+        self.assertEqual(filtered['o'], {'_id': 0, 'a': 1, 'b': 2, 'c': 3})
+
+        # Case 5: update op, no fields provided
         self.opman.fields = None
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertEqual(filtered, update_op())
 
-        # Case 4: update op, fields provided
-        self.opman.fields = ['a', 'c']
+        # Case 6: update op, fields provided
+        self.opman.fields = {'include': ['a', 'c']}
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertNotIn('b', filtered['o']['$set'])
         self.assertIn('a', filtered['o']['$set'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
 
-        # Case 5: update op, fields provided, empty $set
-        self.opman.fields = ['c']
+        # Case 7: update op, exclude fields provided
+        self.opman.fields = {'exclude': ['a', 'c']}
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('a', filtered['o']['$set'])
+        self.assertNotIn('c', filtered['o']['$set'])
+        self.assertIn('b', filtered['o']['$set'])
+        self.assertNotIn('$unset', filtered['o'])
+
+        # Case 8: update op, fields provided, empty $set
+        self.opman.fields = {'include': ['c']}
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertNotIn('$set', filtered['o'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
 
-        # Case 6: update op, fields provided, empty $unset
-        self.opman.fields = ['a', 'b']
+        # Case 9: update op, exlcude fields provided, empty $unset
+        self.opman.fields = {'exclude': ['c']}
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertNotIn('$unset', filtered['o'])
         self.assertEqual(filtered['o']['$set'], update_op()['o']['$set'])
 
-        # Case 7: update op, fields provided, entry is nullified
-        self.opman.fields = ['d', 'e', 'f']
+        # Case 10: update op, fields provided, empty $unset
+        self.opman.fields = {'include': ['a', 'b']}
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('$unset', filtered['o'])
+        self.assertEqual(filtered['o']['$set'], update_op()['o']['$set'])
+
+        # Case 11: update op, exclude fields provided, empty $set
+        self.opman.fields = {'exclude': ['a', 'b']}
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertNotIn('$set', filtered['o'])
+        self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
+
+        # Case 12: update op, fields provided, entry is nullified
+        self.opman.fields = {'include': ['d', 'e', 'f']}
         filtered = self.opman.filter_oplog_entry(update_op())
         self.assertEqual(filtered, None)
 
-        # Case 8: update op, fields provided, replacement
-        self.opman.fields = ['a', 'b', 'c']
+        # Case 13: update op, exclude fields provided, entry is nullified
+        self.opman.fields = {'exclude': ['a', 'b', 'c']}
+        filtered = self.opman.filter_oplog_entry(update_op())
+        self.assertEqual(filtered, None)
+
+        # Case 14: update op, fields provided, replacement
+        self.opman.fields = {'include': ['a', 'b', 'c']}
         filtered = self.opman.filter_oplog_entry({
             'op': 'u',
             'o': {'a': 1, 'b': 2, 'c': 3, 'd': 4}
@@ -459,6 +518,14 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(
             filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
 
+        # Case 15: update op, fields provided, replacement
+        self.opman.fields = {'exclude': ['a', 'b', 'c']}
+        filtered = self.opman.filter_oplog_entry({
+            'op': 'u',
+            'o': {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+        })
+        self.assertEqual(
+            filtered, {'op': 'u', 'o': {'d': 4}})
 
 if __name__ == '__main__':
     unittest.main()

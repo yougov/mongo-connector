@@ -35,7 +35,11 @@
         "__sslCertificatePolicy": "Policy for validating SSL certificates provided from the other end of the connection. Possible values are 'required' (require and validate certificates), 'optional' (validate but don't require a certificate), and 'ignored' (ignore certificates)."
     },
 
-    "__fields": ["field1", "field2", "field3"],
+    "__comment__": "Fields cannot have both include and exclude specified. Use either one.",
+    "__fields": {
+        "__include": ["field1", "field2", "field3"],
+        "__exclude": ["field1", "field2", "field4"]
+    },
 
     "namespaces": {
         "__include": ["db.source1", "db.source2"],
