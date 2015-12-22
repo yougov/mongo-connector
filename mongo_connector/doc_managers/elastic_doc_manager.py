@@ -132,7 +132,7 @@ class DocManager(DocManagerBase):
         """Insert a document into Elasticsearch."""
         index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
-        doc_id = u(doc.pop("_id"))
+        doc_id = u(doc.get("_id"))
         metadata = {
             "ns": namespace,
             "_ts": timestamp
@@ -156,7 +156,7 @@ class DocManager(DocManagerBase):
             for doc in docs:
                 # Remove metadata and redundant _id
                 index, doc_type = self._index_and_mapping(namespace)
-                doc_id = u(doc.pop("_id"))
+                doc_id = u(doc.get("_id"))
                 document_action = {
                     "_index": index,
                     "_type": doc_type,
@@ -202,7 +202,7 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
         doc = f.get_metadata()
-        doc_id = str(doc.pop('_id'))
+        doc_id = str(doc.get('_id'))
         index, doc_type = self._index_and_mapping(namespace)
 
         # make sure that elasticsearch treats it like a file
