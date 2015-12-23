@@ -43,6 +43,10 @@ wrap_exceptions = exception_wrapper({
 
 LOG = logging.getLogger(__name__)
 
+tracer = logging.getLogger('elasticsearch.trace')
+tracer.setLevel(logging.DEBUG)
+logging.getLogger('elasticsearch').setLevel(logging.DEBUG)
+logging.getLogger('urllib3').setLevel(logging.DEBUG)
 
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
