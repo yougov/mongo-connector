@@ -203,11 +203,13 @@ class DocManager(DocManagerBase):
             for ok, resp in responses:
                 if not ok:
                     LOG.error("Could not bulk-upsert document into ElasticSearch: %r" % resp)
-                    if 'index' in resp:
-                        if 'error' in resp['index']:
-                            error_field = parseError(resp['index']['error'])
-                            if error_field and '_id' in resp['index']:
-                                yield (resp['index']['_id'], error_field['field_name'])
+                    if resp and resp.index:
+                        index = resp.index
+                        LOG.info('Read error response: %r' % index)
+                        if 'error' in index:
+                            error_field = parseError(index['error'])
+                            if error_field and '_id' in index:
+                                yield (index['_id'], error_field['field_name'])
                     LOG.error("Could not parse response to reinsert: %r" % resp)
             if self.auto_commit_interval == 0:
                 self.commit()
