@@ -186,7 +186,7 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
 
         def parseError(errorDesc):
-            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
+            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
             if parsed and parsed.named:
                 return parsed.named
             return None
@@ -202,15 +202,14 @@ class DocManager(DocManagerBase):
 
             for ok, resp in responses:
                 if not ok:
-                    LOG.error("Could not bulk-upsert document into ElasticSearch: %r" % resp)
-                    if resp and resp.index:
-                        index = resp.index
-                        LOG.info('Read error response: %r' % index)
-                        if 'error' in index:
+                    if resp:
+                        try:
+                            index = resp['index']
                             error_field = parseError(index['error'])
-                            if error_field and '_id' in index:
+                            if error_field:
                                 yield (index['_id'], error_field['field_name'])
-                    LOG.error("Could not parse response to reinsert: %r" % resp)
+                        except KeyError:
+                            LOG.error("Could not parse response to reinsert: %r" % resp)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
