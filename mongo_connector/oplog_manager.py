@@ -567,6 +567,8 @@ class OplogThread(threading.Thread):
             LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
             self.running = False
             return None
+        else:
+            LOG.info('OplogThread: Successfully dumped collection')
 
         return timestamp
 
