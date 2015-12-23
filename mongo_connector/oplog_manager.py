@@ -455,7 +455,7 @@ class OplogThread(threading.Thread):
                 try:
                     for doc in cursor:
                         if not self.running:
-                            LOG.error("Stopped Iterating over Cursor while initial import")
+                            LOG.error("Stopped iterating over Cursor while initial import")
                             raise StopIteration
                         self.pop_excluded_fields(doc)
                         last_id = doc["_id"]
@@ -465,6 +465,50 @@ class OplogThread(threading.Thread):
                         pymongo.errors.OperationFailure):
                     attempts += 1
                     time.sleep(1)
+
+        def get_failed_docs(namespace, doc_ids):
+            database, coll = namespace.split('.', 1)
+            attempts = 0
+
+            while attempts < 60:
+                target_coll = self.primary_client[database][coll]
+                fields_to_fetch = None
+                if 'include' in self._fields:
+                    fields_to_fetch = self._fields['include']
+
+                for doc_id in list(doc_ids):
+                    doc = util.retry_until_ok(
+                        target_coll.find_one,
+                        {"_id": doc_id},
+                        fields=fields_to_fetch,
+                        sort=[("_id", pymongo.ASCENDING)]
+                    )
+                    try:
+                        if not self.running:
+                            LOG.error("Stopped iterating over failed docs during initial import")
+                            raise StopIteration
+                        self.pop_excluded_fields(doc)
+                        doc_ids.remove(doc_id)
+                        yield doc
+                    except (pymongo.errors.AutoReconnect,
+                            pymongo.errors.OperationFailure):
+                        attempts += 1
+                        time.sleep(1)
+                        break
+
+        def upsert_all_failed_docs(dm, namespace, errors):
+            try:
+                exclude_fields = set(field for (_id, field) in errors)
+                if 'exclude' not in self._fields:
+                    self._fields['exclude'] = []
+                self._fields['exclude'].extend(exclude_fields)
+                _ids = [_id for (_id, field) in errors]
+                LOG.info('MOE: Trying to upsert %d failed documents' % len(_ids))
+                mapped_ns = self.dest_mapping.get(namespace, namespace)
+                errors = dm.bulk_upsert(get_failed_docs(_ids), mapped_ns, long_ts)
+                upsert_all_failed_docs(dm, namespace, errors)
+            except StopIteration:
+                pass
 
         def upsert_each(dm):
             num_inserted = 0
@@ -492,7 +536,8 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
-                    dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    upsert_all_failed_docs(dm, namespace, errors)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"

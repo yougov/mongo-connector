@@ -24,6 +24,8 @@ from threading import Timer
 
 import bson.json_util
 
+from parse import search
+
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
 
@@ -182,6 +184,13 @@ class DocManager(DocManagerBase):
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
+
+        def parseError(errorDesc):
+            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
+            if parsed and parsed.named:
+                return parsed.named
+            return None
+
         try:
             kw = {}
             if self.chunk_size > 0:
@@ -193,9 +202,13 @@ class DocManager(DocManagerBase):
 
             for ok, resp in responses:
                 if not ok:
-                    LOG.error(
-                        "Could not bulk-upsert document "
-                        "into ElasticSearch: %r" % resp)
+                    LOG.error("Could not bulk-upsert document into ElasticSearch: %r" % resp)
+                    if 'index' in resp:
+                        if 'error' in resp['index']:
+                            error_field = parseError(resp['index']['error'])
+                            if error_field and '_id' in resp['index']:
+                                yield (resp['index']['_id'], error_field['field_name'])
+                    LOG.error("Could not parse response to reinsert: %r" % resp)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
