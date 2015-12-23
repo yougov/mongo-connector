@@ -505,7 +505,7 @@ class OplogThread(threading.Thread):
                 _ids = [_id for (_id, field) in errors]
                 LOG.info('MOE: Trying to upsert %d failed documents' % len(_ids))
                 mapped_ns = self.dest_mapping.get(namespace, namespace)
-                errors = dm.bulk_upsert(get_failed_docs(_ids), mapped_ns, long_ts)
+                errors = dm.bulk_upsert(get_failed_docs(namespace, _ids), mapped_ns, long_ts)
                 upsert_all_failed_docs(dm, namespace, errors)
             except StopIteration:
                 pass
