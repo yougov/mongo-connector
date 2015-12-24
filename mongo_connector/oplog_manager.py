@@ -490,15 +490,18 @@ class OplogThread(threading.Thread):
             error_doc = doc
             if not error_doc:
                 error_doc = get_failed_doc(namespace, _id)
-            error_doc.pop(error_field, None)
-            try:
-                error = dm.upsert(error_doc, mapped_ns, long_ts)
-                if error:
-                    upsert_failed_doc(dm, namespace, error[0], error[1], error_doc)
-                #self._fields['exclude'].remove(field)
-            except Exception:
-                LOG.critical("Failed to upsert document: %r" % doc)
-                raise
+            if error_field in error_doc:
+                error_doc.pop(error_field)
+                try:
+                    error = dm.upsert(error_doc, mapped_ns, long_ts)
+                    if error:
+                        upsert_failed_doc(dm, namespace, error[0], error[1], error_doc)
+                    #self._fields['exclude'].remove(field)
+                except Exception:
+                    LOG.critical("Failed to upsert document: %r" % error_doc)
+                    raise
+            else:
+                LOG.critical("Error Field not found in document: %r" % error_doc)
 
         def upsert_all_failed_docs(dm, namespace, errors):
             for _id, field in errors:
