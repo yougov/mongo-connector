@@ -21,6 +21,7 @@ try:
     import Queue as queue
 except ImportError:
     import queue
+from parse import search
 import pymongo
 import sys
 import time
@@ -208,7 +209,7 @@ class OplogThread(threading.Thread):
                         if not self.filter_oplog_entry(entry):
                             continue
 
-                        #sync the current oplog operation
+                        # sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
 
@@ -466,52 +467,50 @@ class OplogThread(threading.Thread):
                     attempts += 1
                     time.sleep(1)
 
-        def get_failed_docs(namespace, doc_ids):
+        def get_failed_doc(namespace, doc_id):
             database, coll = namespace.split('.', 1)
-            attempts = 0
-
-            while attempts < 60:
-                target_coll = self.primary_client[database][coll]
-                fields_to_fetch = None
-                if 'include' in self._fields:
-                    fields_to_fetch = self._fields['include']
-
-                for doc_id in list(doc_ids):
-                    doc = util.retry_until_ok(
-                        target_coll.find_one,
-                        {"_id": doc_id},
-                        fields=fields_to_fetch,
-                        sort=[("_id", pymongo.ASCENDING)]
-                    )
-                    try:
-                        if not self.running:
-                            LOG.error("Stopped iterating over failed docs during initial import")
-                            raise StopIteration
-                        self.pop_excluded_fields(doc)
-                        doc_ids.remove(doc_id)
-                        yield doc
-                    except (pymongo.errors.AutoReconnect,
-                            pymongo.errors.OperationFailure):
-                        attempts += 1
-                        time.sleep(1)
-                        break
+            target_coll = self.primary_client[database][coll]
+            fields_to_fetch = None
+            if 'include' in self._fields:
+                fields_to_fetch = self._fields['include']
+            doc = util.retry_until_ok(
+                target_coll.find_one,
+                {"_id": doc_id},
+                fields=fields_to_fetch
+            )
+            self.pop_excluded_fields(doc)
+            return doc
 
         def upsert_all_failed_docs(dm, namespace, errors):
-            try:
-                LOG.error("MOE: Trying to upsert failed documents")
-                exclude_fields = set(field for (_id, field) in errors)
-                LOG.error("Excluding fields: %r" % exclude_fields)
+            for _id, field in errors:
                 if 'exclude' not in self._fields:
                     self._fields['exclude'] = set()
-                self._fields['exclude'].update(exclude_fields)
-                LOG.error("Fields now excluded: %r" % self._fields['exclude'])
-                _ids = [_id for (_id, field) in errors]
-                LOG.info("MOE: Trying to upsert %d failed documents" % len(_ids))
+                self._fields['exclude'].add(field)
                 mapped_ns = self.dest_mapping.get(namespace, namespace)
-                errors = dm.bulk_upsert(get_failed_docs(namespace, _ids), mapped_ns, long_ts)
-                upsert_all_failed_docs(dm, namespace, errors)
-            except StopIteration:
-                pass
+                doc = get_failed_doc(namespace, _id)
+                try:
+                    dm.upsert(doc, mapped_ns, long_ts)
+                except Exception:
+                    LOG.critical("Failed to upsert document: %r" % doc)
+
+        def parseError(errorDesc):
+            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
+            if parsed and parsed.named:
+                return parsed.named
+            return None
+
+        def parseBulkResponses(responses):
+            for ok, resp in responses:
+                if not ok and resp:
+                    try:
+                        index = resp['index']
+                        error_field = parseError(index['error'])
+                        if error_field:
+                            error = (index['_id'], error_field['field_name'])
+                            LOG.error("Found failed document from bulk upsert: %r" % error)
+                            yield error
+                    except KeyError:
+                        LOG.error("Could not parse response to reinsert: %r" % resp)
 
         def upsert_each(dm):
             num_inserted = 0
@@ -539,7 +538,8 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
-                    errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    responses = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    errors = parseBulkResponses(responses)
                     upsert_all_failed_docs(dm, namespace, errors)
             except Exception:
                 if self.continue_on_error:

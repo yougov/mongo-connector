@@ -24,8 +24,6 @@ from threading import Timer
 
 import bson.json_util
 
-from parse import search
-
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
 
@@ -151,8 +149,6 @@ class DocManager(DocManagerBase):
         self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
                            body=bson.json_util.dumps(metadata), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
-        # Leave _id, since it's part of the original document
-        doc['_id'] = doc_id
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -185,12 +181,7 @@ class DocManager(DocManagerBase):
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
 
-        def parseError(errorDesc):
-            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
-            if parsed and parsed.named:
-                return parsed.named
-            return None
-
+        responses = []
         try:
             kw = {}
             if self.chunk_size > 0:
@@ -199,23 +190,13 @@ class DocManager(DocManagerBase):
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
-
-            for ok, resp in responses:
-                if not ok:
-                    if resp:
-                        try:
-                            index = resp['index']
-                            error_field = parseError(index['error'])
-                            if error_field:
-                                yield (index['_id'], error_field['field_name'])
-                        except KeyError:
-                            LOG.error("Could not parse response to reinsert: %r" % resp)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
             pass
+        return responses
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
