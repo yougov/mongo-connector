@@ -153,10 +153,19 @@ class DocManager(DocManagerBase):
                                refresh=(self.auto_commit_interval == 0))
         except es_exceptions.RequestError, e:
             LOG.critical("Failed to upsert document: %r", e.info)
-            error = parseError(e.info['error'])
+            error = self.parseError(e.info['error'])
             if(error):
                 return (doc_id, error['field_name'])
         return None
+
+    def parseError(self, errorDesc):
+            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
+            if not parsed:
+                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]]{}", errorDesc)
+            LOG.warning("Parsed ES Error: %s from description %s", parsed, errorDesc)
+            if parsed and parsed.named:
+                return parsed.named
+            return None
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -189,15 +198,6 @@ class DocManager(DocManagerBase):
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
 
-        def parseError(errorDesc):
-            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
-            if not parsed:
-                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]]{}", errorDesc)
-            LOG.warning("Parsed ES Error: %s from description %s", parsed, errorDesc)
-            if parsed and parsed.named:
-                return parsed.named
-            return None
-
         responses = []
         try:
             kw = {}
@@ -212,7 +212,7 @@ class DocManager(DocManagerBase):
                 if not ok and resp:
                     try:
                         index = resp['index']
-                        error_field = parseError(index['error'])
+                        error_field = self.parseError(index['error'])
                         if error_field:
                             error = (index['_id'], error_field['field_name'])
                             LOG.warning("Found failed document from bulk upsert: %s", error)
