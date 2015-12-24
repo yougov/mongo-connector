@@ -208,7 +208,7 @@ class DocManager(DocManagerBase):
                         error_field = parseError(index['error'])
                         if error_field:
                             error = (index['_id'], error_field['field_name'])
-                            LOG.warning("Found failed document from bulk upsert: %r" % error)
+                            LOG.warning("Found failed document from bulk upsert: (%s, %s)" % error)
                             yield error
                     except KeyError:
                         LOG.error("Could not parse response to reinsert: %r" % resp)
