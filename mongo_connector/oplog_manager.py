@@ -479,6 +479,7 @@ class OplogThread(threading.Thread):
                 fields=fields_to_fetch
             )
             self.pop_excluded_fields(doc)
+            LOG.warning("Reinserting document: %r" % doc)
             return doc
 
         def upsert_all_failed_docs(dm, namespace, errors):
@@ -492,6 +493,7 @@ class OplogThread(threading.Thread):
                     dm.upsert(doc, mapped_ns, long_ts)
                 except Exception:
                     LOG.critical("Failed to upsert document: %r" % doc)
+                    raise
 
         def parseError(errorDesc):
             parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
@@ -500,6 +502,7 @@ class OplogThread(threading.Thread):
             return None
 
         def parseBulkResponses(responses):
+            documents_inserted = 0
             for ok, resp in responses:
                 if not ok and resp:
                     try:
@@ -507,10 +510,14 @@ class OplogThread(threading.Thread):
                         error_field = parseError(index['error'])
                         if error_field:
                             error = (index['_id'], error_field['field_name'])
-                            LOG.error("Found failed document from bulk upsert: %r" % error)
+                            LOG.warning("Found failed document from bulk upsert: %r" % error)
                             yield error
                     except KeyError:
                         LOG.error("Could not parse response to reinsert: %r" % resp)
+                else:
+                    documents_inserted += 1
+                    if(documents_inserted % 10000):
+                        LOG.warning("Inserted %d documents during initial import" % documents_inserted)
 
         def upsert_each(dm):
             num_inserted = 0
