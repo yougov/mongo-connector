@@ -183,7 +183,9 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
 
         def parseError(errorDesc):
-            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
+            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
+            if not parsed:
+                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]]{}")
             LOG.warning("Parsed ES Error: %s from description %s", parsed, errorDesc)
             if parsed and parsed.named:
                 return parsed.named
