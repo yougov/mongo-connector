@@ -283,7 +283,7 @@ class Connector(threading.Thread):
             main_conn.close()
             main_conn = MongoClient(
                 self.address, replicaSet=is_master['setName'],
-                tz_aware=self.tz_aware, **self.ssl_kwargs)
+                tz_aware=self.tz_aware, read_preference=ReadPreference.SECONDARY_PREFERRED, **self.ssl_kwargs)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
