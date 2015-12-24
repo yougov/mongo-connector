@@ -152,7 +152,7 @@ class DocManager(DocManagerBase):
                                body=bson.json_util.dumps(metadata), id=doc_id,
                                refresh=(self.auto_commit_interval == 0))
         except es_exceptions.RequestError, e:
-            LOG.critical("Failed to upsert document: %r", e.info)
+            LOG.info("Failed to upsert document: %r", e.info)
             error = self.parseError(e.info['error'])
             if(error):
                 return (doc_id, error['field_name'])
@@ -162,9 +162,11 @@ class DocManager(DocManagerBase):
             parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
             if not parsed:
                 parsed = search("MapperParsingException[{}[{}]{}[{field_name}]]{}", errorDesc)
-            LOG.warning("Parsed ES Error: %s from description %s", parsed, errorDesc)
+            LOG.info("Parsed ES Error: %s from description %s", parsed, errorDesc)
             if parsed and parsed.named:
                 return parsed.named
+            else:
+                LOG.warning("Couldn't parse ES error: %s", errorDesc)
             return None
 
     @wrap_exceptions
@@ -215,14 +217,14 @@ class DocManager(DocManagerBase):
                         error_field = self.parseError(index['error'])
                         if error_field:
                             error = (index['_id'], error_field['field_name'])
-                            LOG.warning("Found failed document from bulk upsert: %s", error)
+                            LOG.info("Found failed document from bulk upsert: %s", error)
                             yield error
                     except KeyError:
                         LOG.error("Could not parse response to reinsert: %r" % resp)
                 else:
                     docs_inserted += 1
                     if(docs_inserted % 10000 == 0):
-                        LOG.warning("Bulk Upsert: Inserted %d docs" % docs_inserted)
+                        LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:

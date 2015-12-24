@@ -480,7 +480,7 @@ class OplogThread(threading.Thread):
             )
             if doc:
                 self.pop_excluded_fields(doc)
-                LOG.warning("Reinserting document: %r" % doc)
+                LOG.info("Reinserting document: %r" % doc)
             else:
                 LOG.critical("Could not find document with id %s from mongodb", doc_id)
             return doc
@@ -517,8 +517,7 @@ class OplogThread(threading.Thread):
                         num_inserted += 1
                     except Exception:
                         if self.continue_on_error:
-                            LOG.exception(
-                                "Could not upsert document: %r" % doc)
+                            LOG.exception("Could not upsert document: %r" % doc)
                             num_failed += 1
                         else:
                             raise
