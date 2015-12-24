@@ -30,6 +30,7 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
+from bson.objectid import ObjectId
 
 LOG = logging.getLogger(__name__)
 
@@ -474,11 +475,14 @@ class OplogThread(threading.Thread):
                 fields_to_fetch = self._fields['include']
             doc = util.retry_until_ok(
                 target_coll.find_one,
-                {"_id": doc_id},
+                {"_id": ObjectId(doc_id)},
                 fields=fields_to_fetch
             )
-            self.pop_excluded_fields(doc)
-            LOG.warning("Reinserting document: %r" % doc)
+            if doc:
+                self.pop_excluded_fields(doc)
+                LOG.warning("Reinserting document: %r" % doc)
+            else:
+                LOG.critical("Could not find document with id %s from mongodb", doc_id)
             return doc
 
         def upsert_all_failed_docs(dm, namespace, errors):
