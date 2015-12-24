@@ -516,7 +516,7 @@ class OplogThread(threading.Thread):
                         LOG.error("Could not parse response to reinsert: %r" % resp)
                 else:
                     documents_inserted += 1
-                    if(documents_inserted % 10000):
+                    if(documents_inserted % 10000 == 0):
                         LOG.warning("Inserted %d documents during initial import" % documents_inserted)
 
         def upsert_each(dm):
