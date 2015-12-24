@@ -32,6 +32,7 @@ from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions
+from pymongo import ReadPreference
 
 from pymongo import MongoClient
 
@@ -338,7 +339,7 @@ class Connector(threading.Thread):
                         return
 
                     shard_conn = MongoClient(
-                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
+                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware, read_preference=ReadPreference.SECONDARY_PREFERRED,
                         **self.ssl_kwargs)
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)

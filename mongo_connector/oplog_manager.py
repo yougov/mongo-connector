@@ -31,6 +31,7 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
+from bson.objectid import ObjectId
 
 LOG = logging.getLogger(__name__)
 
