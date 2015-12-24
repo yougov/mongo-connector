@@ -152,7 +152,11 @@ class DocManager(DocManagerBase):
                                body=bson.json_util.dumps(metadata), id=doc_id,
                                refresh=(self.auto_commit_interval == 0))
         except es_exceptions.RequestError, e:
-            LOG.critical("Failed to upsert document: %r", e)
+            LOG.critical("Failed to upsert document: %r", e.info)
+            error = parseError(e.info['error'])
+            if(error):
+                return (doc_id, error['field_name'])
+        return None
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):

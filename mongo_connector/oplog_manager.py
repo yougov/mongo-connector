@@ -485,19 +485,24 @@ class OplogThread(threading.Thread):
                 LOG.critical("Could not find document with id %s from mongodb", doc_id)
             return doc
 
-        def upsert_all_failed_docs(dm, namespace, errors):
-            for _id, field in errors:
-                if 'exclude' not in self._fields:
+        def upsert_failed_doc(namespace, _id, error_field):
+            if 'exclude' not in self._fields:
                     self._fields['exclude'] = set()
-                self._fields['exclude'].add(field)
+                self._fields['exclude'].add(error_field)
                 mapped_ns = self.dest_mapping.get(namespace, namespace)
                 doc = get_failed_doc(namespace, _id)
                 try:
-                    dm.upsert(doc, mapped_ns, long_ts)
+                    error = dm.upsert(doc, mapped_ns, long_ts)
+                    if error:
+                        upsert_failed_doc(namespace, error[0], error[1])
                     #self._fields['exclude'].remove(field)
                 except Exception:
                     LOG.critical("Failed to upsert document: %r" % doc)
                     raise
+
+        def upsert_all_failed_docs(dm, namespace, errors):
+            for _id, field in errors:
+                upsert_failed_doc(namespace, _id, field)
 
         def upsert_each(dm):
             num_inserted = 0
