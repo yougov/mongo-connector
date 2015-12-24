@@ -23,6 +23,7 @@ import logging
 from threading import Timer
 
 import bson.json_util
+from parse import search
 
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
@@ -181,6 +182,13 @@ class DocManager(DocManagerBase):
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
 
+        def parseError(errorDesc):
+            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
+            LOG.warning("Parsed ES Error: %s from description %s", (parsed, errorDesc))
+            if parsed and parsed.named:
+                return parsed.named
+            return None
+
         responses = []
         try:
             kw = {}
@@ -190,13 +198,28 @@ class DocManager(DocManagerBase):
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
+            docs_inserted = 0
+            for ok, resp in responses:
+                if not ok and resp:
+                    try:
+                        index = resp['index']
+                        error_field = parseError(index['error'])
+                        if error_field:
+                            error = (index['_id'], error_field['field_name'])
+                            LOG.warning("Found failed document from bulk upsert: %r" % error)
+                            yield error
+                    except KeyError:
+                        LOG.error("Could not parse response to reinsert: %r" % resp)
+                else:
+                    docs_inserted += 1
+                    if(docs_inserted % 10000 == 0):
+                        LOG.warning("Bulk Upsert: Inserted %d docs" % docs_inserted)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
             pass
-        return responses
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):

@@ -21,7 +21,6 @@ try:
     import Queue as queue
 except ImportError:
     import queue
-from parse import search
 import pymongo
 import sys
 import time
@@ -31,7 +30,6 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
-from bson.objectid import ObjectId
 
 LOG = logging.getLogger(__name__)
 
@@ -496,30 +494,6 @@ class OplogThread(threading.Thread):
                     LOG.critical("Failed to upsert document: %r" % doc)
                     raise
 
-        def parseError(errorDesc):
-            parsed = search("MapperParsingException[{}field [{field_name}]]{}", errorDesc)
-            if parsed and parsed.named:
-                return parsed.named
-            return None
-
-        def parseBulkResponses(responses):
-            documents_inserted = 0
-            for ok, resp in responses:
-                if not ok and resp:
-                    try:
-                        index = resp['index']
-                        error_field = parseError(index['error'])
-                        if error_field:
-                            error = (index['_id'], error_field['field_name'])
-                            LOG.warning("Found failed document from bulk upsert: %r" % error)
-                            yield error
-                    except KeyError:
-                        LOG.error("Could not parse response to reinsert: %r" % resp)
-                else:
-                    documents_inserted += 1
-                    if(documents_inserted % 10000 == 0):
-                        LOG.warning("Inserted %d documents during initial import" % documents_inserted)
-
         def upsert_each(dm):
             num_inserted = 0
             num_failed = 0
@@ -546,8 +520,7 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
-                    responses = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
-                    errors = parseBulkResponses(responses)
+                    errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
                     upsert_all_failed_docs(dm, namespace, errors)
             except Exception:
                 if self.continue_on_error:
