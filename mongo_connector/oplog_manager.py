@@ -500,9 +500,11 @@ class OplogThread(threading.Thread):
             try:
                 LOG.error("MOE: Trying to upsert failed documents")
                 exclude_fields = set(field for (_id, field) in errors)
+                LOG.error("Excluding fields: %r" % exclude_fields)
                 if 'exclude' not in self._fields:
                     self._fields['exclude'] = set()
                 self._fields['exclude'].update(exclude_fields)
+                LOG.error("Fields now excluded: %r" % self._fields['exclude'])
                 _ids = [_id for (_id, field) in errors]
                 LOG.info("MOE: Trying to upsert %d failed documents" % len(_ids))
                 mapped_ns = self.dest_mapping.get(namespace, namespace)
