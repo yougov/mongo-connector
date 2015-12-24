@@ -494,7 +494,7 @@ class OplogThread(threading.Thread):
                 doc = get_failed_doc(namespace, _id)
                 try:
                     dm.upsert(doc, mapped_ns, long_ts)
-                    self._fields['exclude'].remove(field)
+                    #self._fields['exclude'].remove(field)
                 except Exception:
                     LOG.critical("Failed to upsert document: %r" % doc)
                     raise
