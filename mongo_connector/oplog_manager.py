@@ -405,7 +405,7 @@ class OplogThread(threading.Thread):
             cursor.add_option(8)
         return cursor
 
-    def get_failed_doc(namespace, doc_id):
+    def get_failed_doc(self, namespace, doc_id):
             database, coll = namespace.split('.', 1)
             target_coll = self.primary_client[database][coll]
             fields_to_fetch = None
