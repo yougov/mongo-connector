@@ -31,6 +31,7 @@ from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from bson.objectid import ObjectId
+from elasticsearch.exceptions import NotFoundError
 
 LOG = logging.getLogger(__name__)
 
@@ -266,9 +267,17 @@ class OplogThread(threading.Thread):
 
                                 # Update
                                 elif operation == 'u':
-                                    docman.update(entry['o2']['_id'],
-                                                  entry['o'],
-                                                  ns, timestamp)
+                                    _id, error = docman.update(entry['o2']['_id'], entry['o'], ns, timestamp)
+                                    if error and type(error) is NotFoundError:
+                                        doc = self.get_failed_doc(ns, _id)
+                                        if doc:
+                                            retry_id, retry_error = docman.update(entry['o2']['_id'], entry['o'], ns, timestamp, doc)
+                                            if retry_error:
+                                                LOG.critical("Document update failed for id: %s with error: %r" % (retry_id, retry_error)
+                                                continue
+                                        else:
+                                            LOG.critical("Document with id: %s not found in mongodb" % _id)
+                                            continue
                                     update_inc += 1
 
                                 # Command
@@ -289,7 +298,7 @@ class OplogThread(threading.Thread):
                                     "document %r" % entry)
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.debug(
+                            LOG.info(
                                 "OplogThread: Documents removed: %d, "
                                 "inserted: %d, updated: %d so far" % (
                                     remove_inc, upsert_inc, update_inc))
@@ -396,6 +405,24 @@ class OplogThread(threading.Thread):
             cursor.add_option(8)
         return cursor
 
+    def get_failed_doc(namespace, doc_id):
+            database, coll = namespace.split('.', 1)
+            target_coll = self.primary_client[database][coll]
+            fields_to_fetch = None
+            if 'include' in self._fields and len(self._fields['include']) > 0:
+                fields_to_fetch = self._fields['include']
+            doc = util.retry_until_ok(
+                target_coll.find_one,
+                {"_id": ObjectId(doc_id)},
+                fields=fields_to_fetch
+            )
+            if doc:
+                self.pop_excluded_fields(doc)
+                LOG.info("Reinserting failed document: %r" % doc)
+            else:
+                LOG.critical("Could not find document with id %s from mongodb", doc_id)
+            return doc
+
     def dump_collection(self):
         """Dumps collection into the target system.
 
@@ -467,29 +494,11 @@ class OplogThread(threading.Thread):
                     attempts += 1
                     time.sleep(1)
 
-        def get_failed_doc(namespace, doc_id):
-            database, coll = namespace.split('.', 1)
-            target_coll = self.primary_client[database][coll]
-            fields_to_fetch = None
-            if 'include' in self._fields:
-                fields_to_fetch = self._fields['include']
-            doc = util.retry_until_ok(
-                target_coll.find_one,
-                {"_id": ObjectId(doc_id)},
-                fields=fields_to_fetch
-            )
-            if doc:
-                self.pop_excluded_fields(doc)
-                LOG.info("Reinserting document: %r" % doc)
-            else:
-                LOG.critical("Could not find document with id %s from mongodb", doc_id)
-            return doc
-
         def upsert_failed_doc(dm, namespace, _id, error_field, doc=None):
             mapped_ns = self.dest_mapping.get(namespace, namespace)
             error_doc = doc
             if not error_doc:
-                error_doc = get_failed_doc(namespace, _id)
+                error_doc = self.get_failed_doc(namespace, _id)
             if error_field in error_doc:
                 error_doc.pop(error_field)
                 try:

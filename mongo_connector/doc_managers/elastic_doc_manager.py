@@ -98,8 +98,7 @@ class DocManager(DocManagerBase):
                 self.elastic.indices.delete(index=_db.lower())
 
         if doc.get('renameCollection'):
-            raise errors.OperationFailed(
-                "elastic_doc_manager does not support renaming a mapping.")
+            LOG.warning("elastic_doc_manager does not support renaming a mapping")
 
         if doc.get('create'):
             db, coll = self.command_helper.map_collection(db, doc['create'])
@@ -117,20 +116,26 @@ class DocManager(DocManagerBase):
                                                     doc_type=coll)
 
     @wrap_exceptions
-    def update(self, document_id, update_spec, namespace, timestamp):
+    def update(self, document_id, update_spec, namespace, timestamp, doc=None):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
         """
         self.commit()
         index, doc_type = self._index_and_mapping(namespace)
-        document = self.elastic.get(index=index, doc_type=doc_type,
-                                    id=u(document_id))
+        document = {}
+        if not doc:
+            try:
+                document = self.elastic.get(index=index, doc_type=doc_type, id=u(document_id))
+            except es_exceptions.NotFoundError, e:
+                return (document_id, e)
+        else:
+            document['_source'] = doc
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
         self.upsert(updated, namespace, timestamp)
         # upsert() strips metadata, so only _id + fields in _source still here
-        return updated
+        return (updated['_id'], None)
 
     @wrap_exceptions
     def upsert(self, doc, namespace, timestamp):
