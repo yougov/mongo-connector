@@ -273,7 +273,7 @@ class OplogThread(threading.Thread):
                                         if doc:
                                             retry_id, retry_error = docman.update(entry['o2']['_id'], entry['o'], ns, timestamp, doc)
                                             if retry_error:
-                                                LOG.critical("Document update failed for id: %s with error: %r" % (retry_id, retry_error)
+                                                LOG.critical("Document update failed for id: %s with error: %r" % (retry_id, retry_error))
                                                 continue
                                         else:
                                             LOG.critical("Document with id: %s not found in mongodb" % _id)
