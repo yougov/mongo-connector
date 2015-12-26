@@ -164,14 +164,13 @@ class DocManager(DocManagerBase):
         return None
 
     def parseError(self, errorDesc):
-            parsed = search("MapperParsingException[{}[{field_name}]]{}", errorDesc)
+            parsed = search("MapperParsingException[{}[{field_name}]{}", errorDesc)
             if not parsed:
-                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]]{}", errorDesc)
+                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]{}", errorDesc)
             LOG.info("Parsed ES Error: %s from description %s", parsed, errorDesc)
             if parsed and parsed.named:
                 return parsed.named
-            else:
-                LOG.warning("Couldn't parse ES error: %s", errorDesc)
+            LOG.warning("Couldn't parse ES error: %s", errorDesc)
             return None
 
     @wrap_exceptions
@@ -220,11 +219,10 @@ class DocManager(DocManagerBase):
                     try:
                         index = resp['index']
                         error_field = self.parseError(index['error'])
-                        if error_field:
-                            error = (index['_id'], error_field['field_name'])
-                            LOG.info("Found failed document from bulk upsert: %s", error)
-                            yield error
-                    except KeyError:
+                        error = (index['_id'], error_field['field_name'])
+                        LOG.info("Found failed document from bulk upsert: %s", error)
+                        yield error
+                    except Exception:
                         LOG.error("Could not parse response to reinsert: %r" % resp)
                 else:
                     docs_inserted += 1
