@@ -654,20 +654,21 @@ class OplogThread(threading.Thread):
 
         Returns the cursor and the number of documents left in the cursor.
         """
-        LOG.info("Trying to create cursor: init_cursor called")
         timestamp = self.read_last_checkpoint()
+
+        LOG.info("Initializing cursor with initial timestamp: %r" % timestamp)
 
         if timestamp is None:
             if self.initial_import['dump']:
                 # dump collection and update checkpoint
-                LOG.info("DUMP: Starting initial import of data")
+                LOG.info("INITIAL IMPORT: Starting initial import of data")
                 timestamp = self.dump_collection()
                 if timestamp is None:
                     return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
-                LOG.info("DUMP: Initial import skipped, creating oplog cursor")
+                LOG.info("INITIAL IMPORT: Initial import skipped, creating oplog cursor")
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
