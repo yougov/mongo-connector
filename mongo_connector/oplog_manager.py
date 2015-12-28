@@ -212,7 +212,7 @@ class OplogThread(threading.Thread):
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
                         if not self.filter_oplog_entry(entry):
-                            LOG.warning("OplogThread: Nullified entry: %r" % entry)
+                            LOG.info("OplogThread: Nullified entry: %r" % entry)
                             continue
 
                         # sync the current oplog operation
@@ -244,7 +244,7 @@ class OplogThread(threading.Thread):
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.warning("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
+                                LOG.info("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
 
                                 # Remove
                                 if operation == 'd':
