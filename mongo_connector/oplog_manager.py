@@ -464,6 +464,7 @@ class OplogThread(threading.Thread):
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 target_coll = self.primary_client[database][coll]
+                LOG.warning("Connecting to mongo instance: %s" % target_coll.read_preference)
                 fields_to_fetch = None
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']
