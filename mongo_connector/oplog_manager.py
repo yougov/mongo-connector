@@ -41,7 +41,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
-    def __init__(self, primary_client, doc_managers,
+    def __init__(self, primary_client, secondary_client, doc_managers,
                  oplog_progress_dict, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
@@ -49,6 +49,9 @@ class OplogThread(threading.Thread):
 
         # The connection to the primary for this replicaSet.
         self.primary_client = primary_client
+
+        # The connection to the secondary for this replicaSet.
+        self.secondary_client = secondary_client
 
         # The connection to the mongos, if there is one.
         self.mongos_client = mongos_client
@@ -208,7 +211,6 @@ class OplogThread(threading.Thread):
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
                         if not self.filter_oplog_entry(entry):
-                            LOG.warning("OPLOG Entry nullified: %r" % entry)
                             continue
 
                         # sync the current oplog operation
@@ -240,7 +242,7 @@ class OplogThread(threading.Thread):
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.warning("OplogThread: Operation for this "
+                                LOG.debug("OplogThread: Operation for this "
                                           "entry is %s" % str(operation))
 
                                 # Remove
@@ -254,7 +256,6 @@ class OplogThread(threading.Thread):
                                     # Retrieve inserted document from
                                     # 'o' field in oplog record
                                     doc = entry.get('o')
-                                    LOG.warning("Inserting new document from oplog: %r" % doc)
                                     # Extract timestamp and namespace
                                     if is_gridfs_file:
                                         db, coll = ns.split('.', 1)
@@ -264,7 +265,6 @@ class OplogThread(threading.Thread):
                                         docman.insert_file(
                                             gridfile, namespace, timestamp)
                                     else:
-                                        LOG.warning("Parameters to upsert doc: %r %r %r" % (ns, timestamp, doc))
                                         self.upsert_doc(docman, ns, timestamp, doc['_id'], None, doc)
                                     upsert_inc += 1
 
@@ -405,7 +405,7 @@ class OplogThread(threading.Thread):
 
     def get_failed_doc(self, namespace, doc_id):
             database, coll = namespace.split('.', 1)
-            target_coll = self.primary_client[database][coll]
+            target_coll = self.secondary_client[database][coll]
             fields_to_fetch = None
             if 'include' in self._fields and len(self._fields['include']) > 0:
                 fields_to_fetch = self._fields['include']
@@ -479,7 +479,7 @@ class OplogThread(threading.Thread):
 
             # Loop to handle possible AutoReconnect
             while attempts < 60:
-                target_coll = self.primary_client[database][coll]
+                target_coll = self.secondary_client[database][coll]
                 LOG.warning("Connecting to mongo instance: %s" % target_coll.read_preference)
                 fields_to_fetch = None
                 if 'include' in self._fields:
