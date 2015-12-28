@@ -23,6 +23,7 @@ import logging
 from threading import Timer
 
 import bson.json_util
+from parse import search
 
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import scan, streaming_bulk
@@ -44,9 +45,9 @@ wrap_exceptions = exception_wrapper({
 LOG = logging.getLogger(__name__)
 
 tracer = logging.getLogger('elasticsearch.trace')
-tracer.setLevel(logging.DEBUG)
-logging.getLogger('elasticsearch').setLevel(logging.DEBUG)
-logging.getLogger('urllib3').setLevel(logging.DEBUG)
+tracer.setLevel(logging.WARNING)
+logging.getLogger('elasticsearch').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
@@ -97,8 +98,7 @@ class DocManager(DocManagerBase):
                 self.elastic.indices.delete(index=_db.lower())
 
         if doc.get('renameCollection'):
-            raise errors.OperationFailed(
-                "elastic_doc_manager does not support renaming a mapping.")
+            LOG.warning("elastic_doc_manager does not support renaming a mapping")
 
         if doc.get('create'):
             db, coll = self.command_helper.map_collection(db, doc['create'])
@@ -116,20 +116,28 @@ class DocManager(DocManagerBase):
                                                     doc_type=coll)
 
     @wrap_exceptions
-    def update(self, document_id, update_spec, namespace, timestamp):
+    def update(self, document_id, update_spec, namespace, timestamp, doc=None):
         """Apply updates given in update_spec to the document whose id
         matches that of doc.
         """
         self.commit()
         index, doc_type = self._index_and_mapping(namespace)
-        document = self.elastic.get(index=index, doc_type=doc_type,
-                                    id=u(document_id))
+        document = {}
+        if not doc:
+            try:
+                document = self.elastic.get(index=index, doc_type=doc_type, id=u(document_id))
+            except es_exceptions.NotFoundError, e:
+                return (document_id, e)
+        else:
+            document['_source'] = doc
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        self.upsert(updated, namespace, timestamp)
+        error = self.upsert(updated, namespace, timestamp)
+        if error:
+            return error
         # upsert() strips metadata, so only _id + fields in _source still here
-        return updated
+        return (updated['_id'], None)
 
     @wrap_exceptions
     def upsert(self, doc, namespace, timestamp):
@@ -141,16 +149,31 @@ class DocManager(DocManagerBase):
             "ns": namespace,
             "_ts": timestamp
         }
-        # Index the source document, using lowercase namespace as index name.
-        self.elastic.index(index=index, doc_type=doc_type,
-                           body=self._formatter.format_document(doc), id=doc_id,
-                           refresh=(self.auto_commit_interval == 0))
-        # Index document metadata with original namespace (mixed upper/lower).
-        self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
-                           body=bson.json_util.dumps(metadata), id=doc_id,
-                           refresh=(self.auto_commit_interval == 0))
-        # Leave _id, since it's part of the original document
-        doc['_id'] = doc_id
+        try:
+            # Index the source document, using lowercase namespace as index name.
+            self.elastic.index(index=index, doc_type=doc_type,
+                               body=self._formatter.format_document(doc), id=doc_id,
+                               refresh=(self.auto_commit_interval == 0))
+            # Index document metadata with original namespace (mixed upper/lower).
+            self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
+                               body=bson.json_util.dumps(metadata), id=doc_id,
+                               refresh=(self.auto_commit_interval == 0))
+        except es_exceptions.RequestError, e:
+            LOG.info("Failed to upsert document: %r", e.info)
+            error = self.parseError(e.info['error'])
+            if(error):
+                return (doc_id, error['field_name'])
+        return None
+
+    def parseError(self, errorDesc):
+            parsed = search("MapperParsingException[{}[{field_name}]{}", errorDesc)
+            if not parsed:
+                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]{}", errorDesc)
+            LOG.info("Parsed ES Error: %s from description %s", parsed, errorDesc)
+            if parsed and parsed.named:
+                return parsed.named
+            LOG.warning("Couldn't parse ES error: %s", errorDesc)
+            return None
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -182,6 +205,8 @@ class DocManager(DocManagerBase):
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
+
+        responses = []
         try:
             kw = {}
             if self.chunk_size > 0:
@@ -190,12 +215,21 @@ class DocManager(DocManagerBase):
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
-
+            docs_inserted = 0
             for ok, resp in responses:
-                if not ok:
-                    LOG.error(
-                        "Could not bulk-upsert document "
-                        "into ElasticSearch: %r" % resp)
+                if not ok and resp:
+                    try:
+                        index = resp['index']
+                        error_field = self.parseError(index['error'])
+                        error = (index['_id'], error_field['field_name'])
+                        LOG.info("Found failed document from bulk upsert: %s", error)
+                        yield error
+                    except Exception:
+                        LOG.error("Could not parse response to reinsert: %r" % resp)
+                else:
+                    docs_inserted += 1
+                    if(docs_inserted % 10000 == 0):
+                        LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:

@@ -30,6 +30,8 @@ from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
+from bson.objectid import ObjectId
+from elasticsearch.exceptions import NotFoundError
 
 LOG = logging.getLogger(__name__)
 
@@ -160,7 +162,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_len = self.init_cursor()
+            cursor = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -169,15 +171,6 @@ class OplogThread(threading.Thread):
                 LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
                 continue
-
-            if cursor_len == 0:
-                LOG.debug("OplogThread: Last entry is the one we "
-                          "already processed.  Up to date.  Sleeping.")
-                time.sleep(1)
-                continue
-
-            LOG.debug("OplogThread: Got the cursor, count is %d"
-                      % cursor_len)
 
             last_ts = None
             remove_inc = 0
@@ -206,9 +199,10 @@ class OplogThread(threading.Thread):
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
                         if not self.filter_oplog_entry(entry):
+                            LOG.warning("OplogThread: Nullified entry: %r" % entry)
                             continue
 
-                        #sync the current oplog operation
+                        # sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
 
@@ -233,17 +227,16 @@ class OplogThread(threading.Thread):
                                 continue
 
                         # use namespace mapping if one exists
-                        ns = self.dest_mapping.get(ns, ns)
+                        namespace = self.dest_mapping.get(ns, ns)
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.debug("OplogThread: Operation for this "
-                                          "entry is %s" % str(operation))
+                                LOG.warning("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
 
                                 # Remove
                                 if operation == 'd':
                                     docman.remove(
-                                        entry['o']['_id'], ns, timestamp)
+                                        entry['o']['_id'], namespace, timestamp)
                                     remove_inc += 1
 
                                 # Insert
@@ -258,16 +251,21 @@ class OplogThread(threading.Thread):
                                             self.primary_client[db][coll],
                                             doc)
                                         docman.insert_file(
-                                            gridfile, ns, timestamp)
+                                            gridfile, namespace, timestamp)
                                     else:
-                                        docman.upsert(doc, ns, timestamp)
+                                        self.upsert_doc(docman, ns, timestamp, doc['_id'], None, doc)
                                     upsert_inc += 1
 
                                 # Update
                                 elif operation == 'u':
-                                    docman.update(entry['o2']['_id'],
-                                                  entry['o'],
-                                                  ns, timestamp)
+                                    _id, error = docman.update(entry['o2']['_id'], entry['o'], namespace, timestamp)
+                                    if error:
+                                        if type(error) is NotFoundError:
+                                            LOG.warning("Document with id: %s not found in Elastic Search, re-upserting the document" % _id)
+                                            self.upsert_doc(docman, ns, timestamp, _id, None)
+                                        else:
+                                            LOG.warning("Failed to update document with id: %s, trying re-upsert" % _id)
+                                            self.upsert_doc(docman, ns, timestamp, _id, error)
                                     update_inc += 1
 
                                 # Command
@@ -286,9 +284,11 @@ class OplogThread(threading.Thread):
                                 LOG.exception(
                                     "Connection failed while processing oplog "
                                     "document %r" % entry)
+                            except Exception, e:
+                                LOG.critical("Failed to process oplog document %r due to exception %r" % (entry, e))
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.debug(
+                            LOG.info(
                                 "OplogThread: Documents removed: %d, "
                                 "inserted: %d, updated: %d so far" % (
                                     remove_inc, upsert_inc, update_inc))
@@ -334,7 +334,7 @@ class OplogThread(threading.Thread):
     def join(self):
         """Stop this thread from managing the oplog.
         """
-        LOG.debug("OplogThread: exiting due to join call.")
+        LOG.info("OplogThread: exiting due to join call.")
         self.running = False
         threading.Thread.join(self)
 
@@ -348,7 +348,7 @@ class OplogThread(threading.Thread):
 
     def filter_oplog_entry(self, entry):
         """Remove fields from an oplog entry that should not be replicated."""
-        if not self._fields or (not 'include' in self._fields and not 'exclude' in self._fields):
+        if not self._fields or ('include' not in self._fields and 'exclude' not in self._fields):
             return entry
 
         entry_o = entry['o']
@@ -380,6 +380,7 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {}
+        LOG.info("Creating oplog cursor with timestamp: %r" % timestamp)
         if self.oplog_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
 
@@ -393,7 +394,44 @@ class OplogThread(threading.Thread):
                 query, tailable=True, await_data=True)
             # Applying 8 as the mask to the cursor enables OplogReplay
             cursor.add_option(8)
+        LOG.info("Created oplog cursor with timestamp: %r" % timestamp)
         return cursor
+
+    def get_failed_doc(self, namespace, doc_id):
+            database, coll = namespace.split('.', 1)
+            target_coll = self.primary_client[database][coll]
+            fields_to_fetch = None
+            if 'include' in self._fields and len(self._fields['include']) > 0:
+                fields_to_fetch = self._fields['include']
+            doc = util.retry_until_ok(
+                target_coll.find_one,
+                {"_id": ObjectId(doc_id)},
+                fields=fields_to_fetch
+            )
+            if doc:
+                self.pop_excluded_fields(doc)
+                LOG.info("Reinserting failed document: %r" % doc)
+            else:
+                LOG.critical("Could not find document with id %s from mongodb", doc_id)
+            return doc
+
+    def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
+            mapped_ns = self.dest_mapping.get(namespace, namespace)
+            doc_to_upsert = doc
+            if not doc_to_upsert:
+                doc_to_upsert = self.get_failed_doc(namespace, _id)
+            if error_field and error_field in doc_to_upsert:
+                doc_to_upsert.pop(error_field)
+            else:
+                LOG.info("Upserting document without any field removed: %r" % doc_to_upsert)
+            try:
+                error = dm.upsert(doc_to_upsert, mapped_ns, ts)
+                if error:
+                    self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
+                # self._fields['exclude'].remove(field)
+            except Exception:
+                LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
+                raise
 
     def dump_collection(self):
         """Dumps collection into the target system.
@@ -405,7 +443,7 @@ class OplogThread(threading.Thread):
         dump_set = self.namespace_set or []
         LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
 
-        #no namespaces specified
+        # no namespaces specified
         if not self.namespace_set:
             db_list = retry_until_ok(self.primary_client.database_names)
             for database in db_list:
@@ -455,7 +493,7 @@ class OplogThread(threading.Thread):
                 try:
                     for doc in cursor:
                         if not self.running:
-                            LOG.error("Stopped Iterating over Cursor while initial import")
+                            LOG.error("Stopped iterating over Cursor while initial import")
                             raise StopIteration
                         self.pop_excluded_fields(doc)
                         last_id = doc["_id"]
@@ -466,6 +504,10 @@ class OplogThread(threading.Thread):
                     attempts += 1
                     time.sleep(1)
 
+        def upsert_all_failed_docs(dm, namespace, errors):
+            for _id, field in errors:
+                self.upsert_doc(dm, namespace, long_ts, _id, field)
+
         def upsert_each(dm):
             num_inserted = 0
             num_failed = 0
@@ -474,13 +516,11 @@ class OplogThread(threading.Thread):
                     if num % 10000 == 0:
                         LOG.info("Upserted %d docs." % num)
                     try:
-                        mapped_ns = self.dest_mapping.get(namespace, namespace)
-                        dm.upsert(doc, mapped_ns, long_ts)
+                        self.upsert_doc(dm, namespace, long_ts, None, None, doc)
                         num_inserted += 1
                     except Exception:
                         if self.continue_on_error:
-                            LOG.exception(
-                                "Could not upsert document: %r" % doc)
+                            LOG.exception("Could not upsert document: %r" % doc)
                             num_failed += 1
                         else:
                             raise
@@ -492,7 +532,8 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
-                    dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    upsert_all_failed_docs(dm, namespace, errors)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
@@ -530,7 +571,6 @@ class OplogThread(threading.Thread):
                 # mongo_connector.errors.ConnectionFailed
                 # mongo_connector.errors.OperationFailed
                 error_queue.put(sys.exc_info())
-
 
         # Extra threads (if any) that assist with collection dumps
         dumping_threads = []
@@ -599,6 +639,7 @@ class OplogThread(threading.Thread):
 
         Returns the cursor and the number of documents left in the cursor.
         """
+        LOG.info("Trying to create cursor: init_cursor called")
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
@@ -606,29 +647,20 @@ class OplogThread(threading.Thread):
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
                 if timestamp is None:
-                    return None, 0
+                    return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, retry_until_ok(cursor.count)
+                return cursor
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
         for i in range(60):
             cursor = self.get_oplog_cursor(timestamp)
-            cursor_len = retry_until_ok(cursor.count)
-
-            if cursor_len == 0:
-                # rollback, update checkpoint, and retry
-                LOG.debug("OplogThread: Initiating rollback from "
-                          "get_oplog_cursor")
-                self.checkpoint = self.rollback()
-                self.update_checkpoint()
-                return self.init_cursor()
 
             # try to get the first oplog entry
             try:
@@ -646,10 +678,12 @@ class OplogThread(threading.Thread):
             if cursor_ts_long > given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
-                return None, 0
+                LOG.critical("Oplog Cursor has fallen behind, please reimport data")
+                return None
 
             # first entry has been consumed
-            return cursor, cursor_len - 1
+            LOG.info("Created oplog cursor")
+            return cursor
 
         else:
             raise errors.MongoConnectorError(
@@ -721,6 +755,7 @@ class OplogThread(threading.Thread):
         # The oplog entry for the most recent document doesn't exist anymore.
         # If we've fallen behind in the oplog, this will be caught later
         if last_oplog_entry is None:
+            LOG.critical("OPLOG cursor has fallen behind, please reimport data")
             return None
 
         # rollback_cutoff_ts happened *before* the rollback
