@@ -235,7 +235,7 @@ class OplogThread(threading.Thread):
                                 continue
 
                         # use namespace mapping if one exists
-                        ns = self.dest_mapping.get(ns, ns)
+                        namespace = self.dest_mapping.get(ns, ns)
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
@@ -245,7 +245,7 @@ class OplogThread(threading.Thread):
                                 # Remove
                                 if operation == 'd':
                                     docman.remove(
-                                        entry['o']['_id'], ns, timestamp)
+                                        entry['o']['_id'], namespace, timestamp)
                                     remove_inc += 1
 
                                 # Insert
@@ -260,24 +260,17 @@ class OplogThread(threading.Thread):
                                             self.primary_client[db][coll],
                                             doc)
                                         docman.insert_file(
-                                            gridfile, ns, timestamp)
+                                            gridfile, namespace, timestamp)
                                     else:
-                                        docman.upsert(doc, ns, timestamp)
+                                        self.upsert_doc(docman, ns, timestamp, None, None, doc)
                                     upsert_inc += 1
 
                                 # Update
                                 elif operation == 'u':
-                                    _id, error = docman.update(entry['o2']['_id'], entry['o'], ns, timestamp)
+                                    _id, error = docman.update(entry['o2']['_id'], entry['o'], namespace, timestamp)
                                     if error and type(error) is NotFoundError:
-                                        doc = self.get_failed_doc(ns, _id)
-                                        if doc:
-                                            retry_id, retry_error = docman.update(entry['o2']['_id'], entry['o'], ns, timestamp, doc)
-                                            if retry_error:
-                                                LOG.critical("Document update failed for id: %s with error: %r" % (retry_id, retry_error))
-                                                continue
-                                        else:
-                                            LOG.critical("Document with id: %s not found in mongodb" % _id)
-                                            continue
+                                        LOG.warning("Failed to update document with id: %s, re-upserting the document" % _id)
+                                        self.upsert_doc(docman, ns, timestamp, _id, None)
                                     update_inc += 1
 
                                 # Command
@@ -296,6 +289,8 @@ class OplogThread(threading.Thread):
                                 LOG.exception(
                                     "Connection failed while processing oplog "
                                     "document %r" % entry)
+                            except Exception, e:
+                                LOG.critical("Failed to process oplog document %r due to exception %r" % (entry, e))
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
                             LOG.info(
@@ -358,7 +353,7 @@ class OplogThread(threading.Thread):
 
     def filter_oplog_entry(self, entry):
         """Remove fields from an oplog entry that should not be replicated."""
-        if not self._fields or (not 'include' in self._fields and not 'exclude' in self._fields):
+        if not self._fields or ('include' not in self._fields and 'exclude' not in self._fields):
             return entry
 
         entry_o = entry['o']
@@ -423,6 +418,22 @@ class OplogThread(threading.Thread):
                 LOG.critical("Could not find document with id %s from mongodb", doc_id)
             return doc
 
+    def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
+            mapped_ns = self.dest_mapping.get(namespace, namespace)
+            doc_to_upsert = doc
+            if not doc_to_upsert:
+                doc_to_upsert = self.get_failed_doc(namespace, _id)
+            if error_field and error_field in doc_to_upsert:
+                doc_to_upsert.pop(error_field)
+            try:
+                error = dm.upsert(doc_to_upsert, mapped_ns, ts)
+                if error:
+                    self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
+                # self._fields['exclude'].remove(field)
+            except Exception:
+                LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
+                raise
+
     def dump_collection(self):
         """Dumps collection into the target system.
 
@@ -433,7 +444,7 @@ class OplogThread(threading.Thread):
         dump_set = self.namespace_set or []
         LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
 
-        #no namespaces specified
+        # no namespaces specified
         if not self.namespace_set:
             db_list = retry_until_ok(self.primary_client.database_names)
             for database in db_list:
@@ -495,27 +506,9 @@ class OplogThread(threading.Thread):
                     attempts += 1
                     time.sleep(1)
 
-        def upsert_failed_doc(dm, namespace, _id, error_field, doc=None):
-            mapped_ns = self.dest_mapping.get(namespace, namespace)
-            error_doc = doc
-            if not error_doc:
-                error_doc = self.get_failed_doc(namespace, _id)
-            if error_field in error_doc:
-                error_doc.pop(error_field)
-                try:
-                    error = dm.upsert(error_doc, mapped_ns, long_ts)
-                    if error:
-                        upsert_failed_doc(dm, namespace, error[0], error[1], error_doc)
-                    #self._fields['exclude'].remove(field)
-                except Exception:
-                    LOG.critical("Failed to upsert document: %r" % error_doc)
-                    raise
-            else:
-                LOG.critical("Error Field not found in document: %r" % error_doc)
-
         def upsert_all_failed_docs(dm, namespace, errors):
             for _id, field in errors:
-                upsert_failed_doc(dm, namespace, _id, field)
+                self.upsert_doc(dm, namespace, long_ts, _id, field)
 
         def upsert_each(dm):
             num_inserted = 0
@@ -525,8 +518,7 @@ class OplogThread(threading.Thread):
                     if num % 10000 == 0:
                         LOG.info("Upserted %d docs." % num)
                     try:
-                        mapped_ns = self.dest_mapping.get(namespace, namespace)
-                        dm.upsert(doc, mapped_ns, long_ts)
+                        self.upsert_doc(dm, namespace, long_ts, None, None, doc)
                         num_inserted += 1
                     except Exception:
                         if self.continue_on_error:
