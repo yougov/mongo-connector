@@ -54,7 +54,7 @@ class OplogThread(threading.Thread):
         self.mongos_client = mongos_client
 
         # Are we allowed to perform a collection dump?
-        self.collection_dump = kwargs.get('collection_dump', True)
+        self.initial_import = kwargs.get('initial_import', None)
 
         # The document manager for each target system.
         # These are the same for all threads.
@@ -112,6 +112,19 @@ class OplogThread(threading.Thread):
         else:
             self._fields['include'] = None
             self._fields['exclude'] = None
+
+    @property
+    def initial_import(self):
+        return self._initial_import
+
+    @initial_import.setter
+    def initial_import_set(self, initial_import):
+        self._initial_import = {'dump': True, 'query': None}
+        if initial_import:
+            if 'dump' in initial_import:
+                self._initial_import['dump'] = initial_import['dump']
+            if 'query' in initial_import and initial_import['query']:
+                self._initial_import['query'] = initial_import['query']
 
     @property
     def namespace_set(self):
@@ -477,16 +490,20 @@ class OplogThread(threading.Thread):
                 fields_to_fetch = None
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']
+                query = {}
+                if self._initial_import['query']:
+                    query = self._initial_import['query']
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
+                        query,
                         fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
                     cursor = util.retry_until_ok(
                         target_coll.find,
-                        {"_id": {"$gt": last_id}},
+                        query.update({"_id": {"$gt": last_id}}),
                         fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
@@ -643,7 +660,7 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            if self.collection_dump:
+            if self._initial_import['dump']:
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
                 if timestamp is None:

@@ -148,7 +148,7 @@ class Connector(threading.Thread):
             mongo_address=config['mainAddress'],
             doc_managers=config['docManagers'],
             oplog_checkpoint=config['oplogFile'],
-            collection_dump=(not config['noDump']),
+            initial_import=config['initialImport'],
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
             auth_username=config['authentication.adminUsername'],
@@ -406,18 +406,36 @@ def get_config_options():
         "the connector will miss some documents and behave "
         "incorrectly.")
 
-    no_dump = add_option(
-        config_key="noDump",
-        default=False,
-        type=bool)
+    def apply_initial_import(option, cli_values):
+        if 'dump' in cli_values:
+            option.value['dump'] = cli_values['dump']
+
+        if cli_values['query']:
+            option.value['query'] = json.loads(cli_values['query'])
+
+    default_initial_import = {
+        'dump': True,
+        'query': None
+    }
+
+    initial_import = add_option(
+        config_key="initialImport",
+        default=default_initial_import,
+        type=dict,
+        apply_function=apply_initial_import)
 
     # --no-dump specifies whether we should read an entire collection from
     # scratch if no timestamp is found in the oplog_config.
-    no_dump.add_cli(
-        "--no-dump", action="store_true", dest="no_dump", help=
+    initial_import.add_cli(
+        "--no-initial-import", action="store_false", dest="dump", help=
         "If specified, this flag will ensure that "
         "mongo_connector won't read the entire contents of a "
         "namespace iff --oplog-ts points to an empty file.")
+
+    initial_import.add_cli(
+        "--import-query", dest="query", help=
+        "If specified, this option will only import documents that match this query,"
+        "during initial data import")
 
     batch_size = add_option(
         config_key="batchSize",
