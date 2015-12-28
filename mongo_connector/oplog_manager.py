@@ -120,6 +120,7 @@ class OplogThread(threading.Thread):
     @initial_import.setter
     def initial_import(self, initial_import):
         self._initial_import = {'dump': True, 'query': None}
+        LOG.info("Setting initial import to %r" % initial_import)
         if initial_import:
             if 'dump' in initial_import:
                 self._initial_import['dump'] = initial_import['dump']
@@ -488,8 +489,8 @@ class OplogThread(threading.Thread):
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']
                 query = {}
-                if self._initial_import['query']:
-                    query = self._initial_import['query']
+                if self.initial_import['query']:
+                    query = self.initial_import['query']
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
@@ -657,14 +658,16 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
-            if self._initial_import['dump']:
+            if self.initial_import['dump']:
                 # dump collection and update checkpoint
+                LOG.info("DUMP: Starting initial import of data")
                 timestamp = self.dump_collection()
                 if timestamp is None:
                     return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
+                LOG.info("DUMP: Initial import skipped, creating oplog cursor")
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
@@ -726,7 +729,7 @@ class OplogThread(threading.Thread):
             if oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
-        LOG.debug("OplogThread: reading last checkpoint as %s " %
+        LOG.info("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
         return ret_val
 
