@@ -212,7 +212,7 @@ class OplogThread(threading.Thread):
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
                         if not self.filter_oplog_entry(entry):
-                            LOG.info("OplogThread: Nullified entry: %r" % entry)
+                            LOG.debug("OplogThread: Nullified entry: %r" % entry)
                             continue
 
                         # sync the current oplog operation
@@ -244,7 +244,7 @@ class OplogThread(threading.Thread):
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.info("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
+                                LOG.debug("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
 
                                 # Remove
                                 if operation == 'd':
@@ -393,7 +393,6 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {}
-        LOG.info("Creating oplog cursor with timestamp: %r" % timestamp)
         if self.oplog_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
 
@@ -431,12 +430,10 @@ class OplogThread(threading.Thread):
     def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
             mapped_ns = self.dest_mapping.get(namespace, namespace)
             doc_to_upsert = doc
-            if not doc_to_upsert:
+            if not doc_to_upsert and _id:
                 doc_to_upsert = self.get_failed_doc(namespace, _id)
             if error_field and error_field in doc_to_upsert:
                 doc_to_upsert.pop(error_field)
-            else:
-                LOG.info("Upserting document without any field removed: %r" % doc_to_upsert)
             try:
                 error = dm.upsert(doc_to_upsert, mapped_ns, ts)
                 if error:
