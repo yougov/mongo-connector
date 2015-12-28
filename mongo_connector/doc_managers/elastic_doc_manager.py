@@ -133,7 +133,9 @@ class DocManager(DocManagerBase):
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        self.upsert(updated, namespace, timestamp)
+        error = self.upsert(updated, namespace, timestamp)
+        if error:
+            return error
         # upsert() strips metadata, so only _id + fields in _source still here
         return (updated['_id'], None)
 
