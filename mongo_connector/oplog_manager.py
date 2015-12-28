@@ -253,6 +253,7 @@ class OplogThread(threading.Thread):
                                     # Retrieve inserted document from
                                     # 'o' field in oplog record
                                     doc = entry.get('o')
+                                    LOG.warning("Inserting new document from oplog: %r" % doc)
                                     # Extract timestamp and namespace
                                     if is_gridfs_file:
                                         db, coll = ns.split('.', 1)
@@ -262,6 +263,7 @@ class OplogThread(threading.Thread):
                                         docman.insert_file(
                                             gridfile, namespace, timestamp)
                                     else:
+                                        LOG.warning("Parameters to upsert doc: %r %r %r" % (ns, timestamp, doc))
                                         self.upsert_doc(docman, ns, timestamp, doc['_id'], None, doc)
                                     upsert_inc += 1
 
