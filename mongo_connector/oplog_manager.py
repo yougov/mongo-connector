@@ -673,6 +673,8 @@ class OplogThread(threading.Thread):
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
                 return cursor
+        else:
+            LOG.info("Last checkpoint found from timestamp file, resuming oplog tailing from timestamp: %r" % timestamp)
 
         self.checkpoint = timestamp
         self.update_checkpoint()
