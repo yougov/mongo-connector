@@ -176,13 +176,11 @@ class OplogThread(threading.Thread):
                 continue
 
             if cursor_len == 0:
-                LOG.debug("OplogThread: Last entry is the one we "
-                          "already processed.  Up to date.  Sleeping.")
+                LOG.info("OplogThread: Last entry is the one we already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
                 continue
 
-            LOG.debug("OplogThread: Got the cursor, count is %d"
-                      % cursor_len)
+            LOG.debug("OplogThread: Got the cursor, count is %d" % cursor_len)
 
             last_ts = None
             remove_inc = 0
@@ -342,7 +340,7 @@ class OplogThread(threading.Thread):
     def join(self):
         """Stop this thread from managing the oplog.
         """
-        LOG.debug("OplogThread: exiting due to join call.")
+        LOG.info("OplogThread: exiting due to join call.")
         self.running = False
         threading.Thread.join(self)
 
@@ -388,6 +386,7 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {}
+        LOG.info("Creating oplog cursor with timestamp: %r" % timestamp)
         if self.oplog_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
 
@@ -401,6 +400,7 @@ class OplogThread(threading.Thread):
                 query, tailable=True, await_data=True)
             # Applying 8 as the mask to the cursor enables OplogReplay
             cursor.add_option(8)
+        LOG.info("Created oplog cursor with timestamp: %r" % timestamp)
         return cursor
 
     def get_failed_doc(self, namespace, doc_id):
@@ -646,6 +646,7 @@ class OplogThread(threading.Thread):
 
         Returns the cursor and the number of documents left in the cursor.
         """
+        LOG.info("Trying to create cursor: init_cursor called")
         timestamp = self.read_last_checkpoint()
 
         if timestamp is None:
@@ -671,8 +672,7 @@ class OplogThread(threading.Thread):
 
             if cursor_len == 0:
                 # rollback, update checkpoint, and retry
-                LOG.debug("OplogThread: Initiating rollback from "
-                          "get_oplog_cursor")
+                LOG.critical("OplogThread: Initiating rollback from get_oplog_cursor")
                 self.checkpoint = self.rollback()
                 self.update_checkpoint()
                 return self.init_cursor()
@@ -693,9 +693,11 @@ class OplogThread(threading.Thread):
             if cursor_ts_long > given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
+                LOG.critical("Oplog Cursor has fallen behind, please reimport data")
                 return None, 0
 
             # first entry has been consumed
+            LOG.info("Created cursor with length: %s" % str(cursor_len))
             return cursor, cursor_len - 1
 
         else:
@@ -768,6 +770,7 @@ class OplogThread(threading.Thread):
         # The oplog entry for the most recent document doesn't exist anymore.
         # If we've fallen behind in the oplog, this will be caught later
         if last_oplog_entry is None:
+            LOG.critical("OPLOG cursor has fallen behind, please reimport data")
             return None
 
         # rollback_cutoff_ts happened *before* the rollback
