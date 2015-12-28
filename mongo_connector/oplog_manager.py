@@ -41,7 +41,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
-    def __init__(self, primary_client, secondary_client, doc_managers,
+    def __init__(self, primary_client, doc_managers,
                  oplog_progress_dict, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
@@ -49,9 +49,6 @@ class OplogThread(threading.Thread):
 
         # The connection to the primary for this replicaSet.
         self.primary_client = primary_client
-
-        # The connection to the secondary for this replicaSet.
-        self.secondary_client = secondary_client
 
         # The connection to the mongos, if there is one.
         self.mongos_client = mongos_client
@@ -398,7 +395,7 @@ class OplogThread(threading.Thread):
 
     def get_failed_doc(self, namespace, doc_id):
             database, coll = namespace.split('.', 1)
-            target_coll = self.secondary_client[database][coll]
+            target_coll = self.primary_client[database][coll]
             fields_to_fetch = None
             if 'include' in self._fields and len(self._fields['include']) > 0:
                 fields_to_fetch = self._fields['include']
@@ -472,7 +469,7 @@ class OplogThread(threading.Thread):
 
             # Loop to handle possible AutoReconnect
             while attempts < 60:
-                target_coll = self.secondary_client[database][coll]
+                target_coll = self.primary_client[database][coll]
                 fields_to_fetch = None
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']

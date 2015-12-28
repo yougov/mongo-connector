@@ -280,15 +280,14 @@ class Connector(threading.Thread):
 
             # Establish a connection to the replica set as a whole
             main_conn.close()
-            main_conn = MongoClient(self.address, replicaSet=is_master['setName'], tz_aware=self.tz_aware, **self.ssl_kwargs)
-            secondary_conn = ReplicaSetConnection(self.address, replicaSet=is_master['setName'],
-                                                  tz_aware=self.tz_aware, readPreference='secondaryPreferred', **self.ssl_kwargs)
+            main_conn = ReplicaSetConnection(self.address, replicaSet=is_master['setName'],
+                                             tz_aware=self.tz_aware, readPreference='secondaryPreferred', **self.ssl_kwargs)
             if self.auth_key is not None:
                 main_conn.admin.authenticate(self.auth_username, self.auth_key)
 
             # non sharded configuration
             oplog = OplogThread(
-                main_conn, secondary_conn, self.doc_managers, self.oplog_progress,
+                main_conn, self.doc_managers, self.oplog_progress,
                 **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
@@ -337,15 +336,12 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    main_conn = MongoClient(hosts, replicaSet=repl_set, tz_aware=self.tz_aware, **self.ssl_kwargs)
                     shard_conn = ReplicaSetConnection(
                         hosts, replicaSet=repl_set, tz_aware=self.tz_aware, readPreference='secondaryPreferred',
                         **self.ssl_kwargs)
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
-                    oplog = OplogThread(
-                        main_conn, shard_conn, self.doc_managers, self.oplog_progress,
-                        **self.kwargs)
+                    oplog = OplogThread(shard_conn, self.doc_managers, self.oplog_progress, **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
