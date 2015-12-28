@@ -165,7 +165,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_len = self.init_cursor()
+            cursor = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -174,13 +174,6 @@ class OplogThread(threading.Thread):
                 LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
                 continue
-
-            if cursor_len == 0:
-                LOG.info("OplogThread: Last entry is the one we already processed.  Up to date.  Sleeping.")
-                time.sleep(1)
-                continue
-
-            LOG.debug("OplogThread: Got the cursor, count is %d" % cursor_len)
 
             last_ts = None
             remove_inc = 0
@@ -480,7 +473,6 @@ class OplogThread(threading.Thread):
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 target_coll = self.secondary_client[database][coll]
-                LOG.warning("Connecting to mongo instance: %s" % target_coll.read_preference)
                 fields_to_fetch = None
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']
@@ -654,28 +646,20 @@ class OplogThread(threading.Thread):
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
                 if timestamp is None:
-                    return None, 0
+                    return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, retry_until_ok(cursor.count)
+                return cursor
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
         for i in range(60):
             cursor = self.get_oplog_cursor(timestamp)
-            cursor_len = retry_until_ok(cursor.count)
-
-            if cursor_len == 0:
-                # rollback, update checkpoint, and retry
-                LOG.critical("OplogThread: Initiating rollback from get_oplog_cursor")
-                self.checkpoint = self.rollback()
-                self.update_checkpoint()
-                return self.init_cursor()
 
             # try to get the first oplog entry
             try:
@@ -694,11 +678,11 @@ class OplogThread(threading.Thread):
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
                 LOG.critical("Oplog Cursor has fallen behind, please reimport data")
-                return None, 0
+                return None
 
             # first entry has been consumed
-            LOG.info("Created cursor with length: %s" % str(cursor_len))
-            return cursor, cursor_len - 1
+            LOG.info("Created oplog cursor")
+            return cursor
 
         else:
             raise errors.MongoConnectorError(
