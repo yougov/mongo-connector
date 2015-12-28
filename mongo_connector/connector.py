@@ -123,8 +123,7 @@ class Connector(threading.Thread):
                                  str(e))
                     sys.exit(2)
             else:
-                if (not os.access(self.oplog_checkpoint, os.W_OK)
-                        and not os.access(self.oplog_checkpoint, os.R_OK)):
+                if (not os.access(self.oplog_checkpoint, os.W_OK) and not os.access(self.oplog_checkpoint, os.R_OK)):
                     LOG.critical("Invalid permissions on %s! Exiting" %
                                  (self.oplog_checkpoint))
                     sys.exit(2)
@@ -407,27 +406,22 @@ def get_config_options():
         "incorrectly.")
 
     def apply_initial_import(option, cli_values):
-        if 'dump' in cli_values:
-            option.value['dump'] = cli_values['dump']
+        if 'noDump' in cli_values and type(cli_values["noDump"]) is bool:
+            option.value["dump"] = not cli_values["noDump"]
 
-        if cli_values['query']:
-            option.value['query'] = json.loads(cli_values['query'])
-
-    default_initial_import = {
-        'dump': True,
-        'query': None
-    }
+        if cli_values["query"]:
+            option.value['query'] = json.loads(cli_values["query"])
 
     initial_import = add_option(
         config_key="initialImport",
-        default=default_initial_import,
+        default={},
         type=dict,
         apply_function=apply_initial_import)
 
     # --no-dump specifies whether we should read an entire collection from
     # scratch if no timestamp is found in the oplog_config.
     initial_import.add_cli(
-        "--no-initial-import", action="store_false", dest="dump", help=
+        "--no-initial-import", action="store_true", dest="noDump", help=
         "If specified, this flag will ensure that "
         "mongo_connector won't read the entire contents of a "
         "namespace iff --oplog-ts points to an empty file.")
