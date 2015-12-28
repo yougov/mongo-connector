@@ -262,7 +262,7 @@ class OplogThread(threading.Thread):
                                         docman.insert_file(
                                             gridfile, namespace, timestamp)
                                     else:
-                                        self.upsert_doc(docman, ns, timestamp, None, None, doc)
+                                        self.upsert_doc(docman, ns, timestamp, doc['_id'], None, doc)
                                     upsert_inc += 1
 
                                 # Update
@@ -425,6 +425,8 @@ class OplogThread(threading.Thread):
                 doc_to_upsert = self.get_failed_doc(namespace, _id)
             if error_field and error_field in doc_to_upsert:
                 doc_to_upsert.pop(error_field)
+            else:
+                LOG.info("Upserting document without any field removed: %r" % doc_to_upsert)
             try:
                 error = dm.upsert(doc_to_upsert, mapped_ns, ts)
                 if error:
