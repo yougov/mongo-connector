@@ -49,6 +49,7 @@ tracer.setLevel(logging.WARNING)
 logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
+
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
 
@@ -204,13 +205,14 @@ class DocManager(DocManagerBase):
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
-
         responses = []
         try:
+            index_name, doc_type_name = self._index_and_mapping(namespace)
+            old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
+            self.elastic.indices.put_settings({'index': {'refresh_interval': '-1'}}, index=index_name)
             kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
-
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
@@ -230,11 +232,16 @@ class DocManager(DocManagerBase):
                     if(docs_inserted % 10000 == 0):
                         LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
             LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
+            refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
+            self.elastic.indices.put_settings({'index': {'refresh_interval': refresh_interval}}, index=index_name)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
+            pass
+        except Exception:
+            LOG.critical("Bulk Upsert: Failed due to error in refresh interval update")
             pass
 
     @wrap_exceptions
