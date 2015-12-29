@@ -120,7 +120,6 @@ class OplogThread(threading.Thread):
     @initial_import.setter
     def initial_import(self, initial_import):
         self._initial_import = {'dump': True, 'query': None}
-        LOG.info("Setting initial import to %r" % initial_import)
         if initial_import:
             if 'dump' in initial_import:
                 self._initial_import['dump'] = initial_import['dump']
@@ -464,6 +463,7 @@ class OplogThread(threading.Thread):
                         continue
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
+        return dump_set
 
     def dump_collection(self):
         """Dumps collection into the target system.
