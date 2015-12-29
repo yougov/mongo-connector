@@ -231,7 +231,7 @@ class DocManager(DocManagerBase):
                 old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
                 refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
                 self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
-                LOG.info("Setting refresh interval to -1, old interval: %r" % refresh_interval)
+                LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % refresh_interval)
             except Exception:
                 refresh_interval = '30s'
             kw = {}
@@ -257,6 +257,7 @@ class DocManager(DocManagerBase):
                         LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
             LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
             self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
+            LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % refresh_interval)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
