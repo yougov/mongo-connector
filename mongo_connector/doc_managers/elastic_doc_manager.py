@@ -226,9 +226,14 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
         responses = []
         try:
-            index_name, doc_type_name = self._index_and_mapping(namespace)
-            old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
-            self.elastic.indices.put_settings({'index': {'refresh_interval': '-1'}}, index=index_name)
+            try:
+                index_name, doc_type_name = self._index_and_mapping(namespace)
+                old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
+                refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
+                self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
+                LOG.info("Setting refresh interval to -1, old interval: %r" % refresh_interval)
+            except Exception:
+                refresh_interval = '30s'
             kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
@@ -251,8 +256,7 @@ class DocManager(DocManagerBase):
                     if(docs_inserted % 10000 == 0):
                         LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
             LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
-            refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
-            self.elastic.indices.put_settings({'index': {'refresh_interval': refresh_interval}}, index=index_name)
+            self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
