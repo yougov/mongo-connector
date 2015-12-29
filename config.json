@@ -62,16 +62,16 @@
             "__autoCommitInterval": null,
             "categorizer": {
                 "small": {
-                    "shards": 1,
-                    "replicas": 1
+                    "number_of_shards": 1,
+                    "number_of_replicas": 1
                 },
                 "medium": {
-                    "shards": 3,
-                    "replicas": 1
+                    "number_of_shards": 3,
+                    "number_of_replicas": 1
                 },
                 "large": {
-                    "shards": 5,
-                    "replicas": 1
+                    "number_of_shards": 5,
+                    "number_of_replicas": 1
                 }
             }
         }

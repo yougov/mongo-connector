@@ -444,15 +444,8 @@ class OplogThread(threading.Thread):
                 LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
                 raise
 
-    def dump_collection(self):
-        """Dumps collection into the target system.
-
-        This method is called when we're initializing the cursor and have no
-        configs i.e. when we're starting for the first time.
-        """
-
+    def get_dump_set(self):
         dump_set = self.namespace_set or []
-        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
 
         # no namespaces specified
         if not self.namespace_set:
@@ -472,6 +465,16 @@ class OplogThread(threading.Thread):
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
 
+    def dump_collection(self):
+        """Dumps collection into the target system.
+
+        This method is called when we're initializing the cursor and have no
+        configs i.e. when we're starting for the first time.
+        """
+
+        dump_set = self.get_dump_set()
+
+        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
@@ -657,6 +660,13 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         LOG.info("Initializing cursor with initial timestamp: %r" % timestamp)
+
+        dump_set = self.get_dump_set()
+
+        for dm in self.doc_managers:
+            for namespace in dump_set:
+                if not dm.index_exists(namespace):
+                    dm.index_create(namespace)
 
         if timestamp is None:
             if self.initial_import['dump']:

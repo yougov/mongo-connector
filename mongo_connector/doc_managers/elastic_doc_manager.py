@@ -31,7 +31,7 @@ from elasticsearch.helpers import scan, streaming_bulk
 from mongo_connector import errors
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
-                                       DEFAULT_MAX_BULK)
+                                       DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER, DEFAULT_INDEX_CATEGORY)
 from mongo_connector.util import exception_wrapper, retry_until_ok
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
@@ -60,7 +60,8 @@ class DocManager(DocManagerBase):
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  meta_index_name="mongodb_meta", meta_type="mongodb_meta",
-                 attachment_field="content", **kwargs):
+                 attachment_field="content", categorizer=DEFAULT_CATEGORIZER,
+                 index_category=DEFAULT_INDEX_CATEGORY, **kwargs):
         self.elastic = Elasticsearch(
             hosts=[url], **kwargs.get('clientOptions', {}))
         self.auto_commit_interval = auto_commit_interval
@@ -68,6 +69,8 @@ class DocManager(DocManagerBase):
         self.meta_type = meta_type
         self.unique_key = unique_key
         self.chunk_size = chunk_size
+        self.categorizer = categorizer
+        self.index_category = index_category
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
         self._formatter = DefaultDocumentFormatter()
@@ -89,6 +92,22 @@ class DocManager(DocManagerBase):
             # Don't try to add ns and _ts fields back in from doc
             return update_spec
         return super(DocManager, self).apply_update(doc, update_spec)
+
+    def index_exists(self, namespace):
+        index, doc_type = self._index_and_mapping(namespace)
+        try:
+            return self.elastic.indices.exists(index=index)
+        except Exception:
+            return False
+
+    def index_create(self, namespace):
+        index, doc_type = self._index_and_mapping(namespace)
+        request = {'settings': {'index': self.categorizer[self.index_category]}}
+        LOG.info("Creating index: %r with settings: %r" % (index, request))
+        try:
+            self.elastic.indices.create(index=index, body=request)
+        except es_exceptions.RequestError, e:
+            LOG.warning('Failed to create index due to error: %r' % e)
 
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):
