@@ -4,7 +4,10 @@
 
     "mainAddress": "localhost:27017",
     "oplogFile": "/var/log/mongo-connector/oplog.timestamp",
-    "noDump": false,
+    "initialImport": {
+        "dump": true,
+        "query": {}
+    },
     "batchSize": -1,
     "verbosity": 0,
     "continueOnError": false,
@@ -56,7 +59,21 @@
             "targetURL": "localhost:9200",
             "__bulkSize": 1000,
             "__uniqueKey": "_id",
-            "__autoCommitInterval": null
+            "__autoCommitInterval": null,
+            "categorizer": {
+                "small": {
+                    "shards": 1,
+                    "replicas": 1
+                },
+                "medium": {
+                    "shards": 3,
+                    "replicas": 1
+                },
+                "large": {
+                    "shards": 5,
+                    "replicas": 1
+                }
+            }
         }
     ]
 }
