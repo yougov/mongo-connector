@@ -15,7 +15,6 @@
 """Tails the oplog of a shard and returns entries
 """
 
-import bson
 import logging
 try:
     import Queue as queue
@@ -435,7 +434,7 @@ class OplogThread(threading.Thread):
             if error_field and error_field in doc_to_upsert:
                 doc_to_upsert.pop(error_field)
             try:
-                error = dm.upsert(doc_to_upsert, mapped_ns, ts)
+                error = dm.upsert(doc_to_upsert, mapped_ns)
                 if error:
                     self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
                 # self._fields['exclude'].remove(field)
@@ -751,141 +750,3 @@ class OplogThread(threading.Thread):
         LOG.info("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
         return ret_val
-
-    def rollback(self):
-        """Rollback target system to consistent state.
-
-        The strategy is to find the latest timestamp in the target system and
-        the largest timestamp in the oplog less than the latest target system
-        timestamp. This defines the rollback window and we just roll these
-        back until the oplog and target system are in consistent states.
-        """
-        # Find the most recently inserted document in each target system
-        LOG.debug("OplogThread: Initiating rollback sequence to bring "
-                  "system into a consistent state.")
-        last_docs = []
-        for dm in self.doc_managers:
-            dm.commit()
-            last_docs.append(dm.get_last_doc())
-
-        # Of these documents, which is the most recent?
-        last_inserted_doc = max(last_docs,
-                                key=lambda x: x["_ts"] if x else float("-inf"))
-
-        # Nothing has been replicated. No need to rollback target systems
-        if last_inserted_doc is None:
-            return None
-
-        # Find the oplog entry that touched the most recent document.
-        # We'll use this to figure where to pick up the oplog later.
-        target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
-        last_oplog_entry = util.retry_until_ok(
-            self.oplog.find_one,
-            {'ts': {'$lte': target_ts}},
-            sort=[('$natural', pymongo.DESCENDING)]
-        )
-
-        LOG.debug("OplogThread: last oplog entry is %s"
-                  % str(last_oplog_entry))
-
-        # The oplog entry for the most recent document doesn't exist anymore.
-        # If we've fallen behind in the oplog, this will be caught later
-        if last_oplog_entry is None:
-            LOG.critical("OPLOG cursor has fallen behind, please reimport data")
-            return None
-
-        # rollback_cutoff_ts happened *before* the rollback
-        rollback_cutoff_ts = last_oplog_entry['ts']
-        start_ts = util.bson_ts_to_long(rollback_cutoff_ts)
-        # timestamp of the most recent document on any target system
-        end_ts = last_inserted_doc['_ts']
-
-        for dm in self.doc_managers:
-            rollback_set = {}   # this is a dictionary of ns:list of docs
-
-            # group potentially conflicted documents by namespace
-            for doc in dm.search(start_ts, end_ts):
-                if doc['ns'] in rollback_set:
-                    rollback_set[doc['ns']].append(doc)
-                else:
-                    rollback_set[doc['ns']] = [doc]
-
-            # retrieve these documents from MongoDB, either updating
-            # or removing them in each target system
-            for namespace, doc_list in rollback_set.items():
-                # Get the original namespace
-                original_namespace = namespace
-                for source_name, dest_name in self.dest_mapping.items():
-                    if dest_name == namespace:
-                        original_namespace = source_name
-
-                database, coll = original_namespace.split('.', 1)
-                obj_id = bson.objectid.ObjectId
-                bson_obj_id_list = [obj_id(doc['_id']) for doc in doc_list]
-
-                # Use connection to whole cluster if in sharded environment.
-                client = self.mongos_client or self.primary_client
-                to_update = util.retry_until_ok(
-                    client[database][coll].find,
-                    {'_id': {'$in': bson_obj_id_list}},
-                    fields=self.fields
-                )
-                #doc list are docs in target system, to_update are
-                #docs in mongo
-                doc_hash = {}  # hash by _id
-                for doc in doc_list:
-                    doc_hash[bson.objectid.ObjectId(doc['_id'])] = doc
-
-                to_index = []
-
-                def collect_existing_docs():
-                    for doc in to_update:
-                        if doc['_id'] in doc_hash:
-                            del doc_hash[doc['_id']]
-                            to_index.append(doc)
-                retry_until_ok(collect_existing_docs)
-
-                #delete the inconsistent documents
-                LOG.debug("OplogThread: Rollback, removing inconsistent "
-                          "docs.")
-                remov_inc = 0
-                for document_id in doc_hash:
-                    try:
-                        dm.remove(document_id, namespace,
-                                  util.bson_ts_to_long(rollback_cutoff_ts))
-                        remov_inc += 1
-                        LOG.debug(
-                            "OplogThread: Rollback, removed %r " % doc)
-                    except errors.OperationFailed:
-                        LOG.warning(
-                            "Could not delete document during rollback: %r "
-                            "This can happen if this document was already "
-                            "removed by another rollback happening at the "
-                            "same time." % doc
-                        )
-
-                LOG.debug("OplogThread: Rollback, removed %d docs." %
-                          remov_inc)
-
-                #insert the ones from mongo
-                LOG.debug("OplogThread: Rollback, inserting documents "
-                          "from mongo.")
-                insert_inc = 0
-                fail_insert_inc = 0
-                for doc in to_index:
-                    try:
-                        insert_inc += 1
-                        dm.upsert(doc,
-                                  self.dest_mapping.get(namespace, namespace),
-                                  util.bson_ts_to_long(rollback_cutoff_ts))
-                    except errors.OperationFailed:
-                        fail_insert_inc += 1
-                        LOG.exception("OplogThread: Rollback, Unable to "
-                                      "insert %r" % doc)
-
-        LOG.debug("OplogThread: Rollback, Successfully inserted %d "
-                  " documents and failed to insert %d"
-                  " documents.  Returning a rollback cutoff time of %s "
-                  % (insert_inc, fail_insert_inc, str(rollback_cutoff_ts)))
-
-        return rollback_cutoff_ts

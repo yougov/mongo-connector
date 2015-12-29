@@ -22,11 +22,10 @@ import logging
 
 from threading import Timer
 
-import bson.json_util
 from parse import search
 
 from elasticsearch import Elasticsearch, exceptions as es_exceptions
-from elasticsearch.helpers import scan, streaming_bulk
+from elasticsearch.helpers import streaming_bulk
 
 from mongo_connector import errors
 from mongo_connector.compat import u
@@ -59,14 +58,11 @@ class DocManager(DocManagerBase):
 
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
-                 meta_index_name="mongodb_meta", meta_type="mongodb_meta",
                  attachment_field="content", categorizer=DEFAULT_CATEGORIZER,
                  index_category=DEFAULT_INDEX_CATEGORY, **kwargs):
         self.elastic = Elasticsearch(
             hosts=[url], **kwargs.get('clientOptions', {}))
         self.auto_commit_interval = auto_commit_interval
-        self.meta_index_name = meta_index_name
-        self.meta_type = meta_type
         self.unique_key = unique_key
         self.chunk_size = chunk_size
         self.categorizer = categorizer
@@ -175,30 +171,21 @@ class DocManager(DocManagerBase):
         updated = self.apply_update(document['_source'], update_spec)
         # _id is immutable in MongoDB, so won't have changed in update
         updated['_id'] = document['_id']
-        error = self.upsert(updated, namespace, timestamp)
+        error = self.upsert(updated, namespace)
         if error:
             return error
-        # upsert() strips metadata, so only _id + fields in _source still here
         return (updated['_id'], None)
 
     @wrap_exceptions
-    def upsert(self, doc, namespace, timestamp):
+    def upsert(self, doc, namespace):
         """Insert a document into Elasticsearch."""
         index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
         doc_id = u(doc.get("_id"))
-        metadata = {
-            "ns": namespace,
-            "_ts": timestamp
-        }
         try:
             # Index the source document, using lowercase namespace as index name.
             self.elastic.index(index=index, doc_type=doc_type,
                                body=self._formatter.format_document(doc), id=doc_id,
-                               refresh=(self.auto_commit_interval == 0))
-            # Index document metadata with original namespace (mixed upper/lower).
-            self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
-                               body=bson.json_util.dumps(metadata), id=doc_id,
                                refresh=(self.auto_commit_interval == 0))
         except es_exceptions.RequestError, e:
             LOG.info("Failed to upsert document: %r", e.info)
@@ -223,7 +210,6 @@ class DocManager(DocManagerBase):
         def docs_to_upsert():
             doc = None
             for doc in docs:
-                # Remove metadata and redundant _id
                 index, doc_type = self._index_and_mapping(namespace)
                 doc_id = u(doc.get("_id"))
                 document_action = {
@@ -232,17 +218,7 @@ class DocManager(DocManagerBase):
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
                 }
-                document_meta = {
-                    "_index": self.meta_index_name,
-                    "_type": self.meta_type,
-                    "_id": doc_id,
-                    "_source": {
-                        "ns": index,
-                        "_ts": timestamp
-                    }
-                }
                 yield document_action
-                yield document_meta
             if doc is None:
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
@@ -269,8 +245,8 @@ class DocManager(DocManagerBase):
                 else:
                     docs_inserted += 1
                     if(docs_inserted % 10000 == 0):
-                        LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
-            LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
+                        LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
+            LOG.info("Bulk Upsert: Finished inserting %d docs" % docs_inserted)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
@@ -299,19 +275,11 @@ class DocManager(DocManagerBase):
                                              body=body)
             self.has_attachment_mapping = True
 
-        metadata = {
-            'ns': namespace,
-            '_ts': timestamp,
-        }
-
         doc = self._formatter.format_document(doc)
         doc[self.attachment_field] = base64.b64encode(f.read()).decode()
 
         self.elastic.index(index=index, doc_type=doc_type,
                            body=doc, id=doc_id,
-                           refresh=(self.auto_commit_interval == 0))
-        self.elastic.index(index=self.meta_index_name, doc_type=self.meta_type,
-                           body=bson.json_util.dumps(metadata), id=doc_id,
                            refresh=(self.auto_commit_interval == 0))
 
     @wrap_exceptions
@@ -321,37 +289,6 @@ class DocManager(DocManagerBase):
         self.elastic.delete(index=index, doc_type=doc_type,
                             id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
-        self.elastic.delete(index=self.meta_index_name, doc_type=self.meta_type,
-                            id=u(document_id),
-                            refresh=(self.auto_commit_interval == 0))
-
-    @wrap_exceptions
-    def _stream_search(self, *args, **kwargs):
-        """Helper method for iterating over ES search results."""
-        for hit in scan(self.elastic, query=kwargs.pop('body', None),
-                        scroll='10m', **kwargs):
-            hit['_source']['_id'] = hit['_id']
-            yield hit['_source']
-
-    def search(self, start_ts, end_ts):
-        """Query Elasticsearch for documents in a time range.
-
-        This method is used to find documents that may be in conflict during
-        a rollback event in MongoDB.
-        """
-        return self._stream_search(
-            index=self.meta_index_name,
-            body={
-                "query": {
-                    "filtered": {
-                        "filter": {
-                            "range": {
-                                "_ts": {"gte": start_ts, "lte": end_ts}
-                            }
-                        }
-                    }
-                }
-            })
 
     def commit(self):
         """Refresh all Elasticsearch indexes."""
@@ -362,26 +299,3 @@ class DocManager(DocManagerBase):
         self.elastic.indices.refresh()
         if self.auto_commit_interval not in [None, 0]:
             Timer(self.auto_commit_interval, self.run_auto_commit).start()
-
-    @wrap_exceptions
-    def get_last_doc(self):
-        """Get the most recently modified document from Elasticsearch.
-
-        This method is used to help define a time window within which documents
-        may be in conflict after a MongoDB rollback.
-        """
-        try:
-            result = self.elastic.search(
-                index=self.meta_index_name,
-                body={
-                    "query": {"match_all": {}},
-                    "sort": [{"_ts": "desc"}],
-                },
-                size=1
-            )["hits"]["hits"]
-            for r in result:
-                r['_source']['_id'] = r['_id']
-                return r['_source']
-        except es_exceptions.RequestError:
-            # no documents so ES returns 400 because of undefined _ts mapping
-            return None
