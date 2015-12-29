@@ -101,6 +101,22 @@ class OplogThread(threading.Thread):
             self._fields = set(value)
             # Always include _id field
             self._fields.add('_id')
+
+            # Create _fieldsdict which allows to handle all types of oplog 
+            # updates (nested as well as flattened)
+            self._fieldsdict = {}
+            for field in self._fields:
+                if "." in field:
+                    fieldparts = field.split(".")
+                    curlevel = self._fieldsdict
+                    for fieldpart in fieldparts:
+                        if fieldpart not in curlevel:
+                            curlevel[fieldpart] = {}
+                        curlevel = curlevel[fieldpart]
+                # also add dot-notated fields to support inserts as well 
+                # as updates with $set and $unset
+                if field not in self._fieldsdict:
+                    self._fieldsdict[field] = {}
         else:
             self._fields = None
 
@@ -336,9 +352,25 @@ class OplogThread(threading.Thread):
         if not self._fields:
             return entry
 
-        def pop_excluded_fields(doc):
-            for key in set(doc) - self._fields:
+        def pop_excluded_fields(doc, fields=None):
+            # NOTICE: doc can be a flattened, dot-notated object (when 
+            # updating via $set/$unset), but also a deep nested object (e.g. 
+            # on inserts)
+
+            # initialize fields on first call with _fieldsdict to enable 
+            # recursion
+            if fields == None:
+                fields = self._fieldsdict
+
+            # remove keys which are not in fields
+            for key in set(doc) - set(fields):
                 doc.pop(key)
+            
+            # further investigate sub (nested) fields, only if doc contains 
+            # it and remove excluded sub-props
+            for field, subfields in fields.iteritems():
+                if field in doc and subfields != {}:
+                    pop_excluded_fields(doc[field], subfields)
 
         entry_o = entry['o']
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
