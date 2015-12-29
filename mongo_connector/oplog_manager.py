@@ -665,8 +665,9 @@ class OplogThread(threading.Thread):
 
         for dm in self.doc_managers:
             for namespace in dump_set:
-                if not dm.index_exists(namespace):
-                    dm.index_create(namespace)
+                mapped_ns = self.dest_mapping.get(namespace, namespace)
+                if not dm.index_exists(mapped_ns):
+                    dm.index_create(mapped_ns)
 
         if timestamp is None:
             if self.initial_import['dump']:
