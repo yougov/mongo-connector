@@ -120,7 +120,6 @@ class OplogThread(threading.Thread):
     @initial_import.setter
     def initial_import(self, initial_import):
         self._initial_import = {'dump': True, 'query': None}
-        LOG.info("Setting initial import to %r" % initial_import)
         if initial_import:
             if 'dump' in initial_import:
                 self._initial_import['dump'] = initial_import['dump']
@@ -444,15 +443,8 @@ class OplogThread(threading.Thread):
                 LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
                 raise
 
-    def dump_collection(self):
-        """Dumps collection into the target system.
-
-        This method is called when we're initializing the cursor and have no
-        configs i.e. when we're starting for the first time.
-        """
-
+    def get_dump_set(self):
         dump_set = self.namespace_set or []
-        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
 
         # no namespaces specified
         if not self.namespace_set:
@@ -471,7 +463,18 @@ class OplogThread(threading.Thread):
                         continue
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
+        return dump_set
 
+    def dump_collection(self):
+        """Dumps collection into the target system.
+
+        This method is called when we're initializing the cursor and have no
+        configs i.e. when we're starting for the first time.
+        """
+
+        dump_set = self.get_dump_set()
+
+        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
         timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
@@ -527,6 +530,8 @@ class OplogThread(threading.Thread):
             num_inserted = 0
             num_failed = 0
             for namespace in dump_set:
+                mapped_ns = self.dest_mapping.get(namespace, namespace)
+                refresh_interval = dm.disable_refresh(mapped_ns)
                 for num, doc in enumerate(docs_to_dump(namespace)):
                     if num % 10000 == 0:
                         LOG.info("Upserted %d docs." % num)
@@ -539,6 +544,7 @@ class OplogThread(threading.Thread):
                             num_failed += 1
                         else:
                             raise
+                dm.enable_refresh(mapped_ns, refresh_interval)
             LOG.info("Upserted %d docs" % num_inserted)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
@@ -547,8 +553,10 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
+                    refresh_interval = dm.disable_refresh(mapped_ns)
                     errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
                     upsert_all_failed_docs(dm, namespace, errors)
+                    dm.enable_refresh(mapped_ns, refresh_interval)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
@@ -657,6 +665,14 @@ class OplogThread(threading.Thread):
         timestamp = self.read_last_checkpoint()
 
         LOG.info("Initializing cursor with initial timestamp: %r" % timestamp)
+
+        dump_set = self.get_dump_set()
+
+        for dm in self.doc_managers:
+            for namespace in dump_set:
+                mapped_ns = self.dest_mapping.get(namespace, namespace)
+                if not dm.index_exists(mapped_ns):
+                    dm.index_create(mapped_ns)
 
         if timestamp is None:
             if self.initial_import['dump']:

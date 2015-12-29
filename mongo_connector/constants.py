@@ -42,9 +42,26 @@ DEFAULT_LOGFILE_INTERVAL = 1
 DEFAULT_LOGFILE_BACKUPCOUNT = 7
 # The log format
 DEFAULT_LOG_FORMAT = (
-    '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s')
+    '%(threadName)s-%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s')
 
 # If a single meta collection is used, defines the default collection name
 DEFAULT_META_COLLECTION_NAME = "__oplog"
 # If a single meta collection is used, defines the default cap size
 DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
+
+DEFAULT_INDEX_CATEGORY = "medium"
+
+DEFAULT_CATEGORIZER = {
+    "small": {
+        "number_of_shards": 1,
+        "number_of_replicas": 1
+    },
+    "medium": {
+        "number_of_shards": 3,
+        "number_of_replicas": 1
+    },
+    "large": {
+        "number_of_shards": 5,
+        "number_of_replicas": 1
+    }
+}

@@ -31,7 +31,7 @@ from elasticsearch.helpers import scan, streaming_bulk
 from mongo_connector import errors
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
-                                       DEFAULT_MAX_BULK)
+                                       DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER, DEFAULT_INDEX_CATEGORY)
 from mongo_connector.util import exception_wrapper, retry_until_ok
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
@@ -49,6 +49,7 @@ tracer.setLevel(logging.WARNING)
 logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
+
 class DocManager(DocManagerBase):
     """Elasticsearch implementation of the DocManager interface.
 
@@ -59,7 +60,8 @@ class DocManager(DocManagerBase):
     def __init__(self, url, auto_commit_interval=DEFAULT_COMMIT_INTERVAL,
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  meta_index_name="mongodb_meta", meta_type="mongodb_meta",
-                 attachment_field="content", **kwargs):
+                 attachment_field="content", categorizer=DEFAULT_CATEGORIZER,
+                 index_category=DEFAULT_INDEX_CATEGORY, **kwargs):
         self.elastic = Elasticsearch(
             hosts=[url], **kwargs.get('clientOptions', {}))
         self.auto_commit_interval = auto_commit_interval
@@ -67,6 +69,8 @@ class DocManager(DocManagerBase):
         self.meta_type = meta_type
         self.unique_key = unique_key
         self.chunk_size = chunk_size
+        self.categorizer = categorizer
+        self.index_category = index_category
         if self.auto_commit_interval not in [None, 0]:
             self.run_auto_commit()
         self._formatter = DefaultDocumentFormatter()
@@ -88,6 +92,45 @@ class DocManager(DocManagerBase):
             # Don't try to add ns and _ts fields back in from doc
             return update_spec
         return super(DocManager, self).apply_update(doc, update_spec)
+
+    def index_exists(self, namespace):
+        index, doc_type = self._index_and_mapping(namespace)
+        try:
+            return self.elastic.indices.exists(index=index)
+        except Exception:
+            return False
+
+    def index_create(self, namespace):
+        index, doc_type = self._index_and_mapping(namespace)
+        request = {'settings': {'index': self.categorizer[self.index_category]}}
+        LOG.info("Creating index: %r with settings: %r" % (index, request))
+        try:
+            self.elastic.indices.create(index=index, body=request)
+        except es_exceptions.RequestError, e:
+            LOG.warning('Failed to create index due to error: %r' % e)
+
+    def disable_refresh(self, namespace):
+        refresh_interval = '30s'
+        try:
+            index_name, doc_type_name = self._index_and_mapping(namespace)
+            old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
+            old_refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
+            if old_refresh_interval is not '-1':
+                refresh_interval = old_refresh_interval
+            self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
+            LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % refresh_interval)
+        except Exception:
+            pass
+        return refresh_interval
+
+    def enable_refresh(self, namespace, refresh_interval='30s'):
+        index_name, doc_type_name = self._index_and_mapping(namespace)
+        try:
+            self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
+            LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % refresh_interval)
+        except Exception:
+            LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % refresh_interval)
+            pass
 
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):
@@ -204,13 +247,11 @@ class DocManager(DocManagerBase):
                 raise errors.EmptyDocsError(
                     "Cannot upsert an empty sequence of "
                     "documents into Elastic Search")
-
         responses = []
         try:
             kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
-
             responses = streaming_bulk(client=self.elastic,
                                        actions=docs_to_upsert(),
                                        **kw)
@@ -235,6 +276,9 @@ class DocManager(DocManagerBase):
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
+            pass
+        except Exception:
+            LOG.critical("Bulk Upsert: Failed due to error in refresh interval update")
             pass
 
     @wrap_exceptions
