@@ -60,20 +60,7 @@
             "__bulkSize": 1000,
             "__uniqueKey": "_id",
             "__autoCommitInterval": null,
-            "categorizer": {
-                "small": {
-                    "number_of_shards": 1,
-                    "number_of_replicas": 1
-                },
-                "medium": {
-                    "number_of_shards": 3,
-                    "number_of_replicas": 1
-                },
-                "large": {
-                    "number_of_shards": 5,
-                    "number_of_replicas": 1
-                }
-            }
+            "indexCategory": "small"
         }
     ]
 }

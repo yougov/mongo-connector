@@ -109,6 +109,29 @@ class DocManager(DocManagerBase):
         except es_exceptions.RequestError, e:
             LOG.warning('Failed to create index due to error: %r' % e)
 
+    def disable_refresh(self, namespace):
+        refresh_interval = '30s'
+        try:
+            index_name, doc_type_name = self._index_and_mapping(namespace)
+            old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
+            old_refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
+            if old_refresh_interval is not '-1':
+                refresh_interval = old_refresh_interval
+            self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
+            LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % refresh_interval)
+        except Exception:
+            pass
+        return refresh_interval
+
+    def enable_refresh(self, namespace, refresh_interval='30s'):
+        index_name, doc_type_name = self._index_and_mapping(namespace)
+        try:
+            self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
+            LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % refresh_interval)
+        except Exception:
+            LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % refresh_interval)
+            pass
+
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):
         db = namespace.split('.', 1)[0]
@@ -226,14 +249,6 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
         responses = []
         try:
-            try:
-                index_name, doc_type_name = self._index_and_mapping(namespace)
-                old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
-                refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
-                self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
-                LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % refresh_interval)
-            except Exception:
-                refresh_interval = '30s'
             kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
@@ -256,8 +271,6 @@ class DocManager(DocManagerBase):
                     if(docs_inserted % 10000 == 0):
                         LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
             LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
-            self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
-            LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % refresh_interval)
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:

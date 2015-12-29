@@ -530,6 +530,8 @@ class OplogThread(threading.Thread):
             num_inserted = 0
             num_failed = 0
             for namespace in dump_set:
+                mapped_ns = self.dest_mapping.get(namespace, namespace)
+                refresh_interval = dm.disable_refresh(mapped_ns)
                 for num, doc in enumerate(docs_to_dump(namespace)):
                     if num % 10000 == 0:
                         LOG.info("Upserted %d docs." % num)
@@ -542,6 +544,7 @@ class OplogThread(threading.Thread):
                             num_failed += 1
                         else:
                             raise
+                dm.enable_refresh(mapped_ns, refresh_interval)
             LOG.info("Upserted %d docs" % num_inserted)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
@@ -550,8 +553,10 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
+                    refresh_interval = dm.disable_refresh(mapped_ns)
                     errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
                     upsert_all_failed_docs(dm, namespace, errors)
+                    dm.enable_refresh(mapped_ns, refresh_interval)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
