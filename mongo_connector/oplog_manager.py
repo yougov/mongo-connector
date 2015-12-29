@@ -54,7 +54,7 @@ class OplogThread(threading.Thread):
         self.mongos_client = mongos_client
 
         # Are we allowed to perform a collection dump?
-        self.collection_dump = kwargs.get('collection_dump', True)
+        self.initial_import = kwargs.get('initial_import', None)
 
         # The document manager for each target system.
         # These are the same for all threads.
@@ -112,6 +112,20 @@ class OplogThread(threading.Thread):
         else:
             self._fields['include'] = None
             self._fields['exclude'] = None
+
+    @property
+    def initial_import(self):
+        return self._initial_import
+
+    @initial_import.setter
+    def initial_import(self, initial_import):
+        self._initial_import = {'dump': True, 'query': None}
+        LOG.info("Setting initial import to %r" % initial_import)
+        if initial_import:
+            if 'dump' in initial_import:
+                self._initial_import['dump'] = initial_import['dump']
+            if 'query' in initial_import and initial_import['query']:
+                self._initial_import['query'] = initial_import['query']
 
     @property
     def namespace_set(self):
@@ -199,7 +213,7 @@ class OplogThread(threading.Thread):
                         # shouldn't be replicated. This may nullify
                         # the document if there's nothing to do.
                         if not self.filter_oplog_entry(entry):
-                            LOG.warning("OplogThread: Nullified entry: %r" % entry)
+                            LOG.debug("OplogThread: Nullified entry: %r" % entry)
                             continue
 
                         # sync the current oplog operation
@@ -231,7 +245,7 @@ class OplogThread(threading.Thread):
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
-                                LOG.warning("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
+                                LOG.debug("OplogThread: Operation for this entry is %s and action is %r" % (str(operation), entry['o']))
 
                                 # Remove
                                 if operation == 'd':
@@ -380,7 +394,6 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {}
-        LOG.info("Creating oplog cursor with timestamp: %r" % timestamp)
         if self.oplog_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
 
@@ -418,12 +431,10 @@ class OplogThread(threading.Thread):
     def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
             mapped_ns = self.dest_mapping.get(namespace, namespace)
             doc_to_upsert = doc
-            if not doc_to_upsert:
+            if not doc_to_upsert and _id:
                 doc_to_upsert = self.get_failed_doc(namespace, _id)
             if error_field and error_field in doc_to_upsert:
                 doc_to_upsert.pop(error_field)
-            else:
-                LOG.info("Upserting document without any field removed: %r" % doc_to_upsert)
             try:
                 error = dm.upsert(doc_to_upsert, mapped_ns, ts)
                 if error:
@@ -477,16 +488,20 @@ class OplogThread(threading.Thread):
                 fields_to_fetch = None
                 if 'include' in self._fields:
                     fields_to_fetch = self._fields['include']
+                query = {}
+                if self.initial_import['query']:
+                    query = self.initial_import['query']
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
+                        query,
                         fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
                     cursor = util.retry_until_ok(
                         target_coll.find,
-                        {"_id": {"$gt": last_id}},
+                        query.update({"_id": {"$gt": last_id}}),
                         fields=fields_to_fetch,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
@@ -639,22 +654,27 @@ class OplogThread(threading.Thread):
 
         Returns the cursor and the number of documents left in the cursor.
         """
-        LOG.info("Trying to create cursor: init_cursor called")
         timestamp = self.read_last_checkpoint()
 
+        LOG.info("Initializing cursor with initial timestamp: %r" % timestamp)
+
         if timestamp is None:
-            if self.collection_dump:
+            if self.initial_import['dump']:
                 # dump collection and update checkpoint
+                LOG.info("INITIAL IMPORT: Starting initial import of data")
                 timestamp = self.dump_collection()
                 if timestamp is None:
                     return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
+                LOG.info("INITIAL IMPORT: Initial import skipped, creating oplog cursor")
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
                 return cursor
+        else:
+            LOG.info("Last checkpoint found from timestamp file, resuming oplog tailing from timestamp: %r" % timestamp)
 
         self.checkpoint = timestamp
         self.update_checkpoint()
@@ -712,7 +732,7 @@ class OplogThread(threading.Thread):
             if oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
-        LOG.debug("OplogThread: reading last checkpoint as %s " %
+        LOG.info("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
         return ret_val
 

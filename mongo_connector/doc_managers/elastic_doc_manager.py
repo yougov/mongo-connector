@@ -229,7 +229,8 @@ class DocManager(DocManagerBase):
                 else:
                     docs_inserted += 1
                     if(docs_inserted % 10000 == 0):
-                        LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
+                        LOG.info("Bulk Upsert: Inserted %d docs" % (docs_inserted/2))
+            LOG.info("Bulk Upsert: Finished inserting %d docs" % (docs_inserted/2))
             if self.auto_commit_interval == 0:
                 self.commit()
         except errors.EmptyDocsError:
