@@ -88,6 +88,8 @@ class OplogThread(threading.Thread):
 
         self.oplog = self.primary_client.local.oplog.rs
 
+        self.error_fields = set()
+
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_connection))
@@ -346,6 +348,7 @@ class OplogThread(threading.Thread):
     def join(self):
         """Stop this thread from managing the oplog.
         """
+        LOG.warning('Fields with errors: %r' % self.error_fields)
         LOG.info("OplogThread: exiting due to join call.")
         self.running = False
         threading.Thread.join(self)
@@ -431,8 +434,10 @@ class OplogThread(threading.Thread):
             doc_to_upsert = doc
             if not doc_to_upsert and _id:
                 doc_to_upsert = self.get_failed_doc(namespace, _id)
-            if error_field and error_field in doc_to_upsert:
-                doc_to_upsert.pop(error_field)
+            if error_field:
+                self.error_fields.add(error_field)
+                if error_field in doc_to_upsert:
+                    doc_to_upsert.pop(error_field)
             try:
                 error = dm.upsert(doc_to_upsert, mapped_ns)
                 if error:
@@ -631,6 +636,7 @@ class OplogThread(threading.Thread):
             return None
         else:
             LOG.info('OplogThread: Successfully dumped collection')
+            LOG.warning('Fields with errors: %r' % self.error_fields)
 
         return timestamp
 
