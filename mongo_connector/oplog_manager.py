@@ -484,6 +484,11 @@ class OplogThread(threading.Thread):
             return None
         long_ts = util.bson_ts_to_long(timestamp)
 
+        def query_handle_id(query):
+            if '_id' in query and query['_id']:
+                for key in query['id']:
+                    query['id'][key] = ObjectId(query['id'][key])
+
         def docs_to_dump(namespace):
             database, coll = namespace.split('.', 1)
             last_id = None
@@ -497,6 +502,7 @@ class OplogThread(threading.Thread):
                     fields_to_fetch = self._fields['include']
                 query = {}
                 if self.initial_import['query']:
+                    query_handle_id(self.initial_import['query'])
                     query = self.initial_import['query']
                 if not last_id:
                     cursor = util.retry_until_ok(
