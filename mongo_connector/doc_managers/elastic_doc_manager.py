@@ -253,8 +253,8 @@ class DocManager(DocManagerBase):
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
             pass
-        except Exception:
-            LOG.critical("Bulk Upsert: Failed due to error in refresh interval update")
+        except Exception, e:
+            LOG.critical("Bulk Upsert: Failed due to error: %r" % e)
             pass
 
     @wrap_exceptions
