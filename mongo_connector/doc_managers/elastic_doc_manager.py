@@ -137,7 +137,7 @@ class DocManager(DocManagerBase):
                 self.elastic.indices.delete(index=_db.lower())
 
         if doc.get('renameCollection'):
-            LOG.warning("elastic_doc_manager does not support renaming a mapping")
+            LOG.debug("elastic_doc_manager does not support renaming a mapping")
 
         if doc.get('create'):
             db, coll = self.command_helper.map_collection(db, doc['create'])

@@ -301,7 +301,7 @@ class OplogThread(threading.Thread):
                             except Exception, e:
                                 LOG.critical("Failed to process oplog document %r due to exception %r" % (entry, e))
 
-                        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
+                        if (remove_inc + upsert_inc + update_inc) is not 0 and (remove_inc + upsert_inc + update_inc) % 1000 == 0:
                             LOG.info(
                                 "OplogThread: Documents removed: %d, "
                                 "inserted: %d, updated: %d so far" % (
