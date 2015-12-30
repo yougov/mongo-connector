@@ -486,8 +486,8 @@ class OplogThread(threading.Thread):
 
         def query_handle_id(query):
             if '_id' in query and query['_id']:
-                for key in query['id']:
-                    query['id'][key] = ObjectId(query['id'][key])
+                for key in query['_id']:
+                    query['_id'][key] = ObjectId(query['_id'][key])
 
         def docs_to_dump(namespace):
             database, coll = namespace.split('.', 1)

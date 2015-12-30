@@ -256,7 +256,6 @@ class DocManager(DocManagerBase):
             pass
         except Exception, e:
             LOG.critical("Bulk Upsert: Failed due to error: %r" % e)
-            traceback.print_exc()
             pass
 
     @wrap_exceptions
