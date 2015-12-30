@@ -88,7 +88,7 @@ class OplogThread(threading.Thread):
 
         self.oplog = self.primary_client.local.oplog.rs
 
-        self.error_fields = set()
+        self.error_fields = {}
 
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
@@ -435,7 +435,7 @@ class OplogThread(threading.Thread):
             if not doc_to_upsert and _id:
                 doc_to_upsert = self.get_failed_doc(namespace, _id)
             if error_field:
-                self.error_fields.add(error_field)
+                self.error_fields[error_field] = self.error_fields.get(error_field, 0) + 1
                 if error_field in doc_to_upsert:
                     doc_to_upsert.pop(error_field)
             try:
