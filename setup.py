@@ -124,7 +124,8 @@ setup(name='mongo-connector',
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo >= 2.7.2, < 3.0.0',
                         'pysolr >= 3.1.0',
-                        'elasticsearch >= 1.2, < 2.0.0'],
+                        'elasticsearch >= 1.2, < 2.0.0',
+                        'parse >= 1.6.6'],
       packages=["mongo_connector", "mongo_connector.doc_managers"],
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']
