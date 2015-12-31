@@ -429,6 +429,13 @@ class OplogThread(threading.Thread):
                 LOG.critical("Could not find document with id %s from mongodb", doc_id)
             return doc
 
+    def remove_field_from_doc(self, doc, field):
+        if '.' in field:
+            dict_key = field.split('.', 1)
+            self.remove_field_from_doc(doc[dict_key[0]], dict_key[1])
+        else:
+            doc.pop(field, None)
+
     def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
             mapped_ns = self.dest_mapping.get(namespace, namespace)
             doc_to_upsert = doc
@@ -437,7 +444,7 @@ class OplogThread(threading.Thread):
             if error_field:
                 self.error_fields[error_field] = self.error_fields.get(error_field, 0) + 1
                 if error_field in doc_to_upsert:
-                    doc_to_upsert.pop(error_field)
+                    self.remove_field_from_doc(doc_to_upsert, error_field)
             try:
                 if doc_to_upsert:
                     error = dm.upsert(doc_to_upsert, mapped_ns)
