@@ -444,7 +444,7 @@ class OplogThread(threading.Thread):
                     if error:
                         self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
                 else:
-                    LOG.error("Empty Document found: %r" % _id or doc_to_upsert['_id'] if '_id' in doc_to_upsert or None)
+                    LOG.error("Empty Document found: %r" % _id)
                 # self._fields['exclude'].remove(field)
             except Exception:
                 LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
