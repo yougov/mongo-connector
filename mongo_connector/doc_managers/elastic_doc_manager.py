@@ -208,13 +208,14 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
         """Insert multiple documents into Elasticsearch."""
+        index_name, doc_type = self._index_and_mapping(namespace)
+
         def docs_to_upsert():
             doc = None
             for doc in docs:
-                index, doc_type = self._index_and_mapping(namespace)
                 doc_id = u(doc.get("_id"))
                 document_action = {
-                    "_index": index,
+                    "_index": index_name,
                     "_type": doc_type,
                     "_id": doc_id,
                     "_source": self._formatter.format_document(doc)
@@ -248,8 +249,7 @@ class DocManager(DocManagerBase):
                     if(docs_inserted % 10000 == 0):
                         LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
             LOG.info("Bulk Upsert: Finished inserting %d docs" % docs_inserted)
-            if self.auto_commit_interval == 0:
-                self.commit()
+            self.commit(index_name)
         except errors.EmptyDocsError:
             # This can happen when mongo-connector starts up, there is no
             # config file, but nothing to dump
@@ -291,9 +291,12 @@ class DocManager(DocManagerBase):
                             id=u(document_id),
                             refresh=(self.auto_commit_interval == 0))
 
-    def commit(self):
+    def commit(self, index_name=None):
         """Refresh all Elasticsearch indexes."""
-        retry_until_ok(self.elastic.indices.refresh, index="")
+        if not index_name:
+            retry_until_ok(self.elastic.indices.refresh, index="")
+        else:
+            retry_until_ok(self.elastic.indices.refresh, index=index_name)
 
     def run_auto_commit(self):
         """Periodically commit to the Elastic server."""
