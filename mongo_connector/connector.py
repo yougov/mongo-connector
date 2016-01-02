@@ -307,44 +307,49 @@ class Connector(threading.Thread):
                 time.sleep(1)
 
         else:       # sharded cluster
-            while self.can_run is True:
+            attempts = 0
+            while self.can_run is True and attempts <= 120:
+                try:
+                    for shard_doc in main_conn['config']['shards'].find():
+                        shard_id = shard_doc['_id']
+                        if shard_id in self.shard_set:
+                            if not self.shard_set[shard_id].running:
+                                LOG.error("MongoConnector: OplogThread "
+                                          "%s unexpectedly stopped! Shutting "
+                                          "down" %
+                                          (str(self.shard_set[shard_id])))
+                                self.oplog_thread_join()
+                                for dm in self.doc_managers:
+                                    dm.stop()
+                                return
 
-                for shard_doc in main_conn['config']['shards'].find():
-                    shard_id = shard_doc['_id']
-                    if shard_id in self.shard_set:
-                        if not self.shard_set[shard_id].running:
-                            LOG.error("MongoConnector: OplogThread "
-                                      "%s unexpectedly stopped! Shutting "
-                                      "down" %
-                                      (str(self.shard_set[shard_id])))
+                            self.write_oplog_progress()
+                            time.sleep(1)
+                            continue
+                        try:
+                            repl_set, hosts = shard_doc['host'].split('/')
+                        except ValueError:
+                            cause = "The system only uses replica sets!"
+                            LOG.exception("MongoConnector: %s", cause)
                             self.oplog_thread_join()
                             for dm in self.doc_managers:
                                 dm.stop()
                             return
 
-                        self.write_oplog_progress()
-                        time.sleep(1)
-                        continue
-                    try:
-                        repl_set, hosts = shard_doc['host'].split('/')
-                    except ValueError:
-                        cause = "The system only uses replica sets!"
-                        LOG.exception("MongoConnector: %s", cause)
-                        self.oplog_thread_join()
-                        for dm in self.doc_managers:
-                            dm.stop()
-                        return
-
-                    shard_conn = ReplicaSetConnection(
-                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware, readPreference='secondaryPreferred',
-                        **self.ssl_kwargs)
-                    if self.auth_key is not None:
-                        shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
-                    oplog = OplogThread(shard_conn, self.doc_managers, self.oplog_progress, **self.kwargs)
-                    self.shard_set[shard_id] = oplog
-                    msg = "Starting connection thread"
-                    LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
-                    oplog.start()
+                        shard_conn = ReplicaSetConnection(
+                            hosts, replicaSet=repl_set, tz_aware=self.tz_aware, readPreference='secondaryPreferred',
+                            **self.ssl_kwargs)
+                        if self.auth_key is not None:
+                            shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
+                        oplog = OplogThread(shard_conn, self.doc_managers, self.oplog_progress, **self.kwargs)
+                        self.shard_set[shard_id] = oplog
+                        msg = "Starting connection thread"
+                        LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
+                        oplog.start()
+                    attempts = 0
+                except pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure:
+                    attempts += 1
+                    time.sleep(1)
 
         self.oplog_thread_join()
         self.write_oplog_progress()

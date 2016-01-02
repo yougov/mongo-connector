@@ -412,22 +412,32 @@ class OplogThread(threading.Thread):
         return cursor
 
     def get_failed_doc(self, namespace, doc_id):
-            database, coll = namespace.split('.', 1)
-            target_coll = self.primary_client[database][coll]
-            fields_to_fetch = None
-            if 'include' in self._fields and len(self._fields['include']) > 0:
-                fields_to_fetch = self._fields['include']
-            doc = util.retry_until_ok(
-                target_coll.find_one,
-                {"_id": ObjectId(doc_id)},
-                fields=fields_to_fetch
-            )
-            if doc:
-                self.pop_excluded_fields(doc)
-                LOG.info("Reinserting failed document: %r" % doc)
-            else:
-                LOG.critical("Could not find document with id %s from mongodb", doc_id)
-            return doc
+        attempts = 0
+        database, coll = namespace.split('.', 1)
+        while attempts <= 60:
+            try:
+                target_coll = self.primary_client[database][coll]
+                fields_to_fetch = None
+                if 'include' in self._fields and len(self._fields['include']) > 0:
+                    fields_to_fetch = self._fields['include']
+                doc = util.retry_until_ok(
+                    target_coll.find_one,
+                    {"_id": ObjectId(doc_id)},
+                    fields=fields_to_fetch
+                )
+                if doc:
+                    self.pop_excluded_fields(doc)
+                    LOG.info("Reinserting failed document: %r" % doc)
+                else:
+                    LOG.critical("Could not find document with id %s from mongodb", doc_id)
+                    break
+            except pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure:
+                LOG.warning("MongoDB possible AutoReconnect, retrying in 1s")
+                attempts += 1
+                time.sleep(1)
+        if attempts >= 60:
+            LOG.critical("Coudnt retrieve document with id %s from mongo after %d attempts" % (doc_id, attempts))
+        return doc
 
     def remove_field_from_doc(self, doc, field):
         if '.' in field:
@@ -437,25 +447,25 @@ class OplogThread(threading.Thread):
             doc.pop(field, None)
 
     def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
-            mapped_ns = self.dest_mapping.get(namespace, namespace)
-            doc_to_upsert = doc
-            if not doc_to_upsert and _id:
-                doc_to_upsert = self.get_failed_doc(namespace, _id)
-            if error_field:
-                self.error_fields[error_field] = self.error_fields.get(error_field, 0) + 1
-                if error_field in doc_to_upsert:
-                    self.remove_field_from_doc(doc_to_upsert, error_field)
-            try:
-                if doc_to_upsert:
-                    error = dm.upsert(doc_to_upsert, mapped_ns)
-                    if error:
-                        self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
-                else:
-                    LOG.error("Empty Document found: %r" % _id)
-                # self._fields['exclude'].remove(field)
-            except Exception:
-                LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
-                raise
+        mapped_ns = self.dest_mapping.get(namespace, namespace)
+        doc_to_upsert = doc
+        if not doc_to_upsert and _id:
+            doc_to_upsert = self.get_failed_doc(namespace, _id)
+        if error_field:
+            self.error_fields[error_field] = self.error_fields.get(error_field, 0) + 1
+            if error_field in doc_to_upsert:
+                self.remove_field_from_doc(doc_to_upsert, error_field)
+        try:
+            if doc_to_upsert:
+                error = dm.upsert(doc_to_upsert, mapped_ns)
+                if error:
+                    self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
+            else:
+                LOG.error("Empty Document found: %r" % _id)
+            # self._fields['exclude'].remove(field)
+        except Exception:
+            LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
+            raise
 
     def get_dump_set(self):
         dump_set = self.namespace_set or []
