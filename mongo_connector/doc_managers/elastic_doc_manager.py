@@ -195,14 +195,14 @@ class DocManager(DocManagerBase):
         return None
 
     def parseError(self, errorDesc):
-            parsed = search("MapperParsingException[{}[{field_name}]{}", errorDesc)
-            if not parsed:
-                parsed = search("MapperParsingException[{}[{}]{}[{field_name}]{}", errorDesc)
-            LOG.info("Parsed ES Error: %s from description %s", parsed, errorDesc)
-            if parsed and parsed.named:
-                return parsed.named
-            LOG.warning("Couldn't parse ES error: %s", errorDesc)
-            return None
+        parsed = search("MapperParsingException[{}[{field_name}]{}", errorDesc)
+        if not parsed:
+            parsed = search("MapperParsingException[{}[{}]{}[{field_name}]{}", errorDesc)
+        LOG.info("Parsed ES Error: %s from description %s", parsed, errorDesc)
+        if parsed and parsed.named:
+            return parsed.named
+        LOG.warning("Couldn't parse ES error: %s", errorDesc)
+        return None
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -226,7 +226,7 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
         responses = []
         try:
-            kw = {}
+            kw = {'request_timeout': 60}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
             responses = streaming_bulk(client=self.elastic,
