@@ -430,7 +430,7 @@ class OplogThread(threading.Thread):
                     LOG.info("Reinserting failed document with id: %r" % doc_id)
                 else:
                     LOG.critical("Could not find document with id %s from mongodb", doc_id)
-                    break
+                break
             except pymongo.errors.AutoReconnect, pymongo.errors.OperationFailure:
                 LOG.warning("MongoDB possible AutoReconnect, retrying in 1s")
                 attempts += 1
