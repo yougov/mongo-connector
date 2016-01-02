@@ -186,7 +186,8 @@ class DocManager(DocManagerBase):
             # Index the source document, using lowercase namespace as index name.
             self.elastic.index(index=index, doc_type=doc_type,
                                body=self._formatter.format_document(doc), id=doc_id,
-                               refresh=(self.auto_commit_interval == 0))
+                               refresh=(self.auto_commit_interval == 0),
+                               request_timeout=300)
         except es_exceptions.RequestError, e:
             LOG.info("Failed to upsert document: %r", e.info)
             error = self.parseError(e.info['error'])
@@ -226,7 +227,7 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
         responses = []
         try:
-            kw = {'request_timeout': 60}
+            kw = {'request_timeout': 300}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
             responses = streaming_bulk(client=self.elastic,
