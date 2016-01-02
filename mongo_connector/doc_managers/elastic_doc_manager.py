@@ -19,7 +19,6 @@ Elasticsearch.
 """
 import base64
 import logging
-import traceback
 
 from threading import Timer
 
