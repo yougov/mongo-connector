@@ -731,6 +731,10 @@ class OplogThread(threading.Thread):
                 timestamp = self.dump_collection()
                 if timestamp is None:
                     return None
+                for dm in self.doc_managers:
+                    for namespace in dump_set:
+                        mapped_ns = self.dest_mapping.get(namespace, namespace)
+                        dm.index_alias_add(mapped_ns)
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
