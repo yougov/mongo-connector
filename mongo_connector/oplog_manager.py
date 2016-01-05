@@ -637,6 +637,9 @@ class OplogThread(threading.Thread):
         # Holds any exceptions we can't recover from
         errors = queue.Queue()
 
+        # indicate start of collection dump by this thread
+        self.semaphore.acquire()
+
         if len(self.doc_managers) == 1:
             do_dump(self.doc_managers[0], errors)
         else:
@@ -659,6 +662,9 @@ class OplogThread(threading.Thread):
         except queue.Empty:
             pass
 
+        # indicate end of collection dump by this thread
+        self.semaphore.release()
+
         if not dump_success:
             err_msg = "OplogThread: Failed during dump collection"
             effect = "cannot recover!"
@@ -668,6 +674,14 @@ class OplogThread(threading.Thread):
         else:
             LOG.info('OplogThread: Successfully dumped collection')
             LOG.warning('Fields with errors: %r' % self.error_fields)
+            while True:
+                if self.semaphore.proceed():
+                    LOG.info("All threads finished dump, moving ahead")
+                    break
+                else:
+                    sleep_time = 30
+                    LOG.info("Waiting for other threads to finish collection dump, sleeping for %d seconds" % sleep_time)
+                    time.sleep(sleep_time)
 
         return timestamp
 
