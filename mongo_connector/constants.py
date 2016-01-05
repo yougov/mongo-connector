@@ -51,6 +51,8 @@ DEFAULT_META_COLLECTION_CAP_SIZE = 5 * 1024 * 1024
 
 DEFAULT_INDEX_CATEGORY = "medium"
 
+DEFAULT_INDEX_NAME_PREFIX = "mongo-connector-"
+
 DEFAULT_CATEGORIZER = {
     "small": {
         "number_of_shards": 1,

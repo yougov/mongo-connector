@@ -28,9 +28,11 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import streaming_bulk
 
 from mongo_connector import errors
+from mongo_connector.semaphore import Semaphore
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
-                                       DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER, DEFAULT_INDEX_CATEGORY)
+                                       DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER,
+                                       DEFAULT_INDEX_CATEGORY, DEFAULT_INDEX_NAME_PREFIX)
 from mongo_connector.util import exception_wrapper, retry_until_ok
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.doc_managers.formatters import DefaultDocumentFormatter
@@ -74,11 +76,14 @@ class DocManager(DocManagerBase):
         self.has_attachment_mapping = False
         self.attachment_field = attachment_field
         self.refresh_interval = None
+        self.index_created = False
+        self.alias_added = False
+        self.mutex = Semaphore(mutex=True)
 
     def _index_and_mapping(self, namespace):
         """Helper method for getting the index and type from a namespace."""
         index, doc_type = namespace.split('.', 1)
-        return index.lower(), doc_type
+        return DEFAULT_INDEX_NAME_PREFIX + index.lower(), doc_type
 
     def stop(self):
         """Stop the auto-commit thread."""
@@ -97,39 +102,74 @@ class DocManager(DocManagerBase):
         except Exception:
             return False
 
-    def index_create(self, namespace):
-        index, doc_type = self._index_and_mapping(namespace)
-        request = {'settings': {'index': self.categorizer[self.index_category]}}
-        LOG.info("Creating index: %r with settings: %r" % (index, request))
+    def index_alias_add(self, namespace):
+        with self.mutex:
+            if not self.alias_added:
+                index, doc_type = self._index_and_mapping(namespace)
+                alias_name = index.replace(DEFAULT_INDEX_NAME_PREFIX, "", 1)
+                try:
+                    self.__remove_alias_and_index(alias_name)
+                    self.elastic.indices.put_alias(index=index, name=alias_name)
+                    LOG.info("Added alias %s for index %s" % (alias_name, index))
+                    self.alias_added = True
+                except Exception, e:
+                    LOG.critical("Failed to add alias for index %s due to error %r" % (index, e))
+            else:
+                LOG.info("Alias already added for namespace: %s, skipping alias creation" % namespace)
+
+    def __remove_alias_and_index(self, alias_name):
         try:
-            self.elastic.indices.create(index=index, body=request)
+            alias_dict = self.elastic.indices.get_alias(name=alias_name)
+            for index_name in alias_dict:
+                LOG.info("Removing alias %s from index %s" % (alias_name, index_name))
+                self.elastic.indices.delete_alias(index=index_name, name=alias_name)
+        except es_exceptions.NotFoundError:
+            LOG.info("No alias with name %s found" % alias_name)
+        try:
+            if self.elastic.indices.exists(index=alias_name):
+                LOG.info("Found index with name: %s, deleting old index to set new alias" % alias_name)
+                self.elastic.indices.delete(index=alias_name)
+                LOG.warning("Deleted index with name: %s" % alias_name)
         except es_exceptions.RequestError, e:
-            LOG.warning('Failed to create index due to error: %r' % e)
+            LOG.error("Failed to delete index with name: %s due to error: %r" % (alias_name, e))
+
+    def index_create(self, namespace):
+        with self.mutex:
+            if not self.index_created:
+                index, doc_type = self._index_and_mapping(namespace)
+                request = {'settings': {'index': self.categorizer[self.index_category]}}
+                LOG.info("Creating index: %r with settings: %r" % (index, request))
+                try:
+                    self.elastic.indices.create(index=index, body=request)
+                    self.index_created = True
+                except es_exceptions.RequestError, e:
+                    LOG.warning('Failed to create index due to error: %r' % e)
+            else:
+                LOG.info("Index already created, skipping index creation")
 
     def disable_refresh(self, namespace):
-        if not self.refresh_interval:
-            try:
-                index_name, doc_type_name = self._index_and_mapping(namespace)
-                old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
-                if not self.refresh_interval:
+        with self.mutex:
+            if not self.refresh_interval:
+                try:
+                    index_name, doc_type_name = self._index_and_mapping(namespace)
+                    old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
                     self.refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
-                self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
-                LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % self.refresh_interval)
-            except Exception, e:
-                LOG.warning("Exception %r encountered while disabling refresh on index, setting default refresh interval of 30s" % e)
-                self.refresh_interval = '30s'
+                    self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
+                    LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % self.refresh_interval)
+                except Exception, e:
+                    LOG.warning("Exception %r encountered while disabling refresh on index" % e)
         return self.refresh_interval
 
     def enable_refresh(self, namespace):
-        index_name, doc_type_name = self._index_and_mapping(namespace)
-        if self.refresh_interval:
-            try:
-                self.elastic.indices.put_settings(body={'index': {'refresh_interval': self.refresh_interval}}, index=index_name)
-                self.refresh_interval = None
-                LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % self.refresh_interval)
-            except Exception:
-                LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % self.refresh_interval)
-                pass
+        with self.mutex:
+            if self.refresh_interval:
+                try:
+                    index_name, doc_type_name = self._index_and_mapping(namespace)
+                    self.elastic.indices.put_settings(body={'index': {'refresh_interval': self.refresh_interval}}, index=index_name)
+                    self.refresh_interval = None
+                    LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % self.refresh_interval)
+                except Exception:
+                    LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % self.refresh_interval)
 
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):
