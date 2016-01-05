@@ -166,8 +166,8 @@ class DocManager(DocManagerBase):
                 try:
                     index_name, doc_type_name = self._index_and_mapping(namespace)
                     self.elastic.indices.put_settings(body={'index': {'refresh_interval': self.refresh_interval}}, index=index_name)
-                    self.refresh_interval = None
                     LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % self.refresh_interval)
+                    self.refresh_interval = None
                 except Exception:
                     LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % self.refresh_interval)
 
