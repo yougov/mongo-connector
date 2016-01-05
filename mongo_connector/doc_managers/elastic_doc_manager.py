@@ -73,6 +73,7 @@ class DocManager(DocManagerBase):
 
         self.has_attachment_mapping = False
         self.attachment_field = attachment_field
+        self.refresh_interval = None
 
     def _index_and_mapping(self, namespace):
         """Helper method for getting the index and type from a namespace."""
@@ -106,27 +107,29 @@ class DocManager(DocManagerBase):
             LOG.warning('Failed to create index due to error: %r' % e)
 
     def disable_refresh(self, namespace):
-        refresh_interval = '30s'
-        try:
-            index_name, doc_type_name = self._index_and_mapping(namespace)
-            old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
-            old_refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
-            if old_refresh_interval is not '-1':
-                refresh_interval = old_refresh_interval
-            self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
-            LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % refresh_interval)
-        except Exception:
-            pass
-        return refresh_interval
+        if not self.refresh_interval:
+            try:
+                index_name, doc_type_name = self._index_and_mapping(namespace)
+                old_settings = self.elastic.indices.get_settings(index=index_name)[index_name]['settings']
+                if not self.refresh_interval:
+                    self.refresh_interval = old_settings.get('index', {}).get('refresh_interval', '30s')
+                self.elastic.indices.put_settings(body={'index': {'refresh_interval': '-1'}}, index=index_name)
+                LOG.info("Bulk Upsert: Setting refresh interval to -1, old interval: %r" % self.refresh_interval)
+            except Exception, e:
+                LOG.warning("Exception %r encountered while disabling refresh on index, setting default refresh interval of 30s" % e)
+                self.refresh_interval = '30s'
+        return self.refresh_interval
 
-    def enable_refresh(self, namespace, refresh_interval='30s'):
+    def enable_refresh(self, namespace):
         index_name, doc_type_name = self._index_and_mapping(namespace)
-        try:
-            self.elastic.indices.put_settings(body={'index': {'refresh_interval': refresh_interval}}, index=index_name)
-            LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % refresh_interval)
-        except Exception:
-            LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % refresh_interval)
-            pass
+        if self.refresh_interval:
+            try:
+                self.elastic.indices.put_settings(body={'index': {'refresh_interval': self.refresh_interval}}, index=index_name)
+                self.refresh_interval = None
+                LOG.info("Bulk Upsert: Resetting refresh interval back to %s" % self.refresh_interval)
+            except Exception:
+                LOG.warning("Bulk Upsert: Failed to refresh interval back to %s" % self.refresh_interval)
+                pass
 
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):

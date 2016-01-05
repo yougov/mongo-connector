@@ -41,7 +41,7 @@ class OplogThread(threading.Thread):
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
     def __init__(self, primary_client, doc_managers,
-                 oplog_progress_dict, mongos_client=None, **kwargs):
+                 oplog_progress_dict, semaphore=None, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
         self.batch_size = kwargs.get('batch_size', DEFAULT_BATCH_SIZE)
@@ -68,6 +68,9 @@ class OplogThread(threading.Thread):
         # A dictionary that stores OplogThread/timestamp pairs.
         # Represents the last checkpoint for a OplogThread.
         self.oplog_progress = oplog_progress_dict
+
+        # A semaphore implementation to synchronize initial data import
+        self.semaphore = semaphore
 
         # The set of namespaces to process from the mongo cluster.
         self.namespace_set = kwargs.get('ns_set', [])
@@ -563,7 +566,7 @@ class OplogThread(threading.Thread):
             num_failed = 0
             for namespace in dump_set:
                 mapped_ns = self.dest_mapping.get(namespace, namespace)
-                refresh_interval = dm.disable_refresh(mapped_ns)
+                dm.disable_refresh(mapped_ns)
                 for num, doc in enumerate(docs_to_dump(namespace)):
                     if num % 10000 == 0:
                         LOG.info("Upserted %d docs." % num)
@@ -576,7 +579,7 @@ class OplogThread(threading.Thread):
                             num_failed += 1
                         else:
                             raise
-                dm.enable_refresh(mapped_ns, refresh_interval)
+                dm.enable_refresh(mapped_ns)
             LOG.info("Upserted %d docs" % num_inserted)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
@@ -585,10 +588,10 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     mapped_ns = self.dest_mapping.get(namespace, namespace)
-                    refresh_interval = dm.disable_refresh(mapped_ns)
+                    dm.disable_refresh(mapped_ns)
                     errors = dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
                     upsert_all_failed_docs(dm, namespace, errors)
-                    dm.enable_refresh(mapped_ns, refresh_interval)
+                    dm.enable_refresh(mapped_ns)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
