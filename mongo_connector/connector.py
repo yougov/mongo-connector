@@ -27,7 +27,7 @@ import threading
 import time
 from mongo_connector import config, constants, errors, util
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.semaphore import Semaphore
+from mongo_connector.barrier import Barrier
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
@@ -82,7 +82,7 @@ class Connector(threading.Thread):
         # Dict of OplogThread/timestamp pairs to record progress
         self.oplog_progress = LockingDict()
 
-        self.semaphore = Semaphore()
+        self.barrier = None
 
         # Timezone awareness
         self.tz_aware = kwargs.get('tz_aware', False)
@@ -311,6 +311,8 @@ class Connector(threading.Thread):
 
         else:       # sharded cluster
             attempts = 0
+            shard_count = main_conn['config']['shards'].count()
+            self.barrier = Barrier(shard_count)
             while self.can_run is True and attempts <= 120:
                 try:
                     for shard_doc in main_conn['config']['shards'].find():
@@ -344,7 +346,7 @@ class Connector(threading.Thread):
                             **self.ssl_kwargs)
                         if self.auth_key is not None:
                             shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
-                        oplog = OplogThread(shard_conn, self.doc_managers, self.oplog_progress, self.semaphore, **self.kwargs)
+                        oplog = OplogThread(shard_conn, self.doc_managers, self.oplog_progress, self.barrier, **self.kwargs)
                         self.shard_set[shard_id] = oplog
                         msg = "Starting connection thread"
                         LOG.info("MongoConnector: %s %s" % (msg, shard_conn))

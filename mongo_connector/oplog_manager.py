@@ -41,7 +41,7 @@ class OplogThread(threading.Thread):
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
     def __init__(self, primary_client, doc_managers,
-                 oplog_progress_dict, semaphore=None, mongos_client=None, **kwargs):
+                 oplog_progress_dict, barrier=None, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
         self.batch_size = kwargs.get('batch_size', DEFAULT_BATCH_SIZE)
@@ -70,7 +70,7 @@ class OplogThread(threading.Thread):
         self.oplog_progress = oplog_progress_dict
 
         # A semaphore implementation to synchronize initial data import
-        self.semaphore = semaphore
+        self.barrier = barrier
 
         # The set of namespaces to process from the mongo cluster.
         self.namespace_set = kwargs.get('ns_set', [])
@@ -637,9 +637,6 @@ class OplogThread(threading.Thread):
         # Holds any exceptions we can't recover from
         errors = queue.Queue()
 
-        # indicate start of collection dump by this thread
-        self.semaphore.acquire()
-
         if len(self.doc_managers) == 1:
             do_dump(self.doc_managers[0], errors)
         else:
@@ -662,9 +659,6 @@ class OplogThread(threading.Thread):
         except queue.Empty:
             pass
 
-        # indicate end of collection dump by this thread
-        self.semaphore.release()
-
         if not dump_success:
             err_msg = "OplogThread: Failed during dump collection"
             effect = "cannot recover!"
@@ -674,14 +668,8 @@ class OplogThread(threading.Thread):
         else:
             LOG.info('OplogThread: Successfully dumped collection')
             LOG.warning('Fields with errors: %r' % self.error_fields)
-            while True:
-                if self.semaphore.proceed():
-                    LOG.info("All threads finished dump, moving ahead")
-                    break
-                else:
-                    sleep_time = 30
-                    LOG.info("Waiting for other threads to finish collection dump, sleeping for %d seconds" % sleep_time)
-                    time.sleep(sleep_time)
+            LOG.info("Waiting for other threads to finish collection dump")
+            self.barrier.wait()
 
         return timestamp
 

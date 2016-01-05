@@ -28,7 +28,7 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import streaming_bulk
 
 from mongo_connector import errors
-from mongo_connector.semaphore import Semaphore
+from threading import Semaphore
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER,
@@ -78,7 +78,7 @@ class DocManager(DocManagerBase):
         self.refresh_interval = None
         self.index_created = False
         self.alias_added = False
-        self.mutex = Semaphore(mutex=True)
+        self.mutex = Semaphore(1)
 
     def _index_and_mapping(self, namespace):
         """Helper method for getting the index and type from a namespace."""
