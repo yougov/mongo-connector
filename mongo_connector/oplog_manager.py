@@ -445,7 +445,10 @@ class OplogThread(threading.Thread):
     def remove_field_from_doc(self, doc, field):
         if '.' in field:
             dict_key = field.split('.', 1)
-            self.remove_field_from_doc(doc[dict_key[0]], dict_key[1])
+            if dict_key[0] in doc:
+                self.remove_field_from_doc(doc[dict_key[0]], dict_key[1])
+            else:
+                self.remove_field_from_doc(doc, dict_key[1])
         else:
             try:
                 doc.pop(field)
