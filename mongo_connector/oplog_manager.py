@@ -452,10 +452,10 @@ class OplogThread(threading.Thread):
         else:
             try:
                 doc.pop(field)
-            except KeyError:
+            except Exception:
                 LOG.warning("Error Field [%r] not found in doc: %r" % (field, doc))
 
-    def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None):
+    def upsert_doc(self, dm, namespace, ts, _id, error_field, doc=None, retry_count=0):
         mapped_ns = self.dest_mapping.get(namespace, namespace)
         doc_to_upsert = doc
         if not doc_to_upsert and _id:
@@ -463,16 +463,18 @@ class OplogThread(threading.Thread):
         if error_field:
             self.error_fields[error_field] = self.error_fields.get(error_field, 0) + 1
             self.remove_field_from_doc(doc_to_upsert, error_field)
+        if retry_count > 50:
+            raise Exception("Hit maximum retry attempts when trying to insert document: %r" % doc_to_upsert)
         try:
             if doc_to_upsert:
                 error = dm.upsert(doc_to_upsert, mapped_ns)
                 if error:
-                    self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert)
+                    self.upsert_doc(dm, namespace, ts, error[0], error[1], doc_to_upsert, retry_count+1)
             else:
                 LOG.error("Empty Document found: %r" % _id)
             # self._fields['exclude'].remove(field)
-        except Exception:
-            LOG.critical("Failed to upsert document: %r" % doc_to_upsert)
+        except Exception, e:
+            LOG.critical("Failed to upsert document: %r due to error: %r" % (doc_to_upsert, e))
             raise
 
     def get_dump_set(self):
@@ -793,6 +795,5 @@ class OplogThread(threading.Thread):
             if oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
-        LOG.info("OplogThread: reading last checkpoint as %s " %
-                  str(ret_val))
+        LOG.info("OplogThread: reading last checkpoint as %s " % str(ret_val))
         return ret_val

@@ -62,8 +62,8 @@ class DocManager(DocManagerBase):
                  unique_key='_id', chunk_size=DEFAULT_MAX_BULK,
                  attachment_field="content", categorizer=DEFAULT_CATEGORIZER,
                  index_category=DEFAULT_INDEX_CATEGORY, **kwargs):
-        self.elastic = Elasticsearch(
-            hosts=[url], **kwargs.get('clientOptions', {}))
+        es_nodes = [node.strip(' ') for node in url.split(',')]
+        self.elastic = Elasticsearch(hosts=es_nodes, **kwargs.get('clientOptions', {}))
         self.auto_commit_interval = auto_commit_interval
         self.unique_key = unique_key
         self.chunk_size = chunk_size
