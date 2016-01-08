@@ -28,7 +28,7 @@ from elasticsearch import Elasticsearch, exceptions as es_exceptions
 from elasticsearch.helpers import streaming_bulk
 
 from mongo_connector import errors
-from threading import Semaphore
+from threading import Lock
 from mongo_connector.compat import u
 from mongo_connector.constants import (DEFAULT_COMMIT_INTERVAL,
                                        DEFAULT_MAX_BULK, DEFAULT_CATEGORIZER,
@@ -78,7 +78,7 @@ class DocManager(DocManagerBase):
         self.refresh_interval = None
         self.index_created = False
         self.alias_added = False
-        self.mutex = Semaphore(1)
+        self.mutex = Lock()
 
     def _index_and_mapping(self, namespace):
         """Helper method for getting the index and type from a namespace."""
@@ -229,8 +229,7 @@ class DocManager(DocManagerBase):
             # Index the source document, using lowercase namespace as index name.
             self.elastic.index(index=index, doc_type=doc_type,
                                body=self._formatter.format_document(doc), id=doc_id,
-                               refresh=(self.auto_commit_interval == 0),
-                               request_timeout=300)
+                               refresh=(self.auto_commit_interval == 0))
         except es_exceptions.RequestError, e:
             LOG.info("Failed to upsert document: %r", e.info)
             error = self.parseError(e.info['error'])
@@ -270,7 +269,7 @@ class DocManager(DocManagerBase):
                     "documents into Elastic Search")
         responses = []
         try:
-            kw = {'request_timeout': 300}
+            kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
             responses = streaming_bulk(client=self.elastic,
@@ -293,13 +292,8 @@ class DocManager(DocManagerBase):
                         LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
             LOG.info("Bulk Upsert: Finished inserting %d docs" % docs_inserted)
             self.commit(index_name)
-        except errors.EmptyDocsError:
-            # This can happen when mongo-connector starts up, there is no
-            # config file, but nothing to dump
-            pass
         except Exception, e:
             LOG.critical("Bulk Upsert: Failed due to error: %r" % e)
-            pass
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
