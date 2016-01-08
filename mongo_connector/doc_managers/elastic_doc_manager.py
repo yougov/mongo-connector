@@ -294,6 +294,7 @@ class DocManager(DocManagerBase):
             self.commit(index_name)
         except Exception, e:
             LOG.critical("Bulk Upsert: Failed due to error: %r" % e)
+            raise
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
