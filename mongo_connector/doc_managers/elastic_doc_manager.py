@@ -292,6 +292,8 @@ class DocManager(DocManagerBase):
                         LOG.info("Bulk Upsert: Inserted %d docs" % docs_inserted)
             LOG.info("Bulk Upsert: Finished inserting %d docs" % docs_inserted)
             self.commit(index_name)
+        except errors.EmptyDocsError:
+            pass
         except Exception, e:
             LOG.critical("Bulk Upsert: Failed due to error: %r" % e)
             raise
