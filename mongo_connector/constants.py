@@ -59,11 +59,11 @@ DEFAULT_CATEGORIZER = {
         "number_of_replicas": 1
     },
     "medium": {
-        "number_of_shards": 3,
+        "number_of_shards": 2,
         "number_of_replicas": 1
     },
     "large": {
-        "number_of_shards": 5,
+        "number_of_shards": 3,
         "number_of_replicas": 1
     }
 }
