@@ -22,6 +22,7 @@ from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
 from tests import unittest
 from tests.setup_cluster import ReplicaSet
+from tests.util import close_client
 
 
 class MockGridFSFile:
@@ -63,7 +64,7 @@ class TestGridFSFile(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.main_connection.close()
+        close_client(cls.main_connection)
         cls.repl_set.stop()
 
     def setUp(self):
@@ -118,7 +119,7 @@ class TestGridFSFile(unittest.TestCase):
         doc = self.collection.files.find_one(id)
         f = self.get_file(doc)
 
-        self.main_connection['test']['fs.chunks'].remove({
+        self.main_connection['test']['fs.chunks'].delete_one({
             'files_id': id
         })
 

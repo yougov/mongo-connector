@@ -18,6 +18,7 @@ import os
 import sys
 import time
 
+from bson import SON
 from elasticsearch import Elasticsearch
 from gridfs import GridFS
 
@@ -28,7 +29,7 @@ from tests.setup_cluster import ReplicaSet
 from mongo_connector.doc_managers.elastic_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from tests.util import assert_soon
+from tests.util import assert_soon, close_client
 from tests import unittest
 
 
@@ -89,6 +90,7 @@ class TestElastic(ElasticsearchTestCase):
     @classmethod
     def tearDownClass(cls):
         """Kill the cluster."""
+        close_client(cls.conn)
         cls.repl_set.stop()
 
     def tearDown(self):
@@ -121,7 +123,7 @@ class TestElastic(ElasticsearchTestCase):
 
     def test_insert(self):
         """Test insert operations."""
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: self._count() > 0)
         result_set_1 = list(self._search())
         self.assertEqual(len(result_set_1), 1)
@@ -132,9 +134,9 @@ class TestElastic(ElasticsearchTestCase):
 
     def test_remove(self):
         """Tests remove operations."""
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: self._count() == 1)
-        self.conn['test']['test'].remove({'name': 'paulie'})
+        self.conn['test']['test'].delete_one({'name': 'paulie'})
         assert_soon(lambda: self._count() != 1)
         self.assertEqual(self._count(), 0)
 
@@ -164,21 +166,18 @@ class TestElastic(ElasticsearchTestCase):
     def test_update(self):
         """Test update operations."""
         # Insert
-        self.conn.test.test.insert({"a": 0})
+        self.conn.test.test.insert_one({"a": 0})
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         def check_update(update_spec):
-            updated = self.conn.test.test.find_and_modify(
-                {"a": 0},
-                update_spec,
-                new=True
-            )
+            updated = self.conn.test.command(
+                SON([('findAndModify', 'test'),
+                     ('query', {"a": 0}),
+                     ('update', update_spec),
+                     ('new', True)]))['value']
             # Stringify _id to match what will be retrieved from ES
             updated['_id'] = str(updated['_id'])
-            # Allow some time for update to propagate
-            time.sleep(1)
-            replicated = next(self._search())
-            self.assertEqual(replicated, updated)
+            assert_soon(lambda: next(self._search()) == updated)
 
         # Update by adding a field. Note that ES can't mix types within an array
         check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
@@ -213,7 +212,7 @@ class TestElastic(ElasticsearchTestCase):
         """
         primary_conn = self.repl_set.primary.client()
 
-        self.conn['test']['test'].insert({'name': 'paul'})
+        self.conn['test']['test'].insert_one({'name': 'paul'})
         condition1 = lambda: self.conn['test']['test'].find(
             {'name': 'paul'}).count() == 1
         condition2 = lambda: self._count() == 1
@@ -227,7 +226,7 @@ class TestElastic(ElasticsearchTestCase):
         admin = new_primary_conn['admin']
         assert_soon(lambda: admin.command("isMaster")['ismaster'])
         time.sleep(5)
-        retry_until_ok(self.conn.test.test.insert,
+        retry_until_ok(self.conn.test.test.insert_one,
                        {'name': 'pauline'})
         assert_soon(lambda: self._count() == 2)
         result_set_1 = list(self._search())
@@ -255,7 +254,7 @@ class TestElastic(ElasticsearchTestCase):
         self.assertEqual(retry_until_ok(find_cursor.count), 1)
 
     def test_bad_int_value(self):
-        self.conn.test.test.insert({
+        self.conn.test.test.insert_one({
             'inf': float('inf'), 'nan': float('nan'),
             'still_exists': True})
         assert_soon(lambda: self._count() > 0)

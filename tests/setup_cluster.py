@@ -37,13 +37,7 @@ if db_user and db_password:
 
 
 def _proc_params(mongos=False):
-    params = dict(port=next(_free_port), **DEFAULT_OPTIONS)
-    if not mongos:
-        params['smallfiles'] = True
-        params['noprealloc'] = True
-        params['nojournal'] = True
-
-    return params
+    return dict(port=next(_free_port), **DEFAULT_OPTIONS)
 
 
 def _mo_url(resource, *args):
@@ -172,6 +166,8 @@ class ShardedCluster(MCTestObject):
     def start(self):
         # We never need to restart a sharded cluster, only start new ones.
         response = self._make_post_request()
+        if 'shards' not in response:
+            raise RuntimeError("Error starting cluster: %s" % (response))
         for shard in response['shards']:
             if shard['id'] == 'demo-set-0':
                 repl1_id = shard['_id']

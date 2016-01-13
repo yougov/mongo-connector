@@ -34,3 +34,9 @@ def assert_soon(condition, message=None, max_tries=60):
     """
     if not wait_for(condition, max_tries=max_tries):
         raise AssertionError(message or "")
+
+def close_client(client):
+    if hasattr(type(client), '_process_kill_cursors_queue'):
+        client._process_kill_cursors_queue()
+        time.sleep(1)  # Wait for queue to clear.
+    client.close()
