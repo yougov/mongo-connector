@@ -179,15 +179,9 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor = self.init_cursor()
-
-            # we've fallen too far behind
-            if cursor is None and self.checkpoint is not None:
-                err_msg = "OplogThread: Last entry no longer in oplog"
-                effect = "cannot recover!"
-                LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
-                self.running = False
-                continue
+            cursor = None
+            while not cursor:
+                cursor = self.init_cursor()
 
             last_ts = None
             remove_inc = 0
@@ -761,7 +755,9 @@ class OplogThread(threading.Thread):
             if cursor_ts_long > given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
-                LOG.critical("Oplog Cursor has fallen behind, please reimport data")
+                LOG.critical("Oplog Cursor has fallen behind, reimporting data")
+                self.clear_checkpoint()
+                self.initial_import['dump'] = True
                 return None
 
             # first entry has been consumed
@@ -783,6 +779,12 @@ class OplogThread(threading.Thread):
                           str(self.checkpoint))
         else:
             LOG.debug("OplogThread: no checkpoint to update.")
+
+    def clear_checkpoint(self):
+        with self.oplog_progress as oplog_prog:
+            oplog_dict = oplog_prog.get_dict()
+            oplog_dict.pop(str(self.oplog))
+            LOG.info("OplogThread: Cleared checkpoint to initiate reimport")
 
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
