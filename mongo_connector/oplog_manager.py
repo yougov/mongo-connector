@@ -754,7 +754,7 @@ class OplogThread(threading.Thread):
             cursor_ts_long = util.bson_ts_to_long(
                 first_oplog_entry.get("ts"))
             given_ts_long = util.bson_ts_to_long(timestamp)
-            if cursor_ts_long > given_ts_long:
+            if cursor_ts_long >= given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
                 LOG.critical("Oplog Cursor has fallen behind, reimporting data")
