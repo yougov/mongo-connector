@@ -26,6 +26,7 @@ import time
 import threading
 
 from mongo_connector import errors, util
+from mongo_connector.barrier import Barrier
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
@@ -749,6 +750,7 @@ class OplogThread(threading.Thread):
                 continue
 
             # first entry should be last oplog entry processed
+            LOG.info("Retrieved first oplog entry: %r" % first_oplog_entry)
             cursor_ts_long = util.bson_ts_to_long(
                 first_oplog_entry.get("ts"))
             given_ts_long = util.bson_ts_to_long(timestamp)
@@ -757,6 +759,7 @@ class OplogThread(threading.Thread):
                 # we've fallen behind
                 LOG.critical("Oplog Cursor has fallen behind, reimporting data")
                 self.clear_checkpoint()
+                self.barrier = Barrier(1)
                 self.initial_import['dump'] = True
                 return None
 
