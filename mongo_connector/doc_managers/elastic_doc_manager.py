@@ -102,11 +102,12 @@ class DocManager(DocManagerBase):
         except Exception:
             return False
 
-    def index_alias_add(self, namespace):
+    def index_alias_add(self, mapped_ns, namespace):
         with self.mutex:
             if not self.alias_added:
-                index, doc_type = self._index_and_mapping(namespace)
-                alias_name = index.replace(DEFAULT_INDEX_NAME_PREFIX, "", 1)
+                index_alias, doc_type_alias = self._index_and_mapping(namespace)
+                index, doc_type = self._index_and_mapping(mapped_ns)
+                alias_name = index_alias.replace(DEFAULT_INDEX_NAME_PREFIX, "", 1)
                 try:
                     self.__remove_alias_and_index(alias_name)
                     self.elastic.indices.put_alias(index=index, name=alias_name)
@@ -224,7 +225,9 @@ class DocManager(DocManagerBase):
         """Insert a document into Elasticsearch."""
         index, doc_type = self._index_and_mapping(namespace)
         # No need to duplicate '_id' in source document
+        self.mapGeoFields(doc)
         doc_id = u(doc.get("_id"))
+
         try:
             # Index the source document, using lowercase namespace as index name.
             self.elastic.index(index=index, doc_type=doc_type,
@@ -236,6 +239,19 @@ class DocManager(DocManagerBase):
             if(error):
                 return (doc_id, error['field_name'])
         return None
+
+    def mapGeoFields(self, doc):
+        for key in doc.keys():
+            if key == 'geo' or key.startswith('moe_geo'):
+                value = doc.pop(key)
+            else:
+                continue
+            try:
+                if isinstance(value, (list, tuple)) and len(value) == 2:
+                    mapped_value = {'lat': value[1], 'lon': value[0]}
+                    doc[key] = mapped_value
+            except:
+                LOG.warning("Incorrect value passed in a geo point field: %r, value: %r" % (key, value))
 
     def parseError(self, errorDesc):
         parsed = search("MapperParsingException[{}[{field_name}]{}", errorDesc)
@@ -259,6 +275,7 @@ class DocManager(DocManagerBase):
         def docs_to_upsert():
             doc = None
             for doc in docs:
+                self.mapGeoFields(doc)
                 doc_id = u(doc.get("_id"))
                 document_action = {
                     "_index": index_name,
@@ -305,6 +322,7 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
         doc = f.get_metadata()
+        self.mapGeoFields(doc)
         doc_id = str(doc.get('_id'))
         index, doc_type = self._index_and_mapping(namespace)
 
