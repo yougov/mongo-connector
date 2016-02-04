@@ -85,6 +85,8 @@ class OplogThread(threading.Thread):
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
+        self.reimporting = False
+
         # Set of fields to export
         self.fields = kwargs.get('fields', {})
 
@@ -668,8 +670,9 @@ class OplogThread(threading.Thread):
         else:
             LOG.info('OplogThread: Successfully dumped collection')
             LOG.warning('Fields with errors: %r' % self.error_fields)
-            LOG.info("Waiting for other threads to finish collection dump")
-            self.barrier.wait()
+            if not self.reimporting:
+                LOG.info("Waiting for other threads to finish collection dump")
+                self.barrier.wait()
 
         return timestamp
 
@@ -759,7 +762,7 @@ class OplogThread(threading.Thread):
                 # we've fallen behind
                 LOG.critical("Oplog Cursor has fallen behind, reimporting data")
                 self.clear_checkpoint()
-                self.barrier = Barrier(1)
+                self.reimporting = True
                 self.initial_import['dump'] = True
                 return None
 
