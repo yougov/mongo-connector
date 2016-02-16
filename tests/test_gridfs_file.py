@@ -18,40 +18,10 @@ import gridfs
 
 sys.path[0:0] = [""]
 
-from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector import errors
+from mongo_connector.gridfs_file import GridFSFile
+from mongo_connector.test_utils import ReplicaSet, close_client
 from tests import unittest
-from tests.setup_cluster import ReplicaSet
-from tests.util import close_client
-
-
-class MockGridFSFile:
-    def __init__(self, doc, data):
-        self._id = doc['_id']
-        self.filename = doc['filename']
-        self.upload_date = doc['upload_date']
-        self.md5 = doc['md5']
-        self.data = data
-        self.length = len(self.data)
-        self.pos = 0
-
-    def get_metadata(self):
-        return {
-            '_id': self._id,
-            'filename': self.filename,
-            'upload_date': self.upload_date,
-            'md5': self.md5
-        }
-
-    def __len__(self):
-        return self.length
-
-    def read(self, n=-1):
-        if n < 0 or self.pos + n > self.length:
-            n = self.length - self.pos
-        s = self.data[self.pos:self.pos+n]
-        self.pos += n
-        return s
 
 
 class TestGridFSFile(unittest.TestCase):

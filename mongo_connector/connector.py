@@ -807,7 +807,11 @@ def get_config_options():
                 return module
             except ImportError:
                 raise errors.InvalidConfiguration(
-                    "Could not import %s." % full_name)
+                    "Could not import %s. It could be that this doc manager ha"
+                    "s been moved out of this project and is maintained elsewh"
+                    "ere. Make sure that you have the doc manager installed al"
+                    "ongside mongo-connector. Check the README for a list of a"
+                    "vailable doc managers." % full_name)
                 sys.exit(1)
             except (AttributeError, TypeError):
                 raise errors.InvalidConfiguration(

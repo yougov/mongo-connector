@@ -25,9 +25,9 @@ from bson.timestamp import Timestamp
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import unittest, connector_opts
-from tests.setup_cluster import ReplicaSet
+from mongo_connector.test_utils import ReplicaSet, connector_opts
 from mongo_connector.util import long_to_bson_ts
+from tests import unittest
 
 
 class TestMongoConnector(unittest.TestCase):
