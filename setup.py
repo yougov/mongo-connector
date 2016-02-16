@@ -42,7 +42,8 @@ except ImportError:
     from setuptools import setup
 
 extra_opts = {"test_suite": "tests",
-              "tests_require": ["mongo-orchestration>= 0.2, < 0.4", "requests>=2.5.1"]}
+              "tests_require": ["mongo-orchestration>= 0.2, < 0.4",
+                                "requests>=2.5.1"]}
 
 if sys.version_info[:2] == (2, 6):
     # Need unittest2 to run unittests in Python 2.6
@@ -123,8 +124,7 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo >= 2.9',
-                        'pysolr >= 3.1.0',
-                        'elasticsearch >= 1.2, < 2.0.0'],
+                        'pysolr >= 3.1.0'],
       packages=["mongo_connector", "mongo_connector.doc_managers"],
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']

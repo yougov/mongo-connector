@@ -14,25 +14,26 @@
 # limitations under the License.
 
 """Test Solr search using the synchronizer, i.e. as it would be used by an user
-    """
+"""
+
 import logging
 import os
 import sys
 import time
 
+from pysolr import Solr, SolrError
+
 from bson import SON
 from gridfs import GridFS
-from pysolr import Solr, SolrError
 
 sys.path[0:0] = [""]
 
-from tests import solr_url, unittest
-from tests.setup_cluster import ReplicaSet
-from tests.util import assert_soon
 from mongo_connector.compat import u
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
+from mongo_connector.test_utils import ReplicaSet, solr_url, assert_soon
 from mongo_connector.util import retry_until_ok
+from tests import unittest
 
 
 class SolrTestCase(unittest.TestCase):
@@ -159,7 +160,7 @@ class TestSolr(SolrTestCase):
                      ('new', True)]))['value']
 
             # Stringify _id to match what will be retrieved from Solr
-            updated['_id'] = u(updated['_id'])
+            updated[u('_id')] = u(updated['_id'])
             # Flatten the MongoDB document to match Solr
             updated = docman._clean_doc(updated, 'dummy.namespace', 0)
             # Allow some time for update to propagate
@@ -175,6 +176,8 @@ class TestSolr(SolrTestCase):
             # Remove field added by Solr
             replicated.pop("_version_")
 
+            print("REPLICATED", replicated)
+            print("UPDATED", updated)
             self.assertEqual(replicated, updated)
 
         # Update by adding a field.

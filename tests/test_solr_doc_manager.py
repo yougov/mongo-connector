@@ -20,11 +20,9 @@ sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
-
-from tests import unittest, TESTARGS, solr_url
-from tests.test_gridfs_file import MockGridFSFile
+from mongo_connector.test_utils import MockGridFSFile, TESTARGS, solr_url
+from tests import unittest
 from tests.test_solr import SolrTestCase
-
 
 class TestSolrDocManager(SolrTestCase):
     """Test class for SolrDocManager

@@ -23,8 +23,8 @@ sys.path[0:0] = [""]
 from mongo_connector import config, errors, connector
 from mongo_connector.connector import get_config_options, setup_logging
 from mongo_connector.doc_managers import doc_manager_simulator
-from tests import unittest, solr_url
-from tests.setup_cluster import ReplicaSet
+from mongo_connector.test_utils import ReplicaSet, solr_url
+from tests import unittest
 
 from_here = lambda *paths: os.path.join(
     os.path.abspath(os.path.dirname(__file__)), *paths)

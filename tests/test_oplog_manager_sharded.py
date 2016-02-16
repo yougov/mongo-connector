@@ -20,7 +20,6 @@ import time
 
 import bson
 import pymongo
-
 from pymongo.read_preferences import ReadPreference
 from pymongo.write_concern import WriteConcern
 
@@ -29,10 +28,11 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
+from mongo_connector.test_utils import (ShardedCluster,
+                                        assert_soon,
+                                        close_client)
 from mongo_connector.util import retry_until_ok
-from tests import SkipTest, unittest
-from tests.setup_cluster import ShardedCluster
-from tests.util import assert_soon, close_client
+from tests import unittest, SkipTest
 
 
 class TestOplogManagerSharded(unittest.TestCase):
