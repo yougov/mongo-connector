@@ -284,8 +284,6 @@ class DocManager(DocManagerBase):
                     "_source": self._formatter.format_document(doc)
                 }
                 yield document_action
-            if doc is None:
-                return None
         responses = []
         doc_actions = docs_to_upsert()
         if not doc_actions:
