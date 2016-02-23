@@ -165,6 +165,7 @@ class OplogThread(threading.Thread):
             remove_inc = 0
             upsert_inc = 0
             update_inc = 0
+            operation = ''
             try:
                 logging.debug("OplogThread: about to process new oplog "
                               "entries")
@@ -252,9 +253,12 @@ class OplogThread(threading.Thread):
 
                         last_ts = entry['ts']
 
-                        # update timestamp per batch size
+                        # update timestamp per batch size or whenever a delete operation is successfully synced
+                        # (delete is a special case, in which we won't be able to sucessfully repeat the operation
+                        # when mongoconnector is restarted from last_written_batch_size based checkpoint and hence
+                        # will fail to sync any data)
                         # n % -1 (default for self.batch_size) == 0 for all n
-                        if n % self.batch_size == 1 and last_ts is not None:
+                        if (n % self.batch_size == 1 or operation == 'd') and last_ts is not None:
                             self.checkpoint = last_ts
                             self.update_checkpoint()
 
