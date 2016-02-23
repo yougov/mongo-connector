@@ -511,9 +511,9 @@ class OplogThread(threading.Thread):
         LOG.info("OplogThread: Dumping set of collections %s from shard %s with %d docs" % (dump_set, self.shard_name, shard_doc_count))
         if shard_doc_count > 0:
             timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
-        if timestamp is None:
-            return None
-        long_ts = util.bson_ts_to_long(timestamp)
+            long_ts = util.bson_ts_to_long(timestamp)
+        else:
+            long_ts = 0
 
         def query_handle_id(query):
             if '_id' in query and query['_id']:
@@ -564,8 +564,9 @@ class OplogThread(threading.Thread):
                     time.sleep(1)
 
         def upsert_all_failed_docs(dm, namespace, errors):
-            for _id, field in errors:
-                self.upsert_doc(dm, namespace, long_ts, _id, field)
+            if errors:
+                for _id, field in errors:
+                    self.upsert_doc(dm, namespace, long_ts, _id, field)
 
         def upsert_each(dm):
             num_inserted = 0

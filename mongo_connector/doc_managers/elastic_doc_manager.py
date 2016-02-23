@@ -285,16 +285,17 @@ class DocManager(DocManagerBase):
                 }
                 yield document_action
             if doc is None:
-                raise errors.EmptyDocsError(
-                    "Cannot upsert an empty sequence of "
-                    "documents into Elastic Search")
+                return None
         responses = []
+        doc_actions = docs_to_upsert()
+        if not doc_actions:
+            return
         try:
             kw = {}
             if self.chunk_size > 0:
                 kw['chunk_size'] = self.chunk_size
             responses = streaming_bulk(client=self.elastic,
-                                       actions=docs_to_upsert(),
+                                       actions=doc_actions,
                                        **kw)
             docs_inserted = 0
             for ok, resp in responses:
