@@ -26,7 +26,6 @@ import time
 import threading
 
 from mongo_connector import errors, util
-from mongo_connector.barrier import Barrier
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
@@ -41,7 +40,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
-    def __init__(self, primary_client, doc_managers,
+    def __init__(self, shard_name, primary_client, doc_managers,
                  oplog_progress_dict, barrier=None, mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
@@ -72,6 +71,8 @@ class OplogThread(threading.Thread):
 
         # A semaphore implementation to synchronize initial data import
         self.barrier = barrier
+
+        self.shard_name = shard_name
 
         # The set of namespaces to process from the mongo cluster.
         self.namespace_set = kwargs.get('ns_set', [])
@@ -504,9 +505,12 @@ class OplogThread(threading.Thread):
         """
 
         dump_set = self.get_dump_set()
+        shard_doc_count = self.shard_doc_count()
+        timestamp = None
 
-        LOG.info("OplogThread: Dumping set of collections %s " % dump_set)
-        timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
+        LOG.info("OplogThread: Dumping set of collections %s from shard %s with %d docs" % (dump_set, self.shard_name, shard_doc_count))
+        if shard_doc_count > 0:
+            timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
         long_ts = util.bson_ts_to_long(timestamp)
@@ -695,14 +699,14 @@ class OplogThread(threading.Thread):
                   % curr[0]['ts'].time)
         return curr[0]['ts']
 
-    def shard_has_docs(self):
+    def shard_doc_count(self):
         dump_set = self.get_dump_set()
+        count = 0
         for namespace in dump_set:
             database, coll = namespace.split('.', 1)
             target_coll = self.primary_client[database][coll]
-            if target_coll.count() > 0:
-                return True
-        return False
+            count += target_coll.count()
+        return count
 
     def init_cursor(self):
         """Position the cursor appropriately.
@@ -725,16 +729,15 @@ class OplogThread(threading.Thread):
                     dm.index_create(mapped_ns)
 
         if timestamp is None:
-            if self.initial_import['dump'] and self.shard_has_docs():
+            if self.initial_import['dump']:
                 # dump collection and update checkpoint
                 LOG.info("INITIAL IMPORT: Starting initial import of data")
                 timestamp = self.dump_collection()
-                if timestamp is None:
-                    return None
-                for dm in self.doc_managers:
-                    for namespace in dump_set:
-                        mapped_ns = self.dest_mapping.get(namespace, namespace)
-                        dm.index_alias_add(mapped_ns, namespace)
+                if timestamp is not None:
+                    for dm in self.doc_managers:
+                        for namespace in dump_set:
+                            mapped_ns = self.dest_mapping.get(namespace, namespace)
+                            dm.index_alias_add(mapped_ns, namespace)
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
@@ -748,6 +751,10 @@ class OplogThread(threading.Thread):
 
         self.checkpoint = timestamp
         self.update_checkpoint()
+
+        if timestamp is None:
+            LOG.info("No documents found in shard: %s, creating cursor to tail oplog" % self.shard_name)
+            return self.get_oplog_cursor()
 
         for i in range(60):
             cursor = self.get_oplog_cursor(timestamp)
