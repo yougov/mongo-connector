@@ -695,6 +695,15 @@ class OplogThread(threading.Thread):
                   % curr[0]['ts'].time)
         return curr[0]['ts']
 
+    def shard_has_docs(self):
+        dump_set = self.get_dump_set()
+        for namespace in dump_set:
+            database, coll = namespace.split('.', 1)
+            target_coll = self.primary_client[database][coll]
+            if target_coll.count() > 0:
+                return True
+        return False
+
     def init_cursor(self):
         """Position the cursor appropriately.
 
@@ -716,7 +725,7 @@ class OplogThread(threading.Thread):
                     dm.index_create(mapped_ns)
 
         if timestamp is None:
-            if self.initial_import['dump']:
+            if self.initial_import['dump'] and self.shard_has_docs():
                 # dump collection and update checkpoint
                 LOG.info("INITIAL IMPORT: Starting initial import of data")
                 timestamp = self.dump_collection()
