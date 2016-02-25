@@ -250,6 +250,8 @@ class DocManager(DocManagerBase):
                 if isinstance(value, (list, tuple)) and len(value) == 2:
                     mapped_value = {'lat': value[1], 'lon': value[0]}
                     doc[key] = mapped_value
+                elif isinstance(value, dict) and 'lat' in value and 'lon' in value:
+                    doc[key] = value
             except:
                 LOG.warning("Incorrect value passed in a geo point field: %r, value: %r" % (key, value))
 
