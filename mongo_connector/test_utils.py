@@ -16,10 +16,14 @@ import atexit
 import itertools
 import time
 import os
+import sys
 
 import pymongo
 import requests
 
+
+if sys.version_info[0] == 3:
+    unicode = str
 
 # Configurable hosts and ports used in the tests
 solr_url = unicode(os.environ.get('SOLR_URL', 'http://localhost:8983/solr'))
