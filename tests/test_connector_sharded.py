@@ -35,7 +35,7 @@ class TestConnectorSharded(unittest.TestCase):
         # Insert some documents into the sharded cluster.  These
         # should go to the DocManager, and the connector should not
         # have an auth failure.
-        self.cluster.client().test.test.insert({'auth_failure': False})
+        self.cluster.client().test.test.insert_one({'auth_failure': False})
         assert_soon(lambda: len(dm._search()) > 0)
 
         connector.join()

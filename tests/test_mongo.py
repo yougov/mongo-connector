@@ -19,6 +19,7 @@ import os
 import sys
 import time
 
+from bson import SON
 from gridfs import GridFS
 
 sys.path[0:0] = [""]
@@ -28,7 +29,7 @@ from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from tests import unittest, connector_opts
-from tests.util import assert_soon
+from tests.util import assert_soon, close_client
 
 
 class MongoTestCase(unittest.TestCase):
@@ -44,6 +45,7 @@ class MongoTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        close_client(cls.mongo_conn)
         cls.standalone.stop()
 
     def _search(self, **kwargs):
@@ -114,7 +116,7 @@ class TestMongo(MongoTestCase):
         """Tests insert
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
         result_set_1 = self._search()
         self.assertEqual(sum(1 for _ in result_set_1), 1)
@@ -127,9 +129,9 @@ class TestMongo(MongoTestCase):
         """Tests remove
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
-        self.conn['test']['test'].remove({'name': 'paulie'})
+        self.conn['test']['test'].delete_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self._search()) != 1)
         self.assertEqual(sum(1 for _ in self._search()), 0)
 
@@ -158,15 +160,17 @@ class TestMongo(MongoTestCase):
     def test_update(self):
         """Test update operations."""
         # Insert
-        self.conn.test.test.insert({"a": 0})
+        self.conn.test.test.insert_one({"a": 0})
         assert_soon(lambda: sum(1 for _ in self._search()) == 1)
 
         def check_update(update_spec):
-            updated = self.conn.test.test.find_and_modify(
-                {"a": 0},
-                update_spec,
-                new=True
-            )
+            updated = self.conn.test.command(
+                SON([('findAndModify', 'test'),
+                     ('query', {"a": 0}),
+                     ('update', update_spec),
+                     ('new', True)]))['value']
+
+
             # Allow some time for update to propagate
             time.sleep(2)
             replicated = self.mongo_doc.mongo.test.test.find_one({"a": 0})
@@ -202,7 +206,7 @@ class TestMongo(MongoTestCase):
             restarting both.
         """
         primary_conn = self.repl_set.primary.client()
-        self.conn['test']['test'].insert({'name': 'paul'})
+        self.conn['test']['test'].insert_one({'name': 'paul'})
         condition = lambda: self.conn['test']['test'].find_one(
             {'name': 'paul'}) is not None
         assert_soon(condition)
@@ -214,7 +218,7 @@ class TestMongo(MongoTestCase):
         condition = lambda: admin.command("isMaster")['ismaster']
         assert_soon(lambda: retry_until_ok(condition))
 
-        retry_until_ok(self.conn.test.test.insert,
+        retry_until_ok(self.conn.test.test.insert_one,
                        {'name': 'pauline'})
         assert_soon(lambda: sum(1 for _ in self._search()) == 2)
         result_set_1 = list(self._search())

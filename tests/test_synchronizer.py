@@ -61,13 +61,13 @@ class TestSynchronizer(unittest.TestCase):
     def setUp(self):
         """ Clears the db
         """
-        self.conn['test']['test'].remove()
+        self.conn['test']['test'].delete_many({})
         assert_soon(lambda: len(self.synchronizer._search()) == 0)
 
     def test_insert(self):
         """Tests insert
         """
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         while (len(self.synchronizer._search()) == 0):
             time.sleep(1)
         result_set_1 = self.synchronizer._search()
@@ -78,7 +78,7 @@ class TestSynchronizer(unittest.TestCase):
             self.assertEqual(item['name'], result_set_2['name'])
 
     def test_ns_set(self):
-        self.conn.test.other.insert({"replicated": False})
+        self.conn.test.other.insert_one({"replicated": False})
         results = self.synchronizer._search()
         self.assertEqual(len(results), 0,
                          "Should not replicate outside of test.test namespace")
@@ -86,10 +86,10 @@ class TestSynchronizer(unittest.TestCase):
     def test_remove(self):
         """Tests remove
         """
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         while (len(self.synchronizer._search()) != 1):
             time.sleep(1)
-        self.conn['test']['test'].remove({'name': 'paulie'})
+        self.conn['test']['test'].delete_one({'name': 'paulie'})
 
         while (len(self.synchronizer._search()) == 1):
             time.sleep(1)
@@ -99,17 +99,22 @@ class TestSynchronizer(unittest.TestCase):
     def test_update(self):
         """Test that Connector can replicate updates successfully."""
         doc = {"a": 1, "b": 2}
-        self.conn.test.test.insert(doc)
+        self.conn.test.test.insert_one(doc)
         selector = {"_id": doc['_id']}
 
-        def update_and_retrieve(update_spec):
-            self.conn.test.test.update(selector, update_spec)
+        def update_and_retrieve(update_spec, replace=False):
+            if replace:
+                self.conn.test.test.replace_one(selector, update_spec)
+            else:
+                self.conn.test.test.update_one(selector, update_spec)
+
+            # self.conn.test.test.update(selector, update_spec)
             # Give the connector some time to perform update
             time.sleep(1)
             return self.synchronizer._search()[0]
 
         # Update whole document
-        doc = update_and_retrieve({"a": 1, "b": 2, "c": 10})
+        doc = update_and_retrieve({"a": 1, "b": 2, "c": 10}, replace=True)
         self.assertEqual(doc['a'], 1)
         self.assertEqual(doc['b'], 2)
         self.assertEqual(doc['c'], 10)

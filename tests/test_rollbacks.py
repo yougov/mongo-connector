@@ -8,6 +8,7 @@ import sys
 import time
 
 from pymongo.read_preferences import ReadPreference
+from pymongo.write_concern import WriteConcern
 
 sys.path[0:0] = [""]
 
@@ -17,13 +18,15 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.oplog_manager import OplogThread
 
 from tests import unittest, STRESS_COUNT
-from tests.util import assert_soon
+from tests.util import assert_soon, close_client
 from tests.setup_cluster import ReplicaSet
 
 
 class TestRollbacks(unittest.TestCase):
 
     def tearDown(self):
+        close_client(self.primary_conn)
+        close_client(self.secondary_conn)
         self.repl_set.stop()
 
     def setUp(self):
@@ -63,7 +66,7 @@ class TestRollbacks(unittest.TestCase):
         self.opman.start()
 
         # Insert first document with primary up
-        self.main_conn["test"]["mc"].insert({"i": 0})
+        self.main_conn["test"]["mc"].insert_one({"i": 0})
         self.assertEqual(self.primary_conn["test"]["mc"].find().count(), 1)
 
         # Make sure the insert is replicated
@@ -78,7 +81,7 @@ class TestRollbacks(unittest.TestCase):
         assert_soon(lambda: secondary["admin"].command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
-        retry_until_ok(self.main_conn["test"]["mc"].insert, {"i": 1})
+        retry_until_ok(self.main_conn["test"]["mc"].insert_one, {"i": 1})
         self.assertEqual(secondary["test"]["mc"].count(), 2)
 
         # Wait for replication to doc manager
@@ -124,7 +127,7 @@ class TestRollbacks(unittest.TestCase):
         self.opman.start()
 
         # Insert a document into each namespace
-        self.main_conn["test"]["mc"].insert({"i": 0})
+        self.main_conn["test"]["mc"].insert_one({"i": 0})
         self.assertEqual(self.primary_conn["test"]["mc"].count(), 1)
 
         # Make sure the insert is replicated
@@ -146,8 +149,8 @@ class TestRollbacks(unittest.TestCase):
         secondary_ids = []
         for i in range(1, 10):
             secondary_ids.append(
-                retry_until_ok(self.main_conn["test"]["mc"].insert,
-                               {"i": i}))
+                retry_until_ok(self.main_conn["test"]["mc"].insert_one,
+                               {"i": i}).inserted_id)
         self.assertEqual(self.secondary_conn["test"]["mc"].count(), 10)
 
         # Wait for replication to the doc managers
@@ -203,8 +206,8 @@ class TestRollbacks(unittest.TestCase):
         self.opman.start()
 
         # Insert a document, wait till it replicates to secondary
-        self.main_conn["test"]["mc"].insert({"i": 0})
-        self.main_conn["test"]["mc"].insert({"i": 1})
+        self.main_conn["test"]["mc"].insert_one({"i": 0})
+        self.main_conn["test"]["mc"].insert_one({"i": 1})
         self.assertEqual(self.primary_conn["test"]["mc"].find().count(), 2)
         assert_soon(lambda: self.secondary_conn["test"]["mc"].count() == 2,
                     "first write didn't replicate to secondary")
@@ -215,7 +218,7 @@ class TestRollbacks(unittest.TestCase):
                     .command("isMaster")["ismaster"])
 
         # Delete first document
-        retry_until_ok(self.main_conn["test"]["mc"].remove, {"i": 0})
+        retry_until_ok(self.main_conn["test"]["mc"].delete_one, {"i": 0})
         self.assertEqual(self.secondary_conn["test"]["mc"].count(), 1)
 
         # Wait for replication to doc manager
@@ -253,9 +256,9 @@ class TestRollbacks(unittest.TestCase):
 
         c = self.main_conn.test.mc
         docman = self.opman.doc_managers[0]
-
-        c.insert(({'i': i} for i in range(STRESS_COUNT)), w=2)
-        assert_soon(lambda: c.count() == STRESS_COUNT)
+        c2 = c.with_options(write_concern=WriteConcern(w=2))
+        c2.insert_many([{'i': i} for i in range(STRESS_COUNT)])
+        assert_soon(lambda: c2.count() == STRESS_COUNT)
         condition = lambda: len(docman._search()) == STRESS_COUNT
         assert_soon(condition, ("Was expecting %d documents in DocManager, "
                                 "but %d found instead."
@@ -269,7 +272,7 @@ class TestRollbacks(unittest.TestCase):
         assert_soon(
             lambda: retry_until_ok(admin.command, "isMaster")['ismaster'])
 
-        retry_until_ok(c.insert,
+        retry_until_ok(c.insert_many,
                        [{'i': str(STRESS_COUNT + i)}
                         for i in range(STRESS_COUNT)])
 
