@@ -342,7 +342,7 @@ class OplogThread(threading.Thread):
             return entry
 
         def pop_excluded_fields(doc):
-            for key in set(doc) - self._fields:
+            for key in set(doc) - set(self._fields):
                 doc.pop(key)
 
         entry_o = entry['o']
