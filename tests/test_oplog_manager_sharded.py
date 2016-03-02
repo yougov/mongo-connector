@@ -406,6 +406,7 @@ class TestOplogManagerSharded(unittest.TestCase):
 
         # Insert first documents while primaries are up
         db_main = self.mongos_conn["test"]["mcsharded"]
+        # self.mongos_conn["test"]["mcsharded"].drop()
         db_main2 = db_main.with_options(write_concern=WriteConcern(w=2))
         db_main2.insert_one({"i": 0})
         db_main2.insert_one({"i": 1000})
