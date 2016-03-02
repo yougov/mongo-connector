@@ -14,12 +14,31 @@
 
 import atexit
 import itertools
+import time
 import os
+import sys
 
 import pymongo
 import requests
 
-from tests import db_user, db_password
+
+if sys.version_info[0] == 3:
+    unicode = str
+
+# Configurable hosts and ports used in the tests
+solr_url = unicode(os.environ.get('SOLR_URL', 'http://localhost:8983/solr'))
+db_user = unicode(os.environ.get("DB_USER", ""))
+db_password = unicode(os.environ.get("DB_PASSWORD", ""))
+# Extra keyword options to provide to Connector.
+connector_opts = {}
+if db_user:
+    connector_opts = {'auth_username': db_user, 'auth_key': db_password}
+
+# Document count for stress tests
+STRESS_COUNT = 100
+
+# Test namespace, timestamp arguments
+TESTARGS = ('test.test', 1)
 
 _mo_address = os.environ.get("MO_ADDRESS", "localhost:8889")
 _mongo_start_port = int(os.environ.get("MONGO_PORT", 27017))
@@ -180,3 +199,56 @@ class ShardedCluster(MCTestObject):
         self.shards = [ReplicaSet()._init_from_response(resp)
                        for resp in (shard1, shard2)]
         return self
+
+
+class MockGridFSFile:
+    def __init__(self, doc, data):
+        self._id = doc['_id']
+        self.filename = doc['filename']
+        self.upload_date = doc['upload_date']
+        self.md5 = doc['md5']
+        self.data = data
+        self.length = len(self.data)
+        self.pos = 0
+
+    def get_metadata(self):
+        return {
+            '_id': self._id,
+            'filename': self.filename,
+            'upload_date': self.upload_date,
+            'md5': self.md5
+        }
+
+    def __len__(self):
+        return self.length
+
+    def read(self, n=-1):
+        if n < 0 or self.pos + n > self.length:
+            n = self.length - self.pos
+        s = self.data[self.pos:self.pos+n]
+        self.pos += n
+        return s
+
+
+def wait_for(condition, max_tries=60):
+    """Wait for a condition to be true up to a maximum number of tries
+    """
+    while not condition() and max_tries > 1:
+        time.sleep(1)
+        max_tries -= 1
+    return condition()
+
+
+def assert_soon(condition, message=None, max_tries=60):
+    """Assert that a condition eventually evaluates to True after at most
+    max_tries number of attempts
+
+    """
+    if not wait_for(condition, max_tries=max_tries):
+        raise AssertionError(message or "")
+
+def close_client(client):
+    if hasattr(type(client), '_process_kill_cursors_queue'):
+        client._process_kill_cursors_queue()
+        time.sleep(1)  # Wait for queue to clear.
+    client.close()

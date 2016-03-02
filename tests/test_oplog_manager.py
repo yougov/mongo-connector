@@ -28,9 +28,8 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
+from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
 from tests import unittest
-from tests.setup_cluster import ReplicaSet
-from tests.util import assert_soon, close_client
 
 
 class TestOplogManager(unittest.TestCase):

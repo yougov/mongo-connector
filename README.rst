@@ -72,6 +72,14 @@ If you want to jump-start into using mongo-connector with a another particular s
 - `Usage with Elasticsearch <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
 - `Usage with MongoDB <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
 
+Doc Managers
+~~~~~~~~~~~~~~~~~~~~~
+
+Elastic 1.x doc manager: https://github.com/mongodb-labs/elastic_doc_manager
+Elastic 2.x doc manager: https://github.com/mongodb-labs/elastic2_doc_manager
+
+The Solr doc manager and the MongoDB doc manager come packaged with the mongo-connector project.
+
 Troubleshooting/Questions
 -------------------------
 

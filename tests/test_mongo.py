@@ -15,6 +15,7 @@
 """Test mongo using the synchronizer, i.e. as it would be used by an
     user
 """
+
 import os
 import sys
 import time
@@ -24,12 +25,15 @@ from gridfs import GridFS
 
 sys.path[0:0] = [""]
 
-from tests.setup_cluster import ReplicaSet, Server
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
-from tests import unittest, connector_opts
-from tests.util import assert_soon, close_client
+from mongo_connector.test_utils import (ReplicaSet,
+                                        Server,
+                                        connector_opts,
+                                        assert_soon,
+                                        close_client)
+from tests import unittest
 
 
 class MongoTestCase(unittest.TestCase):

@@ -14,6 +14,7 @@
 
 """Test synchronizer using DocManagerSimulator
 """
+
 import os
 import sys
 import time
@@ -21,9 +22,8 @@ import time
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from tests import unittest, connector_opts
-from tests.setup_cluster import ReplicaSet
-from tests.util import assert_soon
+from mongo_connector.test_utils import ReplicaSet, connector_opts, assert_soon
+from tests import unittest
 
 
 class TestSynchronizer(unittest.TestCase):

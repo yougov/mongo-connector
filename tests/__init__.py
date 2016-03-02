@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import logging
-import os
 import sys
 
 logging.basicConfig(stream=sys.stdout)
@@ -27,20 +27,3 @@ else:
     import unittest
     from unittest.case import SkipTest
 
-# Configurable hosts and ports used in the tests
-elastic_host = unicode(os.environ.get("ES_HOST", 'localhost'))
-elastic_port = unicode(os.environ.get("ES_PORT", 9200))
-elastic_pair = '%s:%s' % (elastic_host, elastic_port)
-solr_url = unicode(os.environ.get('SOLR_URL', 'http://localhost:8983/solr'))
-db_user = unicode(os.environ.get("DB_USER", ""))
-db_password = unicode(os.environ.get("DB_PASSWORD", ""))
-# Extra keyword options to provide to Connector.
-connector_opts = {}
-if db_user:
-    connector_opts = {'auth_username': db_user, 'auth_key': db_password}
-
-# Document count for stress tests
-STRESS_COUNT = 100
-
-# Test namespace, timestamp arguments
-TESTARGS = ('test.test', 1)
