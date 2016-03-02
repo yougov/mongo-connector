@@ -460,6 +460,16 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(
             filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
 
+    def test_fields(self):
+        fields = ["_id","title","content","author"]
+        opman = OplogThread(
+            primary_client=self.primary_conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict(),
+            fields = fields
+        )
+        self.assertEqual(set(fields), opman._fields)
+        self.assertEqual(sorted(fields), sorted(opman.fields))
 
 if __name__ == '__main__':
     unittest.main()
