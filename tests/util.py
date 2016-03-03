@@ -21,7 +21,12 @@ import time
 def wait_for(condition, max_tries=60):
     """Wait for a condition to be true up to a maximum number of tries
     """
-    while not condition() and max_tries > 1:
+    cond = False
+    while not cond and max_tries > 1:
+        try:
+            cond = condition()
+        except Exception:
+            pass
         time.sleep(1)
         max_tries -= 1
     return condition()

@@ -4,6 +4,7 @@ python:
   - 2.7
   - 3.3
   - 3.4
+  - 3.5
 
 services:
   - elasticsearch
@@ -20,7 +21,6 @@ before_script:
   - sudo service elasticsearch restart
   - cd solr-4.9.1/example/ && java -Djetty.port=8983 -Dsolr.solr.home=solr -jar start.jar > /dev/null 2>&1 &
   - mongo-orchestration start
-  - mongod --version
 
 script:
   - python setup.py test

@@ -61,7 +61,7 @@ def long_to_bson_ts(val):
 def retry_until_ok(func, *args, **kwargs):
     """Retry code block until it succeeds.
 
-    If it does not succeed in 60 attempts, the function re-raises any
+    If it does not succeed in 120 attempts, the function re-raises any
     error the function raised on its last attempt.
 
     """
