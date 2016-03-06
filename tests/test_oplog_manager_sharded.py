@@ -30,7 +30,7 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.util import retry_until_ok
-from tests import unittest
+from tests import SkipTest, unittest
 from tests.setup_cluster import ShardedCluster
 from tests.util import assert_soon, close_client
 
@@ -421,7 +421,13 @@ class TestOplogManagerSharded(unittest.TestCase):
             lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
-        retry_until_ok(db_main.insert_one, {"i": 1})
+        def cond():
+            try:
+                db_main.insert_one({"i": 1})
+            except:
+                pass
+            return db_main.find_one({"i": 1})
+        retry_until_ok(cond)
         db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
         db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
         self.assertEqual(db_secondary1.count(), 2)
@@ -636,7 +642,10 @@ class TestOplogManagerSharded(unittest.TestCase):
         for op in operations["inprog"]:
             if op.get("query", {}).get("moveChunk"):
                 opid = op["opid"]
-        self.assertNotEqual(opid, None, "could not find moveChunk operation")
+
+        if opid is None:
+            raise SkipTest("could not find moveChunk operation, cannot test "
+                           "failed moveChunk")
         # Kill moveChunk with the opid
 
         if self.mongos_conn.server_info()['versionArray'][:3] >= [3, 1, 2]:
