@@ -84,8 +84,11 @@ class MCTestObject(object):
     def _make_post_request(self):
         config = _post_request_template.copy()
         config.update(self.get_config())
-        return requests.post(
+        ret = requests.post(
             _mo_url(self._resource), timeout=None, json=config).json()
+        if type(ret) == list:  # Will return a list if an error occurred.
+            raise RuntimeError("Error sending POST to cluster: %s" % (ret))
+        return ret
 
     def client(self, **kwargs):
         client = pymongo.MongoClient(self.uri, **kwargs)
@@ -185,8 +188,6 @@ class ShardedCluster(MCTestObject):
     def start(self):
         # We never need to restart a sharded cluster, only start new ones.
         response = self._make_post_request()
-        if 'shards' not in response:
-            raise RuntimeError("Error starting cluster: %s" % (response))
         for shard in response['shards']:
             if shard['id'] == 'demo-set-0':
                 repl1_id = shard['_id']
