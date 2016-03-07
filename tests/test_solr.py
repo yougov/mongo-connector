@@ -164,7 +164,7 @@ class TestSolr(SolrTestCase):
             # Flatten the MongoDB document to match Solr
             updated = docman._clean_doc(updated, 'dummy.namespace', 0)
             # Allow some time for update to propagate
-            time.sleep(1)
+            time.sleep(3)
             replicated = list(self._search("a:0"))[0]
 
             # Remove add'l fields until these are stored in a separate Solr core
@@ -176,8 +176,6 @@ class TestSolr(SolrTestCase):
             # Remove field added by Solr
             replicated.pop("_version_")
 
-            print("REPLICATED", replicated)
-            print("UPDATED", updated)
             self.assertEqual(replicated, updated)
 
         # Update by adding a field.
