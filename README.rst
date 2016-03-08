@@ -75,8 +75,9 @@ If you want to jump-start into using mongo-connector with a another particular s
 Doc Managers
 ~~~~~~~~~~~~~~~~~~~~~
 
-Elastic 1.x doc manager: https://github.com/mongodb-labs/elastic_doc_manager
-Elastic 2.x doc manager: https://github.com/mongodb-labs/elastic2_doc_manager
+Elastic 1.x doc manager: https://github.com/mongodb-labs/elastic-doc-manager
+
+Elastic 2.x doc manager: https://github.com/mongodb-labs/elastic2-doc-manager
 
 The Solr doc manager and the MongoDB doc manager come packaged with the mongo-connector project.
 
