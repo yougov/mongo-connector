@@ -283,6 +283,8 @@ class OplogThread(threading.Thread):
                                 LOG.exception(
                                     "Unable to process oplog document %r"
                                     % entry)
+                                # pass here, to avoid crashing of script
+                                pass
                             except errors.ConnectionFailed:
                                 LOG.exception(
                                     "Connection failed while processing oplog "
