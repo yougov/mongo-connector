@@ -460,7 +460,8 @@ class TestOplogManager(unittest.TestCase):
             filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
 
     def test_fields(self):
-        fields = ["_id","title","content","author"]
+        # Test with "_id" field in constructor
+        fields = ["_id", "title", "content", "author"]
         opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -469,6 +470,58 @@ class TestOplogManager(unittest.TestCase):
         )
         self.assertEqual(set(fields), opman._fields)
         self.assertEqual(sorted(fields), sorted(opman.fields))
+        extra_fields = fields + ['extra1', 'extra2']
+        filtered = opman.filter_oplog_entry(
+            {'op': 'i',
+             'o': dict((f, 1) for f in extra_fields)})['o']
+        self.assertEqual(dict((f, 1) for f in fields), filtered)
+
+        # Test without "_id" field in constructor
+        fields = ["title", "content", "author"]
+        opman = OplogThread(
+            primary_client=self.primary_conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict(),
+            fields = fields
+        )
+        self.assertEqual(set(fields), opman._fields)
+        self.assertEqual(sorted(fields), sorted(opman.fields))
+        extra_fields = fields + ['extra1', 'extra2']
+        filtered = opman.filter_oplog_entry(
+            {'op': 'i',
+             'o': dict((f, 1) for f in extra_fields)})['o']
+        self.assertEqual(dict((f, 1) for f in fields), filtered)
+
+        # Test with only "_id" field
+        fields = ["_id"]
+        opman = OplogThread(
+            primary_client=self.primary_conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict(),
+            fields = fields
+        )
+        self.assertEqual(set(fields), opman._fields)
+        self.assertEqual(fields, opman.fields)
+        extra_fields = fields + ['extra1', 'extra2']
+        filtered = opman.filter_oplog_entry(
+            {'op': 'i',
+             'o': dict((f, 1) for f in extra_fields)})['o']
+        self.assertEqual({'_id': 1}, filtered)
+
+        # Test with no fields set
+        opman = OplogThread(
+            primary_client=self.primary_conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict(),
+        )
+        self.assertEqual(set([]), opman._fields)
+        self.assertEqual(None, opman.fields)
+        extra_fields = ['_id', 'extra1', 'extra2']
+        filtered = opman.filter_oplog_entry(
+            {'op': 'i',
+             'o': dict((f, 1) for f in extra_fields)})['o']
+        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
+
 
 if __name__ == '__main__':
     unittest.main()

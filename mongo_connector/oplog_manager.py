@@ -107,7 +107,7 @@ class OplogThread(threading.Thread):
             # Always include _id field
             self._fields.add('_id')
         else:
-            self._fields = None
+            self._fields = set([])
 
     @property
     def namespace_set(self):
@@ -342,7 +342,9 @@ class OplogThread(threading.Thread):
             return entry
 
         def pop_excluded_fields(doc):
-            for key in set(doc) - self._fields:
+            # always include _id
+            fields_with_id = self._fields.union(set(['_id']))
+            for key in set(doc) - fields_with_id:
                 doc.pop(key)
 
         entry_o = entry['o']
