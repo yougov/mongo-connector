@@ -776,7 +776,7 @@ def get_config_options():
             if not isinstance(dm, dict):
                 raise errors.InvalidConfiguration(
                     "Elements of docManagers must be a dict.")
-            if 'docManager' not in dm:
+            if 'docManager' not in dm and 'docManagerClassPath' not in dm:
                 raise errors.InvalidConfiguration(
                     "Every element of docManagers"
                     " must contain 'docManager' property.")
@@ -797,31 +797,38 @@ def get_config_options():
                     "autoCommitInterval must be non-negative.")
 
         def import_dm_by_name(name):
+            full_name = "mongo_connector.doc_managers.%s.DocManager" % name
+            return import_dm_by_path(full_name)
+
+        def import_dm_by_path(path):
             try:
-                full_name = "mongo_connector.doc_managers.%s" % name
                 # importlib doesn't exist in 2.6, but __import__ is everywhere
-                module = __import__(full_name, fromlist=(name,))
-                dm_impl = module.DocManager
+                package, klass = path.rsplit('.', 1)
+                module = __import__(package, fromlist=(package,))
+                dm_impl = getattr(module, klass)
                 if not issubclass(dm_impl, DocManagerBase):
                     raise TypeError("DocManager must inherit DocManagerBase.")
-                return module
+                return dm_impl
             except ImportError:
                 raise errors.InvalidConfiguration(
                     "Could not import %s. It could be that this doc manager ha"
                     "s been moved out of this project and is maintained elsewh"
                     "ere. Make sure that you have the doc manager installed al"
                     "ongside mongo-connector. Check the README for a list of a"
-                    "vailable doc managers." % full_name)
+                    "vailable doc managers." % package)
                 sys.exit(1)
             except (AttributeError, TypeError):
                 raise errors.InvalidConfiguration(
-                    "No definition for DocManager found in %s." % full_name)
+                    "No definition for DocManager found in %s." % package)
                 sys.exit(1)
 
         # instantiate the doc manager objects
         dm_instances = []
         for dm in option.value:
-            module = import_dm_by_name(dm['docManager'])
+            if 'docManagerClassPath' in dm:
+                DocManager = import_dm_by_path(dm['docManagerClassPath'])
+            else:
+                DocManager = import_dm_by_name(dm['docManager'])
             kwargs = {
                 'unique_key': dm['uniqueKey'],
                 'auto_commit_interval': dm['autoCommitInterval'],
@@ -833,9 +840,9 @@ def get_config_options():
 
             target_url = dm['targetURL']
             if target_url:
-                dm_instances.append(module.DocManager(target_url, **kwargs))
+                dm_instances.append(DocManager(target_url, **kwargs))
             else:
-                dm_instances.append(module.DocManager(**kwargs))
+                dm_instances.append(DocManager(**kwargs))
 
         option.value = dm_instances
 
