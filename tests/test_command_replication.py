@@ -26,9 +26,8 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
+from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
 from tests import unittest
-from tests.setup_cluster import ReplicaSet
-from tests.util import assert_soon
 
 
 class CommandLoggerDocManager(DocManagerBase):
@@ -64,7 +63,7 @@ class TestCommandReplication(unittest.TestCase):
                 self.opman.join()
         except RuntimeError:
             pass
-        self.primary_conn.close()
+        close_client(self.primary_conn)
         self.repl_set.stop()
 
     def initOplogThread(self, namespace_set=[], dest_mapping={}):
@@ -149,8 +148,12 @@ class TestCommandReplication(unittest.TestCase):
         coll.rename('test2')
         assert_soon(lambda: len(self.docman.commands) == 2)
         self.assertEqual(
-            self.docman.commands[1],
-            {'renameCollection': 'test.test', 'to': 'test.test2'})
+            self.docman.commands[1].get('renameCollection'),
+            'test.test')
+        self.assertEqual(
+            self.docman.commands[1].get('to'),
+            'test.test2')
+
 
 
 if __name__ == '__main__':

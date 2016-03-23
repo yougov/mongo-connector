@@ -21,10 +21,13 @@ try:
     import Queue as queue
 except ImportError:
     import queue
-import pymongo
 import sys
 import time
 import threading
+
+import pymongo
+
+from pymongo import CursorType
 
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
@@ -81,7 +84,7 @@ class OplogThread(threading.Thread):
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
         # Set of fields to export
-        self.fields = kwargs.get('fields', [])
+        self._fields = set(kwargs.get('fields', []))
 
         LOG.info('OplogThread: Initializing oplog thread')
 
@@ -93,7 +96,9 @@ class OplogThread(threading.Thread):
 
     @property
     def fields(self):
-        return self._fields
+        if self._fields:
+            return list(self._fields)
+        return None
 
     @fields.setter
     def fields(self, value):
@@ -118,7 +123,7 @@ class OplogThread(threading.Thread):
                 if field not in self._fieldsdict:
                     self._fieldsdict[field] = {}
         else:
-            self._fields = None
+            self._fields = set([])
 
     @property
     def namespace_set(self):
@@ -407,11 +412,12 @@ class OplogThread(threading.Thread):
         if timestamp is None:
             cursor = self.oplog.find(
                 query,
-                tailable=True, await_data=True)
+                cursor_type=CursorType.TAILABLE_AWAIT)
         else:
             query['ts'] = {'$gte': timestamp}
             cursor = self.oplog.find(
-                query, tailable=True, await_data=True)
+                query,
+                cursor_type=CursorType.TAILABLE_AWAIT)
             # Applying 8 as the mask to the cursor enables OplogReplay
             cursor.add_option(8)
         return cursor
@@ -422,6 +428,11 @@ class OplogThread(threading.Thread):
         This method is called when we're initializing the cursor and have no
         configs i.e. when we're starting for the first time.
         """
+
+        timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
+        if timestamp is None:
+            return None
+        long_ts = util.bson_ts_to_long(timestamp)
 
         dump_set = self.namespace_set or []
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
@@ -444,11 +455,6 @@ class OplogThread(threading.Thread):
                     namespace = "%s.%s" % (database, coll)
                     dump_set.append(namespace)
 
-        timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
-        if timestamp is None:
-            return None
-        long_ts = util.bson_ts_to_long(timestamp)
-
         def docs_to_dump(namespace):
             database, coll = namespace.split('.', 1)
             last_id = None
@@ -460,14 +466,14 @@ class OplogThread(threading.Thread):
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
-                        fields=self._fields,
+                        projection=self.fields,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
                     cursor = util.retry_until_ok(
                         target_coll.find,
                         {"_id": {"$gt": last_id}},
-                        fields=self._fields,
+                        projection=self.fields,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 try:
@@ -592,11 +598,11 @@ class OplogThread(threading.Thread):
         if not self.oplog_ns_set:
             curr = self.oplog.find().sort(
                 '$natural', pymongo.DESCENDING
-            ).limit(1)
+            ).limit(-1)
         else:
             curr = self.oplog.find(
                 {'ns': {'$in': self.oplog_ns_set}}
-            ).sort('$natural', pymongo.DESCENDING).limit(1)
+            ).sort('$natural', pymongo.DESCENDING).limit(-1)
 
         if curr.count(with_limit_and_skip=True) == 0:
             return None
@@ -771,7 +777,7 @@ class OplogThread(threading.Thread):
                 to_update = util.retry_until_ok(
                     client[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    fields=self.fields
+                    projection=self.fields
                 )
                 #doc list are docs in target system, to_update are
                 #docs in mongo

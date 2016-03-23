@@ -14,25 +14,26 @@
 # limitations under the License.
 
 """Test Solr search using the synchronizer, i.e. as it would be used by an user
-    """
+"""
+
 import logging
 import os
 import sys
 import time
 
-from gridfs import GridFS
-from pymongo import MongoClient
 from pysolr import Solr, SolrError
+
+from bson import SON
+from gridfs import GridFS
 
 sys.path[0:0] = [""]
 
-from tests import solr_url, unittest
-from tests.setup_cluster import ReplicaSet
-from tests.util import assert_soon
 from mongo_connector.compat import u
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
+from mongo_connector.test_utils import ReplicaSet, solr_url, assert_soon
 from mongo_connector.util import retry_until_ok
+from tests import unittest
 
 
 class SolrTestCase(unittest.TestCase):
@@ -92,7 +93,7 @@ class TestSolr(SolrTestCase):
         """Tests insert
         """
 
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
         result_set_1 = list(self.solr_conn.search('name:paulie'))
         self.assertEqual(len(result_set_1), 1)
@@ -104,9 +105,9 @@ class TestSolr(SolrTestCase):
     def test_remove(self):
         """Tests remove
         """
-        self.conn['test']['test'].insert({'name': 'paulie'})
+        self.conn['test']['test'].insert_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 1)
-        self.conn['test']['test'].remove({'name': 'paulie'})
+        self.conn['test']['test'].delete_one({'name': 'paulie'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) == 0)
 
     def test_insert_file(self):
@@ -148,21 +149,22 @@ class TestSolr(SolrTestCase):
         docman = self.connector.doc_managers[0]
 
         # Use diabolical value for _id to test string escaping as well.
-        self.conn.test.test.insert({"_id": u'+-&え|!(){}[]^"~*?:\\/', "a": 0})
+        self.conn.test.test.insert_one({"_id": u'+-&え|!(){}[]^"~*?:\\/', "a": 0})
         assert_soon(lambda: sum(1 for _ in self._search("*:*")) == 1)
 
         def check_update(update_spec):
-            updated = self.conn.test.test.find_and_modify(
-                {"a": 0},
-                update_spec,
-                new=True
-            )
+            updated = self.conn.test.command(
+                SON([('findAndModify', 'test'),
+                     ('query', {"a": 0}),
+                     ('update', update_spec),
+                     ('new', True)]))['value']
+
             # Stringify _id to match what will be retrieved from Solr
-            updated['_id'] = u(updated['_id'])
+            updated[u('_id')] = u(updated['_id'])
             # Flatten the MongoDB document to match Solr
             updated = docman._clean_doc(updated, 'dummy.namespace', 0)
             # Allow some time for update to propagate
-            time.sleep(1)
+            time.sleep(3)
             replicated = list(self._search("a:0"))[0]
 
             # Remove add'l fields until these are stored in a separate Solr core
@@ -209,7 +211,7 @@ class TestSolr(SolrTestCase):
 
         primary_conn = self.repl_set.primary.client()
 
-        self.conn['test']['test'].insert({'name': 'paul'})
+        self.conn['test']['test'].insert_one({'name': 'paul'})
         assert_soon(
             lambda: self.conn.test.test.find({'name': 'paul'}).count() == 1)
         assert_soon(
@@ -221,7 +223,7 @@ class TestSolr(SolrTestCase):
         while admin_db.command("isMaster")['ismaster'] is False:
             time.sleep(1)
         time.sleep(5)
-        retry_until_ok(self.conn.test.test.insert,
+        retry_until_ok(self.conn.test.test.insert_one,
                        {'name': 'pauline'})
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) == 2)
 
@@ -248,9 +250,9 @@ class TestSolr(SolrTestCase):
     def test_valid_fields(self):
         """ Tests documents with field definitions
         """
-        inserted_obj = self.conn['test']['test'].insert(
-            {'name': 'test_valid'})
-        self.conn['test']['test'].update(
+        inserted_obj = self.conn['test']['test'].insert_one(
+            {'name': 'test_valid'}).inserted_id
+        self.conn['test']['test'].update_one(
             {'_id': inserted_obj},
             {'$set': {'popularity': 1}}
         )
@@ -265,9 +267,9 @@ class TestSolr(SolrTestCase):
     def test_invalid_fields(self):
         """ Tests documents without field definitions
         """
-        inserted_obj = self.conn['test']['test'].insert(
-            {'name': 'test_invalid'})
-        self.conn['test']['test'].update(
+        inserted_obj = self.conn['test']['test'].insert_one(
+            {'name': 'test_invalid'}).inserted_id
+        self.conn['test']['test'].update_one(
             {'_id': inserted_obj},
             {'$set': {'break_this_test': 1}}
         )
@@ -299,9 +301,9 @@ class TestSolr(SolrTestCase):
         match_none = {"_id": 2, "foo": 300}
 
         # Connector is already running
-        self.conn["test"]["test"].insert(match_first)
-        self.conn["test"]["test"].insert(match_second)
-        self.conn["test"]["test"].insert(match_none)
+        self.conn["test"]["test"].insert_one(match_first)
+        self.conn["test"]["test"].insert_one(match_second)
+        self.conn["test"]["test"].insert_one(match_none)
 
         # Should have documents in Solr now
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search("*:*")) > 0,
@@ -331,7 +333,7 @@ class TestSolr(SolrTestCase):
         """
 
         # Connector is already running
-        self.conn["test"]["test"].insert({
+        self.conn["test"]["test"].insert_one({
             "name": "Jeb",
             "billing": {
                 "address": {
@@ -340,7 +342,7 @@ class TestSolr(SolrTestCase):
                 }
             }
         })
-        self.conn["test"]["test"].insert({
+        self.conn["test"]["test"].insert_one({
             "numbers": ["one", "two", "three"],
             "characters": [
                 {"name": "Big Bird",

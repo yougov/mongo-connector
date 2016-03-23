@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Version 2.2
+-----------
+- Support for using a single meta collection to track replication to MongoDB cluster
+- The log format is now configurable
+- Bug fix for using '—no-dump' when nothing is in the oplog
+- Now requires PyMongo 2.9+
+
 Version 2.1
 -----------
 

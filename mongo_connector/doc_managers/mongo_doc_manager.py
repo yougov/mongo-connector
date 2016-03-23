@@ -24,7 +24,9 @@
 import logging
 import pymongo
 
+from bson import SON
 from gridfs import GridFS
+
 from mongo_connector import errors, constants
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
@@ -86,8 +88,8 @@ class DocManager(DocManagerBase):
                     capped=True,
                     size=self.meta_collection_cap_size)
                 meta_collection = self.meta_database[self.meta_collection_name]
-                meta_collection.ensure_index(self.id_field)
-                meta_collection.ensure_index([('ns', 1), ('_ts', 1)])
+                meta_collection.create_index(self.id_field)
+                meta_collection.create_index([('ns', 1), ('_ts', 1)])
 
     def _db_and_collection(self, namespace):
         return namespace.split('.', 1)
@@ -163,17 +165,20 @@ class DocManager(DocManagerBase):
 
         meta_collection_name = self._get_meta_collection(namespace)
 
-        self.meta_database[meta_collection_name].save({
-            self.id_field: document_id,
-            "_ts": timestamp,
-            "ns": namespace
-        })
+        self.meta_database[meta_collection_name].replace_one(
+            {self.id_field: document_id, "ns": namespace},
+            {self.id_field: document_id,
+             "_ts": timestamp,
+             "ns": namespace},
+            upsert=True)
 
-        updated = self.mongo[db][coll].find_and_modify(
-            {'_id': document_id},
-            update_spec,
-            new=True
-        )
+        no_obj_error = "No matching object found"
+        updated = self.mongo[db].command(
+            SON([('findAndModify', coll),
+                 ('query', {'_id': document_id}),
+                 ('update', update_spec),
+                 ('new', True)]),
+            allowable_errors=[no_obj_error])['value']
         return updated
 
     @wrap_exceptions
@@ -184,12 +189,17 @@ class DocManager(DocManagerBase):
 
         meta_collection_name = self._get_meta_collection(namespace)
 
-        self.meta_database[meta_collection_name].save({
-            self.id_field: doc['_id'],
-            "_ts": timestamp,
-            "ns": namespace
-        })
-        self.mongo[database][coll].save(doc)
+        self.meta_database[meta_collection_name].replace_one(
+            {self.id_field: doc['_id'], "ns": namespace},
+            {self.id_field: doc['_id'],
+             "_ts": timestamp,
+             "ns": namespace},
+             upsert=True)
+
+        self.mongo[database][coll].replace_one(
+            {'_id': doc['_id']},
+            doc,
+            upsert=True)
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -240,12 +250,12 @@ class DocManager(DocManagerBase):
 
         meta_collection = self._get_meta_collection(namespace)
 
-        doc2 = self.meta_database[meta_collection].find_and_modify(
-            {self.id_field: document_id}, remove=True)
+        doc2 = self.meta_database[meta_collection].find_one_and_delete(
+            {self.id_field: document_id})
         if (doc2 and doc2.get('gridfs_id')):
             GridFS(self.mongo[database], coll).delete(doc2['gridfs_id'])
         else:
-            self.mongo[database][coll].remove({'_id': document_id})
+            self.mongo[database][coll].delete_one({'_id': document_id})
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
@@ -255,12 +265,11 @@ class DocManager(DocManagerBase):
 
         meta_collection = self._get_meta_collection(namespace)
 
-        self.meta_database[meta_collection].save({
-            self.id_field: f._id,
-            '_ts': timestamp,
-            'ns': namespace,
-            'gridfs_id': id
-        })
+        self.meta_database[meta_collection].replace_one(
+            {self.id_field: f._id, "ns": namespace},
+            {self.id_field: f._id, '_ts': timestamp,
+             'ns': namespace, 'gridfs_id': id},
+            upsert=True)
 
     @wrap_exceptions
     def search(self, start_ts, end_ts):
@@ -288,7 +297,7 @@ class DocManager(DocManagerBase):
             for namespace in self._namespaces():
                 meta_collection = self._get_meta_collection(namespace)
                 mc_coll = self.meta_database[meta_collection]
-                mc_cursor = mc_coll.find({'ns': namespace}, limit=1)
+                mc_cursor = mc_coll.find({'ns': namespace}, limit=-1)
                 for ts_ns_doc in mc_cursor.sort('_ts', -1):
                     yield ts_ns_doc
 

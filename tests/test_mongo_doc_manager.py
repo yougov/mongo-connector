@@ -21,8 +21,8 @@ sys.path[0:0] = [""]
 
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
-from tests import unittest, TESTARGS
-from tests.test_gridfs_file import MockGridFSFile
+from mongo_connector.test_utils import TESTARGS, MockGridFSFile
+from tests import unittest
 from tests.test_mongo import MongoTestCase
 
 
@@ -53,7 +53,7 @@ class TestMongoDocManager(MongoTestCase):
         conn = self.standalone.client()
         for ns in self.namespaces_inc + self.namespaces_exc:
             db, coll = ns.split('.', 1)
-            conn[db][coll].remove()
+            conn[db][coll].delete_many({})
 
     def test_namespaces(self):
         """Ensure that a DocManager instantiated with a namespace set
@@ -66,7 +66,7 @@ class TestMongoDocManager(MongoTestCase):
     def test_update(self):
         doc_id = '1'
         doc = {"_id": doc_id, "a": 1, "b": 2}
-        self.mongo.insert(doc)
+        self.mongo.insert_one(doc)
         # $set only
         update_spec = {"$set": {"a": 1, "b": 2}}
         doc = self.choosy_docman.update(doc_id, update_spec, *TESTARGS)
@@ -236,7 +236,7 @@ class TestMongoDocManager(MongoTestCase):
         # remove latest document so last doc is in included namespace,
         # shouldn't change result
         db, coll = self.namespaces_inc[0].split(".", 1)
-        self.standalone.client()[db][coll].remove({"_id": 99})
+        self.standalone.client()[db][coll].delete_one({"_id": 99})
         last_doc = self.choosy_docman.get_last_doc()
         self.assertEqual(last_doc[self.id_field], 98)
 
@@ -277,7 +277,7 @@ class TestMongoDocManager(MongoTestCase):
             self.assertNotIn('test', self.mongo_conn.database_names())
 
             # Briefly test mapped database name with dropDatabase command.
-            self.mongo_conn.dropped.collection.insert({'a': 1})
+            self.mongo_conn.dropped.collection.insert_one({'a': 1})
             self.assertIn('dropped', self.mongo_conn.database_names())
             self.choosy_docman.handle_command(
                 {'dropDatabase': 1}, 'test.$cmd', 1)
