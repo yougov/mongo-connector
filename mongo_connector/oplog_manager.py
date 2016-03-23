@@ -368,7 +368,7 @@ class OplogThread(threading.Thread):
             
             # further investigate sub (nested) fields, only if doc contains 
             # it and remove excluded sub-props
-            for field, subfields in fields.iteritems():
+            for field, subfields in fields.items():
                 if field in doc and subfields != {}:
                     pop_excluded_fields(doc[field], subfields)
 
