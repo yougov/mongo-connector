@@ -124,6 +124,7 @@ class OplogThread(threading.Thread):
                     self._fieldsdict[field] = {}
         else:
             self._fields = set([])
+            self._fieldsdict = {}
 
     @property
     def namespace_set(self):
