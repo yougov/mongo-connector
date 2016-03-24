@@ -84,7 +84,8 @@ class OplogThread(threading.Thread):
         self.continue_on_error = kwargs.get('continue_on_error', False)
 
         # Set of fields to export
-        self.fields = set(kwargs.get('fields', []))
+        self._fields = set(kwargs.get('fields', []))
+        self._generateFieldsdict()
 
         LOG.info('OplogThread: Initializing oplog thread')
 
@@ -106,25 +107,30 @@ class OplogThread(threading.Thread):
             self._fields = set(value)
             # Always include _id field
             self._fields.add('_id')
-
-            # Create _fieldsdict which allows to handle all types of oplog 
-            # updates (nested as well as flattened)
-            self._fieldsdict = {}
-            for field in self._fields:
-                if "." in field:
-                    fieldparts = field.split(".")
-                    curlevel = self._fieldsdict
-                    for fieldpart in fieldparts:
-                        if fieldpart not in curlevel:
-                            curlevel[fieldpart] = {}
-                        curlevel = curlevel[fieldpart]
-                # also add dot-notated fields to support inserts as well 
-                # as updates with $set and $unset
-                if field not in self._fieldsdict:
-                    self._fieldsdict[field] = {}
         else:
             self._fields = set([])
-            self._fieldsdict = {}
+        
+        self._generateFieldsdict()
+    
+    def _generateFieldsdict(self):
+        # always include _id
+        fields = self._fields.union(set(['_id']))
+        
+        # Create _fieldsdict which allows to handle all types of oplog 
+        # updates (nested as well as flattened)
+        self._fieldsdict = {}
+        for field in fields:
+            if "." in field:
+                fieldparts = field.split(".")
+                curlevel = self._fieldsdict
+                for fieldpart in fieldparts:
+                    if fieldpart not in curlevel:
+                        curlevel[fieldpart] = {}
+                    curlevel = curlevel[fieldpart]
+            # also add dot-notated fields to support inserts as well 
+            # as updates with $set and $unset
+            if field not in self._fieldsdict:
+                self._fieldsdict[field] = {}
 
     @property
     def namespace_set(self):
