@@ -507,13 +507,13 @@ class OplogThread(threading.Thread):
         dump_set = self.get_dump_set()
         shard_doc_count = self.shard_doc_count()
         timestamp = None
+        long_ts = 0
 
         LOG.info("OplogThread: Dumping set of collections %s from shard %s with %d docs" % (dump_set, self.shard_name, shard_doc_count))
         if shard_doc_count > 0:
             timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
-            long_ts = util.bson_ts_to_long(timestamp)
-        else:
-            long_ts = 0
+            if timestamp:
+                long_ts = util.bson_ts_to_long(timestamp)
 
         def query_handle_id(query):
             if '_id' in query and query['_id']:
