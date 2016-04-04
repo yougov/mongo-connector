@@ -117,12 +117,17 @@ class TestSolr(SolrTestCase):
         test_data = "test_insert_file test file"
         id = fs.put(test_data, filename="test.txt", encoding='utf8')
         assert_soon(lambda: sum(1 for _ in self.solr_conn.search('*:*')) > 0)
+
         res = list(self.solr_conn.search('content:*test_insert_file*'))
+        if not res:
+            res = list(self.solr_conn.search('_text_:*test_insert_file*'))
         self.assertEqual(len(res), 1)
         doc = res[0]
         self.assertEqual(doc['filename'], "test.txt")
         self.assertEqual(doc['_id'], str(id))
-        self.assertIn(test_data.strip(), doc['content'][0].strip())
+        content = doc.get('content', doc.get('_text_', None))
+        self.assertTrue(content)
+        self.assertIn(test_data.strip(), content[0].strip())
 
     def test_remove_file(self):
         """Tests removing a gridfs file

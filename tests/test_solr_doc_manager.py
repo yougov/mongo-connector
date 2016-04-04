@@ -141,8 +141,10 @@ class TestSolrDocManager(SolrTestCase):
         for doc in res:
             self.assertEqual(doc['_id'], docc['_id'])
             self.assertEqual(doc['filename'], docc['filename'])
+            content = doc.get('content', doc.get('_text_', None))
+            self.assertTrue(content)
             self.assertIn(test_data.strip(),
-                          doc['content'][0].strip().encode('utf8'))
+                          content[0].strip().encode('utf8'))
 
     def test_remove_file(self):
         test_data = b'hello world'
