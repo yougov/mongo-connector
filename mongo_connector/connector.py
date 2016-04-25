@@ -746,8 +746,8 @@ def get_config_options():
         "will be mapped respectively according to this "
         "comma-separated list. These lists must have "
         "equal length. The default is to use the identity "
-        "mapping. This is currently only implemented "
-        "for mongo-to-mongo connections.")
+        "mapping. This works for mongo-to-mongo as well as" 
+        "mongo-to-elasticsearch connections.")
 
     # --gridfs-set is the set of GridFS namespaces to consider
     namespaces.add_cli(
