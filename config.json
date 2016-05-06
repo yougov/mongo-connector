@@ -8,6 +8,7 @@
     "batchSize": -1,
     "verbosity": 0,
     "continueOnError": false,
+    "skipCount": false,
 
     "logging": {
         "type": "file",
