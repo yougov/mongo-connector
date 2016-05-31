@@ -194,7 +194,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_len = self.init_cursor()
+            cursor = self.init_cursor()
 
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
@@ -203,15 +203,14 @@ class OplogThread(threading.Thread):
                 LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
                 continue
-
-            if cursor_len == 0:
+            elif cursor is None:
+                # Handle zero-length cursor
                 LOG.debug("OplogThread: Last entry is the one we "
                           "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
                 continue
 
-            LOG.debug("OplogThread: Got the cursor, count is %d"
-                      % cursor_len)
+            LOG.debug("OplogThread: Got the cursor")
 
             last_ts = None
             remove_inc = 0
@@ -671,23 +670,26 @@ class OplogThread(threading.Thread):
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
                 if timestamp is None:
-                    return None, 0
+                    return None
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, retry_until_ok(cursor.count)
+                return cursor
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
         for i in range(60):
             cursor = self.get_oplog_cursor(timestamp)
-            cursor_len = retry_until_ok(cursor.count)
 
-            if cursor_len == 0:
+            # Handle zero-length cursor
+            try:
+                retry_until_ok(next, cursor)
+                cursor.rewind()
+            except StopIteration:
                 # rollback, update checkpoint, and retry
                 LOG.debug("OplogThread: Initiating rollback from "
                           "get_oplog_cursor")
@@ -700,7 +702,7 @@ class OplogThread(threading.Thread):
                 first_oplog_entry = retry_until_ok(next, cursor)
             except StopIteration:
                 # It's possible for the cursor to become invalid
-                # between the cursor.count() call and now
+                # between the first cursor.next() call and now
                 time.sleep(1)
                 continue
 
@@ -711,10 +713,10 @@ class OplogThread(threading.Thread):
             if cursor_ts_long > given_ts_long:
                 # first entry in oplog is beyond timestamp
                 # we've fallen behind
-                return None, 0
+                return None
 
             # first entry has been consumed
-            return cursor, cursor_len - 1
+            return cursor
 
         else:
             raise errors.MongoConnectorError(
