@@ -167,12 +167,8 @@ class OplogThread(threading.Thread):
                 LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
                 self.running = False
                 continue
-
-            # Handle zero-length cursor
-            try:
-                retry_until_ok(next, cursor)
-                cursor.rewind()
-            except StopIteration:
+            elif cursor is None:
+                # Handle zero-length cursor
                 LOG.debug("OplogThread: Last entry is the one we "
                           "already processed.  Up to date.  Sleeping.")
                 time.sleep(1)
