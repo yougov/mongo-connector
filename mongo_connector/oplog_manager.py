@@ -739,7 +739,6 @@ class OplogThread(threading.Thread):
             for host, port in sorted(client._topology_settings.seeds)]
 
         options = client._MongoClient__options._options
-        LOG.info(options)
         tz_aware = options['tz_aware']
         connect = options['connect']
         authsource = options['authsource']
