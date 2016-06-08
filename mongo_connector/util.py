@@ -32,7 +32,12 @@ def exception_wrapper(mapping):
                 return f(*args, **kwargs)
             except:
                 exc_type, exc_value, exc_tb = sys.exc_info()
-                new_type = mapping.get(exc_type)
+                new_type = None
+                for src_type, dest_type in mapping.iteritems():
+                    if issubclass(exc_type, src_type):
+                        new_type = dest_type
+                        break
+
                 if new_type is None:
                     raise
                 reraise(new_type, exc_value, exc_tb)
