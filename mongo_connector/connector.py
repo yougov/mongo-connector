@@ -298,7 +298,7 @@ class Connector(threading.Thread):
 
             while self.can_run:
                 shard_thread = self.shard_set[0]
-                if not (shard_thread.running and shard_thread[0].is_alive()):
+                if not (shard_thread.running and shard_thread.is_alive()):
                     LOG.error("MongoConnector: OplogThread"
                               " %s unexpectedly stopped! Shutting down" %
                               (str(self.shard_set[0])))
