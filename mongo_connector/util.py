@@ -33,9 +33,9 @@ def exception_wrapper(mapping):
             except:
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 new_type = None
-                for src_type, dest_type in mapping.iteritems():
+                for src_type in mapping:
                     if issubclass(exc_type, src_type):
-                        new_type = dest_type
+                        new_type = mapping[src_type]
                         break
 
                 if new_type is None:
