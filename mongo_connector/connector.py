@@ -297,7 +297,8 @@ class Connector(threading.Thread):
             oplog.start()
 
             while self.can_run:
-                if not self.shard_set[0].running:
+                shard_thread = self.shard_set[0]
+                if not (shard_thread.running and shard_thread.is_alive()):
                     LOG.error("MongoConnector: OplogThread"
                               " %s unexpectedly stopped! Shutting down" %
                               (str(self.shard_set[0])))
@@ -315,7 +316,8 @@ class Connector(threading.Thread):
                 for shard_doc in main_conn['config']['shards'].find():
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
-                        if not self.shard_set[shard_id].running:
+                        shard_thread = self.shard_set[shard_id]
+                        if not (shard_thread.running and shard_thread.is_alive()):
                             LOG.error("MongoConnector: OplogThread "
                                       "%s unexpectedly stopped! Shutting "
                                       "down" %
