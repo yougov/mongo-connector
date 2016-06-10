@@ -188,9 +188,9 @@ class TestOplogManager(unittest.TestCase):
 
         # No last checkpoint, empty collections, nothing in oplog
         self.opman.collection_dump = True
-        cursor, cursor_len = self.opman.init_cursor()
+        cursor, cursor_empty = self.opman.init_cursor()
         self.assertEqual(cursor, None)
-        self.assertEqual(cursor_len, 0)
+        self.assertTrue(cursor_empty)
         self.assertEqual(self.opman.checkpoint, None)
 
         # No last checkpoint, empty collections, something in oplog
@@ -200,8 +200,8 @@ class TestOplogManager(unittest.TestCase):
         collection.delete_one({"i": 1})
         time.sleep(3)
         last_ts = self.opman.get_last_oplog_timestamp()
-        cursor, cursor_len = self.opman.init_cursor()
-        self.assertEqual(cursor_len, 0)
+        cursor, cursor_empty = self.opman.init_cursor()
+        self.assertFalse(cursor_empty)
         self.assertEqual(self.opman.checkpoint, last_ts)
         with self.opman.oplog_progress as prog:
             self.assertEqual(prog.get_dict()[self.opman.replset_name],
@@ -212,10 +212,10 @@ class TestOplogManager(unittest.TestCase):
         self.opman.collection_dump = False
         collection.insert_one({"i": 2})
         last_ts = self.opman.get_last_oplog_timestamp()
-        cursor, cursor_len = self.opman.init_cursor()
-        for i in range(cursor_len - 1):
-            next(cursor)
-        self.assertEqual(next(cursor)['o']['i'], 2)
+        cursor, cursor_empty = self.opman.init_cursor()
+        for doc in cursor:
+            last_doc = doc
+        self.assertEqual(last_doc['o']['i'], 2)
         self.assertEqual(self.opman.checkpoint, last_ts)
 
         # Last checkpoint exists
@@ -228,7 +228,7 @@ class TestOplogManager(unittest.TestCase):
         progress.get_dict()[self.opman.replset_name] = entry[0]["ts"]
         self.opman.oplog_progress = progress
         self.opman.checkpoint = None
-        cursor, cursor_len = self.opman.init_cursor()
+        cursor, cursor_empty = self.opman.init_cursor()
         self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
         self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
         with self.opman.oplog_progress as prog:
@@ -240,8 +240,8 @@ class TestOplogManager(unittest.TestCase):
         progress.get_dict()[self.opman.replset_name] = bson.Timestamp(1, 0)
         self.opman.oplog_progress = progress
         self.opman.checkpoint = None
-        cursor, cursor_len = self.opman.init_cursor()
-        self.assertEqual(cursor_len, 0)
+        cursor, cursor_empty = self.opman.init_cursor()
+        self.assertTrue(cursor_empty)
         self.assertEqual(cursor, None)
         self.assertIsNotNone(self.opman.checkpoint)
 
