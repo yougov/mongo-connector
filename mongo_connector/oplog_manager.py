@@ -726,16 +726,30 @@ class OplogThread(threading.Thread):
         if self.checkpoint is not None:
             with self.oplog_progress as oplog_prog:
                 oplog_dict = oplog_prog.get_dict()
-                oplog_dict[str(self.oplog)] = self.checkpoint
+                oplog_dict[self._oplog_key()] = self.checkpoint
                 LOG.debug("OplogThread: oplog checkpoint updated to %s" %
                           str(self.checkpoint))
         else:
             LOG.debug("OplogThread: no checkpoint to update.")
 
+    def _oplog_key(self):
+        client = self.primary_client
+        host = [
+            '%s:%d' % (host, port)
+            for host, port in sorted(client._topology_settings.seeds)]
+
+        options = client._MongoClient__options._options
+        tz_aware = options['tz_aware']
+        connect = options['connect']
+        authsource = options['authsource']
+        replicaset = options['replicaset']
+
+        return "Collection(Database(MongoClient(host={0}, document_class=dict, tz_aware={1}, connect={2}, replicaset='{3}', authsource='{4}'), 'local'), 'oplog.rs')".format(host, str(tz_aware), str(connect), str(replicaset), str(authsource))
+
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
-        oplog_str = str(self.oplog)
+        oplog_str = self._oplog_key()
         ret_val = None
 
         with self.oplog_progress as oplog_prog:
@@ -743,7 +757,7 @@ class OplogThread(threading.Thread):
             if oplog_str in oplog_dict.keys():
                 ret_val = oplog_dict[oplog_str]
 
-        LOG.debug("OplogThread: reading last checkpoint as %s " %
+        LOG.info("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
         return ret_val
 
