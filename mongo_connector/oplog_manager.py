@@ -93,7 +93,7 @@ class OplogThread(threading.Thread):
 
         self.oplog = self.primary_client.local.oplog.rs
         self.replset_name = (
-            self.primary_client._topology_settings.replica_set_name)
+            self.primary_client.admin.command('ismaster')['setName'])
 
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
