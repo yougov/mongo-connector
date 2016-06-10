@@ -92,6 +92,8 @@ class OplogThread(threading.Thread):
         LOG.info('OplogThread: Initializing oplog thread')
 
         self.oplog = self.primary_client.local.oplog.rs
+        self.replset_name = (
+            self.primary_client._topology_settings.replica_set_name)
 
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
@@ -726,7 +728,13 @@ class OplogThread(threading.Thread):
         if self.checkpoint is not None:
             with self.oplog_progress as oplog_prog:
                 oplog_dict = oplog_prog.get_dict()
-                oplog_dict[str(self.oplog)] = self.checkpoint
+                # If we have the repr of our oplog collection in the dictionary,
+                # remove it and replace it with our replica set name.
+                # This allows an easy upgrade path from mongo-connector 2.3.
+                # For an explanation of the format change, see the comment in
+                # read_last_checkpoint.
+                oplog_dict.pop(str(self.oplog), None)
+                oplog_dict[self.replset_name] = self.checkpoint
                 LOG.debug("OplogThread: oplog checkpoint updated to %s" %
                           str(self.checkpoint))
         else:
@@ -735,13 +743,24 @@ class OplogThread(threading.Thread):
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
+        # In versions of mongo-connector 2.3 and before, we used the repr of the
+        # oplog collection as keys in the oplog_progress dictionary.
+        # In versions thereafter, we use the replica set name. For backwards
+        # compatibility, we check for both.
         oplog_str = str(self.oplog)
-        ret_val = None
 
+        ret_val = None
         with self.oplog_progress as oplog_prog:
             oplog_dict = oplog_prog.get_dict()
-            if oplog_str in oplog_dict.keys():
-                ret_val = oplog_dict[oplog_str]
+            try:
+                # New format.
+                ret_val = oplog_dict[self.replset_name]
+            except KeyError:
+                try:
+                    # Old format.
+                    ret_val = oplog_dict[oplog_str]
+                except KeyError:
+                    pass
 
         LOG.debug("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
