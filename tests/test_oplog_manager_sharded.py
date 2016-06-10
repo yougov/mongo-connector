@@ -31,7 +31,7 @@ from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (ShardedCluster,
                                         assert_soon,
                                         close_client)
-from mongo_connector.util import retry_until_ok
+from mongo_connector.util import retry_until_ok, bson_ts_to_long
 from tests import unittest, SkipTest
 
 
@@ -327,7 +327,8 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         with self.opman1.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+            self.assertEqual(prog.get_dict()[self.opman1.replset_name],
+                             last_ts1)
         # init_cursor should point to startup message in shard2 oplog
         cursor, cursor_len = self.opman2.init_cursor()
         self.assertEqual(cursor_len, 0)
@@ -342,14 +343,16 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.opman1.init_cursor()
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         with self.opman1.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)], last_ts1)
+            self.assertEqual(prog.get_dict()[self.opman1.replset_name],
+                             last_ts1)
         cursor, cursor_len = self.opman2.init_cursor()
         for i in range(cursor_len - 1):
             next(cursor)
         self.assertEqual(next(cursor)["o"]["i"], 1200)
         self.assertEqual(self.opman2.checkpoint, last_ts2)
         with self.opman2.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)], last_ts2)
+            self.assertEqual(prog.get_dict()[self.opman2.replset_name],
+                             last_ts2)
 
         # Last checkpoint exists
         progress = LockingDict()
@@ -360,8 +363,8 @@ class TestOplogManagerSharded(unittest.TestCase):
             self.shard1_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
         entry2 = list(
             self.shard2_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
-        progress.get_dict()[str(self.opman1.oplog)] = entry1[0]["ts"]
-        progress.get_dict()[str(self.opman2.oplog)] = entry2[0]["ts"]
+        progress.get_dict()[self.opman1.replset_name] = entry1[0]["ts"]
+        progress.get_dict()[self.opman2.replset_name] = entry2[0]["ts"]
         self.opman1.oplog_progress = self.opman2.oplog_progress = progress
         self.opman1.checkpoint = self.opman2.checkpoint = None
         cursor1, cursor_len1 = self.opman1.init_cursor()
@@ -371,16 +374,16 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(self.opman1.checkpoint, entry1[0]["ts"])
         self.assertEqual(self.opman2.checkpoint, entry2[0]["ts"])
         with self.opman1.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman1.oplog)],
+            self.assertEqual(prog.get_dict()[self.opman1.replset_name],
                              entry1[0]["ts"])
         with self.opman2.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman2.oplog)],
+            self.assertEqual(prog.get_dict()[self.opman2.replset_name],
                              entry2[0]["ts"])
 
         # Last checkpoint is behind
         progress = LockingDict()
-        progress.get_dict()[str(self.opman1.oplog)] = bson.Timestamp(1, 0)
-        progress.get_dict()[str(self.opman2.oplog)] = bson.Timestamp(1, 0)
+        progress.get_dict()[self.opman1.replset_name] = bson.Timestamp(1, 0)
+        progress.get_dict()[self.opman2.replset_name] = bson.Timestamp(1, 0)
         self.opman1.oplog_progress = self.opman2.oplog_progress = progress
         self.opman1.checkpoint = self.opman2.checkpoint = None
         cursor, cursor_len = self.opman1.init_cursor()
@@ -664,6 +667,39 @@ class TestOplogManagerSharded(unittest.TestCase):
         )
         # cleanup
         mover.join()
+
+    def test_upgrade_oplog_progress(self):
+        first_oplog_ts1 = self.opman1.oplog.find_one()['ts']
+        first_oplog_ts2 = self.opman2.oplog.find_one()['ts']
+        # Old format oplog progress file:
+        progress = {
+            str(self.opman1.oplog): bson_ts_to_long(first_oplog_ts1),
+            str(self.opman2.oplog): bson_ts_to_long(first_oplog_ts2)
+        }
+        # Set up oplog managers to use the old format.
+        oplog_progress = LockingDict()
+        oplog_progress.dict = progress
+        self.opman1.oplog_progress = oplog_progress
+        self.opman2.oplog_progress = oplog_progress
+        # Cause the oplog managers to update their checkpoints.
+        self.opman1.checkpoint = first_oplog_ts1
+        self.opman2.checkpoint = first_oplog_ts2
+        self.opman1.update_checkpoint()
+        self.opman2.update_checkpoint()
+        # New format should be in place now.
+        new_format = {
+            self.opman1.replset_name: first_oplog_ts1,
+            self.opman2.replset_name: first_oplog_ts2
+        }
+        self.assertEqual(
+            new_format,
+            self.opman1.oplog_progress.get_dict()
+        )
+        self.assertEqual(
+            new_format,
+            self.opman2.oplog_progress.get_dict()
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

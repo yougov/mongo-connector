@@ -29,6 +29,7 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
+from mongo_connector.util import bson_ts_to_long
 from tests import unittest
 
 
@@ -203,7 +204,8 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(cursor_len, 0)
         self.assertEqual(self.opman.checkpoint, last_ts)
         with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman.oplog)], last_ts)
+            self.assertEqual(prog.get_dict()[self.opman.replset_name],
+                             last_ts)
 
         # No last checkpoint, no collection dump, something in oplog
         self.opman.oplog_progress = LockingDict()
@@ -223,19 +225,19 @@ class TestOplogManager(unittest.TestCase):
             collection.insert_one({"i": i + 500})
         entry = list(
             self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
-        progress.get_dict()[str(self.opman.oplog)] = entry[0]["ts"]
+        progress.get_dict()[self.opman.replset_name] = entry[0]["ts"]
         self.opman.oplog_progress = progress
         self.opman.checkpoint = None
         cursor, cursor_len = self.opman.init_cursor()
         self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
         self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
         with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[str(self.opman.oplog)],
+            self.assertEqual(prog.get_dict()[self.opman.replset_name],
                              entry[0]["ts"])
 
         # Last checkpoint is behind
         progress = LockingDict()
-        progress.get_dict()[str(self.opman.oplog)] = bson.Timestamp(1, 0)
+        progress.get_dict()[self.opman.replset_name] = bson.Timestamp(1, 0)
         self.opman.oplog_progress = progress
         self.opman.checkpoint = None
         cursor, cursor_len = self.opman.init_cursor()
@@ -352,6 +354,23 @@ class TestOplogManager(unittest.TestCase):
         for d in doc_managers:
             self.assertEqual(d._search()[0]["name"], "kermit")
 
+    def test_upgrade_oplog_progress(self):
+        first_oplog_ts = self.opman.oplog.find_one()['ts']
+        # Old format oplog progress file:
+        progress = {str(self.opman.oplog): bson_ts_to_long(first_oplog_ts)}
+        # Set up oplog managers to use the old format.
+        oplog_progress = LockingDict()
+        oplog_progress.dict = progress
+        self.opman.oplog_progress = oplog_progress
+        # Cause the oplog managers to update their checkpoints.
+        self.opman.checkpoint = first_oplog_ts
+        self.opman.update_checkpoint()
+        # New format should be in place now.
+        new_format = {self.opman.replset_name: first_oplog_ts}
+        self.assertEqual(
+            new_format,
+            self.opman.oplog_progress.get_dict()
+        )
 
 
 if __name__ == '__main__':
