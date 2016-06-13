@@ -1,6 +1,24 @@
 Changelog
 =========
 
+Version 2.4
+-----------
+
+- Add --exclude-fields option.
+- Better handling of exceptions in doc managers.
+- Allow doc managers to be imported from anywhere, given the full path.
+- Do not call count() on oplog cursors.
+- Change the oplog format to be resilient to replica set failover.
+
+.. warning:: The change to the oplog timestamp file format means that downgrading
+             from this version is not possible!
+
+Version 2.3
+-----------
+
+- Make self._fields in OplogThread a set.
+- Move elastic doc managers into their own projects.
+
 Version 2.2
 -----------
 - Support for using a single meta collection to track replication to MongoDB cluster
