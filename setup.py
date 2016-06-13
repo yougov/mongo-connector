@@ -114,7 +114,7 @@ extra_opts['cmdclass'] = {
 }
 
 setup(name='mongo-connector',
-      version="2.3",
+      version="2.4",
       author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
