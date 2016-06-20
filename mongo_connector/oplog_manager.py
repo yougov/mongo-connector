@@ -419,7 +419,7 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
-    def _pop_excluded_fields(self, doc):
+    def _pop_excluded_fields(self, doc, update=False):
         # Remove all the fields that were passed in exclude_fields.
         for field in self._exclude_fields:
             curr_doc = doc
@@ -437,23 +437,41 @@ class OplogThread(threading.Thread):
                 remove_up_to.pop(end)
         return doc  # Need this to be similar to copy_included_fields.
 
-    def _copy_included_fields(self, doc):
-        # Copy over included fields to new doc
+    def _contains_field(self, selector, doc, pos=0, path=[]):
+        # check if a given document contains allowed properties and return
+        # value and path for it
+        # parameter selector is a list of property names
+        # pos is internally used to know where in the selector we are
+        # path is used to be able to return a path for the new_doc for updating
+
+        if pos < len(selector):
+            for selpos in range(len(selector) - pos):
+                sel = ".".join(selector[pos:pos+selpos+1])
+                if sel in doc:
+                    return self._contains_field(selector, doc[sel],
+                                    pos=pos+selpos+1,
+                                    path=path + selector[pos:pos+selpos+1])
+            return False, None, path
+        else:
+            return True, doc, path
+
+    def _copy_included_fields(self, doc, update=False):
         new_doc = {}
         for field in self.fields:
-            dots = field.split('.')
-            curr_doc = doc
-            for part in dots:
-                if part not in curr_doc:
-                    break
+            selector = field.split(".")
+            found, value, path = self._contains_field(selector, doc)
+            if found:
+                if update:
+                    # create a diff object (with dot convention)
+                    new_doc[".".join(path)] = value
                 else:
-                    curr_doc = curr_doc[part]
-            else:
-                # If we found the field in the original document, copy it
-                edit_doc = new_doc
-                for part in dots[:-1]:
-                    edit_doc = edit_doc.setdefault(part, {})
-                edit_doc[dots[-1]] = curr_doc
+                    # create a full document
+                    d = new_doc
+                    for p in path[:-1]:
+                        if not p in d:
+                            d[p] = {}
+                        d = d[p]
+                    d[path[-1]] = value
 
         return new_doc
 
@@ -476,9 +494,9 @@ class OplogThread(threading.Thread):
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
             if '$set' in entry_o:
-                entry['o']["$set"] = filter_fields(entry_o["$set"])
+                entry['o']["$set"] = filter_fields(entry_o["$set"], update=True)
             if '$unset' in entry_o:
-                entry['o']["$unset"] = filter_fields(entry_o["$unset"])
+                entry['o']["$unset"] = filter_fields(entry_o["$unset"], update=True)
             # not allowed to have empty $set/$unset, so remove if empty
             if "$set" in entry_o and not entry_o['$set']:
                 entry_o.pop("$set")
