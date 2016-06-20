@@ -268,57 +268,61 @@ class OplogThread(threading.Thread):
                         # use namespace mapping if one exists
                         ns = self.dest_mapping.get(ns, ns)
                         timestamp = util.bson_ts_to_long(entry['ts'])
-                        for docman in self.doc_managers:
-                            try:
-                                LOG.debug("OplogThread: Operation for this "
-                                          "entry is %s" % str(operation))
+                        try:
+                            for docman in self.doc_managers:
+                                    LOG.debug("OplogThread: Operation for this "
+                                              "entry is %s" % str(operation))
 
-                                # Remove
-                                if operation == 'd':
-                                    docman.remove(
-                                        entry['o']['_id'], ns, timestamp)
-                                    remove_inc += 1
+                                    # Remove
+                                    if operation == 'd':
+                                        docman.remove(
+                                            entry['o']['_id'], ns, timestamp)
+                                        remove_inc += 1
 
-                                # Insert
-                                elif operation == 'i':  # Insert
-                                    # Retrieve inserted document from
-                                    # 'o' field in oplog record
-                                    doc = entry.get('o')
-                                    # Extract timestamp and namespace
-                                    if is_gridfs_file:
-                                        db, coll = ns.split('.', 1)
-                                        gridfile = GridFSFile(
-                                            self.primary_client[db][coll],
-                                            doc)
-                                        docman.insert_file(
-                                            gridfile, ns, timestamp)
-                                    else:
-                                        docman.upsert(doc, ns, timestamp)
-                                    upsert_inc += 1
+                                    # Insert
+                                    elif operation == 'i':  # Insert
+                                        # Retrieve inserted document from
+                                        # 'o' field in oplog record
+                                        doc = entry.get('o')
+                                        # Extract timestamp and namespace
+                                        if is_gridfs_file:
+                                            db, coll = ns.split('.', 1)
+                                            gridfile = GridFSFile(
+                                                self.primary_client[db][coll],
+                                                doc)
+                                            docman.insert_file(
+                                                gridfile, ns, timestamp)
+                                        else:
+                                            docman.upsert(doc, ns, timestamp)
+                                        upsert_inc += 1
 
-                                # Update
-                                elif operation == 'u':
-                                    docman.update(entry['o2']['_id'],
-                                                  entry['o'],
-                                                  ns, timestamp)
-                                    update_inc += 1
+                                    # Update
+                                    elif operation == 'u':
+                                        docman.update(entry['o2']['_id'],
+                                                      entry['o'],
+                                                      ns, timestamp)
+                                        update_inc += 1
 
-                                # Command
-                                elif operation == 'c':
-                                    # use unmapped namespace
-                                    doc = entry.get('o')
-                                    docman.handle_command(doc,
-                                                          entry['ns'],
-                                                          timestamp)
+                                    # Command
+                                    elif operation == 'c':
+                                        # use unmapped namespace
+                                        doc = entry.get('o')
+                                        docman.handle_command(doc,
+                                                              entry['ns'],
+                                                              timestamp)
 
-                            except errors.OperationFailed:
-                                LOG.exception(
-                                    "Unable to process oplog document %r"
-                                    % entry)
-                            except errors.ConnectionFailed:
-                                LOG.exception(
-                                    "Connection failed while processing oplog "
-                                    "document %r" % entry)
+                        except errors.OperationFailed:
+                            LOG.exception(
+                                "Unable to process oplog document %r"
+                                % entry)
+                            cursor.close()
+                            break
+                        except errors.ConnectionFailed:
+                            LOG.exception(
+                                "Connection failed while processing oplog "
+                                "document %r" % entry)
+                            cursor.close()
+                            break
 
                         if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
                             LOG.debug(
