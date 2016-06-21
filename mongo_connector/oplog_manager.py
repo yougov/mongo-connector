@@ -371,7 +371,7 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
-    def _pop_excluded_fields(self, doc):
+    def _pop_excluded_fields(self, doc, update=False):
         # Remove all the fields that were passed in exclude_fields.
         for field in self._exclude_fields:
             curr_doc = doc
