@@ -407,13 +407,23 @@ class OplogThread(threading.Thread):
         else:
             return True, doc, path
 
-    def _copy_included_fields(self, doc):
+    def _copy_included_fields(self, doc, update=False):
         new_doc = {}
         for field in self.fields:
             selector = field.split(".")
             found, value, path = self._contains_field(selector, doc)
             if found:
-                new_doc[".".join(path)] = value
+                if update:
+                    # create a diff object (with dot convention)
+                    new_doc[".".join(path)] = value
+                else:
+                    # create a full document
+                    d = new_doc
+                    for p in path[:-1]:
+                        if not p in d:
+                            d[p] = {}
+                        d = d[p]
+                    d[path[-1]] = value
 
         return new_doc
 
@@ -436,9 +446,9 @@ class OplogThread(threading.Thread):
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
             if '$set' in entry_o:
-                entry['o']["$set"] = filter_fields(entry_o["$set"])
+                entry['o']["$set"] = filter_fields(entry_o["$set"], update=True)
             if '$unset' in entry_o:
-                entry['o']["$unset"] = filter_fields(entry_o["$unset"])
+                entry['o']["$unset"] = filter_fields(entry_o["$unset"], update=True)
             # not allowed to have empty $set/$unset, so remove if empty
             if "$set" in entry_o and not entry_o['$set']:
                 entry_o.pop("$set")
