@@ -315,6 +315,10 @@ class OplogThread(threading.Thread):
                             LOG.exception(
                                 "Unable to process oplog document %r"
                                 % entry)
+                        except errors.TransientOperationFailed:
+                            LOG.exception(
+                                "Transient failure while processing oplog document %r"
+                                % entry)
                             cursor.close()
                             break
                         except errors.ConnectionFailed:
@@ -879,7 +883,7 @@ class OplogThread(threading.Thread):
                         remov_inc += 1
                         LOG.debug(
                             "OplogThread: Rollback, removed %r " % doc)
-                    except errors.OperationFailed:
+                    except (errors.OperationFailed, errors.TransientOperationFailed):
                         LOG.warning(
                             "Could not delete document during rollback: %r "
                             "This can happen if this document was already "
@@ -901,7 +905,7 @@ class OplogThread(threading.Thread):
                         dm.upsert(doc,
                                   self.dest_mapping.get(namespace, namespace),
                                   util.bson_ts_to_long(rollback_cutoff_ts))
-                    except errors.OperationFailed:
+                    except (errors.OperationFailed, errors.TransientOperationFailed):
                         fail_insert_inc += 1
                         LOG.exception("OplogThread: Rollback, Unable to "
                                       "insert %r" % doc)

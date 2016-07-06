@@ -169,7 +169,7 @@ class TestSynchronizer(unittest.TestCase):
 
         def fail_upsert(self, doc, namespace, timestamp):
             self.upsert = orig_upsert
-            raise errors.OperationFailed("synthetic failure")
+            raise errors.TransientOperationFailed("synthetic failure")
 
         self.synchronizer.upsert = types.MethodType(fail_upsert, self.synchronizer)
         self.conn.test.test.insert_one({"_id": id2, "x": 2})
