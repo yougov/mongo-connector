@@ -504,6 +504,8 @@ class OplogThread(threading.Thread):
             database, coll = namespace.split('.', 1)
             last_id = None
             attempts = 0
+            to_skip = 0
+            cursor_errors = 0
 
             # Loop to handle possible AutoReconnect
             while attempts < 60:
@@ -511,6 +513,7 @@ class OplogThread(threading.Thread):
                 if not last_id:
                     cursor = util.retry_until_ok(
                         target_coll.find,
+                        skip=to_skip,
                         projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
@@ -518,20 +521,38 @@ class OplogThread(threading.Thread):
                     cursor = util.retry_until_ok(
                         target_coll.find,
                         {"_id": {"$gt": last_id}},
+                        skip=to_skip,
                         projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 try:
+                    to_skip = 0
                     for doc in cursor:
+                        cursor_errors = 0
                         if not self.running:
                             raise StopIteration
                         last_id = doc["_id"]
+                        to_skip += 1
                         yield doc
                     break
                 except (pymongo.errors.AutoReconnect,
                         pymongo.errors.OperationFailure):
                     attempts += 1
                     time.sleep(1)
+                except (bson.errors.InvalidBSON,
+                        bson.errors.InvalidDocument,
+                        bson.errors.InvalidId,
+                        bson.errors.InvalidStringData) as e:
+                    if self.continue_on_error:
+                        cursor_errors += 1
+                        if last_id:
+                            to_skip = cursor_errors + 1
+                        else:
+                            to_skip += cursor_errors + 1
+                        LOG.exception(
+                            "Could not read document: " + repr(e))
+                    else:
+                        raise
 
         def upsert_each(dm):
             num_inserted = 0
