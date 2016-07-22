@@ -38,10 +38,12 @@
     "__fields": ["field1", "field2", "field3"],
 
     "namespaces": {
-        "__include": ["db.source1", "db.source2"],
+        "__include": ["db.source1", "db.source2", "db2.*"],
+        "__exclude": ["db3.source1", "db3.*"],
         "__mapping": {
             "db.source1": "db.dest1",
-            "db.source2": "db.dest2"
+            "db.source2": "db.dest2",
+            "db2.*": "db2_map_*.dest"
         },
 	"__gridfs": ["db.fs"]
     },

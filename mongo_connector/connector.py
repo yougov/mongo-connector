@@ -32,6 +32,7 @@ from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions
+from mongo_connector.dest_mapping import DestMapping
 
 from pymongo import MongoClient
 
@@ -102,9 +103,13 @@ class Connector(threading.Thread):
         # Save the rest of kwargs.
         self.kwargs = kwargs
 
+        # Replace the origin dest_mapping
+        self.dest_mapping = DestMapping(kwargs.get('ns_set', []),
+                                        kwargs.get('ex_ns_set', []),
+                                        kwargs.get('dest_mapping', {}))
+
         # Initialize and set the command helper
-        command_helper = CommandHelper(kwargs.get('ns_set', []),
-                                       kwargs.get('dest_mapping', {}))
+        command_helper = CommandHelper(self.dest_mapping)
         for dm in self.doc_managers:
             dm.command_helper = command_helper
 
@@ -156,6 +161,7 @@ class Connector(threading.Thread):
             fields=config['fields'],
             exclude_fields=config['exclude_fields'],
             ns_set=config['namespaces.include'],
+            ex_ns_set=config['namespaces.exclude'],
             dest_mapping=config['namespaces.mapping'],
             gridfs_set=config['namespaces.gridfs'],
             ssl_certfile=config['ssl.sslCertfile'],
@@ -290,7 +296,7 @@ class Connector(threading.Thread):
             # non sharded configuration
             oplog = OplogThread(
                 main_conn, self.doc_managers, self.oplog_progress,
-                **self.kwargs)
+                self.dest_mapping, **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
                      main_conn)
@@ -347,7 +353,7 @@ class Connector(threading.Thread):
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
-                        **self.kwargs)
+                        self.dest_mapping, **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -687,6 +693,9 @@ def get_config_options():
         if cli_values['ns_set']:
             option.value['include'] = cli_values['ns_set'].split(',')
 
+        if cli_values['ex_ns_set']:
+            option.value['exclude'] = cli_values['ex_ns_set'].split(',')
+
         if cli_values['gridfs_set']:
             option.value['gridfs'] = cli_values['gridfs_set'].split(',')
 
@@ -704,11 +713,47 @@ def get_config_options():
             raise errors.InvalidConfiguration(
                 "Namespace set should not contain any duplicates.")
 
+        ex_ns_set = option.value['exclude']
+        if len(ex_ns_set) != len(set(ex_ns_set)):
+            raise errors.InvalidConfiguration(
+                "Exclude namespace set should not contain any duplicates.")
+
+        # not allow to exist both 'include' and 'exclude'
+        if ns_set and ex_ns_set:
+            raise errors.InvalidConfiguration(
+                "Cannot use both namespace 'include' "
+                "(--namespace-set) and 'exclude' "
+                "(--exclude-namespace-set).")
+
+        # validate 'include' format
+        for ns in ns_set:
+            if ns.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "Namespace set should be plain text "
+                    "e.g. foo.bar or only contains one wildcard, e.g. foo.* .")
+
+        # validate 'exclude' format
+        for ens in ex_ns_set:
+            if ens.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "Exclude namespace set should be plain text "
+                    "e.g. foo.bar or only contains one wildcard, e.g. foo.* .")
+
         dest_mapping = option.value['mapping']
         if len(dest_mapping) != len(set(dest_mapping.values())):
             raise errors.InvalidConfiguration(
                 "Destination namespaces set should not"
                 " contain any duplicates.")
+
+        for key, value in dest_mapping.items():
+            if key.count("*") > 1 or value.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "The namespace mapping source and destination "
+                    "cannot contain more than one '*' character.")
+            if key.count("*") != value.count("*"):
+                raise errors.InvalidConfiguration(
+                    "The namespace mapping source and destination "
+                    "must contain the same number of '*' characters.")
 
         gridfs_set = option.value['gridfs']
         if len(gridfs_set) != len(set(gridfs_set)):
@@ -717,6 +762,7 @@ def get_config_options():
 
     default_namespaces = {
         "include": [],
+        "exclude": [],
         "mapping": {},
         "gridfs": []
     }
@@ -735,10 +781,26 @@ def get_config_options():
         "consider. For example, if we wished to store all "
         "documents from the test.test and alpha.foo "
         "namespaces, we could use `-n test.test,alpha.foo`. "
+        "You can also use, for example, `-n test.*` to store "
+        "documents from all the collections of db test. "
         "The default is to consider all the namespaces, "
         "excluding the system and config databases, and "
         "also ignoring the \"system.indexes\" collection in "
-        "any database.")
+        "any database. This cannot be used together with "
+        "'--exclude-namespace-set'!")
+
+    # -x is to specify the namespaces we dont want to consider. The default
+    # is empty
+    namespaces.add_cli(
+        "-x", "--exclude-namespace-set", dest="ex_ns_set", help=
+        "Used to specify the namespaces we do not want to "
+        "consider. For example, if we wished to ignore all "
+        "documents from the test.test and alpha.foo "
+        "namespaces, we could use `-x test.test,alpha.foo`. "
+        "You can also use, for example, `-x test.*` to ignore "
+        "documents from all the collections of db test. "
+        "The default is not to exclude any namespace. "
+        "This cannot be used together with '--namespace-set'!")
 
     # -g is the destination namespace
     namespaces.add_cli(
@@ -747,8 +809,13 @@ def get_config_options():
         "namespace provided in the --namespace-set option "
         "will be mapped respectively according to this "
         "comma-separated list. These lists must have "
-        "equal length. The default is to use the identity "
-        "mapping. This works for mongo-to-mongo as well as" 
+        "equal length. "
+        "It also supports mapping using wildcard, for example, "
+        "map foo.* to bar_*.someting, means that if we have two "
+        "collections foo.a and foo.b, they will map to "
+        "bar_a.something and bar_b.something. "
+        "The default is to use the identity "
+        "mapping. This works for mongo-to-mongo as well as"
         "mongo-to-elasticsearch connections.")
 
     # --gridfs-set is the set of GridFS namespaces to consider
