@@ -22,6 +22,7 @@ sys.path[0:0] = [""]
 import pymongo
 
 from mongo_connector import errors
+from mongo_connector.dest_mapping import DestMapping
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
@@ -66,34 +67,34 @@ class TestCommandReplication(unittest.TestCase):
         close_client(self.primary_conn)
         self.repl_set.stop()
 
-    def initOplogThread(self, namespace_set=[], dest_mapping={}):
+    def initOplogThread(self, namespace_set=[], ex_namespace_set=[], dest_mapping={}):
         self.docman = CommandLoggerDocManager()
-        self.docman.command_helper = CommandHelper(namespace_set, dest_mapping)
+        # Replace the origin dest_mapping
+        self.dest_mapping_stru = DestMapping(namespace_set,ex_namespace_set,dest_mapping)
+
+        self.docman.command_helper = CommandHelper(self.dest_mapping_stru)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(self.docman,),
             oplog_progress_dict=self.oplog_progress,
+            dest_mapping=self.dest_mapping_stru,
             ns_set=namespace_set,
-            dest_mapping=dest_mapping,
+            ex_ns_set=ex_namespace_set,
             collection_dump=False
         )
         self.opman.start()
 
     def test_command_helper(self):
-        # Databases cannot be merged
-        mapping = {
-            'a.x': 'c.x',
-            'b.x': 'c.y'
-        }
-        self.assertRaises(errors.MongoConnectorError,
-                          CommandHelper,
-                          list(mapping), mapping)
 
         mapping = {
             'a.x': 'b.x',
             'a.y': 'c.y'
         }
-        helper = CommandHelper(list(mapping) + ['a.z'], mapping)
+
+        # Replace the origin dest_mapping
+        dest_mapping_stru = DestMapping(list(mapping) + ['a.z'],[],mapping)
+
+        helper = CommandHelper(dest_mapping_stru)
 
         self.assertEqual(set(helper.map_db('a')), set(['a', 'b', 'c']))
         self.assertEqual(helper.map_db('d'), [])

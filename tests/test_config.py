@@ -89,6 +89,7 @@ class TestConfig(unittest.TestCase):
             'fields': [u'testFields1', u'testField2'],
             'namespaces': {
                 'include': [u'testNamespaceSet'],
+                'exclude': [],
                 'mapping': {'testMapKey': u'testMapValue'},
                 'gridfs': [u'testGridfsSet']
             }
@@ -130,6 +131,7 @@ class TestConfig(unittest.TestCase):
         })
         self.assertEqual(self.conf['namespaces'], {
             'include': [u'testNamespaceSet'],
+            'exclude': [],
             'mapping': {},
             'gridfs': [u'testGridfsSet']
         })
@@ -170,63 +172,63 @@ class TestConfig(unittest.TestCase):
     def test_namespace_set(self):
         # test namespace_set and dest_namespace_set
         self.load_options({
-            "-n": "source_ns_1,source_ns_2,source_ns_3",
-            "-g": "dest_ns_1,dest_ns_2,dest_ns_3"
+            "-n": "source_db_1.col,source_db_2.col,source_db_3.col",
+            "-g": "dest_db_1.col,dest_db_2.col,dest_db_3.col"
         })
         self.assertEqual(self.conf['namespaces.include'],
-                         ['source_ns_1', 'source_ns_2', 'source_ns_3'])
+                         ['source_db_1.col', 'source_db_2.col', 'source_db_3.col'])
         self.assertEqual(self.conf['namespaces.mapping'],
-                         {'source_ns_1': 'dest_ns_1',
-                          'source_ns_2': 'dest_ns_2',
-                          'source_ns_3': 'dest_ns_3'})
+                         {'source_db_1.col': 'dest_db_1.col',
+                          'source_db_2.col': 'dest_db_2.col',
+                          'source_db_3.col': 'dest_db_3.col'})
 
     def test_namespace_set_validation(self):
         # duplicate ns_set
         args = {
-            "-n": "a,a,b",
-            "-g": "1,2,3"
+            "-n": "a.x,a.x,b.y",
+            "-g": "1.0,2.0,3.0"
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
-            'namespaces': {'include': ['a', 'a', 'b']}
+            'namespaces': {'include': ['a.x', 'a.x', 'b.y']}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
         # duplicate gridfs_set
         args = {
-            '--gridfs-set': 'a,a,b'
+            '--gridfs-set': 'a.x,a.x,b.y'
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
-            'namespaces': {'gridfs': ['a', 'a', 'b']}
+            'namespaces': {'gridfs': ['a.x', 'a.x', 'b.y']}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
         # duplicate dest_ns_set
         args = {
-            "-n": "a,b,c",
-            "--dest-namespace-set": "1,3,3"
+            "-n": "a.x,b.y,c.z",
+            "--dest-namespace-set": "1.0,3.0,3.0"
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
             'namespaces': {'mapping': {
-                'a': 'c',
-                'b': 'c'
+                'a.x': 'c.z',
+                'b.y': 'c.z'
             }}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
         # len(ns_set) < len(dest_ns_set)
         args = {
-            "--namespace-set": "a,b,c",
-            "-g": "1,2,3,4"
+            "--namespace-set": "a.x,b.y,c.z",
+            "-g": "1.0,2.0,3.0,4.0"
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
 
         # len(ns_set) > len(dest_ns_set)
         args = {
-            "--namespace-set": "a,b,c,d",
-            "--dest-namespace-set": "1,2,3"
+            "--namespace-set": "a.x,b.y,c.z,d.j",
+            "--dest-namespace-set": "1.0,2.0,3.0"
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
 
@@ -310,7 +312,6 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_json, test_config)
-
 
 class TestConnectorConfig(unittest.TestCase):
     """Test creating a Connector from a Config."""
@@ -447,9 +448,9 @@ class TestConnectorConfig(unittest.TestCase):
         self.assertEqual(mc.ssl_kwargs.get('ssl_cert_reqs'),
                          self.config['ssl.sslCertificatePolicy'])
         command_helper = mc.doc_managers[0].command_helper
-        self.assertEqual(command_helper.namespace_set,
+        self.assertEqual(command_helper.dest_mapping_stru.namespace_set,
                          self.config['namespaces.include'])
-        self.assertEqual(command_helper.dest_mapping,
+        self.assertEqual(command_helper.dest_mapping_stru.plain,
                          self.config['namespaces.mapping'])
 
         # Test Logger options.
