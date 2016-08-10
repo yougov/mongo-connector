@@ -24,15 +24,16 @@ class TestDestMapping(unittest.TestCase):
         self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffelevents.allevents")
         self.assertEqual(self.mapping.get("eiffelevents.artifacts", "eiffelevents.artifacts"), "eiffelevents.artifacts")
         self.assertEqual(self.mapping.get("eiffelevents.baselines", "eiffelevents.baselines"), "eiffelevents.baselines")
-        self.assertFalse(self.mapping.get_key("eiffelevents.allevents"))
+        self.assertEqual(self.mapping.get_key("eiffelevents.allevents"), "eiffelevents.allevents")
         self.assertListEqual(self.mapping.map_db("eiffelevents"), ["eiffelevents"])
         self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffelevents.allevents")
         self.assertIsNone(self.mapping.map_namespace("eiffelevents.jobs"))
         
     def test_wildcard_in_no_ex_no_map(self):
         self.setup_mapping(["eiffelevents.*"], [], {})
-        self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffelevents.allevents")
         self.assertFalse(self.mapping.get_key("eiffelevents.allevents"))
+        self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffelevents.allevents")
+        self.assertEqual(self.mapping.get_key("eiffelevents.allevents"),"eiffelevents.allevents")
         self.assertListEqual(self.mapping.map_db("eiffelevents"), ["eiffelevents"])
         self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffelevents.allevents")
         self.assertIsNone(self.mapping.map_namespace("testevents.jobs"))
@@ -88,7 +89,7 @@ class TestDestMapping(unittest.TestCase):
         self.assertDictEqual(self.mapping.plain, {"eiffelevents.allevents": "eiffel000_allevents.documents", "eiffelevents.artifacts": "eiffel000_artifacts.documents"})
         
         self.assertEqual(self.mapping.get_key("eiffel000_allevents.documents"), "eiffelevents.allevents")
-        self.assertListEqual(self.mapping.map_db("eiffelevents"),["eiffel000_allevents", "eiffel000_artifacts"])
+        self.assertListEqual(self.mapping.map_db("eiffelevents"),["eiffel000_artifacts", "eiffel000_allevents"])
         self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffel000_allevents.documents")
         
         

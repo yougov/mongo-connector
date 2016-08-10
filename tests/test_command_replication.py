@@ -77,7 +77,7 @@ class TestCommandReplication(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(self.docman,),
             oplog_progress_dict=self.oplog_progress,
-            dest_mapping=self.dest_mapping_stru,
+            dest_mapping_stru=self.dest_mapping_stru,
             ns_set=namespace_set,
             ex_ns_set=ex_namespace_set,
             collection_dump=False

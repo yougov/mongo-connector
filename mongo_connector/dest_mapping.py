@@ -106,7 +106,7 @@ class DestMapping():
                             if col != "$cmd":
                                 arr = self.plain_db.get(db, [])
                                 arr.append(res.split(".")[0])
-                                self.plain_db[db] = arr
+                                self.plain_db[db] = list(set(arr))
                             self.lock.release()
                             return res
                         else:
@@ -139,7 +139,7 @@ class DestMapping():
                 self.reverse_plain[value] = key
                 arr = self.plain_db.get(db, [])
                 arr.append(value.split(".")[0])
-                self.plain_db[db] = arr
+                self.plain_db[db] = list(set(arr))
             else:
                 raise errors.InvalidConfiguration(
                 "Destination namespaces set should not"

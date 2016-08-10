@@ -74,7 +74,7 @@ class TestRollbacks(unittest.TestCase):
             primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping=dest_mapping_stru,
+            dest_mapping_stru=dest_mapping_stru,
             ns_set=["test.mc"]
         )
 

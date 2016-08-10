@@ -139,7 +139,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping=dest_mapping_stru,
+            dest_mapping_stru=dest_mapping_stru,
             ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )
@@ -147,7 +147,7 @@ class TestOplogManagerSharded(unittest.TestCase):
             primary_client=self.shard2_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping=dest_mapping_stru,
+            dest_mapping_stru=dest_mapping_stru,
             ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )

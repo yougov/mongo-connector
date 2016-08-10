@@ -48,7 +48,7 @@ class TestOplogManager(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping=self.dest_mapping_stru,
+            dest_mapping_stru=self.dest_mapping_stru,
         )
 
     def tearDown(self):
