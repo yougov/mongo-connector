@@ -89,7 +89,7 @@ class TestDestMapping(unittest.TestCase):
         self.assertDictEqual(self.mapping.plain, {"eiffelevents.allevents": "eiffel000_allevents.documents", "eiffelevents.artifacts": "eiffel000_artifacts.documents"})
         
         self.assertEqual(self.mapping.get_key("eiffel000_allevents.documents"), "eiffelevents.allevents")
-        self.assertListEqual(self.mapping.map_db("eiffelevents"),["eiffel000_artifacts", "eiffel000_allevents"])
+        self.assertSetEqual(set(self.mapping.map_db("eiffelevents")),set(["eiffel000_artifacts", "eiffel000_allevents"]))
         self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffel000_allevents.documents")
         
         
