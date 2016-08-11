@@ -14,83 +14,83 @@ class TestDestMapping(unittest.TestCase):
     def test_default(self):
         # By default, all namespaces are kept without renaming
         self.setup_mapping([], [], {})
-        self.assertEqual(self.mapping.get("a.b", "a.b"), "a.b")
-        self.assertFalse(self.mapping.get_key("a.b"))
-        self.assertListEqual(self.mapping.map_db("a"), ["a"])
-        self.assertEqual(self.mapping.map_namespace("a.b"), "a.b")        
+        self.assertEqual(self.mapping.get("db1.col1", "db1.col1"), "db1.col1")
+        self.assertFalse(self.mapping.get_key("db1.col1"))
+        self.assertListEqual(self.mapping.map_db("db1"), ["db1"])
+        self.assertEqual(self.mapping.map_namespace("db1.col1"), "db1.col1")
         
     def test_plain_in_no_ex_no_map(self):
-        self.setup_mapping(["eiffelevents.allevents", "eiffelevents.artifacts", "eiffelevents.baselines"], [], {})
-        self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertEqual(self.mapping.get("eiffelevents.artifacts", "eiffelevents.artifacts"), "eiffelevents.artifacts")
-        self.assertEqual(self.mapping.get("eiffelevents.baselines", "eiffelevents.baselines"), "eiffelevents.baselines")
-        self.assertEqual(self.mapping.get_key("eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertListEqual(self.mapping.map_db("eiffelevents"), ["eiffelevents"])
-        self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertIsNone(self.mapping.map_namespace("eiffelevents.jobs"))
+        self.setup_mapping(["db1.col1", "db1.col2", "db1.col3"], [], {})
+        self.assertEqual(self.mapping.get("db1.col1", "db1.col1"), "db1.col1")
+        self.assertEqual(self.mapping.get("db1.col2", "db1.col2"), "db1.col2")
+        self.assertEqual(self.mapping.get("db1.col3", "db1.col3"), "db1.col3")
+        self.assertEqual(self.mapping.get_key("db1.col1"), "db1.col1")
+        self.assertListEqual(self.mapping.map_db("db1"), ["db1"])
+        self.assertEqual(self.mapping.map_namespace("db1.col1"), "db1.col1")
+        self.assertIsNone(self.mapping.map_namespace("db1.col4"))
         
     def test_wildcard_in_no_ex_no_map(self):
-        self.setup_mapping(["eiffelevents.*"], [], {})
-        self.assertFalse(self.mapping.get_key("eiffelevents.allevents"))
-        self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertEqual(self.mapping.get_key("eiffelevents.allevents"),"eiffelevents.allevents")
-        self.assertListEqual(self.mapping.map_db("eiffelevents"), ["eiffelevents"])
-        self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertIsNone(self.mapping.map_namespace("testevents.jobs"))
+        self.setup_mapping(["db1.*"], [], {})
+        self.assertFalse(self.mapping.get_key("db1.col1"))
+        self.assertEqual(self.mapping.get("db1.col1", "db1.col1"), "db1.col1")
+        self.assertEqual(self.mapping.get_key("db1.col1"),"db1.col1")
+        self.assertListEqual(self.mapping.map_db("db1"), ["db1"])
+        self.assertEqual(self.mapping.map_namespace("db1.col1"), "db1.col1")
+        self.assertIsNone(self.mapping.map_namespace("db2.col4"))
         
     def test_yes_in_yes_ex_no_map(self):
-        self.setup_mapping(["eiffelevents.*"], ["eiffelevents.jobs"], {})
-        self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffelevents.allevents")
-        self.assertIsNone(self.mapping.map_namespace("eiffelevents.jobs"))
+        self.setup_mapping(["db1.*"], ["db1.col4"], {})
+        self.assertEqual(self.mapping.map_namespace("db1.col1"), "db1.col1")
+        self.assertIsNone(self.mapping.map_namespace("db1.col4"))
         
     def test_init_mapping(self):
         mapping = {
-          "eiffelevents_*.allevents": "eiffel000_allevents.documents"
+          "db1_*.col1": "newdb1.newcol1"
         }
         self.assertRaises(errors.InvalidConfiguration, self.setup_mapping, [], [], mapping)           
             
         mapping = {
-          "eiffelevents.*": "eiffel*_*.documents"
+          "db1.*": "newdb*_*.newcol"
         }
         self.assertRaises(errors.InvalidConfiguration, self.setup_mapping, [], [], mapping)
         
         mapping = {
-          "eiffelevents.allevents": "eiffel000_allevents.documents",
-          "testevents.allevents": "eiffel000_allevents.documents"
+          "db1.col1": "newdb.newcol",
+          "db2.col1": "newdb.newcol"
         }
         self.assertRaises(errors.InvalidConfiguration, self.setup_mapping, [], [], mapping)
         
         mapping = {
-          "eiffelevents.*": "eiffel000_*.documents",
-          "testevents.a": "test000_a.b"
+          "db1.*": "newdb1_*.newcol",
+          "db2.a": "newdb2_a.b"
         }
         self.setup_mapping([], [], mapping)
-        self.assertDictEqual(self.mapping.plain, {"testevents.a":"test000_a.b"})
-        self.assertDictEqual(self.mapping.plain_db, {"testevents":["test000_a"]})
-        self.assertDictEqual(self.mapping.reverse_plain, {"test000_a.b":"testevents.a"})
-        self.assertDictEqual(self.mapping.wildcard, {"eiffelevents.*":"eiffel000_*.documents"})
+        self.assertDictEqual(self.mapping.plain, {"db2.a":"newdb2_a.b"})
+        self.assertDictEqual(self.mapping.plain_db, {"db2":["newdb2_a"]})
+        self.assertDictEqual(self.mapping.reverse_plain, {"newdb2_a.b":"db2.a"})
+        self.assertDictEqual(self.mapping.wildcard, {"db1.*":"newdb1_*.newcol"})
         
     def test_map(self):
-        include = ["eiffelevents.*"]
-        exclude = ["eiffelevents.jobs"]
+        include = ["db1.*"]
+        exclude = ["db1.col4"]
         mapping = {
-          "eiffelevents.*": "eiffel000_*.documents"
+          "db1.*": "newdb1_*.colx"
         }
         self.setup_mapping(include, exclude, mapping)
         self.assertDictEqual(self.mapping.plain, {})
-        self.assertDictEqual(self.mapping.wildcard, {"eiffelevents.*": "eiffel000_*.documents"})
+        self.assertDictEqual(self.mapping.wildcard, {"db1.*": "newdb1_*.colx"})
         
         # when we get a matched map, plain should contain that one afterwards
-        self.assertEqual(self.mapping.get("eiffelevents.allevents", "eiffelevents.allevents"), "eiffel000_allevents.documents")
-        self.assertDictEqual(self.mapping.plain, {"eiffelevents.allevents": "eiffel000_allevents.documents"})
+        self.assertEqual(self.mapping.get("db1.col1", "db1.col1"), "newdb1_col1.colx")
+        self.assertDictEqual(self.mapping.plain, {"db1.col1": "newdb1_col1.colx"})
         
         # when we get a matched map, plain should contain that one afterwards
-        self.assertEqual(self.mapping.get("eiffelevents.artifacts", "eiffelevents.artifacts"), "eiffel000_artifacts.documents")
-        self.assertDictEqual(self.mapping.plain, {"eiffelevents.allevents": "eiffel000_allevents.documents", "eiffelevents.artifacts": "eiffel000_artifacts.documents"})
+        self.assertEqual(self.mapping.get("db1.col2", "db1.col2"), "newdb1_col2.colx")
+        self.assertDictEqual(self.mapping.plain, {"db1.col1": "newdb1_col1.colx", "db1.col2": "newdb1_col2.colx"})
         
-        self.assertEqual(self.mapping.get_key("eiffel000_allevents.documents"), "eiffelevents.allevents")
-        self.assertSetEqual(set(self.mapping.map_db("eiffelevents")),set(["eiffel000_artifacts", "eiffel000_allevents"]))
-        self.assertEqual(self.mapping.map_namespace("eiffelevents.allevents"), "eiffel000_allevents.documents")
+        self.assertEqual(self.mapping.get_key("newdb1_col1.colx"), "db1.col1")
+        self.assertSetEqual(set(self.mapping.map_db("db1")),set(["newdb1_col1", "newdb1_col2"]))
+        self.assertEqual(self.mapping.map_namespace("db1.col1"), "newdb1_col1.colx")
         
         
 
