@@ -66,6 +66,17 @@ class Connector(threading.Thread):
             LOG.warning('No doc managers specified, using simulator.')
             self.doc_managers = (simulator.DocManager(),)
 
+        if not pymongo.has_c():
+            warning = ('pymongo version %s was installed without the C '
+                       'extensions. "InvalidBSON: Date value out of '
+                       'range" errors may occur if there are documents '
+                       'with BSON Datetimes that represent times outside of '
+                       'Python\'s datetime.datetime limit.') % (
+                pymongo.__version__,)
+            # Print and warn to make it extra noticeable
+            print(warning)
+            LOG.warning(warning)
+
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
 
