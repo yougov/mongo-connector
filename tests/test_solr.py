@@ -168,20 +168,23 @@ class TestSolr(SolrTestCase):
             updated[u('_id')] = u(updated['_id'])
             # Flatten the MongoDB document to match Solr
             updated = docman._clean_doc(updated, 'dummy.namespace', 0)
-            # Allow some time for update to propagate
-            time.sleep(3)
-            replicated = list(self._search("a:0"))[0]
-
             # Remove add'l fields until these are stored in a separate Solr core
             updated.pop('_ts')
-            replicated.pop('_ts')
             updated.pop('ns')
-            replicated.pop('ns')
 
-            # Remove field added by Solr
-            replicated.pop("_version_")
+            def update_worked():
+                replicated = list(self._search("a:0"))[0]
+                # Remove add'l fields until these are stored in a separate
+                # Solr core
+                replicated.pop('_ts')
+                replicated.pop('ns')
+                # Remove field added by Solr
+                replicated.pop("_version_")
 
-            self.assertEqual(replicated, updated)
+                return replicated == updated
+
+            # Allow some time for update to propagate
+            assert_soon(update_worked)
 
         # Update by adding a field.
         # Note that Solr can't mix types within an array
