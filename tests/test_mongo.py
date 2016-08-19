@@ -207,8 +207,8 @@ class TestMongo(MongoTestCase):
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
-            primary, adding another doc, killing the new primary, and then
-            restarting both.
+        primary, adding another doc, killing the new primary, and then
+        restarting both.
         """
         primary_conn = self.repl_set.primary.client()
         self.conn['test']['test'].insert_one({'name': 'paul'})
@@ -229,7 +229,7 @@ class TestMongo(MongoTestCase):
         result_set_1 = list(self._search())
         result_set_2 = self.conn['test']['test'].find_one({'name': 'pauline'})
         self.assertEqual(len(result_set_1), 2)
-        #make sure pauline is there
+        # make sure pauline is there
         for item in result_set_1:
             if item['name'] == 'pauline':
                 self.assertEqual(item['_id'], result_set_2['_id'])

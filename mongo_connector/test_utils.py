@@ -55,10 +55,6 @@ if db_user and db_password:
     _post_request_template = {'login': db_user, 'password': db_password}
 
 
-def _proc_params(mongos=False):
-    return dict(port=next(_free_port), **DEFAULT_OPTIONS)
-
-
 def _mo_url(resource, *args):
     return 'http://' + '/'.join([_mo_address, resource] + list(args))
 
@@ -77,6 +73,12 @@ def kill_all():
 
 
 class MCTestObject(object):
+
+    def proc_params(self):
+        params = DEFAULT_OPTIONS.copy()
+        params.update(self._proc_params)
+        params["port"] = next(_free_port)
+        return params
 
     def get_config(self):
         raise NotImplementedError
@@ -104,12 +106,13 @@ class Server(MCTestObject):
 
     _resource = 'servers'
 
-    def __init__(self, id=None, uri=None):
+    def __init__(self, id=None, uri=None, **kwargs):
         self.id = id
         self.uri = uri
+        self._proc_params = kwargs
 
     def get_config(self):
-        return {'name': 'mongod', 'procParams': _proc_params()}
+        return {'name': 'mongod', 'procParams': self.proc_params()}
 
     def start(self):
         if self.id is None:
@@ -135,19 +138,21 @@ class ReplicaSet(MCTestObject):
 
     _resource = 'replica_sets'
 
-    def __init__(self, id=None, uri=None, primary=None, secondary=None):
+    def __init__(self, id=None, uri=None, primary=None, secondary=None,
+                 **kwargs):
         self.id = id
         self.uri = uri
         self.primary = primary
         self.secondary = secondary
+        self._proc_params = kwargs
 
     def get_config(self):
         return {
             'members': [
-                {'procParams': _proc_params()},
-                {'procParams': _proc_params()},
+                {'procParams': self.proc_params()},
+                {'procParams': self.proc_params()},
                 {'rsParams': {'arbiterOnly': True},
-                 'procParams': _proc_params()}
+                 'procParams': self.proc_params()}
             ]
         }
 
@@ -170,10 +175,11 @@ class ShardedCluster(MCTestObject):
 
     _resource = 'sharded_clusters'
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.id = None
         self.uri = None
         self.shards = []
+        self._proc_params = kwargs
 
     def get_config(self):
         return {
@@ -181,8 +187,8 @@ class ShardedCluster(MCTestObject):
                 {'id': 'demo-set-0', 'shardParams': ReplicaSet().get_config()},
                 {'id': 'demo-set-1', 'shardParams': ReplicaSet().get_config()}
             ],
-            'routers': [_proc_params(mongos=True)],
-            'configsvrs': [_proc_params()]
+            'routers': [self.proc_params()],
+            'configsvrs': [self.proc_params()]
         }
 
     def start(self):

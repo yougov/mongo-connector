@@ -170,14 +170,12 @@ class TestOplogManagerSharded(unittest.TestCase):
         # timestamp = None
         cursor1 = self.opman1.get_oplog_cursor(None)
         oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
-            {'op': {'$ne': 'n'},
-             'ns': {'$not': re.compile(r'\.system')}})
+            {'op': {'$ne': 'n'}})
         self.assertEqual(list(cursor1), list(oplog1))
 
         cursor2 = self.opman2.get_oplog_cursor(None)
         oplog2 = self.shard2_conn["local"]["oplog.rs"].find(
-            {'op': {'$ne': 'n'},
-             'ns': {'$not': re.compile(r'\.system')}})
+            {'op': {'$ne': 'n'}})
         self.assertEqual(list(cursor2), list(oplog2))
 
         # earliest entry is the only one at/after timestamp
