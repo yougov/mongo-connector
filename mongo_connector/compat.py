@@ -22,7 +22,7 @@ if PY3:
 
 else:
     exec("""def reraise(exctype, value, trace=None):
-    raise exctype, str(value), trace""")
+    raise exctype, value, trace""")
 
     def is_string(x):
         return isinstance(x, basestring)
