@@ -174,11 +174,12 @@ class TestMongo(MongoTestCase):
                      ('update', update_spec),
                      ('new', True)]))['value']
 
+            def update_worked():
+                replicated = self.mongo_doc.mongo.test.test.find_one({"a": 0})
+                return replicated == updated
 
             # Allow some time for update to propagate
-            time.sleep(2)
-            replicated = self.mongo_doc.mongo.test.test.find_one({"a": 0})
-            self.assertEqual(replicated, updated)
+            assert_soon(update_worked)
 
         # Update by adding a field
         check_update({"$set": {"b": [{"c": 10}, {"d": 11}]}})
