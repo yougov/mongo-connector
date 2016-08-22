@@ -16,13 +16,12 @@
 """
 
 import logging
-from mongo_connector.dest_mapping import DestMapping
 
 LOG = logging.getLogger(__name__)
 
 
 class CommandHelper(object):
-    def __init__(self, dest_mapping_stru=DestMapping([],[],{})):
+    def __init__(self, dest_mapping_stru):
         self.dest_mapping_stru = dest_mapping_stru
 
     # Applies the namespace mapping to a database.

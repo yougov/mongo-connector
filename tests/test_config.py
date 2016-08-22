@@ -89,7 +89,7 @@ class TestConfig(unittest.TestCase):
             'fields': [u'testFields1', u'testField2'],
             'namespaces': {
                 'include': [u'testNamespaceSet'],
-                'exclude': [],
+                'exclude': [u'testExcludeNamespaceSet'],
                 'mapping': {'testMapKey': u'testMapValue'},
                 'gridfs': [u'testGridfsSet']
             }
@@ -110,6 +110,7 @@ class TestConfig(unittest.TestCase):
                 'passwordFile': 'testPasswordFile2'
             },
             'namespaces': {
+                'exclude': [],
                 'mapping': {}
             }
         }
@@ -182,6 +183,13 @@ class TestConfig(unittest.TestCase):
                           'source_db_2.col': 'dest_db_2.col',
                           'source_db_3.col': 'dest_db_3.col'})
 
+        # test exclude_namespace_set
+        self.load_options({
+            "-x": "source_db_1.col,source_db_2.col,source_db_3.col"
+        })
+        self.assertEqual(self.conf['namespaces.exclude'],
+                         ['source_db_1.col', 'source_db_2.col', 'source_db_3.col'])
+
     def test_namespace_set_validation(self):
         # duplicate ns_set
         args = {
@@ -191,6 +199,16 @@ class TestConfig(unittest.TestCase):
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
             'namespaces': {'include': ['a.x', 'a.x', 'b.y']}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+
+        # duplicate ex_ns_set
+        args = {
+            "-x": "a.x,a.x,b.y"
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+        d = {
+            'namespaces': {'exclude': ['a.x', 'a.x', 'b.y']}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
@@ -231,6 +249,56 @@ class TestConfig(unittest.TestCase):
             "--dest-namespace-set": "1.0,2.0,3.0"
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+
+        # ns_set and ex_ns_set should not exist both
+        args = {
+            "-n": "a.x,b.y",
+            "-x": "c.z"
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+        d = {
+            'namespaces': {'include': ['a.x', 'b.y'], 'exclude': ['c.z']}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+
+        # validate ns_set format
+        args = {
+            "-n": "a*.x*"
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+        d = {
+            'namespaces': {'include': ['a*.x*']}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+
+        # validate ex_ns_set format
+        args = {
+            "-x": "a*.x*"
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+        d = {
+            'namespaces': {'exclude': ['a*.x*']}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+
+        # validate dest_ns_set format
+        args = {
+            "-n": "a.x*",
+            "-g": "1*.0*"
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
+        d = {
+            'namespaces': {'mapping': {
+                'a*.x*': '1.0'
+            }}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+        d = {
+            'namespaces': {'mapping': {
+                'a.x*': '1*.0*'
+            }}
+        }
+        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
     def test_doc_managers_from_args(self):
         # Test basic docmanager construction from args
@@ -312,6 +380,7 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_json, test_config)
+
 
 class TestConnectorConfig(unittest.TestCase):
     """Test creating a Connector from a Config."""

@@ -25,7 +25,6 @@ import ssl
 import sys
 import threading
 import time
-import collections
 from mongo_connector import config, constants, errors, util
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
@@ -105,7 +104,9 @@ class Connector(threading.Thread):
         self.kwargs = kwargs
 
         # Replace the origin dest_mapping
-        self.dest_mapping = DestMapping(kwargs.get('ns_set', []),kwargs.get('ex_ns_set', []),kwargs.get('dest_mapping', {}))
+        self.dest_mapping = DestMapping(kwargs.get('ns_set', []),
+                                        kwargs.get('ex_ns_set', []),
+                                        kwargs.get('dest_mapping', {}))
 
         # Initialize and set the command helper
         command_helper = CommandHelper(self.dest_mapping)
@@ -294,8 +295,8 @@ class Connector(threading.Thread):
 
             # non sharded configuration
             oplog = OplogThread(
-                main_conn, self.doc_managers, self.oplog_progress, self.dest_mapping,
-                **self.kwargs)
+                main_conn, self.doc_managers, self.oplog_progress,
+                self.dest_mapping, **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
                      main_conn)
@@ -351,8 +352,8 @@ class Connector(threading.Thread):
                     if self.auth_key is not None:
                         shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
                     oplog = OplogThread(
-                        shard_conn, self.doc_managers, self.oplog_progress, self.dest_mapping,
-                        **self.kwargs)
+                        shard_conn, self.doc_managers, self.oplog_progress,
+                        self.dest_mapping, **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
@@ -717,23 +718,39 @@ def get_config_options():
             raise errors.InvalidConfiguration(
                 "Exclude namespace set should not contain any duplicates.")
 
+        # not allow to exist both 'include' and 'exclude'
+        if ns_set and ex_ns_set:
+            raise errors.InvalidConfiguration(
+                "Include and exclude namespace sets"
+                " are not allowed to exist both.")
+
         # validate 'include' format
         for ns in ns_set:
-            db, col = ns.split(".", 1)
-            if ("*" in db) or (col != "*" and "*" in col):
-                raise errors.InvalidConfiguration("Namespace set should be plain text e.g. foo.bar or only contains one wildcard in the collection name e.g. foo.* .")
+            if ns.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "Namespace set should be plain text "
+                    "e.g. foo.bar or only contains one wildcard, e.g. foo.* .")
 
         # validate 'exclude' format
         for ens in ex_ns_set:
-            db, col = ens.split(".", 1)
-            if "*" in db or (col != "*" and "*" in col):
-                raise errors.InvalidConfiguration("Exclude namespace set should be plain text e.g. foo.bar or only contains one wildcard in the collection name e.g. foo.* .")
+            if ens.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "Exclude namespace set should be plain text "
+                    "e.g. foo.bar or only contains one wildcard, e.g. foo.* .")
 
         dest_mapping = option.value['mapping']
         if len(dest_mapping) != len(set(dest_mapping.values())):
             raise errors.InvalidConfiguration(
                 "Destination namespaces set should not"
                 " contain any duplicates.")
+
+        for key, value in dest_mapping.items():
+            if key.count("*") > 1 or value.count("*") > 1:
+                raise errors.InvalidConfiguration(
+                    "Only one * character is allowed in the namespaces!")
+            if key.count("*") != value.count("*"):
+                raise errors.InvalidConfiguration(
+                    "The number of * character should be equal in the mapping's key and value!")
 
         gridfs_set = option.value['gridfs']
         if len(gridfs_set) != len(set(gridfs_set)):
@@ -766,7 +783,8 @@ def get_config_options():
         "The default is to consider all the namespaces, "
         "excluding the system and config databases, and "
         "also ignoring the \"system.indexes\" collection in "
-        "any database. 'include' and 'exclude' should not conflict!")
+        "any database. This cannot be used together with "
+        "'--exclude-namespace-set'!")
 
     # -x is to specify the namespaces we dont want to consider. The default
     # is empty
@@ -778,7 +796,8 @@ def get_config_options():
         "namespaces, we could use `-x test.test,alpha.foo`. "
         "You can also use, for example, `-x test.*` to ignore "
         "documents from all the collections of db test. "
-        "The default is not to exclude any namespace. 'include' and 'exclude' should not conflict!")
+        "The default is not to exclude any namespace. "
+        "This cannot be used together with '--namespace-set'!")
 
     # -g is the destination namespace
     namespaces.add_cli(
@@ -793,7 +812,7 @@ def get_config_options():
         "collections foo.a and foo.b, they will map to "
         "bar_a.something and bar_b.something. "
         "The default is to use the identity "
-        "mapping. This works for mongo-to-mongo as well as" 
+        "mapping. This works for mongo-to-mongo as well as"
         "mongo-to-elasticsearch connections.")
 
     # --gridfs-set is the set of GridFS namespaces to consider

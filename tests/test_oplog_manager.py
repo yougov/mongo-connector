@@ -43,7 +43,7 @@ class TestOplogManager(unittest.TestCase):
         self.repl_set = ReplicaSet().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
-        self.dest_mapping_stru = DestMapping([],[],{})
+        self.dest_mapping_stru = DestMapping([], [], {})
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -261,8 +261,9 @@ class TestOplogManager(unittest.TestCase):
         phony_ns = ["test.phony1", "test.phony2"]
         dest_mapping = {"test.test1": "test.test1_dest",
                         "test.test2": "test.test2_dest"}
-        dest_mapping_stru = DestMapping(source_ns,[],dest_mapping)
-        self.opman.dest_mapping = dest_mapping_stru
+        dest_mapping_stru = DestMapping(source_ns, [], dest_mapping)
+        self.opman.dest_mapping = dest_mapping
+        self.opman.dest_mapping_stru = dest_mapping_stru
         self.opman.namespace_set = source_ns
         docman = self.opman.doc_managers[0]
         # start replicating

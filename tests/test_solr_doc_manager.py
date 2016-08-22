@@ -18,6 +18,7 @@ import time
 
 sys.path[0:0] = [""]
 
+from mongo_connector.dest_mapping import DestMapping
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.solr_doc_manager import DocManager
 from mongo_connector.test_utils import MockGridFSFile, TESTARGS, solr_url
@@ -223,7 +224,8 @@ class TestSolrDocManager(SolrTestCase):
         self.assertTrue(doc['_id'] == '4' or doc['_id'] == '6')
 
     def test_commands(self):
-        self.docman.command_helper = CommandHelper()
+        dest_mapping_stru = DestMapping([],[],{})
+        self.docman.command_helper = CommandHelper(dest_mapping_stru)
 
         def count_ns(ns):
             return sum(1 for _ in self._search("ns:%s" % ns))

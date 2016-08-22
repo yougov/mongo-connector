@@ -134,7 +134,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Oplog threads (oplog manager) for each shard
         doc_manager = DocManager()
         oplog_progress = LockingDict()
-        dest_mapping_stru = DestMapping(["test.mcsharded", "test.mcunsharded"],[],{})
+        dest_mapping_stru = DestMapping(["test.mcsharded", "test.mcunsharded"], [], {})
         self.opman1 = OplogThread(
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),

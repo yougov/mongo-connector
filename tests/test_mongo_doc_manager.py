@@ -245,10 +245,14 @@ class TestMongoDocManager(MongoTestCase):
         # Also test with namespace mapping.
         # Note that mongo-connector does not currently support commands after
         # renaming a database.
-        dest_mapping_stru = DestMapping(['test.test', 'test.test2', 'test.drop'],[],{
-                'test.test': 'test.othertest',
-                'test.drop': 'dropped.collection'
-            })
+        dest_mapping_stru = DestMapping(['test.test',
+                                         'test.test2',
+                                         'test.drop'],
+                                        [],
+                                        {
+                                         'test.test': 'test.othertest',
+                                         'test.drop': 'dropped.collection'
+                                        })
         self.choosy_docman.command_helper = CommandHelper(dest_mapping_stru)
 
         try:

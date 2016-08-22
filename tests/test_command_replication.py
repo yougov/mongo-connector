@@ -21,7 +21,6 @@ sys.path[0:0] = [""]
 
 import pymongo
 
-from mongo_connector import errors
 from mongo_connector.dest_mapping import DestMapping
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
@@ -67,10 +66,12 @@ class TestCommandReplication(unittest.TestCase):
         close_client(self.primary_conn)
         self.repl_set.stop()
 
-    def initOplogThread(self, namespace_set=[], ex_namespace_set=[], dest_mapping={}):
+    def initOplogThread(self, namespace_set=[], ex_namespace_set=[],
+                        dest_mapping={}):
         self.docman = CommandLoggerDocManager()
         # Replace the origin dest_mapping
-        self.dest_mapping_stru = DestMapping(namespace_set,ex_namespace_set,dest_mapping)
+        self.dest_mapping_stru = DestMapping(namespace_set, ex_namespace_set,
+                                             dest_mapping)
 
         self.docman.command_helper = CommandHelper(self.dest_mapping_stru)
         self.opman = OplogThread(
@@ -92,7 +93,7 @@ class TestCommandReplication(unittest.TestCase):
         }
 
         # Replace the origin dest_mapping
-        dest_mapping_stru = DestMapping(list(mapping) + ['a.z'],[],mapping)
+        dest_mapping_stru = DestMapping(list(mapping) + ['a.z'], [], mapping)
 
         helper = CommandHelper(dest_mapping_stru)
 
@@ -154,8 +155,6 @@ class TestCommandReplication(unittest.TestCase):
         self.assertEqual(
             self.docman.commands[1].get('to'),
             'test.test2')
-
-
 
 if __name__ == '__main__':
     unittest.main()

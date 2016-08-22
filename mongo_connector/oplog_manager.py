@@ -44,7 +44,8 @@ class OplogThread(threading.Thread):
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
     def __init__(self, primary_client, doc_managers,
-                 oplog_progress_dict, dest_mapping_stru, mongos_client=None, **kwargs):
+                 oplog_progress_dict, dest_mapping_stru,
+                 mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
         self.batch_size = kwargs.get('batch_size', DEFAULT_BATCH_SIZE)
@@ -81,8 +82,11 @@ class OplogThread(threading.Thread):
         # The set of gridfs namespaces to process from the mongo cluster
         self.gridfs_set = kwargs.get('gridfs_set', [])
 
+        # The dict of source namespaces to destination namespaces
+        self.dest_mapping = kwargs.get('dest_mapping', {})
+
         # The structure handling dest_mappings dynamically
-        self.dest_mapping = dest_mapping_stru
+        self.dest_mapping_stru = dest_mapping_stru
 
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get('continue_on_error', False)
@@ -199,9 +203,10 @@ class OplogThread(threading.Thread):
             for ns in self.namespace_set:
                 if "*" in ns:
                     # if namespace_set contains *, change to regexp
-                    reg_ns = re.sub(r"(\.)","\.", ns)
+                    reg_ns = re.sub(r"(\.)", "\.", ns)
                     reg_ns = re.sub(r"(\*)", ".*", reg_ns)
-                    LOG.debug("OplogThread: Replace namespace %s to %s"  %(ns, reg_ns))
+                    LOG.debug("OplogThread: Replace namespace %s to %s"
+                              % (ns, reg_ns))
                     reg = re.compile(reg_ns)
                     self._oplog_ns_set.append(reg)
                 else:
@@ -213,10 +218,7 @@ class OplogThread(threading.Thread):
 
     @property
     def oplog_ex_ns_set(self):
-        try:
-            return self._oplog_ex_ns_set
-        except AttributeError:
-            return []
+        return self._oplog_ex_ns_set
 
     def update_oplog_ex_ns_set(self):
         self._oplog_ex_ns_set = []
@@ -224,9 +226,10 @@ class OplogThread(threading.Thread):
             for ens in self.ex_namespace_set:
                 if "*" in ens:
                     # if namespace_set contains *, change to regexp
-                    reg_ens = re.sub(r"(\.)","\.", ens)
+                    reg_ens = re.sub(r"(\.)", "\.", ens)
                     reg_ens = re.sub(r"(\*)", ".*", reg_ens)
-                    LOG.debug("OplogThread: Replace exclude namespace %s to %s"  %(ens, reg_ens))
+                    LOG.debug("OplogThread: Replace exclude namespace %s to %s"
+                              % (ens, reg_ens))
                     reg = re.compile(reg_ens)
                     self._oplog_ex_ns_set.append(reg)
                 else:
@@ -309,7 +312,7 @@ class OplogThread(threading.Thread):
                                 continue
 
                         # use namespace mapping if one exists
-                        ns = self.dest_mapping.get(ns, ns)
+                        ns = self.dest_mapping_stru.get(ns, ns)
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
@@ -502,9 +505,10 @@ class OplogThread(threading.Thread):
             query['ns'] = {'$nin': self.oplog_ex_ns_set}
 
         if self.oplog_ns_set and self.oplog_ex_ns_set:
-            query = {'$and': [{'ns':{'$nin': self.oplog_ex_ns_set}},{'ns':{'$in':self.oplog_ns_set}}]}
+            query = {'$and': [{'ns': {'$nin': self.oplog_ex_ns_set}},
+                              {'ns': {'$in': self.oplog_ns_set}}]}
 
-        LOG.debug("Cursor query: %s" %query)
+        LOG.debug("Cursor query: %s" % query)
 
         if timestamp is None:
             cursor = self.oplog.find(
@@ -531,84 +535,51 @@ class OplogThread(threading.Thread):
             return None
         long_ts = util.bson_ts_to_long(timestamp)
 
-
-        def get_dump_set():
-            res_set = []
-
-            def get_all_ns():
-                all_ns_set = []
-                db_list = retry_until_ok(self.primary_client.database_names)
-                for database in db_list:
-                    if database == "config" or database == "local":
+        def get_all_ns():
+            all_ns_set = []
+            db_list = retry_until_ok(self.primary_client.database_names)
+            for database in db_list:
+                if database == "config" or database == "local":
+                    continue
+                coll_list = retry_until_ok(
+                    self.primary_client[database].collection_names)
+                for coll in coll_list:
+                    # ignore system collections
+                    if coll.startswith("system."):
                         continue
-                    coll_list = retry_until_ok(
-                        self.primary_client[database].collection_names)
-                    for coll in coll_list:
-                        # ignore system collections
-                        if coll.startswith("system."):
-                            continue
-                        # ignore gridfs collections
-                        if coll.endswith(".files") or coll.endswith(".chunks"):
-                            continue
-                        namespace = "%s.%s" % (database, coll)
-                        all_ns_set.append(namespace)
-                return all_ns_set
+                    # ignore gridfs collections
+                    if coll.endswith(".files") or coll.endswith(".chunks"):
+                        continue
+                    namespace = "%s.%s" % (database, coll)
+                    all_ns_set.append(namespace)
+            return all_ns_set
 
-            def get_ns_from_set(namespace_set):
-                ns_set = []
-                for ns in namespace_set:
-                    db, col = ns.split(".", 1)
-                    if "*" not in ns:
-                        # normal case, append to dump_set
-                        ns_set.append(ns)
-                    elif "*" not in db and col == "*":
-                        # get all matched collections in that ns
-                        coll_list = retry_until_ok(self.primary_client[db].collection_names)
-                        for coll in coll_list:
-                            # ignore system collections
-                            if coll.startswith("system."):
-                                continue
-                            # ignore gridfs collections
-                            if coll.endswith(".files") or coll.endswith(".chunks"):
-                                continue
-                            namespace = "%s.%s" % (db, coll)
-                            ns_set.append(namespace)
-                    else:
-                        LOG.error("OplogThread: Got invalid namespace: %s " %ns)
-                        LOG.error("OplogThread: Failed to get dump set!")
-                        self.running = False
-                        return None
+        def get_ns_from_set(namespace_set, include=True):
+            all_ns_set = get_all_ns()
+            ns_set = []
+            for src_ns in all_ns_set:
+                for map_ns in namespace_set:
+                    # get all matched collections in that ns
+                    reg_pattern = r'\A' + map_ns.replace('*', '(.*)') + r'\Z'
+                    if re.match(reg_pattern, src_ns):
+                        ns_set.append(src_ns)
+                        continue
+
+            if include:
                 return ns_set
-
-            # No namespaces specified
-            if (not self.namespace_set) and (not self.ex_namespace_set):
-                res_set = get_all_ns()
-            elif self.namespace_set and not self.ex_namespace_set:
-                res_set = get_ns_from_set(self.namespace_set)
-                if res_set is None:
-                    return None
-            elif self.ex_namespace_set and not self.namespace_set:
-                res_all_set = get_all_ns()
-                res_ex_set = get_ns_from_set(self.ex_namespace_set)
-                if res_ex_set is None:
-                    return None
-
-                res_set = [x for x in res_all_set if x not in res_ex_set]
             else:
-                res_ns_set = get_ns_from_set(self.namespace_set)
-                if res_ns_set is None:
-                    return None
+                return [x for x in all_ns_set if x not in ns_set]
 
-                res_ex_set = get_ns_from_set(self.ex_namespace_set)
-                if res_ex_set is None:
-                    return None
+        # No namespaces specified
+        if (not self.namespace_set) and (not self.ex_namespace_set):
+            dump_set = get_all_ns()
+        elif self.namespace_set and not self.ex_namespace_set:
+            dump_set = get_ns_from_set(self.namespace_set)
+        else:
+            # ex_namespace_set is set but no namespace_set
+            dump_set = get_ns_from_set(self.ex_namespace_set, include=False)
 
-                res_set = [x for x in res_ns_set if x not in res_ex_set]
-
-            LOG.debug("OplogThread: Dumping set of collections %s " % res_set)
-            return res_set
-
-        dump_set = get_dump_set()
+        LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
         def docs_to_dump(namespace):
             database, coll = namespace.split('.', 1)
@@ -651,7 +622,8 @@ class OplogThread(threading.Thread):
                     if num % 10000 == 0:
                         LOG.debug("Upserted %d docs." % num)
                     try:
-                        mapped_ns = self.dest_mapping.get(namespace, namespace)
+                        mapped_ns = self.dest_mapping_stru.get(namespace,
+                                                               namespace)
                         dm.upsert(doc, mapped_ns, long_ts)
                         num_inserted += 1
                     except Exception:
@@ -668,7 +640,8 @@ class OplogThread(threading.Thread):
         def upsert_all(dm):
             try:
                 for namespace in dump_set:
-                    mapped_ns = self.dest_mapping.get(namespace, namespace)
+                    mapped_ns = self.dest_mapping_stru.get(namespace,
+                                                           namespace)
                     dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
@@ -697,7 +670,7 @@ class OplogThread(threading.Thread):
                 for gridfs_ns in self.gridfs_set:
                     db, coll = gridfs_ns.split('.', 1)
                     mongo_coll = self.primary_client[db][coll]
-                    dest_ns = self.dest_mapping.get(gridfs_ns, gridfs_ns)
+                    dest_ns = self.dest_mapping_stru.get(gridfs_ns, gridfs_ns)
                     for doc in docs_to_dump(gridfs_ns + '.files'):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
@@ -757,9 +730,10 @@ class OplogThread(threading.Thread):
             query['ns'] = {'$nin': self.oplog_ex_ns_set}
 
         if self.oplog_ns_set and self.oplog_ex_ns_set:
-            query = {'$and': [{'ns':{'$nin': self.oplog_ex_ns_set}},{'ns':{'$in':self.oplog_ns_set}}]}
+            query = {'$and': [{'ns': {'$nin': self.oplog_ex_ns_set}},
+                              {'ns': {'$in': self.oplog_ns_set}}]}
 
-        LOG.debug("Cursor query: %s" %query)
+        LOG.debug("Cursor query: %s" % query)
 
         curr = self.oplog.find(query).sort(
                 '$natural', pymongo.DESCENDING
@@ -851,8 +825,9 @@ class OplogThread(threading.Thread):
         if self.checkpoint is not None:
             with self.oplog_progress as oplog_prog:
                 oplog_dict = oplog_prog.get_dict()
-                # If we have the repr of our oplog collection in the dictionary,
-                # remove it and replace it with our replica set name.
+                # If we have the repr of our oplog collection
+                # in the dictionary, remove it and replace it
+                # with our replica set name.
                 # This allows an easy upgrade path from mongo-connector 2.3.
                 # For an explanation of the format change, see the comment in
                 # read_last_checkpoint.
@@ -866,7 +841,8 @@ class OplogThread(threading.Thread):
     def read_last_checkpoint(self):
         """Read the last checkpoint from the oplog progress dictionary.
         """
-        # In versions of mongo-connector 2.3 and before, we used the repr of the
+        # In versions of mongo-connector 2.3 and before,
+        # we used the repr of the
         # oplog collection as keys in the oplog_progress dictionary.
         # In versions thereafter, we use the replica set name. For backwards
         # compatibility, we check for both.
@@ -950,7 +926,7 @@ class OplogThread(threading.Thread):
             # or removing them in each target system
             for namespace, doc_list in rollback_set.items():
                 # Get the original namespace
-                original_namespace = self.dest_mapping.get_key(namespace)
+                original_namespace = self.dest_mapping_stru.get_key(namespace)
                 if not original_namespace:
                     original_namespace = namespace
 
@@ -1011,7 +987,8 @@ class OplogThread(threading.Thread):
                     try:
                         insert_inc += 1
                         dm.upsert(doc,
-                                  self.dest_mapping.get(namespace, namespace),
+                                  self.dest_mapping_stru.get(namespace,
+                                                             namespace),
                                   util.bson_ts_to_long(rollback_cutoff_ts))
                     except errors.OperationFailed:
                         fail_insert_inc += 1

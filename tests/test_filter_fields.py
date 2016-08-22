@@ -33,7 +33,7 @@ class TestFilterFields(unittest.TestCase):
         self.repl_set = ReplicaSet().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
-        self.dest_mapping_stru = DestMapping([],[],{})
+        self.dest_mapping_stru = DestMapping([], [], {})
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
