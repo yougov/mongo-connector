@@ -20,6 +20,7 @@ Programming Language :: Python :: 2.6
 Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3.3
 Programming Language :: Python :: 3.4
+Programming Language :: Python :: 3.5
 Topic :: Database
 Topic :: Software Development :: Libraries :: Python Modules
 Operating System :: Unix
@@ -123,8 +124,7 @@ setup(name='mongo-connector',
       license="http://www.apache.org/licenses/LICENSE-2.0.html",
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
-      install_requires=['pymongo >= 2.9',
-                        'pysolr >= 3.1.0'],
+      install_requires=['pymongo >= 2.9'],
       packages=["mongo_connector", "mongo_connector.doc_managers"],
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']
@@ -133,6 +133,11 @@ setup(name='mongo-connector',
           'console_scripts': [
               'mongo-connector = mongo_connector.connector:main',
           ],
+      },
+      extras_require={
+          "solr": ["solr-doc-manager"],
+          "elastic": ["elastic-doc-manager"],
+          "elastic2": ["elastic2-doc-manager"]
       },
       **extra_opts
 )

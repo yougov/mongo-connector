@@ -26,7 +26,6 @@ if sys.version_info[0] == 3:
     unicode = str
 
 # Configurable hosts and ports used in the tests
-solr_url = unicode(os.environ.get('SOLR_URL', 'http://localhost:8983/solr'))
 db_user = unicode(os.environ.get("DB_USER", ""))
 db_password = unicode(os.environ.get("DB_PASSWORD", ""))
 # Extra keyword options to provide to Connector.

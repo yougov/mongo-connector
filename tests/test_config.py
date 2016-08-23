@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 from mongo_connector import config, errors, connector
 from mongo_connector.connector import get_config_options, setup_logging
 from mongo_connector.doc_managers import doc_manager_simulator
-from mongo_connector.test_utils import ReplicaSet, solr_url
+from mongo_connector.test_utils import ReplicaSet
 from tests import unittest
 
 from_here = lambda *paths: os.path.join(
@@ -519,30 +519,27 @@ class TestConnectorConfig(unittest.TestCase):
         self.assertConnectorState()
 
     def test_client_options(self):
-        repl_set = ReplicaSet().start()
-        try:
-            config_def = {
-                'mainAddress': repl_set.uri,
-                'oplogFile': from_here('lib', 'dummy.timestamp'),
-                'docManagers': [
-                    {
-                        'docManager': 'solr_doc_manager',
-                        'targetURL': solr_url,
-                        'args': {
-                            'clientOptions': {
-                                'timeout': 100
-                            }
+        config_def = {
+            'mainAddress': 'localhost:27017',
+            'oplogFile': from_here('lib', 'dummy.timestamp'),
+            'docManagers': [
+                {
+                    'docManager': 'mongo_doc_manager',
+                    'targetURL': 'dummyhost:27017',
+                    'args': {
+                        'clientOptions': {
+                            'maxPoolSize': 50,
+                            'connect': False
                         }
                     }
-                ]
-            }
-            config_obj = config.Config(get_config_options())
-            config_obj.load_json(json.dumps(config_def))
-            config_obj.parse_args(argv=[])
-            conn = connector.Connector.from_config(config_obj)
-            self.assertEqual(100, conn.doc_managers[0].solr.timeout)
-        finally:
-            repl_set.stop()
+                }
+            ]
+        }
+        config_obj = config.Config(get_config_options())
+        config_obj.load_json(json.dumps(config_def))
+        config_obj.parse_args(argv=[])
+        conn = connector.Connector.from_config(config_obj)
+        self.assertEqual(50, conn.doc_managers[0].mongo.max_pool_size)
 
 
 if __name__ == '__main__':
