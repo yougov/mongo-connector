@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Version 2.4.1
+-------------
+
+- Collection dump does not require namespace-set collection entries to be in the oplog.
+- Fix an issue where a rollback was misinterpreted as falling off the oplog.
+- Fix issue when re-raising exceptions containing unicode.
+
 Version 2.4
 -----------
 
@@ -70,7 +77,7 @@ Version 2.0.1
 Version 2.0.1 fixes filtering by namespace (--namespace-set, namespaces.include).
 
 Version 2.0
-----------------
+-----------
 
 Version 2.0 is a major version of Mongo Connector and includes breaking changes, new features, and bug fixes.
 

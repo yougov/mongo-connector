@@ -311,6 +311,13 @@ class OplogThread(threading.Thread):
                             else:
                                 continue
 
+                        # Ignore the collection if it is not included
+                        if self.oplog_ns_set and ns not in self.oplog_ns_set:
+                            LOG.debug("OplogThread: Skipping oplog entry: "
+                                      "'%s' is not in the namespace set." %
+                                      (ns,))
+                            continue
+
                         # use namespace mapping if one exists
                         ns = self.dest_mapping_stru.get(ns, ns)
                         timestamp = util.bson_ts_to_long(entry['ts'])
@@ -492,11 +499,12 @@ class OplogThread(threading.Thread):
         return entry
 
     def get_oplog_cursor(self, timestamp=None):
-        """Get a cursor to the oplog after the given timestamp, filtering
-        entries not in the namespace set.
+        """Get a cursor to the oplog after the given timestamp, excluding
+        no-op entries.
+
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
-        query = {}
+        query = {'op': {'$ne': 'n'}}
 
         if self.oplog_ns_set and not self.oplog_ex_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
@@ -719,10 +727,10 @@ class OplogThread(threading.Thread):
 
         return timestamp
 
-    def get_last_oplog_timestamp(self):
-        """Return the timestamp of the latest entry in the oplog.
+    def _get_oplog_timestamp(self, newest_entry):
+        """Return the timestamp of the latest or earliest entry in the oplog.
         """
-        query = {}
+        query = {'op': {'$ne': 'n'}}
         if self.oplog_ns_set and not self.oplog_ex_ns_set:
             query['ns'] = {'$in': self.oplog_ns_set}
 
@@ -735,18 +743,30 @@ class OplogThread(threading.Thread):
 
         LOG.debug("Cursor query: %s" % query)
 
+        sort_order = pymongo.DESCENDING if newest_entry else pymongo.ASCENDING
         curr = self.oplog.find(query).sort(
-                '$natural', pymongo.DESCENDING
+                '$natural', sort_order
             ).limit(-1)
 
         try:
             ts = next(curr)['ts']
         except StopIteration:
+            LOG.debug("OplogThread: oplog is empty.")
             return None
 
-        LOG.debug("OplogThread: Last oplog entry has timestamp %d."
-                  % ts.time)
+        LOG.debug("OplogThread: %s oplog entry has timestamp %d."
+                  % ('Newest' if newest_entry else 'Oldest', ts.time))
         return ts
+
+    def get_oldest_oplog_timestamp(self):
+        """Return the timestamp of the oldest entry in the oplog.
+        """
+        return self._get_oplog_timestamp(False)
+
+    def get_last_oplog_timestamp(self):
+        """Return the timestamp of the newest entry in the oplog.
+        """
+        return self._get_oplog_timestamp(True)
 
     def _cursor_empty(self, cursor):
         try:
@@ -761,7 +781,7 @@ class OplogThread(threading.Thread):
         The cursor is set to either the beginning of the oplog, or
         wherever it was last left off.
 
-        Returns the cursor and the number of documents left in the cursor.
+        Returns the cursor and True if the cursor is empty.
         """
         timestamp = self.read_last_checkpoint()
 
@@ -803,14 +823,26 @@ class OplogThread(threading.Thread):
                 time.sleep(1)
                 continue
 
-            # first entry should be last oplog entry processed
-            cursor_ts_long = util.bson_ts_to_long(
-                first_oplog_entry.get("ts"))
-            given_ts_long = util.bson_ts_to_long(timestamp)
-            if cursor_ts_long > given_ts_long:
-                # first entry in oplog is beyond timestamp
-                # we've fallen behind
+            oldest_ts_long = util.bson_ts_to_long(
+                self.get_oldest_oplog_timestamp())
+            checkpoint_ts_long = util.bson_ts_to_long(timestamp)
+            if checkpoint_ts_long < oldest_ts_long:
+                # We've fallen behind, the checkpoint has fallen off the oplog
                 return None, True
+
+            cursor_ts_long = util.bson_ts_to_long(first_oplog_entry["ts"])
+            if cursor_ts_long > checkpoint_ts_long:
+                # The checkpoint is not present in this oplog and the oplog
+                # did not rollover. This means that we connected to a new
+                # primary which did not replicate the checkpoint and which has
+                # new changes in its oplog for us to process.
+                # rollback, update checkpoint, and retry
+                LOG.debug("OplogThread: Initiating rollback from "
+                          "get_oplog_cursor: new oplog entries found but "
+                          "checkpoint is not present")
+                self.checkpoint = self.rollback()
+                self.update_checkpoint()
+                return self.init_cursor()
 
             # first entry has been consumed
             return cursor, cursor_empty

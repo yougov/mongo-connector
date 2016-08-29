@@ -9,12 +9,8 @@ python:
 install:
   - pip install pymongo==2.9
   - pip install mongo-orchestration==0.3.1
-  - curl -O http://archive.apache.org/dist/lucene/solr/4.9.1/solr-4.9.1.tgz
-  - tar -zxf solr-4.9.1.tgz
-  - cp mongo_connector/doc_managers/schema.xml solr-4.9.1/example/solr/collection1/conf/
 
 before_script:
-  - cd solr-4.9.1/example/ && java -Djetty.port=8983 -Dsolr.solr.home=solr -jar start.jar > /dev/null 2>&1 &
   - mongo-orchestration start
 
 script:
