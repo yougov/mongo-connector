@@ -201,17 +201,8 @@ class OplogThread(threading.Thread):
         self._oplog_ns_set = []
         if self.namespace_set:
             for ns in self.namespace_set:
-                if "*" in ns:
-                    # if namespace_set contains *, change to regexp
-                    reg_ns = re.sub(r"(\.)", "\.", ns)
-                    reg_ns = re.sub(r"(\*)", ".*", reg_ns)
-                    LOG.debug("OplogThread: Replace namespace %s to %s"
-                              % (ns, reg_ns))
-                    reg = re.compile(reg_ns)
-                    self._oplog_ns_set.append(reg)
-                else:
-                    self._oplog_ns_set.append(ns)
-                    self._oplog_ns_set.append(ns.split('.', 1)[0] + '.$cmd')
+                self._oplog_ns_set.append(ns)
+                self._oplog_ns_set.append(ns.split('.', 1)[0] + '.$cmd')
 
             self._oplog_ns_set.extend(self.gridfs_files_set)
             self._oplog_ns_set.append("admin.$cmd")
@@ -224,16 +215,7 @@ class OplogThread(threading.Thread):
         self._oplog_ex_ns_set = []
         if self.ex_namespace_set:
             for ens in self.ex_namespace_set:
-                if "*" in ens:
-                    # if namespace_set contains *, change to regexp
-                    reg_ens = re.sub(r"(\.)", "\.", ens)
-                    reg_ens = re.sub(r"(\*)", ".*", reg_ens)
-                    LOG.debug("OplogThread: Replace exclude namespace %s to %s"
-                              % (ens, reg_ens))
-                    reg = re.compile(reg_ens)
-                    self._oplog_ex_ns_set.append(reg)
-                else:
-                    self._oplog_ex_ns_set.append(ens)
+                self._oplog_ex_ns_set.append(ens)
 
     @log_fatal_exceptions
     def run(self):
@@ -312,14 +294,27 @@ class OplogThread(threading.Thread):
                                 continue
 
                         # Ignore the collection if it is not included
-                        if self.oplog_ns_set and ns not in self.oplog_ns_set:
+                        # In the connector.py we already verified that
+                        # it is not possible
+                        # to have include and exclude in the same time.
+                        if self.oplog_ns_set and not self.oplog_ex_ns_set and not self.dest_mapping_stru.match_set(ns, self.oplog_ns_set):
                             LOG.debug("OplogThread: Skipping oplog entry: "
                                       "'%s' is not in the namespace set." %
+                                      (ns,))
+                            continue
+                        if self.oplog_ex_ns_set and not self.oplog_ns_set and self.dest_mapping_stru.match_set(ns, self.oplog_ex_ns_set):
+                            LOG.debug("OplogThread: Skipping oplog entry: "
+                                      "'%s' is in the exclude namespace set." %
                                       (ns,))
                             continue
 
                         # use namespace mapping if one exists
                         ns = self.dest_mapping_stru.get(ns, ns)
+                        if ns is None:
+                            LOG.debug("OplogThread: Skipping oplog entry: "
+                                      "'%s' is not in the namespace set." %
+                                      (ns,))
+                            continue
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
@@ -505,19 +500,6 @@ class OplogThread(threading.Thread):
         If no timestamp is specified, returns a cursor to the entire oplog.
         """
         query = {'op': {'$ne': 'n'}}
-
-        if self.oplog_ns_set and not self.oplog_ex_ns_set:
-            query['ns'] = {'$in': self.oplog_ns_set}
-
-        if self.oplog_ex_ns_set and not self.oplog_ns_set:
-            query['ns'] = {'$nin': self.oplog_ex_ns_set}
-
-        if self.oplog_ns_set and self.oplog_ex_ns_set:
-            query = {'$and': [{'ns': {'$nin': self.oplog_ex_ns_set}},
-                              {'ns': {'$in': self.oplog_ns_set}}]}
-
-        LOG.debug("Cursor query: %s" % query)
-
         if timestamp is None:
             cursor = self.oplog.find(
                 query,
@@ -730,21 +712,8 @@ class OplogThread(threading.Thread):
     def _get_oplog_timestamp(self, newest_entry):
         """Return the timestamp of the latest or earliest entry in the oplog.
         """
-        query = {'op': {'$ne': 'n'}}
-        if self.oplog_ns_set and not self.oplog_ex_ns_set:
-            query['ns'] = {'$in': self.oplog_ns_set}
-
-        if self.oplog_ex_ns_set and not self.oplog_ns_set:
-            query['ns'] = {'$nin': self.oplog_ex_ns_set}
-
-        if self.oplog_ns_set and self.oplog_ex_ns_set:
-            query = {'$and': [{'ns': {'$nin': self.oplog_ex_ns_set}},
-                              {'ns': {'$in': self.oplog_ns_set}}]}
-
-        LOG.debug("Cursor query: %s" % query)
-
         sort_order = pymongo.DESCENDING if newest_entry else pymongo.ASCENDING
-        curr = self.oplog.find(query).sort(
+        curr = self.oplog.find({'op': {'$ne': 'n'}}).sort(
                 '$natural', sort_order
             ).limit(-1)
 

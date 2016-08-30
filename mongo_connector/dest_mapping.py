@@ -13,6 +13,13 @@ wildcard mapping namespaces dynamically.
 
 class DestMapping():
     def __init__(self, namespace_set, ex_namespace_set, user_mapping):
+        """
+            namespace_set and ex_namespace_set will not be non-empty
+            in the same time.
+            user_mapping should be non-empty together with namespace_set.
+            This assumption has been verified in the get_config_options()
+            in connector.py.
+        """
         # a dict containing plain mappings
         self.plain = {}
         # a dict containing wildcard mappings
