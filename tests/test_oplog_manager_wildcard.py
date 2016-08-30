@@ -141,9 +141,7 @@ class TestOplogManager(unittest.TestCase):
             [{"idb1col1": i} for i in range(2, 1002)])
         oplog_cursor = self.oplog_coll.find(
             {'op': {'$ne': 'n'},
-             'ns': {'$nin':
-                    [re.compile(r'excludedb3\..*'), 'includedb2.excludecol2']
-                    }},
+             'ns': {'$not': re.compile(r'\.(system|\$cmd)')}},
             sort=[("ts", pymongo.ASCENDING)])
 
         # initial insert + 1000 more inserts
