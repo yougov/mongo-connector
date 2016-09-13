@@ -46,6 +46,11 @@ class DestMapping():
 
     def set_plain(self, key, value):
         """A utility function to set the corresponding plain variables"""
+        if value in self.reverse_plain:
+            raise errors.InvalidConfiguration(
+                "Destination namespaces set should not"
+                " contain any duplicates.")
+
         db, col = key.split(".", 1)
         self.plain[key] = value
         self.reverse_plain[value] = key
@@ -82,74 +87,55 @@ class DestMapping():
         """Given a plain source namespace, return a mapped namespace if matched.
         If no match and given defaultval, return it as a default value.
         """
-        self.lock.acquire()
-        # search in plain mappings first
-        if plain_src_ns in self.plain.keys():
-            self.lock.release()
-            return self.plain[plain_src_ns]
-        else:
-            # search in wildcard mappings
-            # if matched, get a replaced mapped namespace
-            # and add to the plain mappings
-            for k, v in self.wildcard.items():
-                m_res = self.match(plain_src_ns, k)
-                if m_res:
-                    res = self.replace(m_res, v)
-                    if res is not None:
-                        if res not in self.reverse_plain:
+        with self.lock:
+            # search in plain mappings first
+            try:
+                return self.plain[plain_src_ns]
+            except KeyError:
+                # search in wildcard mappings
+                # if matched, get a replaced mapped namespace
+                # and add to the plain mappings
+                for k, v in self.wildcard.items():
+                    m_res = self.match(plain_src_ns, k)
+                    if m_res:
+                        res = self.replace(m_res, v)
+                        if res is not None:
                             self.set_plain(plain_src_ns, res)
-                            self.lock.release()
                             return res
-                        else:
-                            self.lock.release()
-                            raise errors.InvalidConfiguration(
-                                "Destination namespaces set wildcard pattern"
-                                " conflicts with the plain pattern.")
 
-        if defaultval:
-            self.lock.release()
-            return defaultval
-        else:
-            self.lock.release()
-            LOG.warn("Failed to find matched mapping for %s." % plain_src_ns)
-            return None
+            if defaultval:
+                return defaultval
+            else:
+                LOG.warn("Failed to find matched mapping "
+                         "for %s." % plain_src_ns)
+                return None
 
     def set(self, key, value):
         """Set the DestMapping instance to corresponding dictionary"""
-        self.lock.acquire()
-
-        if "*" in key:
-            self.wildcard[key] = value
-        else:
-            if value not in self.reverse_plain:
-                self.set_plain(key, value)
+        with self.lock:
+            if "*" in key:
+                self.wildcard[key] = value
             else:
-                raise errors.InvalidConfiguration(
-                    "Destination namespaces set should not"
-                    " contain any duplicates.")
-
-        self.lock.release()
+                self.set_plain(key, value)
 
     def get_key(self, plain_mapped_ns):
-        """Given a plain mapped namespace,
-         return a source namespace if matched.
-        Only need to consider plain mappings
-         since this is only called in rollback
-         and all the rollback namespaces in the
-         target system should already been
-         put in the reverse_plain dictionary.
+        """Given a plain mapped namespace, return a source namespace if
+        matched. Only need to consider plain mappings since this is only
+        called in rollback and all the rollback namespaces in the target
+        system should already been put in the reverse_plain dictionary.
         """
         return self.reverse_plain.get(plain_mapped_ns)
 
     def map_namespace(self, plain_src_ns):
         """Applies the plain source namespace mapping to a "db.collection" string.
-        The input parameter ns is plain text."""
+        The input parameter ns is plain text.
+        """
         # if plain_src_ns matches ex_namespace_set, ignore
         if self.match_set(plain_src_ns, self.ex_namespace_set):
             return None
         # if no namespace_set, no renaming
         if not self.namespace_set:
-            return plain_src_ns
+            return self.get(plain_src_ns, defaultval=plain_src_ns)
         else:
             return self.get(plain_src_ns)
 

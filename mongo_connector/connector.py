@@ -721,8 +721,9 @@ def get_config_options():
         # not allow to exist both 'include' and 'exclude'
         if ns_set and ex_ns_set:
             raise errors.InvalidConfiguration(
-                "Include and exclude namespace sets"
-                " are not allowed to exist both.")
+                "Cannot use both namespace 'include' "
+                "(--namespace-set) and 'exclude' "
+                "(--exclude-namespace-set).")
 
         # validate 'include' format
         for ns in ns_set:
@@ -747,10 +748,12 @@ def get_config_options():
         for key, value in dest_mapping.items():
             if key.count("*") > 1 or value.count("*") > 1:
                 raise errors.InvalidConfiguration(
-                    "Only one * character is allowed in the namespaces!")
+                    "The namespace mapping source and destination "
+                    "cannot contain more than one '*' character.")
             if key.count("*") != value.count("*"):
                 raise errors.InvalidConfiguration(
-                    "The number of * character should be equal in the mapping's key and value!")
+                    "The namespace mapping source and destination "
+                    "must contain the same number of '*' characters.")
 
         gridfs_set = option.value['gridfs']
         if len(gridfs_set) != len(set(gridfs_set)):
