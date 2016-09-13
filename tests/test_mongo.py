@@ -108,9 +108,7 @@ class TestMongo(MongoTestCase):
             **connector_opts
         )
 
-        self.conn.test.test.drop()
-        self.conn.test.test.files.drop()
-        self.conn.test.test.chunks.drop()
+        self.conn.drop_database('test')
 
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)

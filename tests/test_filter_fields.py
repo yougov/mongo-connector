@@ -28,10 +28,19 @@ from tests import unittest
 
 class TestFilterFields(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.repl_set = ReplicaSet().start()
+        cls.primary_conn = cls.repl_set.client()
+        cls.oplog_coll = cls.primary_conn.local['oplog.rs']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.primary_conn.drop_database("test")
+        close_client(cls.primary_conn)
+        cls.repl_set.stop()
+
     def setUp(self):
-        self.repl_set = ReplicaSet().start()
-        self.primary_conn = self.repl_set.client()
-        self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -42,10 +51,8 @@ class TestFilterFields(unittest.TestCase):
         try:
             self.opman.join()
         except RuntimeError:
-            pass                # OplogThread may not have been started
-        self.primary_conn.drop_database("test")
-        close_client(self.primary_conn)
-        self.repl_set.stop()
+            # OplogThread may not have been started
+             pass
 
     def _check_fields(self, opman, fields, exclude_fields, projection):
         if fields:
@@ -688,3 +695,6 @@ class TestFilterFields(unittest.TestCase):
             LockingDict(),
             fields=fields,
             exclude_fields=exclude_fields)
+
+if __name__ == "__main__":
+    unittest.main()

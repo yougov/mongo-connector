@@ -54,3 +54,7 @@ class TestConnectorSharded(unittest.TestCase):
         assert_soon(lambda: len(dm._search()) > 0)
 
         connector.join()
+
+
+if __name__ == '__main__':
+    unittest.main()
