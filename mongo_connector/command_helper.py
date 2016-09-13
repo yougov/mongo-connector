@@ -16,59 +16,28 @@
 """
 
 import logging
-import mongo_connector.errors
 
 LOG = logging.getLogger(__name__)
 
 
 class CommandHelper(object):
-    def __init__(self, namespace_set=[], dest_mapping={}):
-        self.namespace_set = namespace_set
-        self.dest_mapping = dest_mapping
-
-        # Create a db to db mapping from the namespace mapping.
-        db_pairs = set((ns.split('.')[0],
-                        self.map_namespace(ns).split('.')[0])
-                       for ns in self.namespace_set)
-        targets = set()
-        for _, dest in db_pairs:
-            if dest in targets:
-                dbs = [src2 for src2, dest2 in db_pairs
-                       if dest == dest2]
-                raise mongo_connector.errors.MongoConnectorError(
-                    "Database mapping is not one-to-one."
-                    " %s %s have collections mapped to %s"
-                    % (", ".join(dbs),
-                       "both" if len(dbs) == 2 else "all",
-                       dest))
-            else:
-                targets.add(dest)
-
-        self.db_mapping = {}
-        for src, dest in db_pairs:
-            arr = self.db_mapping.get(src, [])
-            arr.append(dest)
-            self.db_mapping[src] = arr
+    def __init__(self, dest_mapping_stru):
+        self.dest_mapping_stru = dest_mapping_stru
 
     # Applies the namespace mapping to a database.
     # Individual collections in a database can be mapped to
     # different target databases, so map_db can return multiple results.
+    # The input parameter db is plain text
     def map_db(self, db):
-        if self.db_mapping:
-            return self.db_mapping.get(db, [])
-        else:
-            return [db]
+        return self.dest_mapping_stru.map_db(db)
 
     # Applies the namespace mapping to a "db.collection" string
+    # The input parameter ns is plain text
     def map_namespace(self, ns):
-        if not self.namespace_set:
-            return ns
-        elif ns not in self.namespace_set:
-            return None
-        else:
-            return self.dest_mapping.get(ns, ns)
+        return self.dest_mapping_stru.map_namespace(ns)
 
     # Applies the namespace mapping to a db and collection
+    # The input parameter db and coll are plain text
     def map_collection(self, db, coll):
         ns = self.map_namespace(db + '.' + coll)
         if ns:

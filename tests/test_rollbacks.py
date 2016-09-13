@@ -28,6 +28,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
+from mongo_connector.dest_mapping import DestMapping
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (ReplicaSet,
                                         STRESS_COUNT,
@@ -68,10 +69,12 @@ class TestRollbacks(unittest.TestCase):
         # Oplog thread
         doc_manager = DocManager()
         oplog_progress = LockingDict()
+        dest_mapping_stru = DestMapping(["test.mc"], [], {})
         self.opman = OplogThread(
             primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
+            dest_mapping_stru=dest_mapping_stru,
             ns_set=["test.mc"]
         )
 
