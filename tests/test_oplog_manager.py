@@ -28,7 +28,9 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSetSingle)
 from mongo_connector.util import bson_ts_to_long
 from tests import unittest
 
@@ -39,7 +41,7 @@ class TestOplogManager(unittest.TestCase):
     """
 
     def setUp(self):
-        self.repl_set = ReplicaSet().start()
+        self.repl_set = ReplicaSetSingle().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
@@ -139,7 +141,7 @@ class TestOplogManager(unittest.TestCase):
 
         # Case 3
         # 1MB oplog so that we can rollover quickly
-        repl_set = ReplicaSet(oplogSize=1).start()
+        repl_set = ReplicaSetSingle(oplogSize=1).start()
         conn = repl_set.client()
         opman = OplogThread(
             primary_client=conn,

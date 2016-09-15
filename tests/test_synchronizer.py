@@ -22,7 +22,9 @@ import time
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from mongo_connector.test_utils import ReplicaSet, connector_opts, assert_soon
+from mongo_connector.test_utils import (assert_soon,
+                                        connector_opts,
+                                        ReplicaSetSingle)
 from tests import unittest
 
 
@@ -40,7 +42,7 @@ class TestSynchronizer(unittest.TestCase):
             pass
         open("oplog.timestamp", "w").close()
 
-        cls.repl_set = ReplicaSet().start()
+        cls.repl_set = ReplicaSetSingle().start()
         cls.conn = cls.repl_set.client()
         cls.connector = Connector(
             mongo_address=cls.repl_set.uri,

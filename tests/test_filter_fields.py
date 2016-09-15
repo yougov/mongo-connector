@@ -22,16 +22,27 @@ from mongo_connector import errors
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSetSingle)
 from tests import unittest
 
 
 class TestFilterFields(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.repl_set = ReplicaSetSingle().start()
+        cls.primary_conn = cls.repl_set.client()
+        cls.oplog_coll = cls.primary_conn.local['oplog.rs']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.primary_conn.drop_database("test")
+        close_client(cls.primary_conn)
+        cls.repl_set.stop()
+
     def setUp(self):
-        self.repl_set = ReplicaSet().start()
-        self.primary_conn = self.repl_set.client()
-        self.oplog_coll = self.primary_conn.local['oplog.rs']
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -42,10 +53,8 @@ class TestFilterFields(unittest.TestCase):
         try:
             self.opman.join()
         except RuntimeError:
-            pass                # OplogThread may not have been started
-        self.primary_conn.drop_database("test")
-        close_client(self.primary_conn)
-        self.repl_set.stop()
+            # OplogThread may not have been started
+            pass
 
     def _check_fields(self, opman, fields, exclude_fields, projection):
         if fields:
@@ -55,7 +64,8 @@ class TestFilterFields(unittest.TestCase):
             self.assertEqual(opman.fields, None)
             self.assertEqual(opman._fields, set([]))
         if exclude_fields:
-            self.assertEqual(sorted(opman.exclude_fields), sorted(exclude_fields))
+            self.assertEqual(sorted(opman.exclude_fields),
+                             sorted(exclude_fields))
             self.assertEqual(opman._exclude_fields, set(exclude_fields))
         else:
             self.assertEqual(opman.exclude_fields, None)
@@ -358,7 +368,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            fields = fields
+            fields=fields
         )
         fields.append('_id')
         self._check_fields(opman, fields, [],
@@ -375,7 +385,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            fields = fields
+            fields=fields
         )
         self._check_fields(opman, fields, [],
                            dict((f, 1) for f in fields))
@@ -445,7 +455,8 @@ class TestFilterFields(unittest.TestCase):
         # Test with "_id" field included in fields
         fields = ["_id", "title", "content", "author"]
         self.opman.fields = fields
-        self._check_fields(self.opman, fields, [], dict((f, 1) for f in fields))
+        self._check_fields(self.opman, fields, [],
+                           dict((f, 1) for f in fields))
         extra_fields = fields + ['extra1', 'extra2']
         filtered = self.opman.filter_oplog_entry(
             {'op': 'i',
@@ -456,7 +467,8 @@ class TestFilterFields(unittest.TestCase):
         fields = ["title", "content", "author"]
         self.opman.fields = fields
         fields.append('_id')
-        self._check_fields(self.opman, fields, [], dict((f, 1) for f in fields))
+        self._check_fields(self.opman, fields, [],
+                           dict((f, 1) for f in fields))
         extra_fields = fields + ['extra1', 'extra2']
         filtered = self.opman.filter_oplog_entry(
             {'op': 'i',
@@ -466,7 +478,8 @@ class TestFilterFields(unittest.TestCase):
         # Test with only "_id" field
         fields = ["_id"]
         self.opman.fields = fields
-        self._check_fields(self.opman, fields, [], dict((f, 1) for f in fields))
+        self._check_fields(self.opman, fields, [],
+                           dict((f, 1) for f in fields))
         extra_fields = fields + ['extra1', 'extra2']
         filtered = self.opman.filter_oplog_entry(
             {'op': 'i',
@@ -688,3 +701,6 @@ class TestFilterFields(unittest.TestCase):
             LockingDict(),
             fields=fields,
             exclude_fields=exclude_fields)
+
+if __name__ == "__main__":
+    unittest.main()

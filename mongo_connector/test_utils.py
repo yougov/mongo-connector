@@ -117,7 +117,8 @@ class Server(MCTestObject):
         if self.id is None:
             response = self._make_post_request()
             self.id = response['id']
-            self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
+            self.uri = response.get('mongodb_auth_uri',
+                                    response['mongodb_uri'])
         else:
             requests.post(
                 _mo_url('servers', self.id), timeout=None,
@@ -170,9 +171,20 @@ class ReplicaSet(MCTestObject):
         return self._init_from_response(self._make_post_request())
 
 
+class ReplicaSetSingle(ReplicaSet):
+
+    def get_config(self):
+        return {
+            'members': [
+                {'procParams': self.proc_params()}
+            ]
+        }
+
+
 class ShardedCluster(MCTestObject):
 
     _resource = 'sharded_clusters'
+    _shard_type = ReplicaSet
 
     def __init__(self, **kwargs):
         self.id = None
@@ -183,8 +195,10 @@ class ShardedCluster(MCTestObject):
     def get_config(self):
         return {
             'shards': [
-                {'id': 'demo-set-0', 'shardParams': ReplicaSet().get_config()},
-                {'id': 'demo-set-1', 'shardParams': ReplicaSet().get_config()}
+                {'id': 'demo-set-0', 'shardParams':
+                    self._shard_type().get_config()},
+                {'id': 'demo-set-1', 'shardParams':
+                    self._shard_type().get_config()}
             ],
             'routers': [self.proc_params()],
             'configsvrs': [self.proc_params()]
@@ -202,9 +216,13 @@ class ShardedCluster(MCTestObject):
         shard2 = requests.get(_mo_url('replica_sets', repl2_id)).json()
         self.id = response['id']
         self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
-        self.shards = [ReplicaSet()._init_from_response(resp)
+        self.shards = [self._shard_type()._init_from_response(resp)
                        for resp in (shard1, shard2)]
         return self
+
+
+class ShardedClusterSingle(ShardedCluster):
+    _shard_type = ReplicaSetSingle
 
 
 class MockGridFSFile:
@@ -257,6 +275,7 @@ def assert_soon(condition, message=None, max_tries=60):
     """
     if not wait_for(condition, max_tries=max_tries):
         raise AssertionError(message or "")
+
 
 def close_client(client):
     if hasattr(type(client), '_process_kill_cursors_queue'):

@@ -61,7 +61,8 @@ class MongoTestCase(unittest.TestCase):
         collection_name = 'test.test'
         if self.use_single_meta_collection:
             collection_name = '__oplog'
-        for doc in self.mongo_conn['__mongo_connector'][collection_name].find():
+        col = self.mongo_conn['__mongo_connector'][collection_name]
+        for doc in col.find():
             if doc.get('gridfs_id'):
                 for f in fs.find({'_id': doc['gridfs_id']}):
                     doc['filename'] = f.filename
@@ -108,9 +109,7 @@ class TestMongo(MongoTestCase):
             **connector_opts
         )
 
-        self.conn.test.test.drop()
-        self.conn.test.test.files.drop()
-        self.conn.test.test.chunks.drop()
+        self.conn.drop_database('test')
 
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)

@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 from mongo_connector import config, errors, connector
 from mongo_connector.connector import get_config_options, setup_logging
 from mongo_connector.doc_managers import doc_manager_simulator
-from mongo_connector.test_utils import ReplicaSet
+
 from tests import unittest
 
 from_here = lambda *paths: os.path.join(
@@ -74,7 +74,8 @@ class TestConfig(unittest.TestCase):
             'logging': {
                 'type': u'file',
                 'filename': u'testFilename',
-                'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
+                'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d'
+                          u' - %(message)s',
                 'rotationWhen': u'midnight',
                 'rotationInterval': 1,
                 'rotationBackups': 7,
@@ -116,7 +117,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(self.conf['logging'], {
             'type': u'syslog',
             'filename': u'testFilename',
-            'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s',
+            'format': u'%(asctime)s [%(levelname)s] %(name)s:%(lineno)d'
+                      u' - %(message)s',
             'rotationWhen': u'midnight',
             'rotationInterval': 1,
             'rotationBackups': 7,
@@ -480,7 +482,8 @@ class TestConnectorConfig(unittest.TestCase):
 
         # Test keyword arguments passed to OplogThread.
         ot_kwargs = mc.kwargs
-        self.assertEqual(ot_kwargs['ns_set'], self.config['namespaces.include'])
+        self.assertEqual(ot_kwargs['ns_set'],
+                         self.config['namespaces.include'])
         self.assertEqual(ot_kwargs['collection_dump'],
                          not self.config['noDump'])
         self.assertEqual(ot_kwargs['gridfs_set'],
@@ -491,7 +494,8 @@ class TestConnectorConfig(unittest.TestCase):
         self.assertEqual(ot_kwargs['batch_size'], self.config['batchSize'])
 
         # Test DocManager options.
-        for dm, dm_expected in zip(mc.doc_managers, self.config['docManagers']):
+        for dm, dm_expected in zip(mc.doc_managers,
+                                   self.config['docManagers']):
             self.assertEqual(dm.kwargs, dm_expected.kwargs)
             self.assertEqual(dm.auto_commit_interval,
                              dm_expected.auto_commit_interval)

@@ -26,7 +26,9 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSetSingle)
 from tests import unittest
 
 
@@ -52,7 +54,7 @@ class CommandLoggerDocManager(DocManagerBase):
 
 class TestCommandReplication(unittest.TestCase):
     def setUp(self):
-        self.repl_set = ReplicaSet().start()
+        self.repl_set = ReplicaSetSingle().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_progress = LockingDict()
         self.opman = None
@@ -153,7 +155,6 @@ class TestCommandReplication(unittest.TestCase):
         self.assertEqual(
             self.docman.commands[1].get('to'),
             'test.test2')
-
 
 
 if __name__ == '__main__':

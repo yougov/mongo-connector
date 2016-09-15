@@ -13,13 +13,16 @@
 # limitations under the License.
 
 import os
+import sys
+
+sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
-from mongo_connector.test_utils import (ShardedCluster,
+from mongo_connector.test_utils import (assert_soon,
                                         db_user,
                                         db_password,
-                                        assert_soon)
+                                        ShardedClusterSingle)
 from tests import unittest, SkipTest
 
 
@@ -28,7 +31,7 @@ class TestConnectorSharded(unittest.TestCase):
     def setUp(self):
         if not (db_user and db_password):
             raise SkipTest('Need to set a user/password to test this.')
-        self.cluster = ShardedCluster().start()
+        self.cluster = ShardedClusterSingle().start()
 
     def tearDown(self):
         try:
@@ -54,3 +57,7 @@ class TestConnectorSharded(unittest.TestCase):
         assert_soon(lambda: len(dm._search()) > 0)
 
         connector.join()
+
+
+if __name__ == '__main__':
+    unittest.main()

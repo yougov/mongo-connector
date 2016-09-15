@@ -121,4 +121,9 @@ class TestFormatters(unittest.TestCase):
                             for i, v in enumerate(self.lst))
         constructed1.update(constructed2)
         constructed1.update(constructed3)
-        self.assertEqual(formatter.format_document(self.doc_list), constructed1)
+        self.assertEqual(formatter.format_document(self.doc_list),
+                         constructed1)
+
+
+if __name__ == '__main__':
+    unittest.main()
