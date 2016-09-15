@@ -171,15 +171,7 @@ class ReplicaSet(MCTestObject):
         return self._init_from_response(self._make_post_request())
 
 
-class ReplicaSetSingle(MCTestObject):
-
-    _resource = 'replica_sets'
-
-    def __init__(self, id=None, uri=None, primary=None, **kwargs):
-        self.id = id
-        self.uri = uri
-        self.primary = primary
-        self._proc_params = kwargs
+class ReplicaSetSingle(ReplicaSet):
 
     def get_config(self):
         return {
@@ -187,17 +179,6 @@ class ReplicaSetSingle(MCTestObject):
                 {'procParams': self.proc_params()}
             ]
         }
-
-    def _init_from_response(self, response):
-        self.id = response['id']
-        self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
-        member = response['members'][0]
-        self.primary = Server(member['server_id'], member['host'])
-        return self
-
-    def start(self):
-        # We never need to restart a replica set, only start new ones.
-        return self._init_from_response(self._make_post_request())
 
 
 class ShardedCluster(MCTestObject):

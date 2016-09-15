@@ -22,8 +22,9 @@ from mongo_connector import errors
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import ReplicaSetSingle, assert_soon, \
-    close_client
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSetSingle)
 from tests import unittest
 
 
