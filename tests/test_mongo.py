@@ -61,7 +61,8 @@ class MongoTestCase(unittest.TestCase):
         collection_name = 'test.test'
         if self.use_single_meta_collection:
             collection_name = '__oplog'
-        for doc in self.mongo_conn['__mongo_connector'][collection_name].find():
+        col = self.mongo_conn['__mongo_connector'][collection_name]
+        for doc in col.find():
             if doc.get('gridfs_id'):
                 for f in fs.find({'_id': doc['gridfs_id']}):
                     doc['filename'] = f.filename

@@ -268,9 +268,11 @@ class TestMongoDocManager(MongoTestCase):
             self.assertNotIn('test2',
                              self.mongo_conn['test'].collection_names())
 
-            # WiredTiger drops the database when the last collection is dropped.
+            # WiredTiger drops the database when the last collection is
+            # dropped.
             if 'test' not in self.mongo_conn.database_names():
-                self.choosy_docman.handle_command({'create': 'test'}, *TESTARGS)
+                self.choosy_docman.handle_command({'create': 'test'},
+                                                  *TESTARGS)
             self.assertIn('test', self.mongo_conn.database_names())
             self.choosy_docman.handle_command(
                 {'dropDatabase': 1}, 'test.$cmd', 1)

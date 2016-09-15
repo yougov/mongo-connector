@@ -29,10 +29,10 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import (ReplicaSet,
-                                        STRESS_COUNT,
-                                        assert_soon,
-                                        close_client)
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSet,
+                                        STRESS_COUNT)
 from mongo_connector.util import retry_until_ok
 from tests import unittest
 
@@ -42,6 +42,11 @@ class TestRollbacks(unittest.TestCase):
     def tearDown(self):
         close_client(self.primary_conn)
         close_client(self.secondary_conn)
+        try:
+            self.opman.join()
+        except RuntimeError:
+            # OplogThread may not have been started
+            pass
         self.repl_set.stop()
 
     def setUp(self):
@@ -63,7 +68,7 @@ class TestRollbacks(unittest.TestCase):
             read_preference=ReadPreference.SECONDARY_PREFERRED)
 
         # Wipe any test data
-        self.main_conn["test"]["mc"].drop()
+        self.main_conn.drop_database("test")
 
         # Oplog thread
         doc_manager = DocManager()
@@ -305,3 +310,7 @@ class TestRollbacks(unittest.TestCase):
                                 % (STRESS_COUNT, len(docman._search()))))
 
         self.opman.join()
+
+
+if __name__ == "__main__":
+    unittest.main()

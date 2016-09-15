@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import re
 import sys
 import threading
 import time
@@ -28,19 +27,17 @@ sys.path[0:0] = [""]
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import (ShardedCluster,
-                                        assert_soon,
-                                        close_client)
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ShardedCluster,
+                                        ShardedClusterSingle)
 from mongo_connector.util import retry_until_ok, bson_ts_to_long
 from tests import unittest, SkipTest
 
 
-class TestOplogManagerSharded(unittest.TestCase):
-    """Defines all test cases for OplogThreads running on a sharded
-    cluster
-    """
+class ShardedClusterTestCase(unittest.TestCase):
 
-    def setUp(self):
+    def set_up_sharded_cluster(self, sharded_cluster_type):
         """ Initialize the cluster:
 
         Clean out the databases used by the tests
@@ -48,7 +45,7 @@ class TestOplogManagerSharded(unittest.TestCase):
         Create and shard test collections
         Create OplogThreads
         """
-        self.cluster = ShardedCluster().start()
+        self.cluster = sharded_cluster_type().start()
 
         # Connection to mongos
         self.mongos_conn = self.cluster.client()
@@ -56,11 +53,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         # Connections to the shards
         self.shard1_conn = self.cluster.shards[0].client()
         self.shard2_conn = self.cluster.shards[1].client()
-        self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
-            read_preference=ReadPreference.SECONDARY_PREFERRED)
-        self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
 
         # Wipe any test data
         self.mongos_conn["test"]["mcsharded"].drop()
@@ -152,17 +144,24 @@ class TestOplogManagerSharded(unittest.TestCase):
         try:
             self.opman1.join()
         except RuntimeError:
-            pass                # thread may not have been started
+            pass  # thread may not have been started
         try:
             self.opman2.join()
         except RuntimeError:
-            pass                # thread may not have been started
+            pass  # thread may not have been started
         close_client(self.mongos_conn)
         close_client(self.shard1_conn)
         close_client(self.shard2_conn)
-        close_client(self.shard1_secondary_conn)
-        close_client(self.shard2_secondary_conn)
         self.cluster.stop()
+
+
+class TestOplogManagerShardedSingle(ShardedClusterTestCase):
+    """Defines all test cases for OplogThreads running on a sharded
+    cluster with single node replica sets.
+    """
+
+    def setUp(self):
+        self.set_up_sharded_cluster(ShardedClusterSingle)
 
     def test_get_oplog_cursor(self):
         """Test the get_oplog_cursor method"""
@@ -232,9 +231,11 @@ class TestOplogManagerSharded(unittest.TestCase):
                 "i": i + 500
             })
         oplog1 = self.shard1_conn["local"]["oplog.rs"]
-        oplog1 = oplog1.find().sort("$natural", pymongo.DESCENDING).limit(-1)[0]
+        oplog1 = oplog1.find().sort("$natural",
+                                    pymongo.DESCENDING).limit(-1)[0]
         oplog2 = self.shard2_conn["local"]["oplog.rs"]
-        oplog2 = oplog2.find().sort("$natural", pymongo.DESCENDING).limit(-1)[0]
+        oplog2 = oplog2.find().sort("$natural",
+                                    pymongo.DESCENDING).limit(-1)[0]
         self.assertEqual(self.opman1.get_last_oplog_timestamp(),
                          oplog1["ts"])
         self.assertEqual(self.opman2.get_last_oplog_timestamp(),
@@ -393,154 +394,6 @@ class TestOplogManagerSharded(unittest.TestCase):
         self.assertEqual(cursor, None)
         self.assertIsNotNone(self.opman2.checkpoint)
 
-    def test_rollback(self):
-        """Test the rollback method in a sharded environment
-
-        Cases:
-        1. Documents on both shards, rollback on one shard
-        2. Documents on both shards, rollback on both shards
-
-        """
-
-        self.opman1.start()
-        self.opman2.start()
-
-        # Insert first documents while primaries are up
-        db_main = self.mongos_conn["test"]["mcsharded"]
-        db_main2 = db_main.with_options(write_concern=WriteConcern(w=2))
-        db_main2.insert_one({"i": 0})
-        db_main2.insert_one({"i": 1000})
-        self.assertEqual(self.shard1_conn["test"]["mcsharded"].count(), 1)
-        self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
-
-        # Case 1: only one primary goes down, shard1 in this case
-        self.cluster.shards[0].primary.stop(destroy=False)
-
-        # Wait for the secondary to be promoted
-        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
-        assert_soon(
-            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
-
-        # Insert another document. This will be rolled back later
-        def cond():
-            try:
-                db_main.insert_one({"i": 1})
-            except:
-                pass
-            return db_main.find_one({"i": 1})
-        retry_until_ok(cond)
-        db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
-        db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
-        self.assertEqual(db_secondary1.count(), 2)
-
-        # Wait for replication on the doc manager
-        # Note that both OplogThreads share the same doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
-        assert_soon(c, "not all writes were replicated to doc manager",
-                    max_tries=120)
-
-        # Kill the new primary
-        self.cluster.shards[0].secondary.stop(destroy=False)
-
-        # Start both servers back up
-        self.cluster.shards[0].primary.start()
-        primary_admin = self.shard1_conn["admin"]
-        c = lambda: primary_admin.command("isMaster")["ismaster"]
-        assert_soon(lambda: retry_until_ok(c))
-        self.cluster.shards[0].secondary.start()
-        secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        assert_soon(c)
-        query = {"i": {"$lt": 1000}}
-        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
-
-        # Only first document should exist in MongoDB
-        self.assertEqual(db_main.find(query).count(), 1)
-        self.assertEqual(db_main.find_one(query)["i"], 0)
-
-        def check_docman_rollback():
-            docman_docs = [d for d in self.opman1.doc_managers[0]._search()
-                           if d["i"] < 1000]
-            return len(docman_docs) == 1 and docman_docs[0]["i"] == 0
-        assert_soon(check_docman_rollback,
-                    "doc manager did not roll back")
-
-        # Wait for previous rollback to complete.
-        # Insert/delete one document to jump-start replication to secondaries
-        # in MongoDB 3.x.
-        db_main.insert_one({'i': -1})
-        db_main.delete_one({'i': -1})
-
-        def rollback_done():
-            secondary1_count = retry_until_ok(db_secondary1.count)
-            secondary2_count = retry_until_ok(db_secondary2.count)
-            return (1, 1) == (secondary1_count, secondary2_count)
-        assert_soon(rollback_done,
-                    "rollback never replicated to one or more secondaries")
-
-        ##############################
-
-        # Case 2: Primaries on both shards go down
-        self.cluster.shards[0].primary.stop(destroy=False)
-        self.cluster.shards[1].primary.stop(destroy=False)
-
-        # Wait for the secondaries to be promoted
-        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
-        shard2_secondary_admin = self.shard2_secondary_conn["admin"]
-        assert_soon(
-            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
-        assert_soon(
-            lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
-
-        # Insert another document on each shard. These will be rolled back later
-        retry_until_ok(db_main.insert_one, {"i": 1})
-        self.assertEqual(db_secondary1.count(), 2)
-        retry_until_ok(db_main.insert_one, {"i": 1001})
-        self.assertEqual(db_secondary2.count(), 2)
-
-        # Wait for replication on the doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
-        assert_soon(c, "not all writes were replicated to doc manager")
-
-        # Kill the new primaries
-        self.cluster.shards[0].secondary.stop(destroy=False)
-        self.cluster.shards[1].secondary.stop(destroy=False)
-
-        # Start the servers back up...
-        # Shard 1
-        self.cluster.shards[0].primary.start()
-        c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
-        assert_soon(lambda: retry_until_ok(c))
-        self.cluster.shards[0].secondary.start()
-        secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        assert_soon(c)
-        # Shard 2
-        self.cluster.shards[1].primary.start()
-        c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
-        assert_soon(lambda: retry_until_ok(c))
-        self.cluster.shards[1].secondary.start()
-        secondary_admin = self.shard2_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
-        assert_soon(c)
-
-        # Wait for the shards to come online
-        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
-        query2 = {"i": {"$gte": 1000}}
-        assert_soon(lambda: retry_until_ok(db_main.find(query2).count) > 0)
-
-        # Only first documents should exist in MongoDB
-        self.assertEqual(db_main.find(query).count(), 1)
-        self.assertEqual(db_main.find_one(query)["i"], 0)
-        self.assertEqual(db_main.find(query2).count(), 1)
-        self.assertEqual(db_main.find_one(query2)["i"], 1000)
-
-        # Same should hold for the doc manager
-        assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 2)
-        i_values = [d["i"] for d in self.opman1.doc_managers[0]._search()]
-        self.assertIn(0, i_values)
-        self.assertIn(1000, i_values)
-
     def test_with_chunk_migration(self):
         """Test that DocManagers have proper state after both a successful
         and an unsuccessful chunk migration
@@ -697,6 +550,173 @@ class TestOplogManagerSharded(unittest.TestCase):
             new_format,
             self.opman2.oplog_progress.get_dict()
         )
+
+
+class TestOplogManagerSharded(ShardedClusterTestCase):
+    """Defines all test cases for OplogThreads running on a sharded
+    cluster with three node replica sets.
+    """
+
+    def setUp(self):
+        self.set_up_sharded_cluster(ShardedCluster)
+        self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
+        self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+
+    def tearDown(self):
+        super(TestOplogManagerSharded, self).tearDown()
+        close_client(self.shard1_secondary_conn)
+        close_client(self.shard2_secondary_conn)
+
+    def test_rollback(self):
+        """Test the rollback method in a sharded environment
+
+        Cases:
+        1. Documents on both shards, rollback on one shard
+        2. Documents on both shards, rollback on both shards
+
+        """
+
+        self.opman1.start()
+        self.opman2.start()
+
+        # Insert first documents while primaries are up
+        db_main = self.mongos_conn["test"]["mcsharded"]
+        db_main2 = db_main.with_options(write_concern=WriteConcern(w=2))
+        db_main2.insert_one({"i": 0})
+        db_main2.insert_one({"i": 1000})
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].count(), 1)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].count(), 1)
+
+        # Case 1: only one primary goes down, shard1 in this case
+        self.cluster.shards[0].primary.stop(destroy=False)
+
+        # Wait for the secondary to be promoted
+        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+
+        # Insert another document. This will be rolled back later
+        def cond():
+            try:
+                db_main.insert_one({"i": 1})
+            except:
+                pass
+            return db_main.find_one({"i": 1})
+        retry_until_ok(cond)
+        db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
+        db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
+        self.assertEqual(db_secondary1.count(), 2)
+
+        # Wait for replication on the doc manager
+        # Note that both OplogThreads share the same doc manager
+        c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
+        assert_soon(c, "not all writes were replicated to doc manager",
+                    max_tries=120)
+
+        # Kill the new primary
+        self.cluster.shards[0].secondary.stop(destroy=False)
+
+        # Start both servers back up
+        self.cluster.shards[0].primary.start()
+        primary_admin = self.shard1_conn["admin"]
+        c = lambda: primary_admin.command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        self.cluster.shards[0].secondary.start()
+        secondary_admin = self.shard1_secondary_conn["admin"]
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+        query = {"i": {"$lt": 1000}}
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
+
+        # Only first document should exist in MongoDB
+        self.assertEqual(db_main.find(query).count(), 1)
+        self.assertEqual(db_main.find_one(query)["i"], 0)
+
+        def check_docman_rollback():
+            docman_docs = [d for d in self.opman1.doc_managers[0]._search()
+                           if d["i"] < 1000]
+            return len(docman_docs) == 1 and docman_docs[0]["i"] == 0
+        assert_soon(check_docman_rollback,
+                    "doc manager did not roll back")
+
+        # Wait for previous rollback to complete.
+        # Insert/delete one document to jump-start replication to secondaries
+        # in MongoDB 3.x.
+        db_main.insert_one({'i': -1})
+        db_main.delete_one({'i': -1})
+
+        def rollback_done():
+            secondary1_count = retry_until_ok(db_secondary1.count)
+            secondary2_count = retry_until_ok(db_secondary2.count)
+            return (1, 1) == (secondary1_count, secondary2_count)
+        assert_soon(rollback_done,
+                    "rollback never replicated to one or more secondaries")
+
+        ##############################
+
+        # Case 2: Primaries on both shards go down
+        self.cluster.shards[0].primary.stop(destroy=False)
+        self.cluster.shards[1].primary.stop(destroy=False)
+
+        # Wait for the secondaries to be promoted
+        shard1_secondary_admin = self.shard1_secondary_conn["admin"]
+        shard2_secondary_admin = self.shard2_secondary_conn["admin"]
+        assert_soon(
+            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(
+            lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
+
+        # Insert another document on each shard which will be rolled back later
+        retry_until_ok(db_main.insert_one, {"i": 1})
+        self.assertEqual(db_secondary1.count(), 2)
+        retry_until_ok(db_main.insert_one, {"i": 1001})
+        self.assertEqual(db_secondary2.count(), 2)
+
+        # Wait for replication on the doc manager
+        c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
+        assert_soon(c, "not all writes were replicated to doc manager")
+
+        # Kill the new primaries
+        self.cluster.shards[0].secondary.stop(destroy=False)
+        self.cluster.shards[1].secondary.stop(destroy=False)
+
+        # Start the servers back up...
+        # Shard 1
+        self.cluster.shards[0].primary.start()
+        c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        self.cluster.shards[0].secondary.start()
+        secondary_admin = self.shard1_secondary_conn["admin"]
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+        # Shard 2
+        self.cluster.shards[1].primary.start()
+        c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
+        assert_soon(lambda: retry_until_ok(c))
+        self.cluster.shards[1].secondary.start()
+        secondary_admin = self.shard2_secondary_conn["admin"]
+        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+        assert_soon(c)
+
+        # Wait for the shards to come online
+        assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
+        query2 = {"i": {"$gte": 1000}}
+        assert_soon(lambda: retry_until_ok(db_main.find(query2).count) > 0)
+
+        # Only first documents should exist in MongoDB
+        self.assertEqual(db_main.find(query).count(), 1)
+        self.assertEqual(db_main.find_one(query)["i"], 0)
+        self.assertEqual(db_main.find(query2).count(), 1)
+        self.assertEqual(db_main.find_one(query2)["i"], 1000)
+
+        # Same should hold for the doc manager
+        assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 2)
+        i_values = [d["i"] for d in self.opman1.doc_managers[0]._search()]
+        self.assertIn(0, i_values)
+        self.assertIn(1000, i_values)
 
 
 if __name__ == '__main__':
