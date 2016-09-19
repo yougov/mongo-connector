@@ -507,14 +507,15 @@ class TestFilterFields(unittest.TestCase):
         self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
 
     def test_nested_fields(self):
-        def check_nested(document, fields, filtered_document):
+        def check_nested(document, fields, filtered_document, op='i'):
             self.opman.fields = fields
             fields.append('_id')
             self.assertEqual(set(fields), self.opman._fields)
             self.assertEqual(sorted(fields), sorted(self.opman.fields))
             filtered_result = self.opman.filter_oplog_entry(
-                {'op': 'i',
-                 'o': document})['o']
+                {'op': op, 'o': document})
+            if filtered_result is not None:
+                filtered_result = filtered_result['o']
             self.assertEqual(filtered_result, filtered_document)
 
         document = {'name': 'Han Solo', 'a': {'b': {}}}
@@ -575,8 +576,28 @@ class TestFilterFields(unittest.TestCase):
         filtered_document = {'name': 'anna'}
         check_nested(document, fields, filtered_document)
 
+        update = {'$set': {'a.b': 1, 'a.c': 3, 'b': 2, 'c': {'b': 3}}}
+        fields = ['a', 'c']
+        filtered_update = {'$set': {'a.b': 1, 'a.c': 3, 'c': {'b': 3}}}
+        check_nested(update, fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1, 'a.f': 2}}
+        fields = ['a.b.c', 'a.e']
+        filtered_update = {'$set': {'a.b': {'c': 3}, 'a.e': 1}}
+        check_nested(update, fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b.1': 1, 'a.b.2': 2, 'b': 3}}
+        fields = ['a.b']
+        filtered_update = {'$set': {'a.b.1': 1, 'a.b.2': 2}}
+        check_nested(update, fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1}}
+        fields = ['a.b.e']
+        filtered_update = None
+        check_nested(update, fields, filtered_update, op='u')
+
     def test_nested_exclude_fields(self):
-        def check_nested(document, exclude_fields, filtered_document):
+        def check_nested(document, exclude_fields, filtered_document, op='i'):
             self.opman.exclude_fields = exclude_fields
             if '_id' in exclude_fields:
                 exclude_fields.remove('_id')
@@ -584,8 +605,9 @@ class TestFilterFields(unittest.TestCase):
             self.assertEqual(sorted(exclude_fields),
                              sorted(self.opman.exclude_fields))
             filtered_result = self.opman.filter_oplog_entry(
-                {'op': 'i',
-                 'o': document})['o']
+                {'op': op, 'o': document})
+            if filtered_result is not None:
+                filtered_result = filtered_result['o']
             self.assertEqual(filtered_result, filtered_document)
 
         document = {'a': {'b': {'c': {'d': 0, 'e': 1}}}}
@@ -595,7 +617,7 @@ class TestFilterFields(unittest.TestCase):
 
         document = {'a': {'b': {'c': {'-a': 0, 'd': {'e': {'f': 1}}}}}}
         exclude_fields = ['a.b.c.d.e.f']
-        filtered_document = {'a': {'b': {'c': {'-a': 0}}}}
+        filtered_document = {'a': {'b': {'c': {'-a': 0, 'd': {'e': {}}}}}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'a': 1}
@@ -625,20 +647,20 @@ class TestFilterFields(unittest.TestCase):
         document = {'a': {'b': {'c': {'d': 1}}},
                     '-a': {'-b': {'-c': 2}}}
         exclude_fields = ['a.b', '-a']
-        filtered_document = {}
+        filtered_document = {'a': {}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'a': {'b': {'c': {'d': 1}}},
                     '-a': {'-b': {'-c': 2}}}
         exclude_fields = ['a', '-a.-b']
-        filtered_document = {}
+        filtered_document = {'-a': {}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'a': {'b': {'c': {'d': 1}}},
                     '-a': {'-b': {'-c': 2}},
                     '_id': 1}
         exclude_fields = ['a.b', '-a']
-        filtered_document = {'_id': 1}
+        filtered_document = {'_id': 1, 'a': {}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'test': 1}
@@ -653,18 +675,43 @@ class TestFilterFields(unittest.TestCase):
 
         document = {'a': {'b': 1}, 'b': {'a': 1}}
         exclude_fields = ['a.b', 'b.a']
-        filtered_document = {}
+        filtered_document = {'a': {}, 'b': {}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'a': {'b': {'a': {'b': 1}}}, 'c': {'a': {'b': 1}}}
         exclude_fields = ['a.b']
-        filtered_document = {'c': {'a': {'b': 1}}}
+        filtered_document = {'a': {}, 'c': {'a': {'b': 1}}}
         check_nested(document, exclude_fields, filtered_document)
 
         document = {'name': 'anna', 'name_of_cat': 'pushkin'}
         exclude_fields = ['name']
         filtered_document = {'name_of_cat': 'pushkin'}
         check_nested(document, exclude_fields, filtered_document)
+
+        update = {'$set': {'a.b': 1, 'a.c': 3, 'b': 2, 'c': {'b': 3}}}
+        exclude_fields = ['a', 'c']
+        filtered_update = {'$set': {'b': 2}}
+        check_nested(update, exclude_fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1, 'a.f': 2}}
+        exclude_fields = ['a.b.c', 'a.e']
+        filtered_update = {'$set': {'a.b': {'d': 1}, 'a.f': 2}}
+        check_nested(update, exclude_fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1}}
+        exclude_fields = ['a.b.c', 'a.b.d', 'a.e']
+        filtered_update = {'$set': {'a.b': {}}}
+        check_nested(update, exclude_fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b.1': 1, 'a.b.2': 2, 'b': 3}}
+        exclude_fields = ['a.b']
+        filtered_update = {'$set': {'b': 3}}
+        check_nested(update, exclude_fields, filtered_update, op='u')
+
+        update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1}}
+        exclude_fields = ['a.b', 'a.e']
+        filtered_update = None
+        check_nested(update, exclude_fields, filtered_update, op='u')
 
     def test_fields_and_exclude(self):
         fields = ['a', 'b', 'c', '_id']
@@ -716,6 +763,60 @@ class TestFilterFields(unittest.TestCase):
             self.dest_mapping_stru,
             fields=fields,
             exclude_fields=exclude_fields)
+
+
+class TestFindFields(unittest.TestCase):
+    def test_find_field(self):
+        doc = {'a': {'b': {'c': 1}}}
+        self.assertEqual(list(OplogThread.find_field('a', doc)),
+                         [(['a'], doc['a'])])
+        self.assertEqual(list(OplogThread.find_field('a.b', doc)),
+                         [(['a', 'b'], doc['a']['b'])])
+        self.assertEqual(list(OplogThread.find_field('a.b.c', doc)),
+                         [(['a', 'b', 'c'], doc['a']['b']['c'])])
+        self.assertEqual(list(OplogThread.find_field('x', doc)),
+                         [])
+        self.assertEqual(list(OplogThread.find_field('a.b.x', doc)),
+                         [])
+
+    def test_find_update_fields(self):
+        doc = {'a': {'b': {'c': 1}}, 'e.f': 1, 'g.h': {'i': {'j': 1}}}
+        self.assertEqual(list(OplogThread.find_update_fields('a', doc)),
+                         [(['a'], doc['a'])])
+        self.assertEqual(list(OplogThread.find_update_fields('a.b', doc)),
+                         [(['a', 'b'], doc['a']['b'])])
+        self.assertEqual(list(OplogThread.find_update_fields('a.b.c', doc)),
+                         [(['a', 'b', 'c'], doc['a']['b']['c'])])
+        self.assertEqual(list(OplogThread.find_update_fields('x', doc)),
+                         [])
+        self.assertEqual(list(OplogThread.find_update_fields('a.b.x', doc)),
+                         [])
+        self.assertEqual(list(OplogThread.find_update_fields('e.f', doc)),
+                         [(['e.f'], doc['e.f'])])
+        self.assertEqual(list(OplogThread.find_update_fields('e', doc)),
+                         [(['e.f'], doc['e.f'])])
+        self.assertEqual(list(OplogThread.find_update_fields('g.h.i.j', doc)),
+                         [(['g.h', 'i', 'j'], doc['g.h']['i']['j'])])
+
+        # Test multiple matches
+        doc = {'a.b': 1, 'a.c': 2, 'e.f.h': 3, 'e.f.i': 4}
+        matches = list(OplogThread.find_update_fields('a', doc))
+        self.assertEqual(len(matches), 2)
+        self.assertIn((['a.b'], doc['a.b']), matches)
+        self.assertIn((['a.c'], doc['a.c']), matches)
+        matches = list(OplogThread.find_update_fields('e.f', doc))
+        self.assertEqual(len(matches), 2)
+        self.assertIn((['e.f.h'], doc['e.f.h']), matches)
+        self.assertIn((['e.f.i'], doc['e.f.i']), matches)
+
+        # Test updates to array fields
+        doc = {'a.b.1': 9, 'a.b.3': 10, 'a.b.4.c': 11}
+        matches = list(OplogThread.find_update_fields('a.b', doc))
+        self.assertEqual(len(matches), 3)
+        self.assertIn((['a.b.1'], doc['a.b.1']), matches)
+        self.assertIn((['a.b.3'], doc['a.b.3']), matches)
+        self.assertIn((['a.b.4.c'], doc['a.b.4.c']), matches)
+
 
 if __name__ == "__main__":
     unittest.main()
