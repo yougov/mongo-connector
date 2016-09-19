@@ -419,59 +419,84 @@ class OplogThread(threading.Thread):
         self.running = False
         threading.Thread.join(self)
 
+    @classmethod
+    def _find_field(cls, field, doc):
+        """Find the field in the document which matches the given field.
+
+        The field may be in dot notation, eg "a.b.c". Returns a list with
+        a single tuple (path, field_value) or the empty list if the field
+        is not present.
+        """
+        path = field.split('.')
+        try:
+            for key in path:
+                doc = doc[key]
+            return [(path, doc)]
+        except (KeyError, TypeError):
+            return []
+
+    @classmethod
+    def _find_update_fields(cls, field, doc):
+        """Find the fields in the update document which match the given field.
+
+        Both the field and the top level keys in the doc may be in dot
+        notation, eg "a.b.c". Returns a list of tuples (path, field_value) or
+        the empty list if the field is not present.
+        """
+        def find_partial_matches():
+            for key in doc:
+                if len(key) > len(field):
+                    # Handle case where field is a prefix of key, eg field is
+                    # 'a' and key is 'a.b'.
+                    if key.startswith(field) and key[len(field)] == '.':
+                        yield [key], doc[key]
+                        # Continue searching, there may be multiple matches.
+                        # For example, field 'a' should match 'a.b' and 'a.c'.
+                elif len(key) < len(field):
+                    # Handle case where key is a prefix of field, eg field is
+                    # 'a.b' and key is 'a'.
+                    if field.startswith(key) and field[len(key)] == '.':
+                        # Search for the remaining part of the field
+                        matched = cls._find_field(field[len(key) + 1:],
+                                                  doc[key])
+                        if matched:
+                            # Add the top level key to the path.
+                            match = matched[0]
+                            match[0].insert(0, key)
+                            yield match
+                        # Stop searching, it's not possible for any other
+                        # keys in the update doc to match this field.
+                        return
+
+        try:
+            return [([field], doc[field])]
+        except KeyError:
+            # Field does not exactly match any key in the update doc.
+            return list(find_partial_matches())
+
     def _pop_excluded_fields(self, doc, update=False):
         # Remove all the fields that were passed in exclude_fields.
+        find_fields = self._find_update_fields if update else self._find_field
         for field in self._exclude_fields:
-            curr_doc = doc
-            dots = field.split('.')
-            remove_up_to = curr_doc
-            end = dots[0]
-            for part in dots:
-                if not isinstance(curr_doc, dict) or part not in curr_doc:
-                    break
-                elif len(curr_doc) != 1:
-                    remove_up_to = curr_doc
-                    end = part
-                curr_doc = curr_doc[part]
-            else:
-                remove_up_to.pop(end)
+            for path, _ in find_fields(field, doc):
+                # Delete each matching field in the original document.
+                temp_doc = doc
+                for p in path[:-1]:
+                    temp_doc = temp_doc[p]
+                temp_doc.pop(path[-1])
+
         return doc  # Need this to be similar to copy_included_fields.
-
-    def _contains_field(self, selector, doc, pos=0, path=[]):
-        # check if a given document contains allowed properties and return
-        # value and path for it
-        # parameter selector is a list of property names
-        # pos is internally used to know where in the selector we are
-        # path is used to be able to return a path for the new_doc for updating
-
-        if pos < len(selector):
-            for selpos in range(len(selector) - pos):
-                sel = ".".join(selector[pos:pos+selpos+1])
-                if sel in doc:
-                    return self._contains_field(selector, doc[sel],
-                                    pos=pos+selpos+1,
-                                    path=path + selector[pos:pos+selpos+1])
-            return False, None, path
-        else:
-            return True, doc, path
 
     def _copy_included_fields(self, doc, update=False):
         new_doc = {}
-        for field in self.fields:
-            selector = field.split(".")
-            found, value, path = self._contains_field(selector, doc)
-            if found:
-                if update:
-                    # create a diff object (with dot convention)
-                    new_doc[".".join(path)] = value
-                else:
-                    # create a full document
-                    d = new_doc
-                    for p in path[:-1]:
-                        if not p in d:
-                            d[p] = {}
-                        d = d[p]
-                    d[path[-1]] = value
+        find_fields = self._find_update_fields if update else self._find_field
+        for field in self._fields:
+            for path, value in find_fields(field, doc):
+                # Copy each matching field in the original document.
+                temp_doc = new_doc
+                for p in path[:-1]:
+                    temp_doc = temp_doc.setdefault(p, {})
+                temp_doc[path[-1]] = value
 
         return new_doc
 
@@ -494,9 +519,11 @@ class OplogThread(threading.Thread):
         # if '$set' or '$unset' are present.
         elif entry['op'] == 'u' and ('$set' in entry_o or '$unset' in entry_o):
             if '$set' in entry_o:
-                entry['o']["$set"] = filter_fields(entry_o["$set"], update=True)
+                entry['o']["$set"] = filter_fields(entry_o["$set"],
+                                                   update=True)
             if '$unset' in entry_o:
-                entry['o']["$unset"] = filter_fields(entry_o["$unset"], update=True)
+                entry['o']["$unset"] = filter_fields(entry_o["$unset"],
+                                                     update=True)
             # not allowed to have empty $set/$unset, so remove if empty
             if "$set" in entry_o and not entry_o['$set']:
                 entry_o.pop("$set")
