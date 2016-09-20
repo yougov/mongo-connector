@@ -29,11 +29,10 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.dest_mapping import DestMapping
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import ReplicaSet, assert_soon, close_client
-from mongo_connector.util import bson_ts_to_long
+from mongo_connector.test_utils import (assert_soon,
+                                        close_client,
+                                        ReplicaSetSingle)
 from tests import unittest
-
-from pymongo import CursorType
 
 
 class TestOplogManager(unittest.TestCase):
@@ -42,7 +41,7 @@ class TestOplogManager(unittest.TestCase):
     """
 
     def setUp(self):
-        self.repl_set = ReplicaSet().start()
+        self.repl_set = ReplicaSetSingle().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
 
