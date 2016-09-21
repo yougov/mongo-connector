@@ -423,8 +423,9 @@ class OplogThread(threading.Thread):
     def _find_field(cls, field, doc):
         """Find the field in the document which matches the given field.
 
-        The field may be in dot notation, eg "a.b.c". Yields a tuple
-        (path, field_value).
+        The field may be in dot notation, eg "a.b.c". Returns a list with
+        a single tuple (path, field_value) or the empty list if the field
+        is not present.
         """
         path = field.split('.')
         try:
@@ -439,29 +440,33 @@ class OplogThread(threading.Thread):
         """Find the fields in the update document which match the given field.
 
         Both the field and the top level keys in the doc may be in dot
-        notation, eg "a.b.c". Yields tuples (path, field_value).
+        notation, eg "a.b.c". Returns a list of tuples (path, field_value) or
+        the empty list if the field is not present.
         """
         def find_all_fields():
             for key in doc:
                 if len(key) > len(field):
-                    # Handle case where field is 'a' and key is 'a.b'
+                    # Handle case where field is a prefix of key, eg field is
+                    # 'a' and key is 'a.b'.
                     if key.startswith(field) and key[len(field)] == '.':
                         yield [key], doc[key]
                         # Continue searching, there may be multiple matches.
-                        # For example, 'a' will match 'a.b' and 'a.c'.
+                        # For example, field 'a' should match 'a.b' and 'a.c'.
                 elif len(key) < len(field):
-                    # Handle case where field is 'a.b' and key is 'a'
+                    # Handle case where key is a prefix of field, eg field is
+                    # 'a.b' and key is 'a'.
                     if field.startswith(key) and field[len(key)] == '.':
                         # Search for the remaining part of the field
-                        remaining_field = field[len(key) + 1:]
-                        match = cls._find_field(remaining_field, doc[key])
-                        if match:
-                            path, value = match[0]
-                            path.insert(0, key)
-                            yield path, value
-                            # Stop searching, it's not possible for any other
-                            # keys in the update doc to match this field.
-                            return
+                        matched = cls._find_field(field[len(key) + 1:],
+                                                  doc[key])
+                        if matched:
+                            # Add the top level key to the path.
+                            match = matched[0]
+                            match[0].insert(0, key)
+                            yield match
+                        # Stop searching, it's not possible for any other
+                        # keys in the update doc to match this field.
+                        return
         if field in doc:
             return [([field], doc[field])]
         return list(find_all_fields())

@@ -708,6 +708,11 @@ class TestFilterFields(unittest.TestCase):
         filtered_update = {'$set': {'b': 3}}
         check_nested(update, exclude_fields, filtered_update, op='u')
 
+        update = {'$set': {'a.b.c': 42, 'd.e.f': 123, 'g': 456}}
+        exclude_fields = ['a.b', 'd']
+        filtered_update = {'$set': {'g': 456}}
+        check_nested(update, exclude_fields, filtered_update, op='u')
+
         update = {'$set': {'a.b': {'c': 3, 'd': 1}, 'a.e': 1}}
         exclude_fields = ['a.b', 'a.e']
         filtered_update = None
