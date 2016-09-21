@@ -768,50 +768,50 @@ class TestFilterFields(unittest.TestCase):
 class TestFindFields(unittest.TestCase):
     def test_find_field(self):
         doc = {'a': {'b': {'c': 1}}}
-        self.assertEqual(list(OplogThread.find_field('a', doc)),
+        self.assertEqual(OplogThread._find_field('a', doc),
                          [(['a'], doc['a'])])
-        self.assertEqual(list(OplogThread.find_field('a.b', doc)),
+        self.assertEqual(OplogThread._find_field('a.b', doc),
                          [(['a', 'b'], doc['a']['b'])])
-        self.assertEqual(list(OplogThread.find_field('a.b.c', doc)),
+        self.assertEqual(OplogThread._find_field('a.b.c', doc),
                          [(['a', 'b', 'c'], doc['a']['b']['c'])])
-        self.assertEqual(list(OplogThread.find_field('x', doc)),
+        self.assertEqual(OplogThread._find_field('x', doc),
                          [])
-        self.assertEqual(list(OplogThread.find_field('a.b.x', doc)),
+        self.assertEqual(OplogThread._find_field('a.b.x', doc),
                          [])
 
     def test_find_update_fields(self):
         doc = {'a': {'b': {'c': 1}}, 'e.f': 1, 'g.h': {'i': {'j': 1}}}
-        self.assertEqual(list(OplogThread.find_update_fields('a', doc)),
+        self.assertEqual(OplogThread._find_update_fields('a', doc),
                          [(['a'], doc['a'])])
-        self.assertEqual(list(OplogThread.find_update_fields('a.b', doc)),
+        self.assertEqual(OplogThread._find_update_fields('a.b', doc),
                          [(['a', 'b'], doc['a']['b'])])
-        self.assertEqual(list(OplogThread.find_update_fields('a.b.c', doc)),
+        self.assertEqual(OplogThread._find_update_fields('a.b.c', doc),
                          [(['a', 'b', 'c'], doc['a']['b']['c'])])
-        self.assertEqual(list(OplogThread.find_update_fields('x', doc)),
+        self.assertEqual(OplogThread._find_update_fields('x', doc),
                          [])
-        self.assertEqual(list(OplogThread.find_update_fields('a.b.x', doc)),
+        self.assertEqual(OplogThread._find_update_fields('a.b.x', doc),
                          [])
-        self.assertEqual(list(OplogThread.find_update_fields('e.f', doc)),
+        self.assertEqual(OplogThread._find_update_fields('e.f', doc),
                          [(['e.f'], doc['e.f'])])
-        self.assertEqual(list(OplogThread.find_update_fields('e', doc)),
+        self.assertEqual(OplogThread._find_update_fields('e', doc),
                          [(['e.f'], doc['e.f'])])
-        self.assertEqual(list(OplogThread.find_update_fields('g.h.i.j', doc)),
+        self.assertEqual(OplogThread._find_update_fields('g.h.i.j', doc),
                          [(['g.h', 'i', 'j'], doc['g.h']['i']['j'])])
 
         # Test multiple matches
         doc = {'a.b': 1, 'a.c': 2, 'e.f.h': 3, 'e.f.i': 4}
-        matches = list(OplogThread.find_update_fields('a', doc))
+        matches = OplogThread._find_update_fields('a', doc)
         self.assertEqual(len(matches), 2)
         self.assertIn((['a.b'], doc['a.b']), matches)
         self.assertIn((['a.c'], doc['a.c']), matches)
-        matches = list(OplogThread.find_update_fields('e.f', doc))
+        matches = OplogThread._find_update_fields('e.f', doc)
         self.assertEqual(len(matches), 2)
         self.assertIn((['e.f.h'], doc['e.f.h']), matches)
         self.assertIn((['e.f.i'], doc['e.f.i']), matches)
 
         # Test updates to array fields
         doc = {'a.b.1': 9, 'a.b.3': 10, 'a.b.4.c': 11}
-        matches = list(OplogThread.find_update_fields('a.b', doc))
+        matches = OplogThread._find_update_fields('a.b', doc)
         self.assertEqual(len(matches), 3)
         self.assertIn((['a.b.1'], doc['a.b.1']), matches)
         self.assertIn((['a.b.3'], doc['a.b.3']), matches)

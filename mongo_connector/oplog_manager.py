@@ -420,7 +420,7 @@ class OplogThread(threading.Thread):
         threading.Thread.join(self)
 
     @classmethod
-    def find_field(cls, field, doc):
+    def _find_field(cls, field, doc):
         """Find the field in the document which matches the given field.
 
         The field may be in dot notation, eg "a.b.c". Yields a tuple
@@ -431,42 +431,46 @@ class OplogThread(threading.Thread):
             for key in path:
                 doc = doc[key]
         except (KeyError, TypeError):
-            return
-        yield path, doc
+            return []
+        return [(path, doc)]
 
     @classmethod
-    def find_update_fields(cls, field, doc):
+    def _find_update_fields(cls, field, doc):
         """Find the fields in the update document which match the given field.
 
         Both the field and the top level keys in the doc may be in dot
         notation, eg "a.b.c". Yields tuples (path, field_value).
         """
+        def find_all_fields():
+            for key in doc:
+                if len(key) > len(field):
+                    # Handle case where field is 'a' and key is 'a.b'
+                    if key.startswith(field) and key[len(field)] == '.':
+                        yield [key], doc[key]
+                        # Continue searching, there may be multiple matches.
+                        # For example, 'a' will match 'a.b' and 'a.c'.
+                elif len(key) < len(field):
+                    # Handle case where field is 'a.b' and key is 'a'
+                    if field.startswith(key) and field[len(key)] == '.':
+                        # Search for the remaining part of the field
+                        remaining_field = field[len(key) + 1:]
+                        match = cls._find_field(remaining_field, doc[key])
+                        if match:
+                            path, value = match[0]
+                            path.insert(0, key)
+                            yield path, value
+                            # Stop searching, it's not possible for any other
+                            # keys in the update doc to match this field.
+                            return
         if field in doc:
-            yield [field], doc[field]
-            return
-        for key in doc:
-            if len(key) > len(field):
-                # Handle case where field is 'a' and key is 'a.b'
-                if key.startswith(field) and key[len(field)] == '.':
-                    yield [key], doc[key]
-                    # Continue searching, there may be multiple matches.
-                    # For example, 'a' will match 'a.b' and 'a.c'.
-            elif len(key) < len(field):
-                # Handle case where field is 'a.b' and key is 'a'
-                if field.startswith(key) and field[len(key)] == '.':
-                    remaining = field[len(key) + 1:]
-                    match = list(cls.find_field(remaining, doc[key]))
-                    if match:
-                        path, value = match[0]
-                        path.insert(0, key)
-                        yield path, value
-                        return
+            return [([field], doc[field])]
+        return list(find_all_fields())
 
     def _pop_excluded_fields(self, doc, update=False):
         # Remove all the fields that were passed in exclude_fields.
-        find_fields = self.find_update_fields if update else self.find_field
+        find_fields = self._find_update_fields if update else self._find_field
         for field in self._exclude_fields:
-            for path, _ in list(find_fields(field, doc)):
+            for path, _ in find_fields(field, doc):
                 # If we found a matching field in the original document,
                 # delete it.
                 temp_doc = doc
@@ -478,9 +482,9 @@ class OplogThread(threading.Thread):
 
     def _copy_included_fields(self, doc, update=False):
         new_doc = {}
-        find_fields = self.find_update_fields if update else self.find_field
+        find_fields = self._find_update_fields if update else self._find_field
         for field in self._fields:
-            for path, value in list(find_fields(field, doc)):
+            for path, value in find_fields(field, doc):
                 # If we found a matching field in the original document,
                 # copy it.
                 temp_doc = new_doc
