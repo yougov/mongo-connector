@@ -431,9 +431,9 @@ class OplogThread(threading.Thread):
         try:
             for key in path:
                 doc = doc[key]
+            return [(path, doc)]
         except (KeyError, TypeError):
             return []
-        return [(path, doc)]
 
     @classmethod
     def _find_update_fields(cls, field, doc):
@@ -479,8 +479,7 @@ class OplogThread(threading.Thread):
         find_fields = self._find_update_fields if update else self._find_field
         for field in self._exclude_fields:
             for path, _ in find_fields(field, doc):
-                # If we found a matching field in the original document,
-                # delete it.
+                # Delete each matching field in the original document.
                 temp_doc = doc
                 for p in path[:-1]:
                     temp_doc = temp_doc[p]
@@ -493,8 +492,7 @@ class OplogThread(threading.Thread):
         find_fields = self._find_update_fields if update else self._find_field
         for field in self._fields:
             for path, value in find_fields(field, doc):
-                # If we found a matching field in the original document,
-                # copy it.
+                # Copy each matching field in the original document.
                 temp_doc = new_doc
                 for p in path[:-1]:
                     temp_doc = temp_doc.setdefault(p, {})
