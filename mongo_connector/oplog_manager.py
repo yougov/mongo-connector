@@ -443,7 +443,7 @@ class OplogThread(threading.Thread):
         notation, eg "a.b.c". Returns a list of tuples (path, field_value) or
         the empty list if the field is not present.
         """
-        def find_all_fields():
+        def find_partial_matches():
             for key in doc:
                 if len(key) > len(field):
                     # Handle case where field is a prefix of key, eg field is
@@ -467,9 +467,12 @@ class OplogThread(threading.Thread):
                         # Stop searching, it's not possible for any other
                         # keys in the update doc to match this field.
                         return
-        if field in doc:
+
+        try:
             return [([field], doc[field])]
-        return list(find_all_fields())
+        except KeyError:
+            # Field does not exactly match any key in the update doc.
+            return list(find_partial_matches())
 
     def _pop_excluded_fields(self, doc, update=False):
         # Remove all the fields that were passed in exclude_fields.
