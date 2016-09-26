@@ -283,11 +283,10 @@ class TestOplogManager(unittest.TestCase):
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertFalse(cursor_empty)
         self.assertEqual(self.opman.checkpoint, last_ts)
-        with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[self.opman.replset_name],
-                             last_ts)
+        self.assertEqual(self.opman.read_last_checkpoint(), last_ts)
 
         # No last checkpoint, no collection dump, something in oplog
+        self.opman.checkpoint = None
         self.opman.oplog_progress = LockingDict()
         self.opman.collection_dump = False
         collection.insert_one({"idb1col1": 2})
@@ -297,33 +296,24 @@ class TestOplogManager(unittest.TestCase):
             last_doc = doc
         self.assertEqual(last_doc['o']['idb1col1'], 2)
         self.assertEqual(self.opman.checkpoint, last_ts)
+        self.assertEqual(self.opman.read_last_checkpoint(), last_ts)
 
         # Last checkpoint exists
-        progress = LockingDict()
-        self.opman.oplog_progress = progress
-        for i in range(1000):
-            collection.insert_one({"idb1col1": i + 500})
+        collection.insert_many([{"idb1col1": i + 500} for i in range(1000)])
         entry = list(
             self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
-        progress.get_dict()[self.opman.replset_name] = entry[0]["ts"]
-        self.opman.oplog_progress = progress
-        self.opman.checkpoint = None
+        self.opman.update_checkpoint(entry[0]["ts"])
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
         self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
-        with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[self.opman.replset_name],
-                             entry[0]["ts"])
+        self.assertEqual(self.opman.read_last_checkpoint(), entry[0]["ts"])
 
         # Last checkpoint is behind
-        progress = LockingDict()
-        progress.get_dict()[self.opman.replset_name] = bson.Timestamp(1, 0)
-        self.opman.oplog_progress = progress
-        self.opman.checkpoint = None
+        self.opman.update_checkpoint(bson.Timestamp(1, 0))
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertTrue(cursor_empty)
         self.assertEqual(cursor, None)
-        self.assertIsNotNone(self.opman.checkpoint)
+        self.assertEqual(self.opman.checkpoint, bson.Timestamp(1, 0))
 
     def test_namespace_mapping(self):
         """Test mapping of namespaces

@@ -256,6 +256,70 @@ class OplogThread(threading.Thread):
             for ens in self.ex_namespace_set:
                 self._oplog_ex_ns_set.append(ens)
 
+    def _should_skip_entry(self, entry):
+        """Determine if this oplog entry should be skipped.
+
+        This has the possible side effect of modifying the entry's namespace
+        and filtering fields from updates and inserts.
+        """
+        # Don't replicate entries resulting from chunk moves
+        if entry.get("fromMigrate"):
+            return True, False
+
+        # Ignore no-ops
+        if entry['op'] == 'n':
+            return True, False
+        ns = entry['ns']
+
+        if '.' not in ns:
+            return True, False
+        coll = ns.split('.', 1)[1]
+
+        # Ignore system collections
+        if coll.startswith("system."):
+            return True, False
+
+        # Ignore GridFS chunks
+        if coll.endswith('.chunks'):
+            return True, False
+
+        is_gridfs_file = False
+        if coll.endswith(".files"):
+            if ns in self.gridfs_files_set:
+                ns = ns[:-len(".files")]
+                is_gridfs_file = True
+            else:
+                return True, False
+
+        # Ignore the collection if it is not included.
+        # It is not possible to have include and exclude at the same time.
+        if (self.oplog_ns_set and not self.oplog_ex_ns_set and not
+                self.dest_mapping_stru.match_set(ns, self.oplog_ns_set)):
+            LOG.debug("OplogThread: Skipping oplog entry: "
+                      "'%s' is not in the namespace set." % (ns,))
+            return True, False
+        if (self.oplog_ex_ns_set and not self.oplog_ns_set and
+                self.dest_mapping_stru.match_set(ns, self.oplog_ex_ns_set)):
+            LOG.debug("OplogThread: Skipping oplog entry: "
+                      "'%s' is in the exclude namespace set." % (ns,))
+            return True, False
+
+        # use namespace mapping if one exists
+        ns = self.dest_mapping_stru.get(ns, ns)
+        if ns is None:
+            LOG.debug("OplogThread: Skipping oplog entry: "
+                      "'%s' is not in the namespace set." % (ns,))
+            return True, False
+
+        # update the namespace
+        entry['ns'] = ns
+
+        # Take fields out of the oplog entry that shouldn't be replicated.
+        # This may nullify the document if there's nothing to do.
+        if not self.filter_oplog_entry(entry):
+            return True, False
+        return False, is_gridfs_file
+
     @log_fatal_exceptions
     def run(self):
         """Start the oplog worker.
@@ -289,70 +353,25 @@ class OplogThread(threading.Thread):
                     LOG.debug("OplogThread: Cursor is still"
                               " alive and thread is still running.")
                     for n, entry in enumerate(cursor):
-
-                        LOG.debug("OplogThread: Iterating through cursor,"
-                                  " document number in this cursor is %d"
-                                  % n)
                         # Break out if this thread should stop
                         if not self.running:
                             break
 
-                        # Don't replicate entries resulting from chunk moves
-                        if entry.get("fromMigrate"):
-                            continue
+                        LOG.debug("OplogThread: Iterating through cursor,"
+                                  " document number in this cursor is %d"
+                                  % n)
 
-                        # Take fields out of the oplog entry that
-                        # shouldn't be replicated. This may nullify
-                        # the document if there's nothing to do.
-                        if not self.filter_oplog_entry(entry):
+                        skip, is_gridfs_file = self._should_skip_entry(entry)
+                        if skip:
+                            # update the last_ts on skipped entries to ensure
+                            # our checkpoint does not fall off the oplog. This
+                            # also prevents reprocessing skipped entries.
+                            last_ts = entry['ts']
                             continue
 
                         # Sync the current oplog operation
                         operation = entry['op']
                         ns = entry['ns']
-
-                        if '.' not in ns:
-                            continue
-                        coll = ns.split('.', 1)[1]
-
-                        # Ignore system collections
-                        if coll.startswith("system."):
-                            continue
-
-                        # Ignore GridFS chunks
-                        if coll.endswith('.chunks'):
-                            continue
-
-                        is_gridfs_file = False
-                        if coll.endswith(".files"):
-                            if ns in self.gridfs_files_set:
-                                ns = ns[:-len(".files")]
-                                is_gridfs_file = True
-                            else:
-                                continue
-
-                        # Ignore the collection if it is not included
-                        # In the connector.py we already verified that
-                        # it is not possible
-                        # to have include and exclude in the same time.
-                        if self.oplog_ns_set and not self.oplog_ex_ns_set and not self.dest_mapping_stru.match_set(ns, self.oplog_ns_set):
-                            LOG.debug("OplogThread: Skipping oplog entry: "
-                                      "'%s' is not in the namespace set." %
-                                      (ns,))
-                            continue
-                        if self.oplog_ex_ns_set and not self.oplog_ns_set and self.dest_mapping_stru.match_set(ns, self.oplog_ex_ns_set):
-                            LOG.debug("OplogThread: Skipping oplog entry: "
-                                      "'%s' is in the exclude namespace set." %
-                                      (ns,))
-                            continue
-
-                        # use namespace mapping if one exists
-                        ns = self.dest_mapping_stru.get(ns, ns)
-                        if ns is None:
-                            LOG.debug("OplogThread: Skipping oplog entry: "
-                                      "'%s' is not in the namespace set." %
-                                      (ns,))
-                            continue
                         timestamp = util.bson_ts_to_long(entry['ts'])
                         for docman in self.doc_managers:
                             try:
@@ -418,16 +437,16 @@ class OplogThread(threading.Thread):
 
                         # update timestamp per batch size
                         # n % -1 (default for self.batch_size) == 0 for all n
-                        if n % self.batch_size == 1 and last_ts is not None:
-                            self.checkpoint = last_ts
-                            self.update_checkpoint()
+                        if n % self.batch_size == 1:
+                            self.update_checkpoint(last_ts)
+                            last_ts = None
 
                     # update timestamp after running through oplog
                     if last_ts is not None:
                         LOG.debug("OplogThread: updating checkpoint after "
                                   "processing new oplog entries")
-                        self.checkpoint = last_ts
-                        self.update_checkpoint()
+                        self.update_checkpoint(last_ts)
+                        last_ts = None
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
@@ -442,8 +461,7 @@ class OplogThread(threading.Thread):
                 LOG.debug("OplogThread: updating checkpoint after an "
                           "Exception, cursor closing, or join() on this"
                           "thread.")
-                self.checkpoint = last_ts
-                self.update_checkpoint()
+                self.update_checkpoint(last_ts)
 
             LOG.debug("OplogThread: Sleeping. Documents removed: %d, "
                       "upserted: %d, updated: %d"
@@ -823,8 +841,8 @@ class OplogThread(threading.Thread):
             LOG.debug("OplogThread: oplog is empty.")
             return None
 
-        LOG.debug("OplogThread: %s oplog entry has timestamp %d."
-                  % ('Newest' if newest_entry else 'Oldest', ts.time))
+        LOG.debug("OplogThread: %s oplog entry has timestamp %s."
+                  % ('Newest' if newest_entry else 'Oldest', ts))
         return ts
 
     def get_oldest_oplog_timestamp(self):
@@ -860,18 +878,15 @@ class OplogThread(threading.Thread):
             if self.collection_dump:
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
+                self.update_checkpoint(timestamp)
                 if timestamp is None:
                     return None, True
             else:
                 # Collection dump disabled:
                 # return cursor to beginning of oplog.
                 cursor = self.get_oplog_cursor()
-                self.checkpoint = self.get_last_oplog_timestamp()
-                self.update_checkpoint()
+                self.update_checkpoint(self.get_last_oplog_timestamp())
                 return cursor, self._cursor_empty(cursor)
-
-        self.checkpoint = timestamp
-        self.update_checkpoint()
 
         cursor = self.get_oplog_cursor(timestamp)
         cursor_empty = self._cursor_empty(cursor)
@@ -880,8 +895,7 @@ class OplogThread(threading.Thread):
             # rollback, update checkpoint, and retry
             LOG.debug("OplogThread: Initiating rollback from "
                       "get_oplog_cursor")
-            self.checkpoint = self.rollback()
-            self.update_checkpoint()
+            self.update_checkpoint(self.rollback())
             return self.init_cursor()
 
         first_oplog_entry = next(cursor)
@@ -903,17 +917,17 @@ class OplogThread(threading.Thread):
             LOG.debug("OplogThread: Initiating rollback from "
                       "get_oplog_cursor: new oplog entries found but "
                       "checkpoint is not present")
-            self.checkpoint = self.rollback()
-            self.update_checkpoint()
+            self.update_checkpoint(self.rollback())
             return self.init_cursor()
 
         # first entry has been consumed
         return cursor, cursor_empty
 
-    def update_checkpoint(self):
+    def update_checkpoint(self, checkpoint):
         """Store the current checkpoint in the oplog progress dictionary.
         """
-        if self.checkpoint is not None:
+        if checkpoint is not None and checkpoint != self.checkpoint:
+            self.checkpoint = checkpoint
             with self.oplog_progress as oplog_prog:
                 oplog_dict = oplog_prog.get_dict()
                 # If we have the repr of our oplog collection
@@ -923,9 +937,9 @@ class OplogThread(threading.Thread):
                 # For an explanation of the format change, see the comment in
                 # read_last_checkpoint.
                 oplog_dict.pop(str(self.oplog), None)
-                oplog_dict[self.replset_name] = self.checkpoint
-                LOG.debug("OplogThread: oplog checkpoint updated to %s" %
-                          str(self.checkpoint))
+                oplog_dict[self.replset_name] = checkpoint
+                LOG.debug("OplogThread: oplog checkpoint updated to %s",
+                          checkpoint)
         else:
             LOG.debug("OplogThread: no checkpoint to update.")
 
@@ -954,6 +968,7 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: reading last checkpoint as %s " %
                   str(ret_val))
+        self.checkpoint = ret_val
         return ret_val
 
     def rollback(self):
