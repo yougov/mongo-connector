@@ -192,6 +192,14 @@ class TestOplogManager(unittest.TestCase):
         for doc, correct_a in zip(docs, expected_a):
             self.assertEqual(doc['a'], correct_a)
 
+    def test_dump_collection_cancel(self):
+        """Test that dump_collection returns None when cancelled."""
+        self.primary_conn["test"]["test"].insert_one({"test": "1"})
+
+        # Pretend that the OplogThead was cancelled
+        self.opman.running = False
+        self.assertIsNone(self.opman.dump_collection())
+
     def test_init_cursor(self):
         """Test the init_cursor method
 
