@@ -784,7 +784,9 @@ class OplogThread(threading.Thread):
 
     def _cursor_empty(self, cursor):
         try:
-            next(cursor.clone().limit(-1))
+            # Tailable cursors can not have singleBatch=True in MongoDB > 3.3
+            next(cursor.clone().remove_option(CursorType.TAILABLE_AWAIT)
+                 .limit(-1))
             return False
         except StopIteration:
             return True
