@@ -827,27 +827,20 @@ def get_config_options():
         "you can use `--gridfs-set test.fs`.")
 
     def apply_doc_managers(option, cli_values):
-        if cli_values['doc_manager'] is None:
-            if cli_values['target_url']:
-                raise errors.InvalidConfiguration(
-                    "Cannot create a Connector with a target URL"
-                    " but no doc manager.")
-        else:
-            if option.value is not None:
-                bulk_size = option.value[0].get(
-                    'bulkSize', constants.DEFAULT_MAX_BULK)
-            else:
-                bulk_size = constants.DEFAULT_MAX_BULK
-            option.value = [{
-                'docManager': cli_values['doc_manager'],
-                'targetURL': cli_values['target_url'],
-                'uniqueKey': cli_values['unique_key'],
-                'autoCommitInterval': cli_values['auto_commit_interval'],
-                'bulkSize': bulk_size
-            }]
-
         if not option.value:
-            return
+            if not cli_values['doc_manager'] and not cli_values['target_url']:
+                return
+            option.value = [{}]
+
+        # Command line options should override the first DocManager config.
+        cli_to_config = dict(doc_manager='docManager',
+                             target_url='targetURL',
+                             auto_commit_interval='autoCommitInterval',
+                             unique_key='uniqueKey')
+        first_dm = option.value[0]
+        for cli_name, value in cli_values.items():
+            if value is not None:
+                first_dm[cli_to_config[cli_name]] = value
 
         # validate doc managers and fill in default values
         for dm in option.value:
