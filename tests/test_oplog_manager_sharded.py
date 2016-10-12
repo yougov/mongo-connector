@@ -187,8 +187,9 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         latest_timestamp = self.opman1.get_last_oplog_timestamp()
         cursor = self.opman1.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
-        self.assertEqual(cursor.count(), 1)
-        next_entry_id = cursor[0]['o']['_id']
+        entries = list(cursor)
+        self.assertEqual(len(entries), 1)
+        next_entry_id = entries[0]['o']['_id']
         retrieved = self.mongos_conn.test.mcsharded.find_one(next_entry_id)
         self.assertEqual(retrieved, doc)
 
