@@ -31,7 +31,7 @@ from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
-from mongo_connector.util import log_fatal_exceptions
+from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.dest_mapping import DestMapping
 
 from pymongo import MongoClient
@@ -330,7 +330,8 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
-                for shard_doc in main_conn['config']['shards'].find():
+                for shard_doc in retry_until_ok(
+                        lambda: list(main_conn.config.shards.find())):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
