@@ -590,6 +590,13 @@ class TestConnectorConfig(unittest.TestCase):
         self.config.load_json(
             json.dumps(TestConnectorConfig.set_everything_config))
         self.config.parse_args(self.set_everything_differently_argv)
+
+        first_dm = self.config['docManagers'][0]
+        first_dm_config = self.set_everything_config['docManagers'][0]
+        self.assertEqual(first_dm.url, 'localhost:54321')
+        self.assertEqual(first_dm.chunk_size, first_dm_config['bulkSize'])
+        self.assertEqual(first_dm.kwargs.get('clientOptions'),
+                         first_dm_config['args']['clientOptions'])
         self.assertConnectorState()
 
     def test_client_options(self):
