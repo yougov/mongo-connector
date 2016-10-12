@@ -368,7 +368,8 @@ class Connector(threading.Thread):
                         hosts, replicaSet=repl_set)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
-                        self.dest_mapping, **self.kwargs)
+                        self.dest_mapping, mongos_client=self.main_conn,
+                        **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
