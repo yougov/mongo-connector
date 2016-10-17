@@ -41,7 +41,7 @@ LOG = logging.getLogger(__name__)
 class ReplicationLagLogger(threading.Thread):
     """Thread that periodically logs the current replication lag.
     """
-    def __init__(self, opman, interval=30):
+    def __init__(self, opman, interval):
         super(ReplicationLagLogger, self).__init__()
         self.opman = opman
         self.interval = interval
@@ -51,8 +51,7 @@ class ReplicationLagLogger(threading.Thread):
         checkpoint = self.opman.checkpoint
         if checkpoint is None:
             return
-        newest_write = retry_until_ok(
-            self.opman.get_last_oplog_timestamp)
+        newest_write = retry_until_ok(self.opman.get_last_oplog_timestamp)
         if newest_write < checkpoint:
             # OplogThread will perform a rollback, don't log anything
             return
