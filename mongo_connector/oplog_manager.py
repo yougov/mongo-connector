@@ -38,6 +38,45 @@ from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 LOG = logging.getLogger(__name__)
 
 
+class ReplicationLagLogger(threading.Thread):
+    """Thread that periodically logs the current replication lag.
+    """
+    def __init__(self, opman, interval):
+        super(ReplicationLagLogger, self).__init__()
+        self.opman = opman
+        self.interval = interval
+        self.daemon = True
+
+    def log_replication_lag(self):
+        checkpoint = self.opman.checkpoint
+        if checkpoint is None:
+            return
+        newest_write = retry_until_ok(self.opman.get_last_oplog_timestamp)
+        if newest_write < checkpoint:
+            # OplogThread will perform a rollback, don't log anything
+            return
+        lag_secs = newest_write.time - checkpoint.time
+        if lag_secs > 0:
+            LOG.info("OplogThread for replica set '%s' is %s seconds behind "
+                     "the oplog.",
+                     self.opman.replset_name, lag_secs)
+        else:
+            lag_inc = newest_write.inc - checkpoint.inc
+            if lag_inc > 0:
+                LOG.info("OplogThread for replica set '%s' is %s entries "
+                         "behind the oplog.",
+                         self.opman.replset_name, lag_inc)
+            else:
+                LOG.info("OplogThread for replica set '%s' is up to date "
+                         "with the oplog.",
+                         self.opman.replset_name)
+
+    def run(self):
+        while self.opman.is_alive():
+            self.log_replication_lag()
+            time.sleep(self.interval)
+
+
 class OplogThread(threading.Thread):
     """Thread that tails an oplog.
 
@@ -221,6 +260,7 @@ class OplogThread(threading.Thread):
     def run(self):
         """Start the oplog worker.
         """
+        ReplicationLagLogger(self, 30).start()
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
@@ -245,8 +285,7 @@ class OplogThread(threading.Thread):
             upsert_inc = 0
             update_inc = 0
             try:
-                LOG.debug("OplogThread: about to process new oplog "
-                          "entries")
+                LOG.debug("OplogThread: about to process new oplog entries")
                 while cursor.alive and self.running:
                     LOG.debug("OplogThread: Cursor is still"
                               " alive and thread is still running.")
@@ -386,7 +425,7 @@ class OplogThread(threading.Thread):
 
                     # update timestamp after running through oplog
                     if last_ts is not None:
-                        LOG.debug("OplogThread: updating checkpoint after"
+                        LOG.debug("OplogThread: updating checkpoint after "
                                   "processing new oplog entries")
                         self.checkpoint = last_ts
                         self.update_checkpoint()
