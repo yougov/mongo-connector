@@ -16,7 +16,7 @@ import logging
 import optparse
 import sys
 
-from mongo_connector import compat, errors
+from mongo_connector import compat, errors, __version__
 from mongo_connector.compat import reraise
 
 
@@ -92,7 +92,7 @@ class Config(object):
         """
 
         # parse the command line options
-        parser = optparse.OptionParser()
+        parser = optparse.OptionParser(version='%prog v' + __version__)
         for option in self.options:
             for args, kwargs in option.cli_options:
                 cli_option = parser.add_option(*args, **kwargs)
