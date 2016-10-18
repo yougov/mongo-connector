@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.5.0.dev0'
-
 # Maximum # of documents to process before recording timestamp
 # default = -1 (no maximum)
 DEFAULT_BATCH_SIZE = -1
