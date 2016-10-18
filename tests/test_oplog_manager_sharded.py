@@ -58,6 +58,13 @@ class ShardedClusterTestCase(unittest.TestCase):
         # Wipe any test data
         self.mongos_conn["test"]["mcsharded"].drop()
 
+        # Disable the balancer before creating the collection
+        self.mongos_conn.config.settings.update_one(
+            {"_id": "balancer"},
+            {"$set": {"stopped": True}},
+            upsert=True
+        )
+
         # Create and shard the collection test.mcsharded on the "i" field
         self.mongos_conn["test"]["mcsharded"].create_index("i")
         self.mongos_conn.admin.command("enableSharding", "test")
@@ -72,13 +79,6 @@ class ShardedClusterTestCase(unittest.TestCase):
             ("split", "test.mcsharded"),
             ("middle", {"i": 1000})
         ]))
-
-        # disable the balancer
-        self.mongos_conn.config.settings.update_one(
-            {"_id": "balancer"},
-            {"$set": {"stopped": True}},
-            upsert=True
-        )
 
         # Move chunks to their proper places
         try:
@@ -590,13 +590,12 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
             lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
-        def cond():
-            try:
-                db_main.insert_one({"i": 1})
-            except:
-                pass
-            return db_main.find_one({"i": 1})
-        retry_until_ok(cond)
+        def insert_one(doc):
+            if not db_main.find_one(doc):
+                return db_main.insert_one(doc)
+            return True
+        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1}),
+                    "could not insert into shard1 with one node down")
         db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
         db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
         self.assertEqual(db_secondary1.count(), 2)
@@ -661,9 +660,11 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
             lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document on each shard which will be rolled back later
-        retry_until_ok(db_main.insert_one, {"i": 1})
+        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1}),
+                    "could not insert into shard1 with one node down")
         self.assertEqual(db_secondary1.count(), 2)
-        retry_until_ok(db_main.insert_one, {"i": 1001})
+        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1001}),
+                    "could not insert into shard2 with one node down")
         self.assertEqual(db_secondary2.count(), 2)
 
         # Wait for replication on the doc manager
