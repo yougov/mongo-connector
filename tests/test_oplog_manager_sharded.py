@@ -441,6 +441,55 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         for i, doc in enumerate(sorted(all_docs, key=lambda x: x["i"])):
             self.assertEqual(doc["i"], i + 500)
 
+    def test_upgrade_oplog_progress(self):
+        first_oplog_ts1 = self.opman1.oplog.find_one()['ts']
+        first_oplog_ts2 = self.opman2.oplog.find_one()['ts']
+        # Old format oplog progress file:
+        progress = {
+            str(self.opman1.oplog): bson_ts_to_long(first_oplog_ts1),
+            str(self.opman2.oplog): bson_ts_to_long(first_oplog_ts2)
+        }
+        # Set up oplog managers to use the old format.
+        oplog_progress = LockingDict()
+        oplog_progress.dict = progress
+        self.opman1.oplog_progress = oplog_progress
+        self.opman2.oplog_progress = oplog_progress
+        # Cause the oplog managers to update their checkpoints.
+        self.opman1.update_checkpoint(first_oplog_ts1)
+        self.opman2.update_checkpoint(first_oplog_ts2)
+        # New format should be in place now.
+        new_format = {
+            self.opman1.replset_name: first_oplog_ts1,
+            self.opman2.replset_name: first_oplog_ts2
+        }
+        self.assertEqual(
+            new_format,
+            self.opman1.oplog_progress.get_dict()
+        )
+        self.assertEqual(
+            new_format,
+            self.opman2.oplog_progress.get_dict()
+        )
+
+
+class TestOplogManagerSharded(ShardedClusterTestCase):
+    """Defines all test cases for OplogThreads running on a sharded
+    cluster with three node replica sets.
+    """
+
+    def setUp(self):
+        self.set_up_sharded_cluster(ShardedCluster)
+        self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED)
+        self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
+
+    def tearDown(self):
+        super(TestOplogManagerSharded, self).tearDown()
+        close_client(self.shard1_secondary_conn)
+        close_client(self.shard2_secondary_conn)
+
     def test_with_orphan_documents(self):
         """Test that DocManagers have proper state after a chunk migration
         that resuts in orphaned documents.
@@ -458,7 +507,9 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
                          500)
         assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 1000)
 
-        # Stop replication using the 'rsSyncApplyStop' failpoint
+        # Stop replication using the 'rsSyncApplyStop' failpoint.
+        # Note: this requires secondaries to ensure the subsequent moveChunk
+        # command does not complete.
         self.shard1_conn.admin.command(
             "configureFailPoint", "rsSyncApplyStop",
             mode="alwaysOn"
@@ -511,55 +562,6 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         )
         # cleanup
         mover.join()
-
-    def test_upgrade_oplog_progress(self):
-        first_oplog_ts1 = self.opman1.oplog.find_one()['ts']
-        first_oplog_ts2 = self.opman2.oplog.find_one()['ts']
-        # Old format oplog progress file:
-        progress = {
-            str(self.opman1.oplog): bson_ts_to_long(first_oplog_ts1),
-            str(self.opman2.oplog): bson_ts_to_long(first_oplog_ts2)
-        }
-        # Set up oplog managers to use the old format.
-        oplog_progress = LockingDict()
-        oplog_progress.dict = progress
-        self.opman1.oplog_progress = oplog_progress
-        self.opman2.oplog_progress = oplog_progress
-        # Cause the oplog managers to update their checkpoints.
-        self.opman1.update_checkpoint(first_oplog_ts1)
-        self.opman2.update_checkpoint(first_oplog_ts2)
-        # New format should be in place now.
-        new_format = {
-            self.opman1.replset_name: first_oplog_ts1,
-            self.opman2.replset_name: first_oplog_ts2
-        }
-        self.assertEqual(
-            new_format,
-            self.opman1.oplog_progress.get_dict()
-        )
-        self.assertEqual(
-            new_format,
-            self.opman2.oplog_progress.get_dict()
-        )
-
-
-class TestOplogManagerSharded(ShardedClusterTestCase):
-    """Defines all test cases for OplogThreads running on a sharded
-    cluster with three node replica sets.
-    """
-
-    def setUp(self):
-        self.set_up_sharded_cluster(ShardedCluster)
-        self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
-            read_preference=ReadPreference.SECONDARY_PREFERRED)
-        self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
-            read_preference=ReadPreference.SECONDARY_PREFERRED
-        )
-
-    def tearDown(self):
-        super(TestOplogManagerSharded, self).tearDown()
-        close_client(self.shard1_secondary_conn)
-        close_client(self.shard2_secondary_conn)
 
     def test_rollback(self):
         """Test the rollback method in a sharded environment
