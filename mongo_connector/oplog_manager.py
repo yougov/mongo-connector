@@ -596,6 +596,11 @@ class OplogThread(threading.Thread):
             cursor.add_option(8)
         return cursor
 
+    def get_collection(self, namespace):
+        """Get a pymongo collection from a namespace."""
+        database, coll = namespace.split('.', 1)
+        return self.primary_client[database][coll]
+
     def dump_collection(self):
         """Dumps collection into the target system.
 
@@ -603,10 +608,13 @@ class OplogThread(threading.Thread):
         configs i.e. when we're starting for the first time.
         """
 
-        timestamp = util.retry_until_ok(self.get_last_oplog_timestamp)
+        timestamp = retry_until_ok(self.get_last_oplog_timestamp)
         if timestamp is None:
             return None
         long_ts = util.bson_ts_to_long(timestamp)
+        # Flag if this oplog thread was cancelled during the collection dump.
+        # Use a list to workaround python scoping.
+        dump_cancelled = [False]
 
         def get_all_ns():
             all_ns_set = []
@@ -654,23 +662,21 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(namespace):
-            database, coll = namespace.split('.', 1)
+        def docs_to_dump(from_coll):
             last_id = None
             attempts = 0
 
             # Loop to handle possible AutoReconnect
             while attempts < 60:
-                target_coll = self.primary_client[database][coll]
-                if not last_id:
-                    cursor = util.retry_until_ok(
-                        target_coll.find,
+                if last_id is None:
+                    cursor = retry_until_ok(
+                        from_coll.find,
                         projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
-                    cursor = util.retry_until_ok(
-                        target_coll.find,
+                    cursor = retry_until_ok(
+                        from_coll.find,
                         {"_id": {"$gt": last_id}},
                         projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
@@ -678,6 +684,9 @@ class OplogThread(threading.Thread):
                 try:
                     for doc in cursor:
                         if not self.running:
+                            # Thread was joined while performing the
+                            # collection dump.
+                            dump_cancelled[0] = True
                             raise StopIteration
                         last_id = doc["_id"]
                         yield doc
@@ -688,17 +697,16 @@ class OplogThread(threading.Thread):
                     time.sleep(1)
 
         def upsert_each(dm):
-            num_inserted = 0
             num_failed = 0
             for namespace in dump_set:
-                for num, doc in enumerate(docs_to_dump(namespace)):
-                    if num % 10000 == 0:
-                        LOG.debug("Upserted %d docs." % num)
+                from_coll = self.get_collection(namespace)
+                total_docs = retry_until_ok(from_coll.count)
+                num = None
+                for num, doc in enumerate(docs_to_dump(from_coll)):
                     try:
                         mapped_ns = self.dest_mapping_stru.get(namespace,
                                                                namespace)
                         dm.upsert(doc, mapped_ns, long_ts)
-                        num_inserted += 1
                     except Exception:
                         if self.continue_on_error:
                             LOG.exception(
@@ -706,16 +714,28 @@ class OplogThread(threading.Thread):
                             num_failed += 1
                         else:
                             raise
-            LOG.debug("Upserted %d docs" % num_inserted)
+                    if num % 10000 == 0:
+                        LOG.info("Upserted %d out of approximately %d docs "
+                                 "from collection '%s'",
+                                 num + 1, total_docs, namespace)
+                if num is not None:
+                    LOG.info("Upserted %d out of approximately %d docs from "
+                             "collection '%s'",
+                             num + 1, total_docs, namespace)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
 
         def upsert_all(dm):
             try:
                 for namespace in dump_set:
+                    from_coll = self.get_collection(namespace)
+                    total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.dest_mapping_stru.get(namespace,
                                                            namespace)
-                    dm.bulk_upsert(docs_to_dump(namespace), mapped_ns, long_ts)
+                    LOG.info("Bulk upserting approximately %d docs from "
+                             "collection '%s'",
+                             total_docs, namespace)
+                    dm.bulk_upsert(docs_to_dump(from_coll), mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
                     LOG.exception("OplogThread: caught exception"
@@ -727,24 +747,16 @@ class OplogThread(threading.Thread):
 
         def do_dump(dm, error_queue):
             try:
-                # Dump the documents, bulk upsert if possible
-                if hasattr(dm, "bulk_upsert"):
-                    LOG.debug("OplogThread: Using bulk upsert function for "
-                              "collection dump")
-                    upsert_all(dm)
-                else:
-                    LOG.debug(
-                        "OplogThread: DocManager %s has no "
-                        "bulk_upsert method.  Upserting documents "
-                        "serially for collection dump." % str(dm))
-                    upsert_each(dm)
+                LOG.debug("OplogThread: Using bulk upsert function for "
+                          "collection dump")
+                upsert_all(dm)
 
                 # Dump GridFS files
                 for gridfs_ns in self.gridfs_set:
-                    db, coll = gridfs_ns.split('.', 1)
-                    mongo_coll = self.primary_client[db][coll]
+                    mongo_coll = self.get_collection(gridfs_ns)
+                    from_coll = self.get_collection(gridfs_ns + '.files')
                     dest_ns = self.dest_mapping_stru.get(gridfs_ns, gridfs_ns)
-                    for doc in docs_to_dump(gridfs_ns + '.files'):
+                    for doc in docs_to_dump(from_coll):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
             except:
@@ -788,6 +800,11 @@ class OplogThread(threading.Thread):
             effect = "cannot recover!"
             LOG.error('%s %s %s' % (err_msg, effect, self.oplog))
             self.running = False
+            return None
+
+        if dump_cancelled[0]:
+            LOG.warning('Initial collection dump was interrupted. '
+                        'Will re-run the collection dump on next startup.')
             return None
 
         return timestamp
