@@ -66,6 +66,10 @@ class Connector(threading.Thread):
             LOG.warning('No doc managers specified, using simulator.')
             self.doc_managers = (simulator.DocManager(),)
 
+        # Warning when pymongo does not have C extensions regarding possible "Date out of range" errors
+        if not pymongo.has_c():
+            LOG.warning('pymongo was installed without C extensions. Possible "Date out of range" errors may occur.')
+
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
 
