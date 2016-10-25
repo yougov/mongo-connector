@@ -28,7 +28,7 @@ import re
 
 import pymongo
 
-from pymongo import CursorType
+from pymongo import CursorType, errors as pymongo_errors
 
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
@@ -264,8 +264,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            cursor, cursor_empty = self.init_cursor()
-
+            cursor, cursor_empty = retry_until_ok(self.init_cursor)
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
                 err_msg = "OplogThread: Last entry no longer in oplog"
@@ -852,59 +851,47 @@ class OplogThread(threading.Thread):
                 cursor = self.get_oplog_cursor()
                 self.checkpoint = self.get_last_oplog_timestamp()
                 self.update_checkpoint()
-                return cursor, retry_until_ok(self._cursor_empty, cursor)
+                return cursor, self._cursor_empty(cursor)
 
         self.checkpoint = timestamp
         self.update_checkpoint()
 
-        for i in range(60):
-            cursor = self.get_oplog_cursor(timestamp)
-            cursor_empty = retry_until_ok(self._cursor_empty, cursor)
+        cursor = self.get_oplog_cursor(timestamp)
+        cursor_empty = self._cursor_empty(cursor)
 
-            if cursor_empty:
-                # rollback, update checkpoint, and retry
-                LOG.debug("OplogThread: Initiating rollback from "
-                          "get_oplog_cursor")
-                self.checkpoint = self.rollback()
-                self.update_checkpoint()
-                return self.init_cursor()
+        if cursor_empty:
+            # rollback, update checkpoint, and retry
+            LOG.debug("OplogThread: Initiating rollback from "
+                      "get_oplog_cursor")
+            self.checkpoint = self.rollback()
+            self.update_checkpoint()
+            return self.init_cursor()
 
-            # try to get the first oplog entry
-            try:
-                first_oplog_entry = retry_until_ok(next, cursor)
-            except StopIteration:
-                # It's possible for the cursor to become invalid
-                # between the next(cursor) call and now
-                time.sleep(1)
-                continue
+        first_oplog_entry = next(cursor)
 
-            oldest_ts_long = util.bson_ts_to_long(
-                self.get_oldest_oplog_timestamp())
-            checkpoint_ts_long = util.bson_ts_to_long(timestamp)
-            if checkpoint_ts_long < oldest_ts_long:
-                # We've fallen behind, the checkpoint has fallen off the oplog
-                return None, True
+        oldest_ts_long = util.bson_ts_to_long(
+            self.get_oldest_oplog_timestamp())
+        checkpoint_ts_long = util.bson_ts_to_long(timestamp)
+        if checkpoint_ts_long < oldest_ts_long:
+            # We've fallen behind, the checkpoint has fallen off the oplog
+            return None, True
 
-            cursor_ts_long = util.bson_ts_to_long(first_oplog_entry["ts"])
-            if cursor_ts_long > checkpoint_ts_long:
-                # The checkpoint is not present in this oplog and the oplog
-                # did not rollover. This means that we connected to a new
-                # primary which did not replicate the checkpoint and which has
-                # new changes in its oplog for us to process.
-                # rollback, update checkpoint, and retry
-                LOG.debug("OplogThread: Initiating rollback from "
-                          "get_oplog_cursor: new oplog entries found but "
-                          "checkpoint is not present")
-                self.checkpoint = self.rollback()
-                self.update_checkpoint()
-                return self.init_cursor()
+        cursor_ts_long = util.bson_ts_to_long(first_oplog_entry["ts"])
+        if cursor_ts_long > checkpoint_ts_long:
+            # The checkpoint is not present in this oplog and the oplog
+            # did not rollover. This means that we connected to a new
+            # primary which did not replicate the checkpoint and which has
+            # new changes in its oplog for us to process.
+            # rollback, update checkpoint, and retry
+            LOG.debug("OplogThread: Initiating rollback from "
+                      "get_oplog_cursor: new oplog entries found but "
+                      "checkpoint is not present")
+            self.checkpoint = self.rollback()
+            self.update_checkpoint()
+            return self.init_cursor()
 
-            # first entry has been consumed
-            return cursor, cursor_empty
-
-        else:
-            raise errors.MongoConnectorError(
-                "Could not initialize oplog cursor.")
+        # first entry has been consumed
+        return cursor, cursor_empty
 
     def update_checkpoint(self):
         """Store the current checkpoint in the oplog progress dictionary.
