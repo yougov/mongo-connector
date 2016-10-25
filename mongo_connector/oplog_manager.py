@@ -264,14 +264,7 @@ class OplogThread(threading.Thread):
         LOG.debug("OplogThread: Run thread started")
         while self.running is True:
             LOG.debug("OplogThread: Getting cursor")
-            try:
-                cursor, cursor_empty = retry_until_ok(self.init_cursor)
-            except (pymongo_errors.ConnectionFailure,
-                    pymongo_errors.OperationFailure):
-                LOG.debug(
-                    "OplogThread: encountered exception during init_cursor, "
-                    "continuing...",
-                    exc_info=1)
+            cursor, cursor_empty = retry_until_ok(self.init_cursor)
             # we've fallen too far behind
             if cursor is None and self.checkpoint is not None:
                 err_msg = "OplogThread: Last entry no longer in oplog"
