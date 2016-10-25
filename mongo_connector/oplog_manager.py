@@ -446,7 +446,6 @@ class OplogThread(threading.Thread):
                         LOG.debug("OplogThread: updating checkpoint after "
                                   "processing new oplog entries")
                         self.update_checkpoint(last_ts)
-                        last_ts = None
 
             except (pymongo.errors.AutoReconnect,
                     pymongo.errors.OperationFailure,
