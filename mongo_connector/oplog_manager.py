@@ -659,7 +659,6 @@ class OplogThread(threading.Thread):
                     time.sleep(1)
 
         def upsert_each(dm):
-            num_inserted = 0
             num_failed = 0
             for namespace in dump_set:
                 from_coll = self.get_collection(namespace)
@@ -670,7 +669,6 @@ class OplogThread(threading.Thread):
                         mapped_ns = self.dest_mapping_stru.get(namespace,
                                                                namespace)
                         dm.upsert(doc, mapped_ns, long_ts)
-                        num_inserted += 1
                     except Exception:
                         if self.continue_on_error:
                             LOG.exception(
@@ -679,12 +677,13 @@ class OplogThread(threading.Thread):
                         else:
                             raise
                     if num % 10000 == 0:
-                        LOG.info("Upserted %d/%d docs from collection %s",
+                        LOG.info("Upserted %d out of approximately %d docs "
+                                 "from collection '%s'",
                                  num + 1, total_docs, namespace)
                 if num is not None:
-                    LOG.info("Upserted %d/%d docs from collection %s",
+                    LOG.info("Upserted %d out of approximately %d docs from "
+                             "collection '%s'",
                              num + 1, total_docs, namespace)
-            LOG.debug("Upserted %d docs" % num_inserted)
             if num_failed > 0:
                 LOG.error("Failed to upsert %d docs" % num_failed)
 
@@ -695,7 +694,8 @@ class OplogThread(threading.Thread):
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.dest_mapping_stru.get(namespace,
                                                            namespace)
-                    LOG.info("Bulk upserting %d docs from collection %s",
+                    LOG.info("Bulk upserting approximately %d docs from "
+                             "collection '%s'",
                              total_docs, namespace)
                     dm.bulk_upsert(docs_to_dump(from_coll), mapped_ns, long_ts)
             except Exception:
