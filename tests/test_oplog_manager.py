@@ -164,6 +164,38 @@ class TestOplogManager(unittest.TestCase):
         last_ts = opman.get_last_oplog_timestamp()
         self.assertEqual(last_ts, opman.dump_collection())
         self.assertEqual(len(opman.doc_managers[0]._search()), 1)
+        conn.close()
+        repl_set.stop()
+
+    def test_skipped_oplog_entry_updates_checkpoint(self):
+        repl_set = ReplicaSetSingle().start()
+        conn = repl_set.client()
+        opman = OplogThread(
+            primary_client=conn,
+            doc_managers=(DocManager(),),
+            oplog_progress_dict=LockingDict(),
+            dest_mapping_stru=DestMapping(["test.test"], [], {}),
+            ns_set=set(["test.test"])
+        )
+        opman.start()
+
+        # Insert a document into a ns_set collection
+        conn["test"]["test"].insert_one({"test": 1})
+        last_ts = opman.get_last_oplog_timestamp()
+        assert_soon(lambda: last_ts == opman.checkpoint,
+                    "OplogThread never updated checkpoint to non-skipped "
+                    "entry.")
+        self.assertEqual(len(opman.doc_managers[0]._search()), 1)
+
+        # Make sure that the oplog thread updates its checkpoint on every
+        # oplog entry.
+        conn["test"]["ignored"].insert_one({"test": 1})
+        last_ts = opman.get_last_oplog_timestamp()
+        assert_soon(lambda: last_ts == opman.checkpoint,
+                    "OplogThread never updated checkpoint to skipped entry.")
+        opman.join()
+        conn.close()
+        repl_set.stop()
 
     def test_dump_collection_with_error(self):
         """Test the dump_collection method with invalid documents.
@@ -242,11 +274,10 @@ class TestOplogManager(unittest.TestCase):
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertFalse(cursor_empty)
         self.assertEqual(self.opman.checkpoint, last_ts)
-        with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[self.opman.replset_name],
-                             last_ts)
+        self.assertEqual(self.opman.read_last_checkpoint(), last_ts)
 
         # No last checkpoint, no collection dump, something in oplog
+        self.opman.checkpoint = None
         self.opman.oplog_progress = LockingDict()
         self.opman.collection_dump = False
         collection.insert_one({"i": 2})
@@ -257,32 +288,22 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(last_doc['o']['i'], 2)
         self.assertEqual(self.opman.checkpoint, last_ts)
 
-        # Last checkpoint exists
-        progress = LockingDict()
-        self.opman.oplog_progress = progress
-        for i in range(1000):
-            collection.insert_one({"i": i + 500})
+        # Last checkpoint exists, no collection dump, something in oplog
+        collection.insert_many([{"i": i + 500} for i in range(1000)])
         entry = list(
             self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
-        progress.get_dict()[self.opman.replset_name] = entry[0]["ts"]
-        self.opman.oplog_progress = progress
-        self.opman.checkpoint = None
+        self.opman.update_checkpoint(entry[0]["ts"])
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
         self.assertEqual(self.opman.checkpoint, entry[0]["ts"])
-        with self.opman.oplog_progress as prog:
-            self.assertEqual(prog.get_dict()[self.opman.replset_name],
-                             entry[0]["ts"])
+        self.assertEqual(self.opman.read_last_checkpoint(), entry[0]["ts"])
 
         # Last checkpoint is behind
-        progress = LockingDict()
-        progress.get_dict()[self.opman.replset_name] = bson.Timestamp(1, 0)
-        self.opman.oplog_progress = progress
-        self.opman.checkpoint = None
+        self.opman.update_checkpoint(bson.Timestamp(1, 0))
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertTrue(cursor_empty)
         self.assertEqual(cursor, None)
-        self.assertIsNotNone(self.opman.checkpoint)
+        self.assertEqual(self.opman.checkpoint, bson.Timestamp(1, 0))
 
     def test_namespace_mapping(self):
         """Test mapping of namespaces
@@ -404,8 +425,7 @@ class TestOplogManager(unittest.TestCase):
         oplog_progress.dict = progress
         self.opman.oplog_progress = oplog_progress
         # Cause the oplog managers to update their checkpoints.
-        self.opman.checkpoint = first_oplog_ts
-        self.opman.update_checkpoint()
+        self.opman.update_checkpoint(first_oplog_ts)
         # New format should be in place now.
         new_format = {self.opman.replset_name: first_oplog_ts}
         self.assertEqual(
