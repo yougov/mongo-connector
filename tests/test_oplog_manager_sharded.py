@@ -347,7 +347,7 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.assertFalse(cursor_empty)
         self.assertEqual(self.opman1.checkpoint, last_ts1)
         self.assertEqual(self.opman1.read_last_checkpoint(), last_ts1)
-        self.assertEqual(cursor[0], self.opman1.get_oplog_cursor()[0])
+        self.assertEqual(next(cursor), next(self.opman1.get_oplog_cursor()))
         cursor, cursor_empty = self.opman2.init_cursor()
         self.assertFalse(cursor_empty)
         self.assertEqual(self.opman2.checkpoint, last_ts2)
