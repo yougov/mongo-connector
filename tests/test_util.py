@@ -17,6 +17,7 @@
 import sys
 
 from bson import timestamp
+from pymongo import errors
 
 sys.path[0:0] = [""]
 
@@ -33,8 +34,10 @@ def err_func():
     err_func.counter += 1
     if err_func.counter == 3:
         return True
-    else:
+    elif err_func.counter == 2:
         raise TypeError
+    else:
+        raise errors.ConnectionFailure
 
 err_func.counter = 0
 
@@ -60,6 +63,12 @@ class TestUtil(unittest.TestCase):
 
         self.assertTrue(retry_until_ok(err_func))
         self.assertEqual(err_func.counter, 3)
+
+        # RuntimeError should not be caught
+        def raise_runtime_error():
+            raise RuntimeError
+        with self.assertRaises(RuntimeError):
+            retry_until_ok(raise_runtime_error)
 
 
 if __name__ == '__main__':

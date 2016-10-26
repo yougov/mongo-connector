@@ -999,7 +999,7 @@ class OplogThread(threading.Thread):
         target_ts = util.long_to_bson_ts(last_inserted_doc['_ts'])
         last_oplog_entry = util.retry_until_ok(
             self.oplog.find_one,
-            {'ts': {'$lte': target_ts}},
+            {'ts': {'$lte': target_ts}, 'op': {'$ne': 'n'}},
             sort=[('$natural', pymongo.DESCENDING)]
         )
 
