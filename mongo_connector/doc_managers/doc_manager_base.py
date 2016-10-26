@@ -67,8 +67,8 @@ class DocManagerBase(object):
                     if '.' in to_set:
                         path = to_set.split(".")
                         where = _retrieve_path(doc, path[:-1], create=True)
-                        wl = len(where)
                         index = _convert_or_raise(where, path[-1])
+                        wl = len(where)
                         if isinstance(where, list) and index >= wl:
                             where.extend([None] * (index + 1 - wl))
                         where[index] = value
