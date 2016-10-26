@@ -336,8 +336,8 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
-                for shard_doc in retry_until_ok(
-                        lambda: list(self.main_conn.config.shards.find())):
+                for shard_doc in retry_until_ok(self.main_conn.admin.command,
+                                                'listShards')['shards']:
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
