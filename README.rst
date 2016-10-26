@@ -1,3 +1,11 @@
+===============
+mongo-connector
+===============
+
+.. image:: https://travis-ci.org/mongodb-labs/mongo-connector.svg?branch=master
+   :alt: View build status
+   :target: https://travis-ci.org/mongodb-labs/mongo-connector
+
 For complete documentation, check out the `Mongo Connector Wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
 
 System Overview
