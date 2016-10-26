@@ -20,6 +20,7 @@ import sys
 import time
 
 from bson.timestamp import Timestamp
+
 from mongo_connector.compat import reraise
 
 LOG = logging.getLogger(__name__)
@@ -75,6 +76,9 @@ def retry_until_ok(func, *args, **kwargs):
     while True:
         try:
             return func(*args, **kwargs)
+        except RuntimeError:
+            # Avoid masking RuntimeErrors
+            raise
         except Exception:
             count += 1
             if count > 120:
