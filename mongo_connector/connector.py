@@ -31,7 +31,7 @@ from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
-from mongo_connector.util import log_fatal_exceptions
+from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.dest_mapping import DestMapping
 
 from pymongo import MongoClient
@@ -58,6 +58,9 @@ class Connector(threading.Thread):
 
         # main address - either mongos for sharded setups or a primary otherwise
         self.address = mongo_address
+
+        # connection to the main address
+        self.main_conn = None
 
         # List of DocManager instances
         if doc_managers:
@@ -270,25 +273,31 @@ class Connector(threading.Thread):
                     (name, util.long_to_bson_ts(timestamp))
                     for name, timestamp in data)
 
+    def create_authed_client(self, address=None, **kwargs):
+        kwargs.update(self.ssl_kwargs)
+        if address is None:
+            address = self.address
+        client = MongoClient(address, tz_aware=self.tz_aware, **kwargs)
+        if self.auth_key is not None:
+            client['admin'].authenticate(self.auth_username, self.auth_key)
+        return client
+
     @log_fatal_exceptions
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
-        main_conn = MongoClient(
-            self.address, tz_aware=self.tz_aware, **self.ssl_kwargs)
-        if self.auth_key is not None:
-            main_conn['admin'].authenticate(self.auth_username, self.auth_key)
+        self.main_conn = self.create_authed_client()
         self.read_oplog_progress()
         conn_type = None
 
         try:
-            main_conn.admin.command("isdbgrid")
+            self.main_conn.admin.command("isdbgrid")
         except pymongo.errors.OperationFailure:
             conn_type = "REPLSET"
 
         if conn_type == "REPLSET":
             # Make sure we are connected to a replica set
-            is_master = main_conn.admin.command("isMaster")
+            is_master = self.main_conn.admin.command("isMaster")
             if "setName" not in is_master:
                 LOG.error(
                     'No replica set at "%s"! A replica set is required '
@@ -297,20 +306,17 @@ class Connector(threading.Thread):
                 return
 
             # Establish a connection to the replica set as a whole
-            main_conn.close()
-            main_conn = MongoClient(
-                self.address, replicaSet=is_master['setName'],
-                tz_aware=self.tz_aware, **self.ssl_kwargs)
-            if self.auth_key is not None:
-                main_conn.admin.authenticate(self.auth_username, self.auth_key)
+            self.main_conn.close()
+            self.main_conn = self.create_authed_client(
+                replicaSet=is_master['setName'])
 
             # non sharded configuration
             oplog = OplogThread(
-                main_conn, self.doc_managers, self.oplog_progress,
+                self.main_conn, self.doc_managers, self.oplog_progress,
                 self.dest_mapping, **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
-                     main_conn)
+                     self.main_conn)
             oplog.start()
 
             while self.can_run:
@@ -330,7 +336,8 @@ class Connector(threading.Thread):
         else:       # sharded cluster
             while self.can_run is True:
 
-                for shard_doc in main_conn['config']['shards'].find():
+                for shard_doc in retry_until_ok(self.main_conn.admin.command,
+                                                'listShards')['shards']:
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
@@ -357,11 +364,8 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = MongoClient(
-                        hosts, replicaSet=repl_set, tz_aware=self.tz_aware,
-                        **self.ssl_kwargs)
-                    if self.auth_key is not None:
-                        shard_conn['admin'].authenticate(self.auth_username, self.auth_key)
+                    shard_conn = self.create_authed_client(
+                        hosts, replicaSet=repl_set)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.dest_mapping, **self.kwargs)

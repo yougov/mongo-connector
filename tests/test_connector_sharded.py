@@ -14,6 +14,7 @@
 
 import os
 import sys
+import time
 
 sys.path[0:0] = [""]
 
@@ -29,34 +30,63 @@ from tests import unittest, SkipTest
 class TestConnectorSharded(unittest.TestCase):
 
     def setUp(self):
-        if not (db_user and db_password):
-            raise SkipTest('Need to set a user/password to test this.')
+        if db_user and db_password:
+            auth_args = dict(auth_username=db_user, auth_key=db_password)
+        else:
+            auth_args = {}
         self.cluster = ShardedClusterSingle().start()
+        self.dm = DocManager()
+        self.connector = Connector(
+            mongo_address=self.cluster.uri,
+            doc_managers=[self.dm],
+            **auth_args
+        )
+        self.connector.start()
 
     def tearDown(self):
+        self.connector.join()
         try:
             os.unlink('oplog.timestamp')
         except OSError:
             pass
         self.cluster.stop()
 
-    def test_start_with_auth(self):
-        dm = DocManager()
-        connector = Connector(
-            mongo_address=self.cluster.uri,
-            doc_managers=[dm],
-            auth_username=db_user,
-            auth_key=db_password
-        )
-        connector.start()
 
+class TestConnectorShardedMongosFailure(TestConnectorSharded):
+
+    def test_mongos_connection_failure(self):
+        """Test that the connector handles temporary mongos failure"""
+        client = self.cluster.client()
+        coll = client.test.test
+        coll.insert_one({'doc': 1})
+        assert_soon(lambda: len(self.dm._search()) == 1)
+
+        # Temporarily shutdown the connector mongos connection
+        self.connector.main_conn.close()
+        time.sleep(5)
+        coll.insert_one({'doc': 2})
+        assert_soon(lambda: len(self.dm._search()) == 2)
+
+        # Bring mongos back online
+        self.connector.main_conn = self.connector.create_authed_client()
+        coll.insert_one({'doc': 3})
+        assert_soon(lambda: len(self.dm._search()) == 3)
+        client.close()
+
+
+class TestConnectorShardedAuth(TestConnectorSharded):
+
+    def setUp(self):
+        if not (db_user and db_password):
+            raise SkipTest('Need to set a user/password to test this.')
+        super(TestConnectorShardedAuth, self).setUp()
+
+    def test_start_with_auth(self):
         # Insert some documents into the sharded cluster.  These
         # should go to the DocManager, and the connector should not
         # have an auth failure.
         self.cluster.client().test.test.insert_one({'auth_failure': False})
-        assert_soon(lambda: len(dm._search()) > 0)
-
-        connector.join()
+        assert_soon(lambda: len(self.dm._search()) > 0)
 
 
 if __name__ == '__main__':
