@@ -23,7 +23,7 @@ implementation with real systems.
 
 from threading import RLock
 
-from mongo_connector import constants
+from mongo_connector import constants, version_info, __version__
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.compat import u
@@ -79,6 +79,13 @@ class DocManager(DocManagerBase):
     The reason for storing id/doc pairs as opposed to doc's is so that multiple
     updates to the same doc reflect the most up to date version as opposed to
     multiple, slightly different versions of a doc.
+    """
+
+    version_info = version_info
+    version = __version__
+    """The Doc Manager Simulator version
+
+    This is packaged with MongoConnector so it shares the same version number.
     """
 
     def __init__(self, url=None, unique_key='_id',

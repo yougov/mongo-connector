@@ -18,6 +18,7 @@ import json
 import logging
 import logging.handlers
 import os
+import platform
 import pymongo
 import re
 import shutil
@@ -25,7 +26,8 @@ import ssl
 import sys
 import threading
 import time
-from mongo_connector import config, constants, errors, util
+
+from mongo_connector import config, constants, errors, util, version
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
@@ -68,17 +70,6 @@ class Connector(threading.Thread):
         else:
             LOG.warning('No doc managers specified, using simulator.')
             self.doc_managers = (simulator.DocManager(),)
-
-        if not pymongo.has_c():
-            warning = ('pymongo version %s was installed without the C '
-                       'extensions. "InvalidBSON: Date value out of '
-                       'range" errors may occur if there are documents '
-                       'with BSON Datetimes that represent times outside of '
-                       'Python\'s datetime.datetime limit.') % (
-                pymongo.__version__,)
-            # Print and warn to make it extra noticeable
-            print(warning)
-            LOG.warning(warning)
 
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
@@ -287,6 +278,15 @@ class Connector(threading.Thread):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         self.main_conn = self.create_authed_client()
+        LOG.always('Source MongoDB version: %s',
+                   self.main_conn.admin.command('buildInfo')['version'])
+        for dm in self.doc_managers:
+            dm_version = 'unknown'
+            if hasattr(dm, 'version'):
+                dm_version = dm.version
+            LOG.always('Target DocManager: %s version: %s',
+                       dm.__class__.__module__, dm_version)
+
         self.read_oplog_progress()
         conn_type = None
 
@@ -470,9 +470,10 @@ def get_config_options():
             raise errors.InvalidConfiguration(
                 "verbosity must be in the range [0, 3].")
 
+    # Default is warnings and above.
     verbosity = add_option(
         config_key="verbosity",
-        default=0,
+        default=1,
         type=int,
         apply_function=apply_verbosity)
 
@@ -1103,7 +1104,7 @@ def setup_logging(conf):
             interval=conf['logging.rotationInterval'],
             backupCount=conf['logging.rotationBackups']
         )
-        print("Logging to %s." % conf['logging.filename'])
+        print("Logging to %s." % os.path.abspath(conf['logging.filename']))
     elif conf['logging.type'] == 'syslog':
         syslog_info = conf['logging.host']
         if ':' in syslog_info:
@@ -1127,6 +1128,24 @@ def setup_logging(conf):
     return root_logger
 
 
+def log_startup_info():
+    """Log info about the current environment."""
+    LOG.always('mongo-connector version: %s', version)
+    LOG.always('Python version: %s', sys.version)
+    LOG.always('Platform: %s', platform.platform())
+    LOG.always('pymongo version: %s', pymongo.__version__)
+    if 'dev' in version:
+        LOG.warning(
+            'This is a development version (%s) of mongo-connector', version)
+
+    if not pymongo.has_c():
+        LOG.warning(
+            'pymongo version %s was installed without the C extensions. '
+            '"InvalidBSON: Date value out of range" errors may occur if '
+            'there are documents with BSON Datetimes that represent times '
+            'outside of Python\'s datetime limit.', pymongo.__version__)
+
+
 @log_fatal_exceptions
 def main():
     """ Starts the mongo connector (assuming CLI)
@@ -1135,7 +1154,7 @@ def main():
     conf.parse_args()
 
     setup_logging(conf)
-    LOG.info('Beginning Mongo Connector')
+    log_startup_info()
 
     connector = Connector.from_config(conf)
     connector.start()

@@ -11,5 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
+
 from pkgutil import extend_path
 __path__ = extend_path(__path__, __name__)
+
+version_info = (2, 5, 0, 'dev0')
+version = '.'.join(str(v) for v in version_info)
+__version__ = version
+
+
+# Monkey patch logging to add Logger.always
+ALWAYS = 100
+
+logging.addLevelName(ALWAYS, 'ALWAYS')
+
+def always(self, message, *args, **kwargs):
+    self._log(ALWAYS, message, args, **kwargs)
+
+logging.Logger.always = always

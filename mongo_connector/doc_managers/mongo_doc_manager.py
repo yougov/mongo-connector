@@ -27,7 +27,7 @@ import pymongo
 from bson import SON
 from gridfs import GridFS
 
-from mongo_connector import errors, constants
+from mongo_connector import errors, constants, version_info, __version__
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
@@ -49,6 +49,13 @@ class DocManager(DocManagerBase):
         We are using MongoDB native fields for _id and ns, but we also store
         them as fields in the document, due to compatibility issues.
         """
+
+    version_info = version_info
+    version = __version__
+    """The MongoDB Doc Manager version
+
+    This is packaged with MongoConnector so it shares the same version number.
+    """
 
     def __init__(self, url, **kwargs):
         """ Verify URL and establish a connection.
