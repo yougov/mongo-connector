@@ -608,9 +608,8 @@ class OplogThread(threading.Thread):
             query['ts'] = {'$gte': timestamp}
             cursor = self.oplog.find(
                 query,
-                cursor_type=CursorType.TAILABLE_AWAIT)
-            # Applying 8 as the mask to the cursor enables OplogReplay
-            cursor.add_option(8)
+                cursor_type=CursorType.TAILABLE_AWAIT,
+                oplog_replay=True)
         return cursor
 
     def get_collection(self, namespace):
