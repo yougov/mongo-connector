@@ -86,9 +86,14 @@ class MCTestObject(object):
         config = _post_request_template.copy()
         config.update(self.get_config())
         ret = requests.post(
-            _mo_url(self._resource), timeout=None, json=config).json()
+            _mo_url(self._resource), timeout=None, json=config)
+        if not ret.ok:
+            raise RuntimeError(
+                "Error sending POST to cluster: %s" % (ret.text,))
+
+        ret = ret.json()
         if type(ret) == list:  # Will return a list if an error occurred.
-            raise RuntimeError("Error sending POST to cluster: %s" % (ret))
+            raise RuntimeError("Error sending POST to cluster: %s" % (ret,))
         return ret
 
     def client(self, **kwargs):

@@ -157,10 +157,9 @@ class TestOplogManager(unittest.TestCase):
         # Insert a document into a ns_set collection
         conn["test"]["test"].insert_one({"test": 1})
         # Cause the oplog to rollover on a non-ns_set collection
-        conn["test"]["ignored"].insert_many(
-            [{"test": "1" * 1024} for _ in range(1024)])
-        self.assertIsNone(
-            conn["local"]["oplog.rs"].find_one({"ns": "test.test"}))
+        while conn["local"]["oplog.rs"].find_one({"ns": "test.test"}):
+            conn["test"]["ignored"].insert_many(
+                [{"test": "1" * 1024} for _ in range(1024)])
         last_ts = opman.get_last_oplog_timestamp()
         self.assertEqual(last_ts, opman.dump_collection())
         self.assertEqual(len(opman.doc_managers[0]._search()), 1)

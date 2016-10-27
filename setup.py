@@ -43,7 +43,7 @@ except ImportError:
     from setuptools import setup
 
 extra_opts = {"test_suite": "tests",
-              "tests_require": ["mongo-orchestration>= 0.2, < 0.4",
+              "tests_require": ["mongo-orchestration>=0.6.7,<1.0",
                                 "requests>=2.5.1"]}
 
 if sys.version_info[:2] == (2, 6):

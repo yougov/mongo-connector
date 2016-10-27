@@ -1,17 +1,32 @@
+sudo: false
 language: python
 python:
   - 2.6
   - 2.7
   - 3.3
-  - 3.4
   - 3.5
 
+env:
+  global:
+    - MO_ADDRESS=127.0.0.1:20000
+  matrix:
+    - MONGODB=2.6.12
+    - MONGODB=3.0.12
+    - MONGODB=3.2.10
+    - MONGODB=3.4.0-rc1
+
+matrix:
+  fast_finish: true
+
 install:
-  - pip install pymongo==2.9
-  - pip install mongo-orchestration==0.3.1
+  - pip install "mongo-orchestration>=0.6.7,<1.0"
+  - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-${MONGODB}.tgz
+  - tar zxf mongodb-linux-x86_64-${MONGODB}.tgz
+  - export PATH=${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/:${PATH}
+  - mongod --version
 
 before_script:
-  - mongo-orchestration start
+  - mongo-orchestration start -p 20000 -b 127.0.0.1
 
 script:
   - python setup.py test
