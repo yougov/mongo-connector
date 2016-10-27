@@ -882,9 +882,10 @@ class OplogThread(threading.Thread):
                     return None, True
             else:
                 # Collection dump disabled:
-                # return cursor to beginning of oplog.
+                # Return cursor to beginning of oplog but do not set the
+                # checkpoint. The checkpoint will be set after an operation
+                # has been applied.
                 cursor = self.get_oplog_cursor()
-                self.update_checkpoint(self.get_last_oplog_timestamp())
                 return cursor, self._cursor_empty(cursor)
 
         cursor = self.get_oplog_cursor(timestamp)

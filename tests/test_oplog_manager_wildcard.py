@@ -286,17 +286,16 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(self.opman.read_last_checkpoint(), last_ts)
 
         # No last checkpoint, no collection dump, something in oplog
+        # If collection dump is false the checkpoint should not be set
         self.opman.checkpoint = None
         self.opman.oplog_progress = LockingDict()
         self.opman.collection_dump = False
         collection.insert_one({"idb1col1": 2})
-        last_ts = self.opman.get_last_oplog_timestamp()
         cursor, cursor_empty = self.opman.init_cursor()
         for doc in cursor:
             last_doc = doc
         self.assertEqual(last_doc['o']['idb1col1'], 2)
-        self.assertEqual(self.opman.checkpoint, last_ts)
-        self.assertEqual(self.opman.read_last_checkpoint(), last_ts)
+        self.assertIsNone(self.opman.checkpoint)
 
         # Last checkpoint exists
         collection.insert_many([{"idb1col1": i + 500} for i in range(1000)])

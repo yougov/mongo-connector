@@ -337,22 +337,19 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.assertEqual(self.opman2.checkpoint, oplog_startup_ts)
 
         # No last checkpoint, no collection dump, stuff in oplog
+        # If collection dump is false the checkpoint should not be set
         progress = LockingDict()
         self.opman1.oplog_progress = self.opman2.oplog_progress = progress
         self.opman1.collection_dump = self.opman2.collection_dump = False
         self.opman1.checkpoint = self.opman2.checkpoint = None
         collection.insert_one({"i": 1200})
-        last_ts2 = self.opman2.get_last_oplog_timestamp()
         cursor, cursor_empty = self.opman1.init_cursor()
         self.assertFalse(cursor_empty)
-        self.assertEqual(self.opman1.checkpoint, last_ts1)
-        self.assertEqual(self.opman1.read_last_checkpoint(), last_ts1)
+        self.assertIsNone(self.opman1.checkpoint)
         self.assertEqual(next(cursor), next(self.opman1.get_oplog_cursor()))
         cursor, cursor_empty = self.opman2.init_cursor()
         self.assertFalse(cursor_empty)
-        self.assertEqual(self.opman2.checkpoint, last_ts2)
-        self.assertEqual(self.opman2.read_last_checkpoint(), last_ts2)
-        self.assertFalse(cursor_empty)
+        self.assertIsNone(self.opman2.checkpoint)
         for doc in cursor:
             last_doc = doc
         self.assertEqual(last_doc["o"]["i"], 1200)
