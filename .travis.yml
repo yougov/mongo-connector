@@ -1,22 +1,21 @@
 sudo: false
 language: python
-python:
-  - 2.6
-  - 2.7
-  - 3.3
-  - 3.5
 
 env:
   global:
     - MO_ADDRESS=127.0.0.1:20000
-  matrix:
-    - MONGODB=2.6.12
-    - MONGODB=3.0.12
-    - MONGODB=3.2.10
-    - MONGODB=3.4.0-rc1
 
 matrix:
   fast_finish: true
+  include:
+    - python: 2.6
+      env: MONGODB=3.4.0-rc1
+    - python: 2.7
+      env: MONGODB=3.2.10
+    - python: 3.3
+      env: MONGODB=3.0.12
+    - python: 3.5
+      env: MONGODB=2.6.12
 
 install:
   - pip install "mongo-orchestration>=0.6.7,<1.0"
