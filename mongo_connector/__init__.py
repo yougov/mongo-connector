@@ -17,17 +17,18 @@ import logging
 from pkgutil import extend_path
 __path__ = extend_path(__path__, __name__)
 
+
 version_info = (2, 5, 0, 'dev0')
-version = '.'.join(str(v) for v in version_info)
-__version__ = version
+__version__ = '.'.join(str(v) for v in version_info)
 
 
 # Monkey patch logging to add Logger.always
-ALWAYS = 100
+ALWAYS = logging.CRITICAL + 10
 
 logging.addLevelName(ALWAYS, 'ALWAYS')
 
+
 def always(self, message, *args, **kwargs):
-    self._log(ALWAYS, message, args, **kwargs)
+    self.log(ALWAYS, message, *args, **kwargs)
 
 logging.Logger.always = always

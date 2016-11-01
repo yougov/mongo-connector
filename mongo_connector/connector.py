@@ -27,7 +27,7 @@ import sys
 import threading
 import time
 
-from mongo_connector import config, constants, errors, util, version
+from mongo_connector import config, constants, errors, util, __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
@@ -157,7 +157,7 @@ class Connector(threading.Thread):
         connector = Connector(
             mongo_address=config['mainAddress'],
             doc_managers=config['docManagers'],
-            oplog_checkpoint=config['oplogFile'],
+            oplog_checkpoint=os.path.abspath(config['oplogFile']),
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
@@ -280,12 +280,16 @@ class Connector(threading.Thread):
         self.main_conn = self.create_authed_client()
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
+
         for dm in self.doc_managers:
-            dm_version = 'unknown'
-            if hasattr(dm, 'version'):
-                dm_version = dm.version
-            LOG.always('Target DocManager: %s version: %s',
-                       dm.__class__.__module__, dm_version)
+            name = dm.__class__.__module__
+            module = sys.modules[name]
+            version = 'unknown'
+            if hasattr(module, '__version__'):
+                version = module.__version__
+            if hasattr(module, 'version'):
+                version = module.version
+            LOG.always('Target DocManager: %s version: %s', name, version)
 
         self.read_oplog_progress()
         conn_type = None
@@ -523,6 +527,9 @@ def get_config_options():
 
         if cli_values['stdout']:
             option.value['type'] = 'stream'
+
+        # Expand the full path to log file
+        option.value['filename'] = os.path.abspath(option.value['filename'])
 
     default_logging = {
         'type': 'file',
@@ -1104,7 +1111,7 @@ def setup_logging(conf):
             interval=conf['logging.rotationInterval'],
             backupCount=conf['logging.rotationBackups']
         )
-        print("Logging to %s." % os.path.abspath(conf['logging.filename']))
+        print("Logging to %s." % conf['logging.filename'])
     elif conf['logging.type'] == 'syslog':
         syslog_info = conf['logging.host']
         if ':' in syslog_info:
@@ -1130,13 +1137,13 @@ def setup_logging(conf):
 
 def log_startup_info():
     """Log info about the current environment."""
-    LOG.always('mongo-connector version: %s', version)
+    LOG.always('mongo-connector version: %s', __version__)
     LOG.always('Python version: %s', sys.version)
     LOG.always('Platform: %s', platform.platform())
     LOG.always('pymongo version: %s', pymongo.__version__)
-    if 'dev' in version:
-        LOG.warning(
-            'This is a development version (%s) of mongo-connector', version)
+    if 'dev' in __version__:
+        LOG.warning('This is a development version (%s) of mongo-connector',
+                    __version__)
 
     if not pymongo.has_c():
         LOG.warning(

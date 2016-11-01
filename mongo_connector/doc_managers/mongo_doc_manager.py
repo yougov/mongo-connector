@@ -37,6 +37,18 @@ wrap_exceptions = exception_wrapper({
 
 LOG = logging.getLogger(__name__)
 
+version_info = version_info
+__version__ = __version__
+"""MongoDB DocManager version information
+
+This is packaged with mongo-connector so it shares the same version.
+Downstream DocManager implementations should add their package __version__
+string and version_info tuple here, for example:
+
+version_info = tuple(0, 1, 0)
+__version__ = '.'.join(str(v) for v in version_info)
+"""
+
 
 class DocManager(DocManagerBase):
     """The DocManager class creates a connection to the backend engine and
@@ -49,13 +61,6 @@ class DocManager(DocManagerBase):
         We are using MongoDB native fields for _id and ns, but we also store
         them as fields in the document, due to compatibility issues.
         """
-
-    version_info = version_info
-    version = __version__
-    """The MongoDB Doc Manager version
-
-    This is packaged with MongoConnector so it shares the same version number.
-    """
 
     def __init__(self, url, **kwargs):
         """ Verify URL and establish a connection.
