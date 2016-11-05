@@ -1093,6 +1093,15 @@ def get_config_options():
 
 
 def setup_logging(conf):
+    # Monkey patch logging to add Logger.always
+    ALWAYS = logging.CRITICAL + 10
+    logging.addLevelName(ALWAYS, 'ALWAYS')
+
+    def always(self, message, *args, **kwargs):
+        self.log(ALWAYS, message, *args, **kwargs)
+
+    logging.Logger.always = always
+
     root_logger = logging.getLogger()
     formatter = logging.Formatter(conf['logging.format'])
 
@@ -1138,14 +1147,13 @@ def setup_logging(conf):
 
 def log_startup_info():
     """Log info about the current environment."""
-    LOG.always('mongo-connector version: %s', __version__)
-    LOG.always('Python version: %s', sys.version)
-    LOG.always('Platform: %s', platform.platform())
-    LOG.always('pymongo version: %s', pymongo.__version__)
+    LOG.always('Starting mongo-connector version: %s', __version__)
     if 'dev' in __version__:
         LOG.warning('This is a development version (%s) of mongo-connector',
                     __version__)
-
+    LOG.always('Python version: %s', sys.version)
+    LOG.always('Platform: %s', platform.platform())
+    LOG.always('pymongo version: %s', pymongo.__version__)
     if not pymongo.has_c():
         LOG.warning(
             'pymongo version %s was installed without the C extensions. '
