@@ -18,10 +18,6 @@ from pkgutil import extend_path
 __path__ = extend_path(__path__, __name__)
 
 
-version_info = (2, 5, 0, 'dev0')
-__version__ = '.'.join(str(v) for v in version_info)
-
-
 # Monkey patch logging to add Logger.always
 ALWAYS = logging.CRITICAL + 10
 

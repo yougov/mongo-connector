@@ -23,21 +23,19 @@ implementation with real systems.
 
 from threading import RLock
 
-from mongo_connector import constants, version_info, __version__
+from mongo_connector import constants
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.compat import u
 
-version_info = version_info
-__version__ = __version__
+__version__ = constants.__version__
 """DocManager Simulator version information
 
 This is packaged with mongo-connector so it shares the same version.
 Downstream DocManager implementations should add their package __version__
-string and version_info tuple here, for example:
+string here, for example:
 
-version_info = tuple(0, 1, 0)
-__version__ = '.'.join(str(v) for v in version_info)
+__version__ = '0.1.0'
 """
 
 

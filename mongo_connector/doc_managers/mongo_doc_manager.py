@@ -27,7 +27,7 @@ import pymongo
 from bson import SON
 from gridfs import GridFS
 
-from mongo_connector import errors, constants, version_info, __version__
+from mongo_connector import errors, constants
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
@@ -37,16 +37,14 @@ wrap_exceptions = exception_wrapper({
 
 LOG = logging.getLogger(__name__)
 
-version_info = version_info
-__version__ = __version__
+__version__ = constants.__version__
 """MongoDB DocManager version information
 
 This is packaged with mongo-connector so it shares the same version.
 Downstream DocManager implementations should add their package __version__
-string and version_info tuple here, for example:
+string here, for example:
 
-version_info = tuple(0, 1, 0)
-__version__ = '.'.join(str(v) for v in version_info)
+__version__ = '0.1.0'
 """
 
 

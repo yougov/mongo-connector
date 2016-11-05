@@ -27,7 +27,8 @@ import sys
 import threading
 import time
 
-from mongo_connector import config, constants, errors, util, __version__
+from mongo_connector import config, constants, errors, util
+from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.doc_managers import doc_manager_simulator as simulator
