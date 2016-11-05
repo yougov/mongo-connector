@@ -39,6 +39,17 @@ from mongo_connector.dest_mapping import DestMapping
 
 from pymongo import MongoClient
 
+
+# Monkey patch logging to add Logger.always
+ALWAYS = logging.CRITICAL + 10
+logging.addLevelName(ALWAYS, 'ALWAYS')
+
+
+def always(self, message, *args, **kwargs):
+    self.log(ALWAYS, message, *args, **kwargs)
+logging.Logger.always = always
+
+
 LOG = logging.getLogger(__name__)
 
 _SSL_POLICY_MAP = {
@@ -1093,15 +1104,6 @@ def get_config_options():
 
 
 def setup_logging(conf):
-    # Monkey patch logging to add Logger.always
-    ALWAYS = logging.CRITICAL + 10
-    logging.addLevelName(ALWAYS, 'ALWAYS')
-
-    def always(self, message, *args, **kwargs):
-        self.log(ALWAYS, message, *args, **kwargs)
-
-    logging.Logger.always = always
-
     root_logger = logging.getLogger()
     formatter = logging.Formatter(conf['logging.format'])
 
