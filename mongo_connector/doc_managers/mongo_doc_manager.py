@@ -37,6 +37,16 @@ wrap_exceptions = exception_wrapper({
 
 LOG = logging.getLogger(__name__)
 
+__version__ = constants.__version__
+"""MongoDB DocManager version information
+
+This is packaged with mongo-connector so it shares the same version.
+Downstream DocManager implementations should add their package __version__
+string here, for example:
+
+__version__ = '0.1.0'
+"""
+
 
 class DocManager(DocManagerBase):
     """The DocManager class creates a connection to the backend engine and

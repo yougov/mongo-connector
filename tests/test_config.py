@@ -154,7 +154,8 @@ class TestConfig(unittest.TestCase):
 
         self.load_options({'-w': 'logFile'})
         self.assertEqual(self.conf['logging.type'], 'file')
-        self.assertEqual(self.conf['logging.filename'], 'logFile')
+        self.assertEqual(self.conf['logging.filename'],
+                         os.path.abspath('logFile'))
 
         self.load_options({'-s': None,
                            '--syslog-host': 'testHost',

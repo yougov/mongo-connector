@@ -93,7 +93,8 @@ class Config(object):
         """
 
         # parse the command line options
-        parser = optparse.OptionParser(version='%prog v' + __version__)
+        parser = optparse.OptionParser(
+            version='%prog version: ' + __version__)
         for option in self.options:
             for args, kwargs in option.cli_options:
                 cli_option = parser.add_option(*args, **kwargs)

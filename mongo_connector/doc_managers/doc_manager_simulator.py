@@ -28,6 +28,16 @@ from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.compat import u
 
+__version__ = constants.__version__
+"""DocManager Simulator version information
+
+This is packaged with mongo-connector so it shares the same version.
+Downstream DocManager implementations should add their package __version__
+string here, for example:
+
+__version__ = '0.1.0'
+"""
+
 
 class DocumentStore(dict):
 
