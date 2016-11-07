@@ -299,7 +299,7 @@ class Connector(threading.Thread):
             version = 'unknown'
             if hasattr(module, '__version__'):
                 version = module.__version__
-            if hasattr(module, 'version'):
+            elif hasattr(module, 'version'):
                 version = module.version
             LOG.always('Target DocManager: %s version: %s', name, version)
 
