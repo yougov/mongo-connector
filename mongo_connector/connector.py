@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Discovers the mongo cluster and starts the connector.
+"""Discovers the MongoDB cluster and starts the connector.
 """
 
 import json
@@ -22,6 +22,7 @@ import platform
 import pymongo
 import re
 import shutil
+import signal
 import ssl
 import sys
 import threading
@@ -69,6 +70,9 @@ class Connector(threading.Thread):
 
         # can_run is set to false when we join the thread
         self.can_run = True
+
+        # The signal that caused the connector to stop or None
+        self.signal = None
 
         # main address - either mongos for sharded setups or a primary otherwise
         self.address = mongo_address
@@ -193,9 +197,9 @@ class Connector(threading.Thread):
         """ Joins thread, stops it from running
         """
         self.can_run = False
+        threading.Thread.join(self)
         for dm in self.doc_managers:
             dm.stop()
-        threading.Thread.join(self)
 
     def write_oplog_progress(self):
         """ Writes oplog progress to file provided by user
@@ -350,7 +354,7 @@ class Connector(threading.Thread):
                 time.sleep(1)
 
         else:       # sharded cluster
-            while self.can_run is True:
+            while self.can_run:
 
                 for shard_doc in retry_until_ok(self.main_conn.admin.command,
                                                 'listShards')['shards']:
@@ -391,6 +395,8 @@ class Connector(threading.Thread):
                     LOG.info("MongoConnector: %s %s" % (msg, shard_conn))
                     oplog.start()
 
+        if self.signal is not None:
+            LOG.info("recieved signal %s: shutting down...", self.signal)
         self.oplog_thread_join()
         self.write_oplog_progress()
 
@@ -1175,6 +1181,13 @@ def main():
     log_startup_info()
 
     connector = Connector.from_config(conf)
+
+    # register a SIGTERM handler to cleanup the connector gracefully
+    def sigterm_handler(signum, frame):
+        connector.signal = ('SIGTERM', signum)
+        connector.can_run = False
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
     connector.start()
 
     while True:
