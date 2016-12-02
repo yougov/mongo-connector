@@ -58,7 +58,9 @@ start()
 stop()
 {
     echo "stopping mongo-connector: "
-    killproc -p $pidfile
+    # Send SIGTERM and wait 60 seconds for mongo-connector to shutdown before
+    # sending the ominous SIGKILL.
+    killproc -p $pidfile -t 60
 
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
