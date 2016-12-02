@@ -592,24 +592,22 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(from_coll, source_namespace):
+        def docs_to_dump(from_coll):
             last_id = None
             attempts = 0
-            projection = self.dest_mapping_stru.projection(source_namespace,
-                                                           self._projection)
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 if last_id is None:
                     cursor = retry_until_ok(
                         from_coll.find,
-                        projection=projection,
+                        projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 else:
                     cursor = retry_until_ok(
                         from_coll.find,
                         {"_id": {"$gt": last_id}},
-                        projection=projection,
+                        projection=self._projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
                 try:
@@ -634,7 +632,7 @@ class OplogThread(threading.Thread):
                 mapped_ns = self.dest_mapping_stru.map_namespace(namespace)
                 total_docs = retry_until_ok(from_coll.count)
                 num = None
-                for num, doc in enumerate(docs_to_dump(from_coll, namespace)):
+                for num, doc in enumerate(docs_to_dump(from_coll)):
                     try:
                         dm.upsert(doc, mapped_ns, long_ts)
                     except Exception:
@@ -665,7 +663,7 @@ class OplogThread(threading.Thread):
                     LOG.info("Bulk upserting approximately %d docs from "
                              "collection '%s'",
                              total_docs, namespace)
-                    dm.bulk_upsert(docs_to_dump(from_coll, namespace),
+                    dm.bulk_upsert(docs_to_dump(from_coll),
                                    mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
@@ -687,7 +685,7 @@ class OplogThread(threading.Thread):
                     mongo_coll = self.get_collection(gridfs_ns)
                     from_coll = self.get_collection(gridfs_ns + '.files')
                     dest_ns = self.dest_mapping_stru.map_namespace(gridfs_ns)
-                    for doc in docs_to_dump(from_coll, gridfs_ns):
+                    for doc in docs_to_dump(from_coll):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
             except:
@@ -960,8 +958,7 @@ class OplogThread(threading.Thread):
                 to_update = util.retry_until_ok(
                     client[database][coll].find,
                     {'_id': {'$in': bson_obj_id_list}},
-                    projection=self.dest_mapping_stru.projection(
-                        original_namespace, self._projection)
+                    projection=self._projection
                 )
                 # Doc list are docs in target system, to_update are
                 # Docs in mongo

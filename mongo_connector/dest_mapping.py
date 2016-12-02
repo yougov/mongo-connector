@@ -248,26 +248,6 @@ class DestMapping(object):
         self.get(plain_src_db + '.$cmd')
         return list(self.plain_db.get(plain_src_db, set()))
 
-    def fields(self, plain_src_ns):
-        """Get the fields to include and exclude for a given namespace."""
-        mapped = self.get(plain_src_ns)
-        if mapped:
-            return mapped.include_fields, mapped.exclude_fields
-        else:
-            return None, None
-
-    def projection(self, plain_src_name, projection):
-        """For the given source namespace return the projected fields."""
-        include_fields, exclude_fields = self.fields(plain_src_name)
-        fields = include_fields or exclude_fields
-        include = 1 if include_fields else 0
-        if fields:
-            full_projection = dict((field, include) for field in fields)
-            if projection:
-                full_projection.update(projection)
-            return full_projection
-        return projection
-
 
 def match_replace_regex(regex, src_namespace, dest_namespace):
     """Return the new mapped namespace if the src_namespace matches the
