@@ -121,9 +121,10 @@ class Connector(threading.Thread):
         self.kwargs = kwargs
 
         # Replace the origin dest_mapping
-        self.dest_mapping = DestMapping(kwargs.get('ns_set', []),
-                                        kwargs.get('ex_ns_set', []),
-                                        kwargs.get('dest_mapping', {}))
+        self.dest_mapping = DestMapping(
+            kwargs.get('ns_set'), kwargs.get('ex_ns_set'),
+            kwargs.get('dest_mapping'), kwargs.get('fields'),
+            kwargs.get('exclude_fields'))
 
         # Initialize and set the command helper
         command_helper = CommandHelper(self.dest_mapping)
@@ -781,12 +782,20 @@ def get_config_options():
                 "Destination namespaces set should not"
                 " contain any duplicates.")
 
-        for key, value in dest_mapping.items():
-            if key.count("*") > 1 or value.count("*") > 1:
+        for source_name, value in dest_mapping.items():
+            # Mapping may be old style with only a target name, eg:
+            # "db.source": "db.dest",
+            # or new style which can support extra options per namespace:
+            # "db.source": {"rename": "db.dest", ...}
+            if isinstance(value, dict):
+                dest_name = value.get("rename", source_name)
+            else:
+                dest_name = value
+            if source_name.count("*") > 1 or dest_name.count("*") > 1:
                 raise errors.InvalidConfiguration(
                     "The namespace mapping source and destination "
                     "cannot contain more than one '*' character.")
-            if key.count("*") != value.count("*"):
+            if source_name.count("*") != dest_name.count("*"):
                 raise errors.InvalidConfiguration(
                     "The namespace mapping source and destination "
                     "must contain the same number of '*' characters.")

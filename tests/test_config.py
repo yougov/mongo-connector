@@ -520,10 +520,9 @@ class TestConnectorConfig(unittest.TestCase):
         self.assertEqual(mc.ssl_kwargs.get('ssl_cert_reqs'),
                          self.config['ssl.sslCertificatePolicy'])
         command_helper = mc.doc_managers[0].command_helper
-        self.assertEqual(command_helper.dest_mapping_stru.namespace_set,
-                         self.config['namespaces.include'])
-        self.assertEqual(command_helper.dest_mapping_stru.plain,
-                         self.config['namespaces.mapping'])
+        for name in self.config['namespaces.mapping']:
+            self.assertTrue(
+                command_helper.dest_mapping_stru.map_namespace(name))
 
         # Test Logger options.
         log_levels = [

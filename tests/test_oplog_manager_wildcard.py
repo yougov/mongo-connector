@@ -37,7 +37,7 @@ from tests import unittest
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
-        cluster
+    cluster
     """
 
     def setUp(self):
@@ -46,19 +46,9 @@ class TestOplogManager(unittest.TestCase):
         self.oplog_coll = self.primary_conn.local['oplog.rs']
 
     def reset_opman(self, include_ns=None, exclude_ns=None, dest_mapping=None):
-        if include_ns is None:
-            include_ns = []
-        if exclude_ns is None:
-            exclude_ns = []
-        if dest_mapping is None:
-            dest_mapping = {}
-
-        # include_ns must not exist together with exclude_ns
-        # dest_mapping must exist together with include_ns
-        # those checks have been tested in test_config.py so we skip that here.
-
-        self.dest_mapping_stru = DestMapping(include_ns, exclude_ns,
-                                             dest_mapping)
+        self.dest_mapping_stru = DestMapping(namespace_set=include_ns,
+                                             ex_namespace_set=exclude_ns,
+                                             user_mapping=dest_mapping)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -350,7 +340,7 @@ class TestOplogManager(unittest.TestCase):
 
             assert_soon(lambda: len(docman._search()) == 1)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.get(ns))
+                             dest_mapping_stru.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -368,7 +358,7 @@ class TestOplogManager(unittest.TestCase):
                     return False
             assert_soon(update_complete)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.get(ns))
+                             dest_mapping_stru.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -376,11 +366,11 @@ class TestOplogManager(unittest.TestCase):
             self.primary_conn[db][coll].delete_one({"_id": 1})
             assert_soon(lambda: len(docman._search()) == 0)
             bad = [d for d in docman._search()
-                   if d["ns"] == dest_mapping_stru.get(ns)]
+                   if d["ns"] == dest_mapping_stru.map_namespace(ns)]
             self.assertEqual(len(bad), 0)
 
             # cleanup
-            self.primary_conn[db][coll].delete_many({})
+            self.primary_conn[db][coll].drop()
             self.opman.doc_managers[0]._delete()
 
         # doc not in namespace set
