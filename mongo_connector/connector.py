@@ -197,7 +197,7 @@ class Connector(threading.Thread):
         """ Joins thread, stops it from running
         """
         self.can_run = False
-        threading.Thread.join(self)
+        super(Connector, self).join()
         for dm in self.doc_managers:
             dm.stop()
 
@@ -1182,23 +1182,22 @@ def main():
 
     connector = Connector.from_config(conf)
 
-    # register a SIGTERM handler to cleanup the connector gracefully
-    def sigterm_handler(signum, frame):
-        connector.signal = ('SIGTERM', signum)
-        connector.can_run = False
-    signal.signal(signal.SIGTERM, sigterm_handler)
+    # Catch SIGTERM and SIGINT to cleanup the connector gracefully
+    def signame_handler(signal_name):
+        def sig_handler(signum, frame):
+            # Save the signal so it can be printed later
+            connector.signal = (signal_name, signum)
+            connector.can_run = False
+        return sig_handler
+    signal.signal(signal.SIGTERM, signame_handler('SIGTERM'))
+    signal.signal(signal.SIGINT, signame_handler('SIGINT'))
 
     connector.start()
 
     while True:
-        try:
-            time.sleep(3)
-            if not connector.is_alive():
-                break
-        except KeyboardInterrupt:
-            LOG.info("Caught keyboard interrupt, exiting!")
-            connector.join()
+        if not connector.is_alive():
             break
+        time.sleep(3)
 
 if __name__ == '__main__':
     main()
