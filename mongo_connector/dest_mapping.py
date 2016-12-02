@@ -285,4 +285,6 @@ def namespace_to_regex(namespace):
         wildcard_group = '([^.]*)'
     else:
         wildcard_group = '(.*)'
-    return re.compile(r'\A' + namespace.replace('*', wildcard_group) + r'\Z')
+    return re.compile(r'\A' +
+                      re.escape(namespace).replace('\*', wildcard_group) +
+                      r'\Z')
