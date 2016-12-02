@@ -55,7 +55,8 @@ class TestDestMapping(unittest.TestCase):
             self.assertEqual(dest_mapping.unmap_namespace("db1.col1"),
                              "db1.col1")
             self.assertEqual(dest_mapping.get("db1.col1"),
-                             MappedNamespace("db1.col1"))
+                             MappedNamespace(dest_name="db1.col1",
+                                             source_name="db1.col1"))
             self.assertListEqual(dest_mapping.map_db("db1"), ["db1"])
             self.assertEqual(dest_mapping.map_namespace("db1.col1"),
                              "db1.col1")

@@ -24,14 +24,16 @@ from mongo_connector import errors
 LOG = logging.getLogger(__name__)
 
 
-_MappedNamespace = namedtuple('MappedNamespace',
-                              ['name', 'include_fields', 'exclude_fields'])
+_MappedNamespace = namedtuple(
+    'MappedNamespace',
+    ['dest_name', 'source_name', 'include_fields', 'exclude_fields'])
 
 
 class MappedNamespace(_MappedNamespace):
-    def __new__(cls, name=None, include_fields=None, exclude_fields=None):
+    def __new__(cls, dest_name=None, source_name=None, include_fields=None,
+                exclude_fields=None):
         return super(MappedNamespace, cls).__new__(
-            cls, name, include_fields, exclude_fields)
+            cls, dest_name, source_name, include_fields, exclude_fields)
 
 
 class RegexSet(MutableSet):
@@ -95,7 +97,7 @@ class DestMapping(object):
                  exclude_fields=None):
         # a dict containing plain mappings
         self.plain = {}
-        # a list of (RegexObject, original namespace, MappedNamespace) tuples
+        # a list of (RegexObject, MappedNamespace) tuples
         self.regex_map = []
         # a dict containing reverse plain mapping
         # because the mappings are not duplicated,
@@ -137,19 +139,21 @@ class DestMapping(object):
                 "namespace mapping for: '%s'" % (src_name,))
         if dest_name is None:
             dest_name = src_name
-        self.set(src_name, MappedNamespace(dest_name, include_fields,
-                                           exclude_fields))
+        self.set(MappedNamespace(dest_name=dest_name, source_name=src_name,
+                                 include_fields=include_fields,
+                                 exclude_fields=exclude_fields))
         # Add the namespace for commands on this database
         cmd_name = src_name.split('.', 1)[0] + '.$cmd'
         dest_cmd_name = dest_name.split('.', 1)[0] + '.$cmd'
-        self.set(cmd_name, MappedNamespace(dest_cmd_name))
+        self.set(MappedNamespace(dest_name=dest_cmd_name, source_name=cmd_name))
 
-    def set_plain(self, src_name, mapped_namespace):
+    def set_plain(self, mapped_namespace):
         """A utility function to set the corresponding plain variables"""
         # The lock is necessary to properly check that multiple namespaces
         # into a single namespace.
         with self.lock:
-            target_name = mapped_namespace.name
+            src_name = mapped_namespace.source_name
+            target_name = mapped_namespace.dest_name
             existing_src = self.reverse_plain.get(target_name)
             if existing_src and existing_src != src_name:
                 raise errors.InvalidConfiguration(
@@ -181,27 +185,29 @@ class DestMapping(object):
             # search in wildcard mappings
             # if matched, get a replaced mapped namespace
             # and add to the plain mappings
-            for regex, _, mapped in self.regex_map:
+            for regex, mapped in self.regex_map:
                 new_name = match_replace_regex(regex, plain_src_ns,
-                                               mapped.name)
+                                               mapped.dest_name)
                 if not new_name:
                     continue
-                new_mapped = MappedNamespace(new_name,
-                                             mapped.include_fields,
-                                             mapped.exclude_fields)
-                self.set_plain(plain_src_ns, new_mapped)
+                new_mapped = MappedNamespace(
+                    dest_name=new_name, source_name=plain_src_ns,
+                    include_fields=mapped.include_fields,
+                    exclude_fields=mapped.exclude_fields)
+                self.set_plain(new_mapped)
                 return new_mapped
 
         self.ex_namespace_set.add(plain_src_ns)
         return None
 
-    def set(self, src_name, mapped_namespace):
+    def set(self, mapped_namespace):
         """Add a new namespace mapping."""
+        src_name = mapped_namespace.source_name
         if "*" in src_name:
             self.regex_map.append((namespace_to_regex(src_name),
-                                   src_name, mapped_namespace))
+                                   mapped_namespace))
         else:
-            self.set_plain(src_name, mapped_namespace)
+            self.set_plain(mapped_namespace)
         self.namespace_set.add(src_name)
 
     def unmap_namespace(self, plain_mapped_ns):
@@ -216,9 +222,10 @@ class DestMapping(object):
         src_name = self.reverse_plain.get(plain_mapped_ns)
         if src_name:
             return src_name
-        for _, wildcard_ns, mapped in self.regex_map:
+        for _, mapped in self.regex_map:
             original_name = match_replace_regex(
-                namespace_to_regex(mapped.name), plain_mapped_ns, wildcard_ns)
+                namespace_to_regex(mapped.dest_name), plain_mapped_ns,
+                mapped.source_name)
             if original_name:
                 return original_name
         return None
@@ -229,7 +236,7 @@ class DestMapping(object):
         """
         mapped = self.get(plain_src_ns)
         if mapped:
-            return mapped.name
+            return mapped.dest_name
         else:
             return None
 
