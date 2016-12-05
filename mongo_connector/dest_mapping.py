@@ -17,6 +17,7 @@ import threading
 import re
 
 from collections import namedtuple, MutableSet
+from itertools import combinations
 
 from mongo_connector import errors
 
@@ -110,7 +111,7 @@ class DestMapping(object):
         self.include_fields = include_fields
         self.exclude_fields = exclude_fields
 
-        # the input namespace_set and ex_namespace_set could contain wildcard
+        # namespace_set and ex_namespace_set can contain wildcards
         self.namespace_set = set()
         self.ex_namespace_set = RegexSet.from_namespaces(
             ex_namespace_set or [])
@@ -123,11 +124,15 @@ class DestMapping(object):
         for ns in namespace_set:
             user_mapping.setdefault(ns, ns)
 
+        renames = {}
         for src_name, v in user_mapping.items():
             if isinstance(v, dict):
-                self._add_mapping(src_name, v.get('rename'))
+                target_name = v.get('rename')
             else:
-                self._add_mapping(src_name, v)
+                target_name = v
+            renames[src_name] = target_name
+            self._add_mapping(src_name, target_name)
+        validate_target_namespaces(renames)
 
     def _add_mapping(self, src_name, dest_name=None, include_fields=None,
                      exclude_fields=None):
@@ -231,7 +236,7 @@ class DestMapping(object):
         return None
 
     def map_namespace(self, plain_src_ns):
-        """Applies the plain source namespace mapping to a "db.collection" string.
+        """Applies the plain source namespace mapping to a "db.col" string.
         The input parameter ns is plain text.
         """
         mapped = self.get(plain_src_ns)
@@ -254,6 +259,55 @@ class DestMapping(object):
         # Lookup this namespace to seed the plain_db dictionary
         self.get(plain_src_db + '.$cmd')
         return list(self.plain_db.get(plain_src_db, set()))
+
+
+def _character_matches(name1, name2):
+    """Yield the number of characters that match the beginning of each string.
+    """
+    if name1[0] == '*':
+        for i in range(len(name2) + 1):
+            yield 1, i
+    if name2[0] == '*':
+        for i in range(len(name1) + 1):
+            yield i, 1
+    if name1[0] == name2[0]:
+        yield 1, 1
+
+
+def wildcards_overlap(name1, name2):
+    """Return true if two wildcard patterns can match the same string."""
+    if not name1 and not name2:
+        return True
+    if not name1 or not name2:
+        return False
+    for matched1, matched2 in _character_matches(name1, name2):
+        if wildcards_overlap(name1[matched1:], name2[matched2:]):
+            return True
+    return False
+
+
+def validate_target_namespaces(user_mapping):
+    """Validate that no target namespaces overlap exactly with each other.
+
+    Also warns when wildcard namespaces have a chance of overlapping.
+    """
+    for namespace1, namespace2 in combinations(user_mapping.keys(), 2):
+        if wildcards_overlap(namespace1, namespace2):
+            LOG.warn('Namespaces "%s" and "%s" may match the '
+                     'same source namespace.', namespace1, namespace2)
+        target1 = user_mapping[namespace1]
+        target2 = user_mapping[namespace2]
+        if target1 == target2:
+            raise errors.InvalidConfiguration(
+                "Multiple namespaces cannot be combined into one target "
+                "namespace. Trying to map '%s' to '%s' but '%s' already "
+                "corresponds to '%s' in the target system." %
+                (namespace2, target2, namespace1, target1))
+        if wildcards_overlap(target1, target2):
+            LOG.warn("Multiple namespaces cannot be combined into one target "
+                     "namespace. Mapping from '%s' to '%s' might overlap "
+                     "with mapping from '%s' to '%s'." %
+                     (namespace2, target2, namespace1, target1))
 
 
 def match_replace_regex(regex, src_namespace, dest_namespace):

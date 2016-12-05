@@ -17,7 +17,7 @@ import re
 from tests import unittest
 from mongo_connector.dest_mapping import (
     DestMapping, MappedNamespace, match_replace_regex, namespace_to_regex,
-    RegexSet)
+    RegexSet, wildcards_overlap)
 from mongo_connector import errors
 
 
@@ -126,13 +126,28 @@ class TestDestMapping(unittest.TestCase):
             DestMapping(user_mapping={
                 "db1.col1": "newdb.newcol",
                 "db2.col1": "newdb.newcol"})
+
         # Multiple collections cannot be merged into the same target namespace
         with self.assertRaises(errors.InvalidConfiguration):
-            dest_mapping = DestMapping(user_mapping={
+            DestMapping(user_mapping={
                 "db*.col1": "newdb.newcol*",
                 "db*.col2": "newdb.newcol*"})
-            dest_mapping.map_namespace("db1.col1")
-            dest_mapping.map_namespace("db1.col2")
+
+        # Multiple collections cannot be merged into the same target namespace
+        dest_mapping = DestMapping(user_mapping={
+            "d*.coll": "d*.coll",
+            "db1.c*l": "db.c*l"})
+        with self.assertRaises(errors.InvalidConfiguration):
+            dest_mapping.map_namespace("db.coll")
+            dest_mapping.map_namespace("db1.coll")
+
+        # Multiple collections cannot be merged into the same target namespace
+        dest_mapping = DestMapping(user_mapping={
+            "*.important_coll": "*.super_important_coll",
+            "important_db.*": "super_important_db.*"})
+        with self.assertRaises(errors.InvalidConfiguration):
+            dest_mapping.map_namespace("super_important_db.important_coll")
+            dest_mapping.map_namespace("important_db.super_important_coll")
 
     def test_match_replace_regex(self):
         """Test regex matching and replacing."""
@@ -157,6 +172,18 @@ class TestDestMapping(unittest.TestCase):
                          re.compile(r"\Adb\&([^.]*)\.\$a\^a\#a\!a\[a\]a\Z"))
         self.assertEqual(namespace_to_regex("db.$a^a#a!a[a]a*"),
                          re.compile(r"\Adb\.\$a\^a\#a\!a\[a\]a(.*)\Z"))
+
+    def test_wildcards_overlap(self):
+        """Test wildcard strings """
+        self.assertTrue(wildcards_overlap("foo.bar", "foo.bar"))
+        self.assertTrue(wildcards_overlap("f*.bar", "foo.bar"))
+        self.assertTrue(wildcards_overlap("*.bar", "foo.*"))
+        self.assertTrue(wildcards_overlap("f*.bar", "foo.b*"))
+        self.assertTrue(wildcards_overlap("a*b*c", "*c*"))
+        self.assertFalse(wildcards_overlap("foo.bar", "foo.bar2"))
+        self.assertFalse(wildcards_overlap("foo.*2", "foo.*1"))
+        self.assertFalse(wildcards_overlap("foo.*", "food.*"))
+        self.assertFalse(wildcards_overlap("a*b*c", "*c*d"))
 
 
 class TestRegexSet(unittest.TestCase):
