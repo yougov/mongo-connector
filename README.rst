@@ -25,7 +25,8 @@ Installation
 ~~~~~~~~~~~~
 
 The easiest way to install mongo-connector is with
-`pip <https://pypi.python.org/pypi/pip>`__::
+`pip <https://pypi.python.org/pypi/pip>`__ 
+(it does not include the mongo-connector script `#110 <https://github.com/10gen-labs/mongo-connector/issues/110>`__)::
 
   pip install mongo-connector
 
@@ -38,6 +39,7 @@ manually::
 
 You may have to run ``python setup.py install`` with ``sudo``, depending
 on where you're installing mongo-connector and what privileges you have.
+
 
 Using mongo-connector
 ~~~~~~~~~~~~~~~~~~~~~
