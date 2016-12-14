@@ -74,13 +74,11 @@ class TestRollbacks(unittest.TestCase):
         # Oplog thread
         doc_manager = DocManager()
         oplog_progress = LockingDict()
-        dest_mapping_stru = DestMapping(["test.mc"], [], {})
         self.opman = OplogThread(
             primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping_stru=dest_mapping_stru,
-            ns_set=["test.mc"]
+            dest_mapping_stru=DestMapping(namespace_set=["test.mc"]),
         )
 
     def test_single_target(self):

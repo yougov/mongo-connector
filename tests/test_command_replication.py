@@ -68,21 +68,17 @@ class TestCommandReplication(unittest.TestCase):
         close_client(self.primary_conn)
         self.repl_set.stop()
 
-    def initOplogThread(self, namespace_set=[], ex_namespace_set=[],
-                        dest_mapping={}):
+    def initOplogThread(self, namespace_set=None):
         self.docman = CommandLoggerDocManager()
         # Replace the origin dest_mapping
-        self.dest_mapping_stru = DestMapping(namespace_set, ex_namespace_set,
-                                             dest_mapping)
+        dest_mapping = DestMapping(namespace_set=namespace_set)
 
-        self.docman.command_helper = CommandHelper(self.dest_mapping_stru)
+        self.docman.command_helper = CommandHelper(dest_mapping)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(self.docman,),
             oplog_progress_dict=self.oplog_progress,
-            dest_mapping_stru=self.dest_mapping_stru,
-            ns_set=namespace_set,
-            ex_ns_set=ex_namespace_set,
+            dest_mapping_stru=dest_mapping,
             collection_dump=False
         )
         self.opman.start()
@@ -94,10 +90,8 @@ class TestCommandReplication(unittest.TestCase):
             'a.y': 'c.y'
         }
 
-        # Replace the origin dest_mapping
-        dest_mapping_stru = DestMapping(list(mapping) + ['a.z'], [], mapping)
-
-        helper = CommandHelper(dest_mapping_stru)
+        helper = CommandHelper(DestMapping(
+            namespace_set=list(mapping) + ['a.z'], user_mapping=mapping))
 
         self.assertEqual(set(helper.map_db('a')), set(['a', 'b', 'c']))
         self.assertEqual(helper.map_db('d'), [])

@@ -126,13 +126,13 @@ class ShardedClusterTestCase(unittest.TestCase):
         # Oplog threads (oplog manager) for each shard
         doc_manager = DocManager()
         oplog_progress = LockingDict()
-        dest_mapping_stru = DestMapping(["test.mcsharded", "test.mcunsharded"], [], {})
+        dest_mapping_stru = DestMapping(
+            namespace_set=["test.mcsharded", "test.mcunsharded"])
         self.opman1 = OplogThread(
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             dest_mapping_stru=dest_mapping_stru,
-            ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )
         self.opman2 = OplogThread(
@@ -140,7 +140,6 @@ class ShardedClusterTestCase(unittest.TestCase):
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             dest_mapping_stru=dest_mapping_stru,
-            ns_set=["test.mcsharded", "test.mcunsharded"],
             mongos_client=self.mongos_conn
         )
 

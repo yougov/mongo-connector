@@ -45,12 +45,11 @@ class TestOplogManager(unittest.TestCase):
         self.repl_set = ReplicaSetSingle().start()
         self.primary_conn = self.repl_set.client()
         self.oplog_coll = self.primary_conn.local['oplog.rs']
-        self.dest_mapping_stru = DestMapping([], [], {})
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            dest_mapping_stru=DestMapping(),
         )
 
     def tearDown(self):
@@ -146,17 +145,15 @@ class TestOplogManager(unittest.TestCase):
         # 1MB oplog so that we can rollover quickly
         repl_set = ReplicaSetSingle(oplogSize=1).start()
         conn = repl_set.client()
-        dest_mapping_stru = DestMapping(["test.test"], [], {})
         opman = OplogThread(
             primary_client=conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=dest_mapping_stru,
-            ns_set=set(["test.test"])
+            dest_mapping_stru=DestMapping(namespace_set=["test.test"]),
         )
-        # Insert a document into a ns_set collection
+        # Insert a document into an included collection
         conn["test"]["test"].insert_one({"test": 1})
-        # Cause the oplog to rollover on a non-ns_set collection
+        # Cause the oplog to rollover on a non-included collection
         while conn["local"]["oplog.rs"].find_one({"ns": "test.test"}):
             conn["test"]["ignored"].insert_many(
                 [{"test": "1" * 1024} for _ in range(1024)])
@@ -173,12 +170,11 @@ class TestOplogManager(unittest.TestCase):
             primary_client=conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=DestMapping(["test.test"], [], {}),
-            ns_set=set(["test.test"])
+            dest_mapping_stru=DestMapping(namespace_set=["test.test"]),
         )
         opman.start()
 
-        # Insert a document into a ns_set collection
+        # Insert a document into an included collection
         conn["test"]["test"].insert_one({"test": 1})
         last_ts = opman.get_last_oplog_timestamp()
         assert_soon(lambda: last_ts == opman.checkpoint,
@@ -317,10 +313,8 @@ class TestOplogManager(unittest.TestCase):
         phony_ns = ["test.phony1", "test.phony2"]
         dest_mapping = {"test.test1": "test.test1_dest",
                         "test.test2": "test.test2_dest"}
-        dest_mapping_stru = DestMapping(source_ns, [], dest_mapping)
-        self.opman.dest_mapping = dest_mapping
-        self.opman.dest_mapping_stru = dest_mapping_stru
-        self.opman.namespace_set = source_ns
+        self.opman.dest_mapping_stru = DestMapping(
+            namespace_set=source_ns, user_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
         # start replicating
         self.opman.start()
