@@ -91,29 +91,24 @@ class TestDestMapping(unittest.TestCase):
         dest_mapping = DestMapping(namespace_set=["db.*"])
         self.assertIsNone(dest_mapping.map_namespace("dbxcol"))
         self.assertEqual(dest_mapping.map_namespace("db.col"), "db.col")
-        self.assertEqual(dest_mapping.map_namespace("db.$cmd"), "db.$cmd")
 
     def test_include_wildcard_multiple_periods(self):
         """Test matching a namespace with multiple '.' characters."""
         dest_mapping = DestMapping(namespace_set=["db.col.*"])
         self.assertIsNone(dest_mapping.map_namespace("db.col"))
         self.assertEqual(dest_mapping.map_namespace("db.col."), "db.col.")
-        self.assertEqual(dest_mapping.map_namespace("db.$cmd"), "db.$cmd")
 
     def test_include_wildcard_no_period_in_database(self):
         """Test that a database wildcard cannot match a period."""
         dest_mapping = DestMapping(namespace_set=["db*.col"])
         self.assertIsNone(dest_mapping.map_namespace("db.bar.col"))
         self.assertEqual(dest_mapping.map_namespace("dbfoo.col"), "dbfoo.col")
-        self.assertEqual(dest_mapping.map_namespace("db2.$cmd"), "db2.$cmd")
 
     def test_include_wildcard_metacharacters(self):
         """Test namespaces with metacharacters are matched."""
         dest_mapping = DestMapping(namespace_set=["db&_*.$_^_#_!_[_]_"])
         self.assertEqual(dest_mapping.map_namespace("db&_foo.$_^_#_!_[_]_"),
                          "db&_foo.$_^_#_!_[_]_")
-        self.assertEqual(dest_mapping.map_namespace("db&_bar.$cmd"),
-                         "db&_bar.$cmd")
         self.assertIsNone(dest_mapping.map_namespace("db&.foo"))
 
     def test_exclude_plain(self):

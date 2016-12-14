@@ -235,6 +235,11 @@ class OplogThread(threading.Thread):
             else:
                 return True, False
 
+        # Commands should not be ignored, filtered, or renamed. Renaming is
+        # handled by the DocManagers via the CommandHelper class.
+        if coll == ".$cmd":
+            return False, False
+
         # Rename or filter out namespaces that are ignored keeping
         # included gridfs namespaces.
         new_ns = self.dest_mapping_stru.map_namespace(ns)
