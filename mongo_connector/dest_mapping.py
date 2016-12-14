@@ -96,16 +96,23 @@ class DestMapping(object):
     def __init__(self, namespace_set=None, ex_namespace_set=None,
                  user_mapping=None, include_fields=None,
                  exclude_fields=None):
-        # a dict containing plain mappings
+        # A mapping from non-wildcard source namespaces to a MappedNamespace
+        # containing the non-wildcard target name.
         self.plain = {}
-        # a list of (RegexObject, MappedNamespace) tuples
-        self.regex_map = []
-        # a dict containing reverse plain mapping
-        # because the mappings are not duplicated,
-        # so the values should also be unique
+        # A mapping from non-wildcard target namespaces to their
+        # corresponding non-wildcard source namespace. Namespaces have a
+        # one-to-one relationship with the target system, meaning multiple
+        # source namespaces cannot be merged into a single namespace in the
+        # target.
         self.reverse_plain = {}
-        # a dict containing plain db mappings, db -> a set of mapped db
+        # A mapping from non-wildcard source database names to the set of
+        # non-wildcard target database names.
         self.plain_db = {}
+        # A list of (re.RegexObject, MappedNamespace) tuples. regex_map maps
+        # wildcard source namespaces to a MappedNamespace containing the
+        # wildcard target name. When a namespace is matched, an entry is
+        # created in `self.plain` for faster subsequent lookups.
+        self.regex_map = []
 
         # Fields to include or exclude from all namespaces
         self.include_fields = include_fields
@@ -120,7 +127,10 @@ class DestMapping(object):
 
         user_mapping = user_mapping or {}
         namespace_set = namespace_set or []
-        # initialize
+        # Add each namespace from the namespace_set and user_mapping
+        # parameters. Namespaces have a one-to-one relationship with the
+        # target system, meaning multiple source namespaces cannot be merged
+        # into a single namespace in the target
         for ns in namespace_set:
             user_mapping.setdefault(ns, ns)
 
