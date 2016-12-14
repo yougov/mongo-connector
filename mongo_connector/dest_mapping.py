@@ -25,15 +25,12 @@ from mongo_connector import errors
 LOG = logging.getLogger(__name__)
 
 
-_MappedNamespace = namedtuple(
-    'MappedNamespace',
-    ['dest_name', 'source_name'])
+_Namespace = namedtuple('Namespace', ['dest_name', 'source_name'])
 
 
-class MappedNamespace(_MappedNamespace):
+class Namespace(_Namespace):
     def __new__(cls, dest_name=None, source_name=None):
-        return super(MappedNamespace, cls).__new__(
-            cls, dest_name, source_name)
+        return super(Namespace, cls).__new__(cls, dest_name, source_name)
 
 
 class RegexSet(MutableSet):
@@ -141,11 +138,11 @@ class DestMapping(object):
     def _add_mapping(self, src_name, dest_name=None):
         if dest_name is None:
             dest_name = src_name
-        self.set(MappedNamespace(dest_name=dest_name, source_name=src_name))
+        self.set(Namespace(dest_name=dest_name, source_name=src_name))
         # Add the namespace for commands on this database
         cmd_name = src_name.split('.', 1)[0] + '.$cmd'
         dest_cmd_name = dest_name.split('.', 1)[0] + '.$cmd'
-        self.set(MappedNamespace(dest_name=dest_cmd_name, source_name=cmd_name))
+        self.set(Namespace(dest_name=dest_cmd_name, source_name=cmd_name))
 
     def set_plain(self, mapped_namespace):
         """A utility function to set the corresponding plain variables"""
@@ -177,7 +174,7 @@ class DestMapping(object):
             return None
         if not self.regex_map and not self.plain:
             # here we include all namespaces
-            return MappedNamespace(plain_src_ns)
+            return Namespace(plain_src_ns)
         # search in plain mappings first
         try:
             return self.plain[plain_src_ns]
@@ -190,7 +187,7 @@ class DestMapping(object):
                                                mapped.dest_name)
                 if not new_name:
                     continue
-                new_mapped = MappedNamespace(
+                new_mapped = Namespace(
                     dest_name=new_name, source_name=plain_src_ns)
                 self.set_plain(new_mapped)
                 return new_mapped
