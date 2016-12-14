@@ -27,14 +27,13 @@ LOG = logging.getLogger(__name__)
 
 _MappedNamespace = namedtuple(
     'MappedNamespace',
-    ['dest_name', 'source_name', 'include_fields', 'exclude_fields'])
+    ['dest_name', 'source_name'])
 
 
 class MappedNamespace(_MappedNamespace):
-    def __new__(cls, dest_name=None, source_name=None, include_fields=None,
-                exclude_fields=None):
+    def __new__(cls, dest_name=None, source_name=None):
         return super(MappedNamespace, cls).__new__(
-            cls, dest_name, source_name, include_fields, exclude_fields)
+            cls, dest_name, source_name)
 
 
 class RegexSet(MutableSet):
@@ -94,8 +93,7 @@ class DestMapping(object):
     """Manages included and excluded namespaces.
     """
     def __init__(self, namespace_set=None, ex_namespace_set=None,
-                 user_mapping=None, include_fields=None,
-                 exclude_fields=None):
+                 user_mapping=None):
         # A mapping from non-wildcard source namespaces to a MappedNamespace
         # containing the non-wildcard target name.
         self.plain = {}
@@ -113,10 +111,6 @@ class DestMapping(object):
         # wildcard target name. When a namespace is matched, an entry is
         # created in `self.plain` for faster subsequent lookups.
         self.regex_map = []
-
-        # Fields to include or exclude from all namespaces
-        self.include_fields = include_fields
-        self.exclude_fields = exclude_fields
 
         # namespace_set and ex_namespace_set can contain wildcards
         self.namespace_set = set()
@@ -144,19 +138,10 @@ class DestMapping(object):
             self._add_mapping(src_name, target_name)
         validate_target_namespaces(renames)
 
-    def _add_mapping(self, src_name, dest_name=None, include_fields=None,
-                     exclude_fields=None):
-        if (self.include_fields and exclude_fields or
-                self.exclude_fields and include_fields or
-                include_fields and exclude_fields):
-            raise errors.InvalidConfiguration(
-                "Cannot mix include fields and exclude fields in "
-                "namespace mapping for: '%s'" % (src_name,))
+    def _add_mapping(self, src_name, dest_name=None):
         if dest_name is None:
             dest_name = src_name
-        self.set(MappedNamespace(dest_name=dest_name, source_name=src_name,
-                                 include_fields=include_fields,
-                                 exclude_fields=exclude_fields))
+        self.set(MappedNamespace(dest_name=dest_name, source_name=src_name))
         # Add the namespace for commands on this database
         cmd_name = src_name.split('.', 1)[0] + '.$cmd'
         dest_cmd_name = dest_name.split('.', 1)[0] + '.$cmd'
@@ -206,9 +191,7 @@ class DestMapping(object):
                 if not new_name:
                     continue
                 new_mapped = MappedNamespace(
-                    dest_name=new_name, source_name=plain_src_ns,
-                    include_fields=mapped.include_fields,
-                    exclude_fields=mapped.exclude_fields)
+                    dest_name=new_name, source_name=plain_src_ns)
                 self.set_plain(new_mapped)
                 return new_mapped
 
