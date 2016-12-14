@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import threading
 import re
 
 from collections import namedtuple, MutableSet
@@ -113,8 +112,6 @@ class DestMapping(object):
         self._ex_namespace_set = RegexSet.from_namespaces(
             ex_namespace_set or [])
 
-        self.lock = threading.Lock()
-
         user_mapping = user_mapping or {}
         namespace_set = namespace_set or []
         # Add each namespace from the namespace_set and user_mapping
@@ -156,25 +153,24 @@ class DestMapping(object):
             self._add_plain_namespace(mapped_namespace)
 
     def _add_plain_namespace(self, mapped_namespace):
-        """A utility function to set the corresponding plain variables"""
-        # The lock is necessary to properly check that multiple namespaces
-        # into a single namespace.
-        with self.lock:
-            src_name = mapped_namespace.source_name
-            target_name = mapped_namespace.dest_name
-            existing_src = self._reverse_plain.get(target_name)
-            if existing_src and existing_src != src_name:
-                raise errors.InvalidConfiguration(
-                    "Multiple namespaces cannot be combined into one target "
-                    "namespace. Trying to map '%s' to '%s' but there already "
-                    "exists a mapping from '%s' to '%s'" %
-                    (src_name, target_name, existing_src, target_name))
+        """Add an included and possibly renamed non-wildcard Namespace."""
+        src_name = mapped_namespace.source_name
+        target_name = mapped_namespace.dest_name
+        src_names = self._reverse_plain.setdefault(target_name, set())
+        src_names.add(src_name)
+        if len(src_names) > 1:
+            # Another source namespace is already mapped to this target
+            existing_src = (src_names - set([src_name])).pop()
+            raise errors.InvalidConfiguration(
+                "Multiple namespaces cannot be combined into one target "
+                "namespace. Trying to map '%s' to '%s' but there already "
+                "exists a mapping from '%s' to '%s'" %
+                (src_name, target_name, existing_src, target_name))
 
-            self._plain[src_name] = mapped_namespace
-            self._reverse_plain[target_name] = src_name
-            src_db, _ = src_name.split(".", 1)
-            target_db, _ = target_name.split(".", 1)
-            self._plain_db.setdefault(src_db, set()).add(target_db)
+        self._plain[src_name] = mapped_namespace
+        src_db, _ = src_name.split(".", 1)
+        target_db, _ = target_name.split(".", 1)
+        self._plain_db.setdefault(src_db, set()).add(target_db)
 
     def lookup(self, plain_src_ns):
         """Given a plain source namespace, return the corresponding Namespace
@@ -225,9 +221,11 @@ class DestMapping(object):
         if not self._regex_map and not self._plain:
             return plain_target_ns
 
-        src_name = self._reverse_plain.get(plain_target_ns)
-        if src_name:
-            return src_name
+        src_name_set = self._reverse_plain.get(plain_target_ns)
+        if src_name_set:
+            # Return the first (and only) item in the set
+            for src_name in src_name_set:
+                return src_name
         # The target namespace could also exist in the wildcard namespaces
         for _, mapped in self._regex_map:
             original_name = match_replace_regex(
