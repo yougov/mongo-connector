@@ -62,6 +62,30 @@ class TestDestMapping(unittest.TestCase):
                              "db1.col1")
             self.assertIsNone(dest_mapping.map_namespace("db2.col4"))
 
+    def test_map_db_wildcard(self):
+        """Test a crazy namespace renaming scheme with wildcards."""
+        dest_mapping = DestMapping(user_mapping={
+            "db.1_*": "db1.new_*",
+            "db.2_*": "db2.new_*",
+            "db.3": "new_db.3"})
+        self.assertEqual(set(dest_mapping.map_db("db")),
+                         set(["db1", "db2", "new_db"]))
+
+    def test_map_db_wildcard_invalid(self):
+        """Test mapping a database with wildcards."""
+        # This behavior demonstrates why it should be invalid to move a
+        # wildcard from the source collection name to the target database
+        # name. map_db() should always return all the corresponding database
+        # names. Otherwise, the dropDatabase command may not drop all the
+        # target databases.
+        dest_mapping = DestMapping(user_mapping={"db.*": "db_*.new"})
+        self.assertEqual(dest_mapping.map_db("db"), [])
+        self.assertEqual(dest_mapping.map_namespace("db.1"), "db_1.new")
+        self.assertEqual(dest_mapping.map_db("db"), ["db_1"])
+        self.assertEqual(dest_mapping.map_namespace("db.2"), "db_2.new")
+        self.assertEqual(set(dest_mapping.map_db("db")),
+                         set(["db_1", "db_2"]))
+
     def test_include_wildcard_periods(self):
         """Test the '.' in the namespace only matches '.'"""
         dest_mapping = DestMapping(namespace_set=["db.*"])

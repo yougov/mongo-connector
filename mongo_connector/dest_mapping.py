@@ -117,7 +117,7 @@ class DestMapping(object):
         # Add each namespace from the namespace_set and user_mapping
         # parameters. Namespaces have a one-to-one relationship with the
         # target system, meaning multiple source namespaces cannot be merged
-        # into a single namespace in the target
+        # into a single namespace in the target.
         for ns in namespace_set:
             user_mapping.setdefault(ns, ns)
 
