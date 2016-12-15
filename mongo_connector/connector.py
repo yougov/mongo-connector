@@ -123,8 +123,7 @@ class Connector(threading.Thread):
         # Replace the origin dest_mapping
         self.dest_mapping = DestMapping(
             kwargs.get('ns_set'), kwargs.get('ex_ns_set'),
-            kwargs.get('dest_mapping'), kwargs.get('fields'),
-            kwargs.get('exclude_fields'))
+            kwargs.get('dest_mapping'))
 
         # Initialize and set the command helper
         command_helper = CommandHelper(self.dest_mapping)
