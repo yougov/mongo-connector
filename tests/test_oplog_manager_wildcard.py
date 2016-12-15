@@ -310,17 +310,15 @@ class TestOplogManager(unittest.TestCase):
         1. in namespace set, mapping provided
         2. outside of namespace set, mapping provided
         """
-
-        source_ns_wildcard = ["includedb1.*", "includedb2.includecol1"]
-        source_ns = ["includedb1.includecol1",
-                     "includedb1.includecol2",
-                     "includedb2.includecol1"]
-        phony_ns = ["includedb2.excludecol2", "excludedb3.excludecol1"]
+        included_names = ["includedb1.includecol1",
+                          "includedb1.includecol2",
+                          "includedb2.includecol1"]
+        excluded_names = ["includedb2.excludecol2", "excludedb3.excludecol1"]
         dest_mapping = {
-                        "includedb1.*": "newdb1_*.bar",
-                        "includedb2.includecol1": "newdb2.newcol1"
-                        }
-        self.reset_opman(source_ns_wildcard, [], dest_mapping)
+            "includedb1.*": "newdb1.*",
+            "includedb2.includecol1": "newdb2.newcol1"
+        }
+        self.reset_opman(dest_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
         dest_mapping_stru = self.opman.dest_mapping_stru
 
@@ -329,8 +327,7 @@ class TestOplogManager(unittest.TestCase):
 
         base_doc = {"_id": 1, "name": "superman"}
 
-        # doc in namespace set
-        for ns in source_ns:
+        for ns in included_names:
             db, coll = ns.split(".", 1)
 
             # test insert
@@ -372,7 +369,7 @@ class TestOplogManager(unittest.TestCase):
             self.opman.doc_managers[0]._delete()
 
         # doc not in namespace set
-        for ns in phony_ns:
+        for ns in excluded_names:
             db, coll = ns.split(".", 1)
 
             # test insert
