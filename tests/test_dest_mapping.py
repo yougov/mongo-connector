@@ -139,19 +139,13 @@ class TestDestMapping(unittest.TestCase):
 
         # Multiple collections cannot be merged into the same target namespace
         dest_mapping = DestMapping(user_mapping={
-            "d*.coll": "d*.coll",
-            "db1.c*l": "db.c*l"})
+            "*.coll": "*.new_coll",
+            "db.*": "new_db.*"})
+        dest_mapping.map_namespace("new_db.coll")
         with self.assertRaises(errors.InvalidConfiguration):
-            dest_mapping.map_namespace("db.coll")
-            dest_mapping.map_namespace("db1.coll")
-
-        # Multiple collections cannot be merged into the same target namespace
-        dest_mapping = DestMapping(user_mapping={
-            "*.important_coll": "*.super_important_coll",
-            "important_db.*": "super_important_db.*"})
-        with self.assertRaises(errors.InvalidConfiguration):
-            dest_mapping.map_namespace("super_important_db.important_coll")
-            dest_mapping.map_namespace("important_db.super_important_coll")
+            # "db.new_coll" should map to "new_db.new_coll" but there is
+            # already a mapping from "new_db.coll" to "new_db.new_coll".
+            dest_mapping.map_namespace("db.new_coll")
 
         # For the sake of map_db, wildcards cannot be moved from database name
         # to collection name.
