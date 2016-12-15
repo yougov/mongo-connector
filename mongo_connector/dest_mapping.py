@@ -124,7 +124,7 @@ class DestMapping(object):
         renames = {}
         for src_name, v in user_mapping.items():
             if isinstance(v, dict):
-                target_name = v.get('rename')
+                target_name = v.get('rename', src_name)
             else:
                 target_name = v
             renames[src_name] = target_name
@@ -238,8 +238,15 @@ class DestMapping(object):
     def map_db(self, plain_src_db):
         """Given a plain source database, return the list of target databases.
 
-        Individual collections in a database can be mapped to
-        different target databases, so map_db can return multiple databases.
+        Individual collections in a database can be mapped to different
+        target databases, so map_db can return multiple databases. This
+        function must return all target database names so we make the
+        following restrictions on wildcards:
+        1) A wildcard appearing in the source database name must also appear
+        in the target database name, eg "db*.col" => "new_db_*.new_col".
+        2) A wildcard appearing in the source collection name must also appear
+        in the target collection name, eg "db.col*" => "new_db.new_col*".
+
         This is used by the CommandHelper for the dropDatabase command.
         """
         if not self._regex_map and not self._plain:
@@ -279,6 +286,28 @@ def validate_target_namespaces(user_mapping):
 
     Also warns when wildcard namespaces have a chance of overlapping.
     """
+    for source, target in user_mapping.items():
+        if source.count("*") > 1 or target.count("*") > 1:
+            raise errors.InvalidConfiguration(
+                "The namespace mapping from '%s' to '%s' cannot contain more "
+                "than one '*' character." % (source, target))
+        if source.count("*") != target.count("*"):
+            raise errors.InvalidConfiguration(
+                "The namespace mapping from '%s' to '%s' must contain the "
+                "same number of '*' characters." % (source, target))
+        if '*' not in source:
+            continue
+        # Make sure that wildcards are not moved from database name to
+        # collection name or vice versa, eg "db*.foo" => "db.foo_*"
+        if wildcard_in_db(source) and not wildcard_in_db(target) or (
+                    not wildcard_in_db(source) and wildcard_in_db(target)):
+            raise errors.InvalidConfiguration(
+                "The namespace mapping from '%s' to '%s' is invalid. A '*' "
+                "that appears in the source database name must also appear"
+                "in the target database name. A '*' that appears in the "
+                "source collection name must also appear in the target "
+                "collection name" % (source, target))
+
     for namespace1, namespace2 in combinations(user_mapping.keys(), 2):
         if wildcards_overlap(namespace1, namespace2):
             LOG.warn('Namespaces "%s" and "%s" may match the '
@@ -307,9 +336,14 @@ def match_replace_regex(regex, src_namespace, dest_namespace):
     return None
 
 
+def wildcard_in_db(namespace):
+    """Return True if a wildcard character appears in the database name."""
+    return namespace.find('*') < namespace.find('.')
+
+
 def namespace_to_regex(namespace):
     """Create a RegexObject from a wildcard namespace."""
-    if namespace.find('*') < namespace.find('.'):
+    if wildcard_in_db(namespace):
         # A database name cannot contain a '.' character
         wildcard_group = '([^.]*)'
     else:
