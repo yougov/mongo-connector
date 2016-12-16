@@ -82,7 +82,7 @@ class OplogThread(threading.Thread):
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
     def __init__(self, primary_client, doc_managers,
-                 oplog_progress_dict, dest_mapping_stru,
+                 oplog_progress_dict, namespace_config,
                  mongos_client=None, **kwargs):
         super(OplogThread, self).__init__()
 
@@ -114,8 +114,8 @@ class OplogThread(threading.Thread):
         # The set of gridfs namespaces to process from the mongo cluster
         self.gridfs_set = kwargs.get('gridfs_set', [])
 
-        # The structure handling dest_mappings dynamically
-        self.dest_mapping_stru = dest_mapping_stru
+        # The namespace configuration
+        self.namespace_config = namespace_config
 
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get('continue_on_error', False)
@@ -242,7 +242,7 @@ class OplogThread(threading.Thread):
 
         # Rename or filter out namespaces that are ignored keeping
         # included gridfs namespaces.
-        new_ns = self.dest_mapping_stru.map_namespace(ns)
+        new_ns = self.namespace_config.map_namespace(ns)
         if new_ns is None:
             if is_gridfs_file:
                 # Gridfs files should not be skipped
@@ -589,7 +589,7 @@ class OplogThread(threading.Thread):
                     if coll.endswith(".files") or coll.endswith(".chunks"):
                         continue
                     namespace = "%s.%s" % (database, coll)
-                    if self.dest_mapping_stru.map_namespace(namespace):
+                    if self.namespace_config.map_namespace(namespace):
                         all_ns_set.append(namespace)
             return all_ns_set
 
@@ -634,7 +634,7 @@ class OplogThread(threading.Thread):
             num_failed = 0
             for namespace in dump_set:
                 from_coll = self.get_collection(namespace)
-                mapped_ns = self.dest_mapping_stru.map_namespace(namespace)
+                mapped_ns = self.namespace_config.map_namespace(namespace)
                 total_docs = retry_until_ok(from_coll.count)
                 num = None
                 for num, doc in enumerate(docs_to_dump(from_coll)):
@@ -663,7 +663,7 @@ class OplogThread(threading.Thread):
                 for namespace in dump_set:
                     from_coll = self.get_collection(namespace)
                     total_docs = retry_until_ok(from_coll.count)
-                    mapped_ns = self.dest_mapping_stru.map_namespace(
+                    mapped_ns = self.namespace_config.map_namespace(
                             namespace)
                     LOG.info("Bulk upserting approximately %d docs from "
                              "collection '%s'",
@@ -689,7 +689,7 @@ class OplogThread(threading.Thread):
                 for gridfs_ns in self.gridfs_set:
                     mongo_coll = self.get_collection(gridfs_ns)
                     from_coll = self.get_collection(gridfs_ns + '.files')
-                    dest_ns = self.dest_mapping_stru.map_namespace(gridfs_ns)
+                    dest_ns = self.namespace_config.map_namespace(gridfs_ns)
                     for doc in docs_to_dump(from_coll):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
@@ -949,7 +949,7 @@ class OplogThread(threading.Thread):
             # or removing them in each target system
             for namespace, doc_list in rollback_set.items():
                 # Get the original namespace
-                original_namespace = self.dest_mapping_stru.unmap_namespace(
+                original_namespace = self.namespace_config.unmap_namespace(
                     namespace)
                 if not original_namespace:
                     original_namespace = namespace

@@ -19,7 +19,7 @@ import sys
 
 sys.path[0:0] = [""]
 
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.test_utils import TESTARGS, MockGridFSFile
@@ -245,13 +245,13 @@ class TestMongoDocManager(MongoTestCase):
         # Also test with namespace mapping.
         # Note that mongo-connector does not currently support commands after
         # renaming a database.
-        dest_mapping_stru = DestMapping(
+        namespace_config = NamespaceConfig(
             namespace_set=['test.test', 'test.test2', 'test.drop'],
             user_mapping={
              'test.test': 'test.othertest',
              'test.drop': 'dropped.collection'
             })
-        self.choosy_docman.command_helper = CommandHelper(dest_mapping_stru)
+        self.choosy_docman.command_helper = CommandHelper(namespace_config)
 
         try:
             self.choosy_docman.handle_command({'create': 'test'}, *TESTARGS)

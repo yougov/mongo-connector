@@ -522,7 +522,7 @@ class TestConnectorConfig(unittest.TestCase):
         command_helper = mc.doc_managers[0].command_helper
         for name in self.config['namespaces.mapping']:
             self.assertTrue(
-                command_helper.dest_mapping_stru.map_namespace(name))
+                command_helper.namespace_config.map_namespace(name))
 
         # Test Logger options.
         log_levels = [

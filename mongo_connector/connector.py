@@ -36,7 +36,7 @@ from mongo_connector.doc_managers import doc_manager_simulator as simulator
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 
 from pymongo import MongoClient
 
@@ -124,13 +124,14 @@ class Connector(threading.Thread):
         # Save the rest of kwargs.
         self.kwargs = kwargs
 
-        # Replace the origin dest_mapping
-        self.dest_mapping = DestMapping(
+        # The namespace configuration shared by all OplogThreads and
+        # DocManagers
+        self.namespace_config = NamespaceConfig(
             kwargs.get('ns_set'), kwargs.get('ex_ns_set'),
             kwargs.get('dest_mapping'))
 
         # Initialize and set the command helper
-        command_helper = CommandHelper(self.dest_mapping)
+        command_helper = CommandHelper(self.namespace_config)
         for dm in self.doc_managers:
             dm.command_helper = command_helper
 
@@ -333,7 +334,7 @@ class Connector(threading.Thread):
             # non sharded configuration
             oplog = OplogThread(
                 self.main_conn, self.doc_managers, self.oplog_progress,
-                self.dest_mapping, **self.kwargs)
+                self.namespace_config, **self.kwargs)
             self.shard_set[0] = oplog
             LOG.info('MongoConnector: Starting connection thread %s' %
                      self.main_conn)
@@ -388,7 +389,7 @@ class Connector(threading.Thread):
                         hosts, replicaSet=repl_set)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
-                        self.dest_mapping, mongos_client=self.main_conn,
+                        self.namespace_config, mongos_client=self.main_conn,
                         **self.kwargs)
                     self.shard_set[shard_id] = oplog
                     msg = "Starting connection thread"

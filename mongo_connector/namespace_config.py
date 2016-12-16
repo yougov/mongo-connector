@@ -85,7 +85,7 @@ class RegexSet(MutableSet):
         return RegexSet(regexes, strings)
 
 
-class DestMapping(object):
+class NamespaceConfig(object):
     """Manages included and excluded namespaces.
     """
     def __init__(self, namespace_set=None, ex_namespace_set=None,

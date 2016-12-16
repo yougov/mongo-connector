@@ -21,7 +21,7 @@ sys.path[0:0] = [""]
 
 import pymongo
 
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.locking_dict import LockingDict
@@ -70,15 +70,14 @@ class TestCommandReplication(unittest.TestCase):
 
     def initOplogThread(self, namespace_set=None):
         self.docman = CommandLoggerDocManager()
-        # Replace the origin dest_mapping
-        dest_mapping = DestMapping(namespace_set=namespace_set)
+        namespace_config = NamespaceConfig(namespace_set=namespace_set)
 
-        self.docman.command_helper = CommandHelper(dest_mapping)
+        self.docman.command_helper = CommandHelper(namespace_config)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(self.docman,),
             oplog_progress_dict=self.oplog_progress,
-            dest_mapping_stru=dest_mapping,
+            namespace_config=namespace_config,
             collection_dump=False
         )
         self.opman.start()
@@ -90,7 +89,7 @@ class TestCommandReplication(unittest.TestCase):
             'a.y': 'c.y'
         }
 
-        helper = CommandHelper(DestMapping(
+        helper = CommandHelper(NamespaceConfig(
             namespace_set=list(mapping) + ['a.z'], user_mapping=mapping))
 
         self.assertEqual(set(helper.map_db('a')), set(['a', 'b', 'c']))

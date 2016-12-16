@@ -27,7 +27,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (assert_soon,
                                         close_client,
@@ -46,14 +46,14 @@ class TestOplogManager(unittest.TestCase):
         self.oplog_coll = self.primary_conn.local['oplog.rs']
 
     def reset_opman(self, include_ns=None, exclude_ns=None, dest_mapping=None):
-        self.dest_mapping_stru = DestMapping(namespace_set=include_ns,
-                                             ex_namespace_set=exclude_ns,
-                                             user_mapping=dest_mapping)
+        self.namespace_config = NamespaceConfig(namespace_set=include_ns,
+                                                ex_namespace_set=exclude_ns,
+                                                user_mapping=dest_mapping)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru
+            namespace_config=self.namespace_config
         )
 
     def init_dbs(self):
@@ -320,7 +320,7 @@ class TestOplogManager(unittest.TestCase):
         }
         self.reset_opman(dest_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
-        dest_mapping_stru = self.opman.dest_mapping_stru
+        namespace_config = self.opman.namespace_config
 
         # start replicating
         self.opman.start()
@@ -335,7 +335,7 @@ class TestOplogManager(unittest.TestCase):
 
             assert_soon(lambda: len(docman._search()) == 1)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.map_namespace(ns))
+                             namespace_config.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -353,7 +353,7 @@ class TestOplogManager(unittest.TestCase):
                     return False
             assert_soon(update_complete)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.map_namespace(ns))
+                             namespace_config.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -361,7 +361,7 @@ class TestOplogManager(unittest.TestCase):
             self.primary_conn[db][coll].delete_one({"_id": 1})
             assert_soon(lambda: len(docman._search()) == 0)
             bad = [d for d in docman._search()
-                   if d["ns"] == dest_mapping_stru.map_namespace(ns)]
+                   if d["ns"] == namespace_config.map_namespace(ns)]
             self.assertEqual(len(bad), 0)
 
             # cleanup

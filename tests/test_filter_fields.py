@@ -22,7 +22,7 @@ from mongo_connector import errors
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.test_utils import (assert_soon,
                                         close_client,
                                         ReplicaSetSingle)
@@ -44,12 +44,12 @@ class TestFilterFields(unittest.TestCase):
         cls.repl_set.stop()
 
     def setUp(self):
-        self.dest_mapping_stru = DestMapping([], [], {})
+        self.namespace_config = NamespaceConfig([], [], {})
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru
+            namespace_config=self.namespace_config
         )
 
     def tearDown(self):
@@ -292,7 +292,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             exclude_fields=exclude_fields
         )
         exclude_fields.remove('_id')
@@ -310,7 +310,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             exclude_fields=exclude_fields
         )
         self._check_fields(opman, [], exclude_fields,
@@ -327,7 +327,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             exclude_fields=exclude_fields
         )
         self._check_fields(opman, [], [], None)
@@ -342,7 +342,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             exclude_fields=None
         )
         self._check_fields(opman, [], [], None)
@@ -359,7 +359,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             fields=fields
         )
         self._check_fields(opman, fields, [],
@@ -376,7 +376,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             fields=fields
         )
         fields.append('_id')
@@ -394,7 +394,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             fields=fields
         )
         self._check_fields(opman, fields, [],
@@ -410,7 +410,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru
+            namespace_config=self.namespace_config
         )
         self._check_fields(opman, [], [], None)
         extra_fields = ['_id', 'extra1', 'extra2']
@@ -727,7 +727,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             fields=None,
             exclude_fields=None
         )
@@ -736,7 +736,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             fields=None,
             exclude_fields=exclude_fields
         )
@@ -751,7 +751,7 @@ class TestFilterFields(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
+            namespace_config=self.namespace_config,
             exclude_fields=None,
             fields=fields
         )
@@ -765,7 +765,7 @@ class TestFilterFields(unittest.TestCase):
             self.primary_conn,
             (DocManager(),),
             LockingDict(),
-            self.dest_mapping_stru,
+            self.namespace_config,
             fields=fields,
             exclude_fields=exclude_fields)
 

@@ -27,7 +27,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (assert_soon,
                                         close_client,
@@ -49,7 +49,7 @@ class TestOplogManager(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=DestMapping(),
+            namespace_config=NamespaceConfig(),
         )
 
     def tearDown(self):
@@ -149,7 +149,7 @@ class TestOplogManager(unittest.TestCase):
             primary_client=conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=DestMapping(namespace_set=["test.test"]),
+            namespace_config=NamespaceConfig(namespace_set=["test.test"]),
         )
         # Insert a document into an included collection
         conn["test"]["test"].insert_one({"test": 1})
@@ -170,7 +170,7 @@ class TestOplogManager(unittest.TestCase):
             primary_client=conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=DestMapping(namespace_set=["test.test"]),
+            namespace_config=NamespaceConfig(namespace_set=["test.test"]),
         )
         opman.start()
 
@@ -313,7 +313,7 @@ class TestOplogManager(unittest.TestCase):
         phony_ns = ["test.phony1", "test.phony2"]
         dest_mapping = {"test.test1": "test.test1_dest",
                         "test.test2": "test.test2_dest"}
-        self.opman.dest_mapping_stru = DestMapping(
+        self.opman.namespace_config = NamespaceConfig(
             namespace_set=source_ns, user_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
         # start replicating

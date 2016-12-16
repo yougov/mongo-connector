@@ -21,20 +21,20 @@ LOG = logging.getLogger(__name__)
 
 
 class CommandHelper(object):
-    def __init__(self, dest_mapping_stru):
-        self.dest_mapping_stru = dest_mapping_stru
+    def __init__(self, namespace_config):
+        self.namespace_config = namespace_config
 
     # Applies the namespace mapping to a database.
     # Individual collections in a database can be mapped to
     # different target databases, so map_db can return multiple results.
     # The input parameter db is plain text
     def map_db(self, db):
-        return self.dest_mapping_stru.map_db(db)
+        return self.namespace_config.map_db(db)
 
     # Applies the namespace mapping to a "db.collection" string
     # The input parameter ns is plain text
     def map_namespace(self, ns):
-        return self.dest_mapping_stru.map_namespace(ns)
+        return self.namespace_config.map_namespace(ns)
 
     # Applies the namespace mapping to a db and collection
     # The input parameter db and coll are plain text

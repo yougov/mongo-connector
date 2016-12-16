@@ -28,7 +28,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (assert_soon,
                                         close_client,
@@ -78,7 +78,7 @@ class TestRollbacks(unittest.TestCase):
             primary_client=self.main_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping_stru=DestMapping(namespace_set=["test.mc"]),
+            namespace_config=NamespaceConfig(namespace_set=["test.mc"]),
         )
 
     def test_single_target(self):

@@ -15,147 +15,159 @@
 import re
 
 from tests import unittest
-from mongo_connector.dest_mapping import (
-    DestMapping, Namespace, match_replace_regex, namespace_to_regex,
+from mongo_connector.namespace_config import (
+    NamespaceConfig, Namespace, match_replace_regex, namespace_to_regex,
     RegexSet, wildcards_overlap)
 from mongo_connector import errors
 
 
-class TestDestMapping(unittest.TestCase):
-    """Test the DestMapping class"""
+class TestDNamespaceConfig(unittest.TestCase):
+    """Test the NamespaceConfig class"""
 
     def test_default(self):
         """Test that by default, all namespaces are kept without renaming"""
-        dest_mapping = DestMapping()
-        self.assertEqual(dest_mapping.unmap_namespace("db1.col1"), "db1.col1")
-        self.assertEqual(dest_mapping.map_db("db1"), ["db1"])
-        self.assertEqual(dest_mapping.map_namespace("db1.col1"), "db1.col1")
+        namespace_config = NamespaceConfig()
+        self.assertEqual(namespace_config.unmap_namespace("db1.col1"),
+                         "db1.col1")
+        self.assertEqual(namespace_config.map_db("db1"), ["db1"])
+        self.assertEqual(namespace_config.map_namespace("db1.col1"),
+                         "db1.col1")
 
     def test_include_plain(self):
         """Test including namespaces without wildcards"""
-        dest_mapping = DestMapping(namespace_set=["db1.col1", "db1.col2"])
-        self.assertEqual(dest_mapping.unmap_namespace("db1.col1"), "db1.col1")
-        self.assertEqual(dest_mapping.unmap_namespace("db1.col2"), "db1.col2")
-        self.assertIsNone(dest_mapping.unmap_namespace("not.included"))
-        self.assertEqual(dest_mapping.map_db("db1"), ["db1"])
-        self.assertEqual(dest_mapping.map_db("not_included"), [])
-        self.assertEqual(dest_mapping.map_namespace("db1.col1"), "db1.col1")
-        self.assertEqual(dest_mapping.map_namespace("db1.col2"), "db1.col2")
-        self.assertIsNone(dest_mapping.map_namespace("db1.col4"))
+        namespace_config = NamespaceConfig(
+            namespace_set=["db1.col1", "db1.col2"])
+        self.assertEqual(namespace_config.unmap_namespace("db1.col1"),
+                         "db1.col1")
+        self.assertEqual(namespace_config.unmap_namespace("db1.col2"),
+                         "db1.col2")
+        self.assertIsNone(namespace_config.unmap_namespace("not.included"))
+        self.assertEqual(namespace_config.map_db("db1"), ["db1"])
+        self.assertEqual(namespace_config.map_db("not_included"), [])
+        self.assertEqual(namespace_config.map_namespace("db1.col1"),
+                         "db1.col1")
+        self.assertEqual(namespace_config.map_namespace("db1.col2"),
+                         "db1.col2")
+        self.assertIsNone(namespace_config.map_namespace("db1.col4"))
 
     def test_include_wildcard(self):
         """Test including namespaces with wildcards"""
-        equivalent_dest_mappings = (
-            DestMapping(namespace_set=["db1.*"]),
-            DestMapping(user_mapping={"db1.*": {}}),
-            DestMapping(user_mapping={"db1.*": {"rename": "db1.*"}}))
-        for dest_mapping in equivalent_dest_mappings:
-            self.assertEqual(dest_mapping.unmap_namespace("db1.col1"),
+        equivalent_namespace_configs = (
+            NamespaceConfig(namespace_set=["db1.*"]),
+            NamespaceConfig(user_mapping={"db1.*": {}}),
+            NamespaceConfig(user_mapping={"db1.*": {"rename": "db1.*"}}))
+        for namespace_config in equivalent_namespace_configs:
+            self.assertEqual(namespace_config.unmap_namespace("db1.col1"),
                              "db1.col1")
-            self.assertEqual(dest_mapping.unmap_namespace("db1.col1"),
+            self.assertEqual(namespace_config.unmap_namespace("db1.col1"),
                              "db1.col1")
-            self.assertEqual(dest_mapping.lookup("db1.col1"),
+            self.assertEqual(namespace_config.lookup("db1.col1"),
                              Namespace(dest_name="db1.col1",
                                        source_name="db1.col1"))
-            self.assertListEqual(dest_mapping.map_db("db1"), ["db1"])
-            self.assertEqual(dest_mapping.map_namespace("db1.col1"),
+            self.assertListEqual(namespace_config.map_db("db1"), ["db1"])
+            self.assertEqual(namespace_config.map_namespace("db1.col1"),
                              "db1.col1")
-            self.assertIsNone(dest_mapping.map_namespace("db2.col4"))
+            self.assertIsNone(namespace_config.map_namespace("db2.col4"))
 
     def test_map_db_wildcard(self):
         """Test a crazy namespace renaming scheme with wildcards."""
-        dest_mapping = DestMapping(user_mapping={
+        namespace_config = NamespaceConfig(user_mapping={
             "db.1_*": "db1.new_*",
             "db.2_*": "db2.new_*",
             "db.3": "new_db.3"})
-        self.assertEqual(set(dest_mapping.map_db("db")),
+        self.assertEqual(set(namespace_config.map_db("db")),
                          set(["db1", "db2", "new_db"]))
 
     def test_include_wildcard_periods(self):
         """Test the '.' in the namespace only matches '.'"""
-        dest_mapping = DestMapping(namespace_set=["db.*"])
-        self.assertIsNone(dest_mapping.map_namespace("dbxcol"))
-        self.assertEqual(dest_mapping.map_namespace("db.col"), "db.col")
+        namespace_config = NamespaceConfig(namespace_set=["db.*"])
+        self.assertIsNone(namespace_config.map_namespace("dbxcol"))
+        self.assertEqual(namespace_config.map_namespace("db.col"), "db.col")
 
     def test_include_wildcard_multiple_periods(self):
         """Test matching a namespace with multiple '.' characters."""
-        dest_mapping = DestMapping(namespace_set=["db.col.*"])
-        self.assertIsNone(dest_mapping.map_namespace("db.col"))
-        self.assertEqual(dest_mapping.map_namespace("db.col."), "db.col.")
+        namespace_config = NamespaceConfig(namespace_set=["db.col.*"])
+        self.assertIsNone(namespace_config.map_namespace("db.col"))
+        self.assertEqual(namespace_config.map_namespace("db.col."), "db.col.")
 
     def test_include_wildcard_no_period_in_database(self):
         """Test that a database wildcard cannot match a period."""
-        dest_mapping = DestMapping(namespace_set=["db*.col"])
-        self.assertIsNone(dest_mapping.map_namespace("db.bar.col"))
-        self.assertEqual(dest_mapping.map_namespace("dbfoo.col"), "dbfoo.col")
+        namespace_config = NamespaceConfig(namespace_set=["db*.col"])
+        self.assertIsNone(namespace_config.map_namespace("db.bar.col"))
+        self.assertEqual(namespace_config.map_namespace("dbfoo.col"),
+                         "dbfoo.col")
 
     def test_include_wildcard_metacharacters(self):
         """Test namespaces with metacharacters are matched."""
-        dest_mapping = DestMapping(namespace_set=["db&_*.$_^_#_!_[_]_"])
-        self.assertEqual(dest_mapping.map_namespace("db&_foo.$_^_#_!_[_]_"),
-                         "db&_foo.$_^_#_!_[_]_")
-        self.assertIsNone(dest_mapping.map_namespace("db&.foo"))
+        namespace_config = NamespaceConfig(
+            namespace_set=["db&_*.$_^_#_!_[_]_"])
+        self.assertEqual(
+            namespace_config.map_namespace("db&_foo.$_^_#_!_[_]_"),
+            "db&_foo.$_^_#_!_[_]_")
+        self.assertIsNone(namespace_config.map_namespace("db&.foo"))
 
     def test_exclude_plain(self):
         """Test excluding namespaces without wildcards"""
-        dest_mapping = DestMapping(ex_namespace_set=["ex.clude"])
-        self.assertEqual(dest_mapping.unmap_namespace("db.col"), "db.col")
-        self.assertEqual(dest_mapping.unmap_namespace("ex.clude"), "ex.clude")
-        self.assertEqual(dest_mapping.map_namespace("db.col"), "db.col")
-        self.assertIsNone(dest_mapping.map_namespace("ex.clude"))
+        namespace_config = NamespaceConfig(ex_namespace_set=["ex.clude"])
+        self.assertEqual(namespace_config.unmap_namespace("db.col"), "db.col")
+        self.assertEqual(namespace_config.unmap_namespace("ex.clude"),
+                         "ex.clude")
+        self.assertEqual(namespace_config.map_namespace("db.col"), "db.col")
+        self.assertIsNone(namespace_config.map_namespace("ex.clude"))
 
     def test_exclude_wildcard(self):
         """Test excluding namespaces with wildcards"""
-        dest_mapping = DestMapping(ex_namespace_set=["ex.*"])
-        self.assertEqual(dest_mapping.unmap_namespace("db.col"), "db.col")
-        self.assertEqual(dest_mapping.unmap_namespace("ex.clude"), "ex.clude")
-        self.assertEqual(dest_mapping.map_namespace("db.col"), "db.col")
-        self.assertIsNone(dest_mapping.map_namespace("ex.clude"))
-        self.assertIsNone(dest_mapping.map_namespace("ex.clude2"))
+        namespace_config = NamespaceConfig(ex_namespace_set=["ex.*"])
+        self.assertEqual(namespace_config.unmap_namespace("db.col"), "db.col")
+        self.assertEqual(namespace_config.unmap_namespace("ex.clude"),
+                         "ex.clude")
+        self.assertEqual(namespace_config.map_namespace("db.col"), "db.col")
+        self.assertIsNone(namespace_config.map_namespace("ex.clude"))
+        self.assertIsNone(namespace_config.map_namespace("ex.clude2"))
 
     def test_unmap_namespace_wildcard(self):
         """Test un-mapping a namespace that was never explicitly mapped."""
-        dest_mapping = DestMapping(user_mapping={
+        namespace_config = NamespaceConfig(user_mapping={
             "db2.*": "db2.f*",
             "db_*.foo": "db_new_*.foo",
         })
-        self.assertEqual(dest_mapping.unmap_namespace("db2.foo"), "db2.oo")
-        self.assertEqual(dest_mapping.unmap_namespace("db_new_123.foo"),
+        self.assertEqual(namespace_config.unmap_namespace("db2.foo"), "db2.oo")
+        self.assertEqual(namespace_config.unmap_namespace("db_new_123.foo"),
                          "db_123.foo")
 
     def test_rename_validation(self):
         """Test namespace renaming validation."""
         # Multiple collections cannot be merged into the same target namespace
         with self.assertRaises(errors.InvalidConfiguration):
-            DestMapping(user_mapping={
+            NamespaceConfig(user_mapping={
                 "db1.col1": "newdb.newcol",
                 "db2.col1": "newdb.newcol"})
 
         # Multiple collections cannot be merged into the same target namespace
         with self.assertRaises(errors.InvalidConfiguration):
-            DestMapping(user_mapping={
+            NamespaceConfig(user_mapping={
                 "db*.col1": "newdb.newcol*",
                 "db*.col2": "newdb.newcol*"})
 
         # Multiple collections cannot be merged into the same target namespace
-        dest_mapping = DestMapping(user_mapping={
+        namespace_config = NamespaceConfig(user_mapping={
             "*.coll": "*.new_coll",
             "db.*": "new_db.*"})
-        dest_mapping.map_namespace("new_db.coll")
+        namespace_config.map_namespace("new_db.coll")
         with self.assertRaises(errors.InvalidConfiguration):
             # "db.new_coll" should map to "new_db.new_coll" but there is
             # already a mapping from "new_db.coll" to "new_db.new_coll".
-            dest_mapping.map_namespace("db.new_coll")
+            namespace_config.map_namespace("db.new_coll")
 
         # For the sake of map_db, wildcards cannot be moved from database name
         # to collection name.
         with self.assertRaises(errors.InvalidConfiguration):
-            DestMapping(user_mapping={"db*.col": "new_db.col_*"})
+            NamespaceConfig(user_mapping={"db*.col": "new_db.col_*"})
 
         # For the sake of map_db, wildcards cannot be moved from collection
         # name to database name.
         with self.assertRaises(errors.InvalidConfiguration):
-            DestMapping(user_mapping={"db.*": "new_db_*.col"})
+            NamespaceConfig(user_mapping={"db.*": "new_db_*.col"})
 
     def test_match_replace_regex(self):
         """Test regex matching and replacing."""

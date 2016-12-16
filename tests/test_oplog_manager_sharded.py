@@ -26,7 +26,7 @@ sys.path[0:0] = [""]
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
-from mongo_connector.dest_mapping import DestMapping
+from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.test_utils import (assert_soon,
                                         close_client,
@@ -126,20 +126,20 @@ class ShardedClusterTestCase(unittest.TestCase):
         # Oplog threads (oplog manager) for each shard
         doc_manager = DocManager()
         oplog_progress = LockingDict()
-        dest_mapping_stru = DestMapping(
+        namespace_config = NamespaceConfig(
             namespace_set=["test.mcsharded", "test.mcunsharded"])
         self.opman1 = OplogThread(
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping_stru=dest_mapping_stru,
+            namespace_config=namespace_config,
             mongos_client=self.mongos_conn
         )
         self.opman2 = OplogThread(
             primary_client=self.shard2_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
-            dest_mapping_stru=dest_mapping_stru,
+            namespace_config=namespace_config,
             mongos_client=self.mongos_conn
         )
 
