@@ -94,6 +94,7 @@ class TestMongo(MongoTestCase):
 
     def tearDown(self):
         self.connector.join()
+        self.drop_all_databases()
 
     def setUp(self):
         try:
@@ -103,17 +104,27 @@ class TestMongo(MongoTestCase):
         self._remove()
         self.connector = Connector(
             mongo_address=self.repl_set.uri,
-            ns_set=['test.test'],
+            ns_set=['test.test', 'rename.me'],
+            dest_mapping={'rename.me': 'new.target',
+                          'rename.me2': 'new2.target2'},
             doc_managers=(self.mongo_doc,),
             gridfs_set=['test.test'],
             **connector_opts
         )
 
-        self.conn.drop_database('test')
+        self.drop_all_databases()
 
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
         assert_soon(lambda: sum(1 for _ in self._search()) == 0)
+
+    def drop_all_databases(self):
+        for name in self.mongo_conn.database_names():
+            if name not in ["local", "admin"]:
+                self.mongo_conn.drop_database(name)
+        for name in self.conn.database_names():
+            if name not in ["local", "admin"]:
+                self.conn.drop_database(name)
 
     def test_insert(self):
         """Tests insert
@@ -203,6 +214,55 @@ class TestMongo(MongoTestCase):
 
         # Update whole document
         check_update({"a": 0, "b": {"1": {"d": 10000}}})
+
+    def check_renamed_insert(self, target_coll):
+        target_db, target_coll = target_coll.split('.', 1)
+        mongo_target = self.mongo_conn[target_db][target_coll]
+        assert_soon(lambda: len(list(mongo_target.find({}))))
+        target_docs = list(mongo_target.find({}))
+        self.assertEqual(len(target_docs), 1)
+        self.assertEqual(target_docs[0]["renamed"], 1)
+
+    def create_renamed_collection(self, source_coll, target_coll):
+        """Create renamed collections for the command tests."""
+        # Create the rename database and 'rename.me' collection
+        source_db, source_coll = source_coll.split('.', 1)
+        mongo_source = self.conn[source_db][source_coll]
+        mongo_source.insert_one({"renamed": 1})
+        self.check_renamed_insert(target_coll)
+
+    def test_drop_database_renamed(self):
+        """Test the dropDatabase command on a renamed database."""
+        self.create_renamed_collection("rename.me", "new.target")
+        self.create_renamed_collection("rename.me2", "new2.target2")
+        # test that drop database removes target databases
+        self.conn.drop_database("rename")
+        assert_soon(lambda: "new" not in self.mongo_conn.database_names())
+        assert_soon(lambda: "new2" not in self.mongo_conn.database_names())
+
+    def test_drop_collection_renamed(self):
+        """Test the drop collection command on a renamed collection."""
+        self.create_renamed_collection("rename.me", "new.target")
+        self.create_renamed_collection("rename.me2", "new2.target2")
+        # test that drop collection removes target collection
+        self.conn.rename.drop_collection("me")
+        assert_soon(
+            lambda: "target" not in self.mongo_conn.new.collection_names())
+        self.conn.rename.drop_collection("me2")
+        assert_soon(
+            lambda: "target2" not in self.mongo_conn.new2.collection_names())
+
+    def test_rename_collection_renamed(self):
+        """Test the renameCollection command on a renamed collection to a
+        renamed collection.
+        """
+        self.create_renamed_collection("rename.me", "new.target")
+        self.conn.admin.command(
+            "renameCollection", "rename.me", to="rename.me2")
+        # In the target, 'new.target' should be renamed to 'new2.target2'
+        assert_soon(
+            lambda: "target" not in self.mongo_conn.new.collection_names())
+        self.check_renamed_insert("new2.target2")
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the

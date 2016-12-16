@@ -35,6 +35,7 @@ from tests import unittest
 class CommandLoggerDocManager(DocManagerBase):
     def __init__(self, url=None, **kwargs):
         self.commands = []
+        self.command_helper = None
 
     def stop(self):
         pass
@@ -49,7 +50,28 @@ class CommandLoggerDocManager(DocManagerBase):
         pass
 
     def handle_command(self, doc, namespace, timestamp):
-        self.commands.append(doc)
+        db, _ = namespace.split('.', 1)
+        if doc.get('dropDatabase'):
+            if self.command_helper.map_db(db):
+                self.commands.append(doc)
+
+        if doc.get('renameCollection'):
+            a = self.command_helper.map_namespace(doc['renameCollection'])
+            b = self.command_helper.map_namespace(doc['to'])
+            if a and b:
+                self.commands.append(doc)
+
+        if doc.get('create'):
+            new_db, coll = self.command_helper.map_collection(
+                db, doc['create'])
+            if new_db:
+                self.commands.append(doc)
+
+        if doc.get('drop'):
+            new_db, coll = self.command_helper.map_collection(
+                db, doc['drop'])
+            if new_db:
+                self.commands.append(doc)
 
 
 class TestCommandReplication(unittest.TestCase):
