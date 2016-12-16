@@ -37,7 +37,7 @@ from tests import unittest
 
 class TestOplogManager(unittest.TestCase):
     """Defines all the testing methods, as well as a method that sets up the
-        cluster
+    cluster
     """
 
     def setUp(self):
@@ -46,26 +46,14 @@ class TestOplogManager(unittest.TestCase):
         self.oplog_coll = self.primary_conn.local['oplog.rs']
 
     def reset_opman(self, include_ns=None, exclude_ns=None, dest_mapping=None):
-        if include_ns is None:
-            include_ns = []
-        if exclude_ns is None:
-            exclude_ns = []
-        if dest_mapping is None:
-            dest_mapping = {}
-
-        # include_ns must not exist together with exclude_ns
-        # dest_mapping must exist together with include_ns
-        # those checks have been tested in test_config.py so we skip that here.
-
-        self.dest_mapping_stru = DestMapping(include_ns, exclude_ns,
-                                             dest_mapping)
+        self.dest_mapping_stru = DestMapping(namespace_set=include_ns,
+                                             ex_namespace_set=exclude_ns,
+                                             user_mapping=dest_mapping)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            dest_mapping_stru=self.dest_mapping_stru,
-            ns_set=include_ns,
-            ex_ns_set=exclude_ns
+            dest_mapping_stru=self.dest_mapping_stru
         )
 
     def init_dbs(self):
@@ -322,17 +310,15 @@ class TestOplogManager(unittest.TestCase):
         1. in namespace set, mapping provided
         2. outside of namespace set, mapping provided
         """
-
-        source_ns_wildcard = ["includedb1.*", "includedb2.includecol1"]
-        source_ns = ["includedb1.includecol1",
-                     "includedb1.includecol2",
-                     "includedb2.includecol1"]
-        phony_ns = ["includedb2.excludecol2", "excludedb3.excludecol1"]
+        included_names = ["includedb1.includecol1",
+                          "includedb1.includecol2",
+                          "includedb2.includecol1"]
+        excluded_names = ["includedb2.excludecol2", "excludedb3.excludecol1"]
         dest_mapping = {
-                        "includedb1.*": "newdb1_*.bar",
-                        "includedb2.includecol1": "newdb2.newcol1"
-                        }
-        self.reset_opman(source_ns_wildcard, [], dest_mapping)
+            "includedb1.*": "newdb1.*",
+            "includedb2.includecol1": "newdb2.newcol1"
+        }
+        self.reset_opman(dest_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
         dest_mapping_stru = self.opman.dest_mapping_stru
 
@@ -341,8 +327,7 @@ class TestOplogManager(unittest.TestCase):
 
         base_doc = {"_id": 1, "name": "superman"}
 
-        # doc in namespace set
-        for ns in source_ns:
+        for ns in included_names:
             db, coll = ns.split(".", 1)
 
             # test insert
@@ -350,7 +335,7 @@ class TestOplogManager(unittest.TestCase):
 
             assert_soon(lambda: len(docman._search()) == 1)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.get(ns))
+                             dest_mapping_stru.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -368,7 +353,7 @@ class TestOplogManager(unittest.TestCase):
                     return False
             assert_soon(update_complete)
             self.assertEqual(docman._search()[0]["ns"],
-                             dest_mapping_stru.get(ns))
+                             dest_mapping_stru.map_namespace(ns))
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
@@ -376,15 +361,15 @@ class TestOplogManager(unittest.TestCase):
             self.primary_conn[db][coll].delete_one({"_id": 1})
             assert_soon(lambda: len(docman._search()) == 0)
             bad = [d for d in docman._search()
-                   if d["ns"] == dest_mapping_stru.get(ns)]
+                   if d["ns"] == dest_mapping_stru.map_namespace(ns)]
             self.assertEqual(len(bad), 0)
 
             # cleanup
-            self.primary_conn[db][coll].delete_many({})
+            self.primary_conn[db][coll].drop()
             self.opman.doc_managers[0]._delete()
 
         # doc not in namespace set
-        for ns in phony_ns:
+        for ns in excluded_names:
             db, coll = ns.split(".", 1)
 
             # test insert

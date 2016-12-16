@@ -43,9 +43,12 @@
         "__mapping": {
             "db.source1": "db.dest1",
             "db.source2": "db.dest2",
-            "db2.*": "db2_map_*.dest"
+            "db2.*": "db2.dest_*",
+            "db.col_*": {
+                "rename": "db.new_name_*"
+            }
         },
-	"__gridfs": ["db.fs"]
+        "__gridfs": ["db.fs"]
     },
 
     "docManagers": [
