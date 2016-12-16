@@ -70,7 +70,6 @@ class DocManager(DocManagerBase):
             raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
-        self.namespace_set = kwargs.get("namespace_set")
         self.chunk_size = kwargs.get('chunk_size', constants.DEFAULT_MAX_BULK)
         self.use_single_meta_collection = kwargs.get(
             'use_single_meta_collection',
@@ -114,9 +113,6 @@ class DocManager(DocManagerBase):
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
         """
-        if self.namespace_set:
-            return self.namespace_set
-
         user_namespaces = []
         db_list = self.mongo.database_names()
         for database in db_list:
