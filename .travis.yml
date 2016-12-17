@@ -9,11 +9,11 @@ matrix:
   fast_finish: true
   include:
     - python: 2.6
-      env: MONGODB=3.4.0-rc1
+      env: MONGODB=3.4.0
     - python: 2.7
-      env: MONGODB=3.2.10
+      env: MONGODB=3.2.11
     - python: 3.3
-      env: MONGODB=3.0.12
+      env: MONGODB=3.0.14
     - python: 3.5
       env: MONGODB=2.6.12
 
