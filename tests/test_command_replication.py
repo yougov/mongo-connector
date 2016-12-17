@@ -108,7 +108,8 @@ class TestCommandReplication(unittest.TestCase):
         pymongo.collection.Collection(
             self.primary_conn['test'], 'test', create=True)
         assert_soon(lambda: self.docman.commands)
-        self.assertEqual(self.docman.commands[0], {'create': 'test'})
+        command = self.docman.commands[0]
+        self.assertEqual(command['create'], 'test')
 
     def test_create_collection_skipped(self):
         self.initOplogThread(['test.test'])
@@ -120,7 +121,8 @@ class TestCommandReplication(unittest.TestCase):
 
         assert_soon(lambda: self.docman.commands)
         self.assertEqual(len(self.docman.commands), 1)
-        self.assertEqual(self.docman.commands[0], {'create': 'test'})
+        command = self.docman.commands[0]
+        self.assertEqual(command['create'], 'test')
 
     def test_drop_collection(self):
         self.initOplogThread()
