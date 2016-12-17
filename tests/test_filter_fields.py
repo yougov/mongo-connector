@@ -44,7 +44,7 @@ class TestFilterFields(unittest.TestCase):
         cls.repl_set.stop()
 
     def setUp(self):
-        self.namespace_config = NamespaceConfig([], [], {})
+        self.namespace_config = NamespaceConfig()
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
@@ -59,22 +59,11 @@ class TestFilterFields(unittest.TestCase):
             # OplogThread may not have been started
             pass
 
-    def _check_fields(self, opman, fields, exclude_fields, projection):
-        if fields:
-            self.assertEqual(sorted(opman.fields), sorted(fields))
-            self.assertEqual(opman._fields, set(fields))
-        else:
-            self.assertEqual(opman.fields, None)
-            self.assertEqual(opman._fields, set([]))
-        if exclude_fields:
-            self.assertEqual(sorted(opman.exclude_fields),
-                             sorted(exclude_fields))
-            self.assertEqual(opman._exclude_fields, set(exclude_fields))
-        else:
-            self.assertEqual(opman.exclude_fields, None)
-            self.assertEqual(opman._exclude_fields, set([]))
+    def reset_include_fields(self, fields):
+        self.opman.namespace_config = NamespaceConfig(include_fields=fields)
 
-        self.assertEqual(opman._projection, projection)
+    def reset_exclude_fields(self, fields):
+        self.opman.namespace_config = NamespaceConfig(exclude_fields=fields)
 
     def test_filter_fields(self):
         docman = self.opman.doc_managers[0]
@@ -84,7 +73,7 @@ class TestFilterFields(unittest.TestCase):
         exclude_fields = ["d", "e", "f"]
 
         # Set fields to care about
-        self.opman.fields = include_fields
+        self.reset_include_fields(include_fields)
         # Documents have more than just these fields
         doc = {
             "a": 1, "b": 2, "c": 3,
@@ -130,67 +119,55 @@ class TestFilterFields(unittest.TestCase):
             }
         }
 
+        def filter_doc(document, fields):
+            if fields and '_id' in fields:
+                fields.remove('_id')
+            return self.opman.filter_oplog_entry(
+                document, exclude_fields=fields)
+
         # Case 0: insert op, no fields provided
-        self.opman.exclude_fields = None
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), None)
         self.assertEqual(filtered, insert_op())
-        self.assertEqual(None, self.opman._projection)
 
         # Case 1: insert op, fields provided
-        self.opman.exclude_fields = ['c']
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), ['c'])
         self.assertEqual(filtered['o'], {'_id': 0, 'a': 1, 'b': 2})
-        self.assertEqual({'c': 0}, self.opman._projection)
 
         # Case 2: insert op, fields provided, doc becomes empty except for _id
-        self.opman.exclude_fields = ['a', 'b', 'c']
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), ['a', 'b', 'c'])
         self.assertEqual(filtered['o'], {'_id': 0})
-        self.assertEqual({'a': 0, 'b': 0, 'c': 0}, self.opman._projection)
 
         # Case 3: update op, no fields provided
-        self.opman.exclude_fields = None
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), None)
         self.assertEqual(filtered, update_op())
-        self.assertEqual(None, self.opman._projection)
 
         # Case 4: update op, fields provided
-        self.opman.exclude_fields = ['b']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['b'])
         self.assertNotIn('b', filtered['o']['$set'])
         self.assertIn('a', filtered['o']['$set'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
-        self.assertEqual({'b': 0}, self.opman._projection)
 
         # Case 5: update op, fields provided, empty $set
-        self.opman.exclude_fields = ['a', 'b']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['a', 'b'])
         self.assertNotIn('$set', filtered['o'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
-        self.assertEqual({'a': 0, 'b': 0}, self.opman._projection)
 
         # Case 6: update op, fields provided, empty $unset
-        self.opman.exclude_fields = ['c']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['c'])
         self.assertNotIn('$unset', filtered['o'])
         self.assertEqual(filtered['o']['$set'], update_op()['o']['$set'])
-        self.assertEqual({'c': 0}, self.opman._projection)
 
         # Case 7: update op, fields provided, entry is nullified
-        self.opman.exclude_fields = ['a', 'b', 'c']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['a', 'b', 'c'])
         self.assertEqual(filtered, None)
-        self.assertEqual({'a': 0, 'b': 0, 'c': 0}, self.opman._projection)
 
         # Case 8: update op, fields provided, replacement
-        self.opman.exclude_fields = ['d', 'e', 'f']
-        filtered = self.opman.filter_oplog_entry({
+        filtered = filter_doc({
             'op': 'u',
             'o': {'a': 1, 'b': 2, 'c': 3, 'd': 4}
-        })
+        }, ['d', 'e', 'f'])
         self.assertEqual(
             filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
-        self.assertEqual({'d': 0, 'e': 0, 'f': 0}, self.opman._projection)
 
     def test_filter_oplog_entry(self):
         # Test oplog entries: these are callables, since
@@ -220,300 +197,62 @@ class TestFilterFields(unittest.TestCase):
             }
         }
 
+        def filter_doc(document, fields):
+            if fields and '_id' not in fields:
+                fields.append('_id')
+            return self.opman.filter_oplog_entry(
+                document, include_fields=fields)
+
         # Case 0: insert op, no fields provided
-        self.opman.fields = None
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), None)
         self.assertEqual(filtered, insert_op())
-        self.assertEqual(None, self.opman._projection)
 
         # Case 1: insert op, fields provided
-        self.opman.fields = ['a', 'b']
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), ['a', 'b'])
         self.assertEqual(filtered['o'], {'_id': 0, 'a': 1, 'b': 2})
-        self.assertEqual({'_id': 1, 'a': 1, 'b': 1}, self.opman._projection)
 
         # Case 2: insert op, fields provided, doc becomes empty except for _id
-        self.opman.fields = ['d', 'e', 'f']
-        filtered = self.opman.filter_oplog_entry(insert_op())
+        filtered = filter_doc(insert_op(), ['d', 'e', 'f'])
         self.assertEqual(filtered['o'], {'_id': 0})
-        self.assertEqual({'_id': 1, 'd': 1, 'e': 1, 'f': 1},
-                         self.opman._projection)
 
         # Case 3: update op, no fields provided
-        self.opman.fields = None
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), None)
         self.assertEqual(filtered, update_op())
-        self.assertEqual(None, self.opman._projection)
 
         # Case 4: update op, fields provided
-        self.opman.fields = ['a', 'c']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['a', 'c'])
         self.assertNotIn('b', filtered['o']['$set'])
         self.assertIn('a', filtered['o']['$set'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
-        self.assertEqual({'_id': 1, 'a': 1, 'c': 1}, self.opman._projection)
 
         # Case 5: update op, fields provided, empty $set
-        self.opman.fields = ['c']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['c'])
         self.assertNotIn('$set', filtered['o'])
         self.assertEqual(filtered['o']['$unset'], update_op()['o']['$unset'])
-        self.assertEqual({'_id': 1, 'c': 1}, self.opman._projection)
 
         # Case 6: update op, fields provided, empty $unset
-        self.opman.fields = ['a', 'b']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['a', 'b'])
         self.assertNotIn('$unset', filtered['o'])
         self.assertEqual(filtered['o']['$set'], update_op()['o']['$set'])
-        self.assertEqual({'_id': 1, 'a': 1, 'b': 1}, self.opman._projection)
 
         # Case 7: update op, fields provided, entry is nullified
-        self.opman.fields = ['d', 'e', 'f']
-        filtered = self.opman.filter_oplog_entry(update_op())
+        filtered = filter_doc(update_op(), ['d', 'e', 'f'])
         self.assertEqual(filtered, None)
-        self.assertEqual({'_id': 1, 'd': 1, 'e': 1, 'f': 1},
-                         self.opman._projection)
 
         # Case 8: update op, fields provided, replacement
-        self.opman.fields = ['a', 'b', 'c']
-        filtered = self.opman.filter_oplog_entry({
+        filtered = filter_doc({
             'op': 'u',
             'o': {'a': 1, 'b': 2, 'c': 3, 'd': 4}
-        })
+        }, ['a', 'b', 'c'])
         self.assertEqual(
             filtered, {'op': 'u', 'o': {'a': 1, 'b': 2, 'c': 3}})
-        self.assertEqual({'_id': 1, 'a': 1, 'b': 1, 'c': 1},
-                         self.opman._projection)
-
-    def test_exclude_fields_constructor(self):
-        # Test with the "_id" field in exclude_fields
-        exclude_fields = ["_id", "title", "content", "author"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            exclude_fields=exclude_fields
-        )
-        exclude_fields.remove('_id')
-        self._check_fields(opman, [], exclude_fields,
-                           dict((f, 0) for f in exclude_fields))
-        extra_fields = exclude_fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in ['extra1', 'extra2']), filtered)
-
-        # Test without "_id" field included in exclude_fields
-        exclude_fields = ["title", "content", "author"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            exclude_fields=exclude_fields
-        )
-        self._check_fields(opman, [], exclude_fields,
-                           dict((f, 0) for f in exclude_fields))
-        extra_fields = extra_fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual({'extra1': 1, 'extra2': 1}, filtered)
-
-        # Test with only "_id" field in exclude_fields
-        exclude_fields = ["_id"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            exclude_fields=exclude_fields
-        )
-        self._check_fields(opman, [], [], None)
-        extra_fields = exclude_fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
-
-        # Test with nothing set for exclude_fields
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            exclude_fields=None
-        )
-        self._check_fields(opman, [], [], None)
-        extra_fields = ['_id', 'extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
-
-    def test_fields_constructor(self):
-        # Test with "_id" field in constructor
-        fields = ["_id", "title", "content", "author"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            fields=fields
-        )
-        self._check_fields(opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in fields), filtered)
-
-        # Test without "_id" field in constructor
-        fields = ["title", "content", "author"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            fields=fields
-        )
-        fields.append('_id')
-        self._check_fields(opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in fields), filtered)
-
-        # Test with only "_id" field
-        fields = ["_id"]
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            fields=fields
-        )
-        self._check_fields(opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual({'_id': 1}, filtered)
-
-        # Test with no fields set
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config
-        )
-        self._check_fields(opman, [], [], None)
-        extra_fields = ['_id', 'extra1', 'extra2']
-        filtered = opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
-
-    def test_exclude_fields_attr(self):
-        # Test with the "_id" field in exclude_fields.
-        exclude_fields = ["_id", "title", "content", "author"]
-        exclude_fields.remove('_id')
-        self.opman.exclude_fields = exclude_fields
-        self._check_fields(self.opman, [], exclude_fields,
-                           dict((f, 0) for f in exclude_fields))
-        extra_fields = exclude_fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in ['extra1', 'extra2']), filtered)
-
-        # Test without "_id" field included in exclude_fields
-        exclude_fields = ["title", "content", "author"]
-        self.opman.exclude_fields = exclude_fields
-        self._check_fields(self.opman, [], exclude_fields,
-                           dict((f, 0) for f in exclude_fields))
-        extra_fields = extra_fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual({'extra1': 1, 'extra2': 1}, filtered)
-
-        # Test with only "_id" field in exclude_fields
-        exclude_fields = ["_id"]
-        self.opman.exclude_fields = exclude_fields
-        self._check_fields(self.opman, [], [], None)
-        extra_fields = exclude_fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
-
-        # Test with nothing set for exclude_fields
-        self.opman.exclude_fields = None
-        self._check_fields(self.opman, [], [], None)
-        extra_fields = ['_id', 'extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
-
-    def test_fields_attr(self):
-        # Test with "_id" field included in fields
-        fields = ["_id", "title", "content", "author"]
-        self.opman.fields = fields
-        self._check_fields(self.opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in fields), filtered)
-
-        # Test without "_id" field included in fields
-        fields = ["title", "content", "author"]
-        self.opman.fields = fields
-        fields.append('_id')
-        self._check_fields(self.opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in fields), filtered)
-
-        # Test with only "_id" field
-        fields = ["_id"]
-        self.opman.fields = fields
-        self._check_fields(self.opman, fields, [],
-                           dict((f, 1) for f in fields))
-        extra_fields = fields + ['extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual({'_id': 1}, filtered)
-
-        # Test with no fields set
-        self.opman.fields = None
-        self._check_fields(self.opman, [], [], None)
-        extra_fields = ['_id', 'extra1', 'extra2']
-        filtered = self.opman.filter_oplog_entry(
-            {'op': 'i',
-             'o': dict((f, 1) for f in extra_fields)})['o']
-        self.assertEqual(dict((f, 1) for f in extra_fields), filtered)
 
     def test_nested_fields(self):
         def check_nested(document, fields, filtered_document, op='i'):
-            self.opman.fields = fields
-            fields.append('_id')
-            self.assertEqual(set(fields), self.opman._fields)
-            self.assertEqual(sorted(fields), sorted(self.opman.fields))
+            if '_id' not in fields:
+                fields.append('_id')
             filtered_result = self.opman.filter_oplog_entry(
-                {'op': op, 'o': document})
+                {'op': op, 'o': document}, include_fields=fields)
             if filtered_result is not None:
                 filtered_result = filtered_result['o']
             self.assertEqual(filtered_result, filtered_document)
@@ -598,14 +337,10 @@ class TestFilterFields(unittest.TestCase):
 
     def test_nested_exclude_fields(self):
         def check_nested(document, exclude_fields, filtered_document, op='i'):
-            self.opman.exclude_fields = exclude_fields
             if '_id' in exclude_fields:
                 exclude_fields.remove('_id')
-            self.assertEqual(set(exclude_fields), self.opman._exclude_fields)
-            self.assertEqual(sorted(exclude_fields),
-                             sorted(self.opman.exclude_fields))
             filtered_result = self.opman.filter_oplog_entry(
-                {'op': op, 'o': document})
+                {'op': op, 'o': document}, exclude_fields=exclude_fields)
             if filtered_result is not None:
                 filtered_result = filtered_result['o']
             self.assertEqual(filtered_result, filtered_document)
@@ -717,57 +452,6 @@ class TestFilterFields(unittest.TestCase):
         exclude_fields = ['a.b', 'a.e']
         filtered_update = None
         check_nested(update, exclude_fields, filtered_update, op='u')
-
-    def test_fields_and_exclude(self):
-        fields = ['a', 'b', 'c', '_id']
-        exclude_fields = ['x', 'y', 'z']
-
-        # Test setting both to None in constructor
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            fields=None,
-            exclude_fields=None
-        )
-        self._check_fields(opman, [], [], None)
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            fields=None,
-            exclude_fields=exclude_fields
-        )
-        self._check_fields(opman, [], exclude_fields,
-                           dict((f, 0) for f in exclude_fields))
-        # Test setting fields when exclude_fields is set
-        self.assertRaises(
-            errors.InvalidConfiguration, setattr, opman, "fields", fields)
-        self.assertRaises(
-            errors.InvalidConfiguration, setattr, opman, "fields", None)
-        opman = OplogThread(
-            primary_client=self.primary_conn,
-            doc_managers=(DocManager(),),
-            oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config,
-            exclude_fields=None,
-            fields=fields
-        )
-        self._check_fields(opman, fields, [], dict((f, 1) for f in fields))
-        self.assertRaises(errors.InvalidConfiguration, setattr, opman,
-                          "exclude_fields", exclude_fields)
-        self.assertRaises(errors.InvalidConfiguration, setattr, opman,
-                          "exclude_fields", None)
-        self.assertRaises(
-            errors.InvalidConfiguration, OplogThread,
-            self.primary_conn,
-            (DocManager(),),
-            LockingDict(),
-            self.namespace_config,
-            fields=fields,
-            exclude_fields=exclude_fields)
 
 
 class TestFindFields(unittest.TestCase):
