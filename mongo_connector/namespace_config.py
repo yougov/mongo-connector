@@ -24,12 +24,17 @@ from mongo_connector import errors
 LOG = logging.getLogger(__name__)
 
 
-_Namespace = namedtuple('Namespace', ['dest_name', 'source_name'])
+_Namespace = namedtuple('Namespace', ['dest_name', 'source_name',
+                                      'include_fields', 'exclude_fields'])
 
 
 class Namespace(_Namespace):
-    def __new__(cls, dest_name=None, source_name=None):
-        return super(Namespace, cls).__new__(cls, dest_name, source_name)
+    def __new__(cls, dest_name=None, source_name=None, include_fields=None,
+                exclude_fields=None):
+        include_fields = set(include_fields or [])
+        exclude_fields = set(exclude_fields or [])
+        return super(Namespace, cls).__new__(
+            cls, dest_name, source_name, include_fields, exclude_fields)
 
 
 class RegexSet(MutableSet):
@@ -89,7 +94,7 @@ class NamespaceConfig(object):
     """Manages included and excluded namespaces.
     """
     def __init__(self, namespace_set=None, ex_namespace_set=None,
-                 user_mapping=None):
+                 user_mapping=None, include_fields=None, exclude_fields=None):
         # A mapping from non-wildcard source namespaces to a MappedNamespace
         # containing the non-wildcard target name.
         self._plain = {}
@@ -108,6 +113,10 @@ class NamespaceConfig(object):
         # created in `self.plain` for faster subsequent lookups.
         self._regex_map = []
 
+        # Fields to include or exclude from all namespaces
+        self._include_fields = validate_include_fields(include_fields)
+        self._exclude_fields = validate_exclude_fields(exclude_fields)
+
         # The set of namespaces to exclude. Can contain wildcard namespaces.
         self._ex_namespace_set = RegexSet.from_namespaces(
             ex_namespace_set or [])
@@ -123,20 +132,37 @@ class NamespaceConfig(object):
 
         renames = {}
         for src_name, v in user_mapping.items():
+            include_fields, exclude_fields = None, None
             if isinstance(v, dict):
                 target_name = v.get('rename', src_name)
+                include_fields = v.get('fields')
+                exclude_fields = v.get('excludeFields')
             else:
                 target_name = v
             renames[src_name] = target_name
-            self._add_collection(src_name, target_name)
+            self._add_collection(src_name, target_name, include_fields,
+                                 exclude_fields)
         validate_target_namespaces(renames)
 
-    def _add_collection(self, src_name, dest_name=None):
+    def _add_collection(self, src_name, dest_name, include_fields,
+                        exclude_fields):
         """Add the collection name and the corresponding command namespace."""
+        include_fields = include_fields or []
+        exclude_fields = exclude_fields or []
+        if (self._include_fields and exclude_fields or
+                self._exclude_fields and include_fields or
+                include_fields and exclude_fields):
+            raise errors.InvalidConfiguration(
+                "Cannot mix include fields and exclude fields in "
+                "namespace mapping for: '%s'" % (src_name,))
         if dest_name is None:
             dest_name = src_name
         self._add_namespace(Namespace(
-            dest_name=dest_name, source_name=src_name))
+            dest_name=dest_name, source_name=src_name,
+            include_fields=validate_include_fields(self._include_fields,
+                                                   include_fields),
+            exclude_fields=validate_exclude_fields(self._exclude_fields,
+                                                   exclude_fields)))
         # Add the namespace for commands on this database
         cmd_name = src_name.split('.', 1)[0] + '.$cmd'
         dest_cmd_name = dest_name.split('.', 1)[0] + '.$cmd'
@@ -181,7 +207,9 @@ class NamespaceConfig(object):
             return None
         # Include all namespaces if there are no included namespaces.
         if not self._regex_map and not self._plain:
-            return Namespace(plain_src_ns)
+            return Namespace(dest_name=plain_src_ns, source_name=plain_src_ns,
+                             include_fields=self._include_fields,
+                             exclude_fields=self._exclude_fields)
         # First, search for the namespace in the plain namespaces.
         try:
             return self._plain[plain_src_ns]
@@ -195,7 +223,9 @@ class NamespaceConfig(object):
                 # Save the new target Namespace in the plain namespaces so
                 # future lookups are fast.
                 new_mapped = Namespace(
-                    dest_name=new_name, source_name=plain_src_ns)
+                    dest_name=new_name, source_name=plain_src_ns,
+                    include_fields=mapped.include_fields,
+                    exclude_fields=mapped.exclude_fields)
                 self._add_plain_namespace(new_mapped)
                 return new_mapped
 
@@ -254,6 +284,17 @@ class NamespaceConfig(object):
         # Lookup this namespace to seed the plain_db dictionary
         self.lookup(plain_src_db + '.$cmd')
         return list(self._plain_db.get(plain_src_db, set()))
+
+    def projection(self, plain_src_name):
+        """Return the projection for the given source namespace."""
+        mapped = self.lookup(plain_src_name)
+        if not mapped:
+            return None
+        fields = mapped.include_fields or mapped.exclude_fields
+        if fields:
+            include = 1 if mapped.include_fields else 0
+            return dict((field, include) for field in fields)
+        return None
 
 
 def _character_matches(name1, name2):
@@ -351,3 +392,23 @@ def namespace_to_regex(namespace):
     return re.compile(r'\A' +
                       re.escape(namespace).replace('\*', wildcard_group) +
                       r'\Z')
+
+
+def validate_include_fields(include_fields, namespace_fields=None):
+    include_fields = set(include_fields or [])
+    namespace_fields = set(namespace_fields or [])
+    merged = include_fields | namespace_fields
+    if merged:
+        merged.add('_id')
+    return merged
+
+
+def validate_exclude_fields(exclude_fields, namespace_fields=None):
+    exclude_fields = set(exclude_fields or [])
+    namespace_fields = set(namespace_fields or [])
+    merged = exclude_fields | namespace_fields
+    if '_id' in merged:
+        LOG.warning("OplogThread: Cannot exclude '_id' field, "
+                    "ignoring")
+        merged.discard('_id')
+    return merged
