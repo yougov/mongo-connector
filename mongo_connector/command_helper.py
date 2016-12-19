@@ -17,11 +17,15 @@
 
 import logging
 
+from mongo_connector.namespace_config import NamespaceConfig
+
 LOG = logging.getLogger(__name__)
 
 
 class CommandHelper(object):
-    def __init__(self, namespace_config):
+    def __init__(self, namespace_config=None):
+        if namespace_config is None:
+            namespace_config = NamespaceConfig()
         self.namespace_config = namespace_config
 
     # Applies the namespace mapping to a database.
