@@ -111,9 +111,6 @@ class OplogThread(threading.Thread):
         # Represents the last checkpoint for a OplogThread.
         self.oplog_progress = oplog_progress_dict
 
-        # The set of gridfs namespaces to process from the mongo cluster
-        self.gridfs_set = kwargs.get('gridfs_set', [])
-
         # The namespace configuration
         self.namespace_config = namespace_config
 
@@ -129,22 +126,6 @@ class OplogThread(threading.Thread):
         if not self.oplog.find_one():
             err_msg = 'OplogThread: No oplog for thread:'
             LOG.warning('%s %s' % (err_msg, self.primary_client))
-
-    @property
-    def gridfs_set(self):
-        return self._gridfs_set
-
-    @gridfs_set.setter
-    def gridfs_set(self, gridfs_set):
-        self._gridfs_set = gridfs_set
-        self._gridfs_files_set = [ns + '.files' for ns in gridfs_set]
-
-    @property
-    def gridfs_files_set(self):
-        try:
-            return self._gridfs_files_set
-        except AttributeError:
-            return []
 
     def _should_skip_entry(self, entry):
         """Determine if this oplog entry should be skipped.
@@ -175,8 +156,8 @@ class OplogThread(threading.Thread):
 
         is_gridfs_file = False
         if coll.endswith(".files"):
-            if ns in self.gridfs_files_set:
-                ns = ns[:-len(".files")]
+            ns = ns[:-len(".files")]
+            if self.namespace_config.gridfs_namespace(ns):
                 is_gridfs_file = True
             else:
                 return True, False
@@ -189,24 +170,19 @@ class OplogThread(threading.Thread):
         # Rename or filter out namespaces that are ignored keeping
         # included gridfs namespaces.
         namespace = self.namespace_config.lookup(ns)
-        include_fields = None
-        exclude_fields = None
         if namespace is None:
-            # Gridfs files should not be skipped
-            if not is_gridfs_file:
-                LOG.debug("OplogThread: Skipping oplog entry: "
-                          "'%s' is not in the namespace set." % (ns,))
-                return True, False
-        else:
-            # Update the namespace.
-            entry['ns'] = namespace.dest_name
-            include_fields = namespace.include_fields
-            exclude_fields = namespace.exclude_fields
+            LOG.debug("OplogThread: Skipping oplog entry: "
+                      "'%s' is not in the namespace configuration." % (ns,))
+            return True, False
+
+        # Update the namespace.
+        entry['ns'] = namespace.dest_name
 
         # Take fields out of the oplog entry that shouldn't be replicated.
         # This may nullify the document if there's nothing to do.
-        if not self.filter_oplog_entry(entry, include_fields=include_fields,
-                                       exclude_fields=exclude_fields):
+        if not self.filter_oplog_entry(
+                entry, include_fields=namespace.include_fields,
+                exclude_fields=namespace.exclude_fields):
             return True, False
         return False, is_gridfs_file
 
@@ -525,7 +501,8 @@ class OplogThread(threading.Thread):
         dump_cancelled = [False]
 
         def get_all_ns():
-            all_ns_set = []
+            ns_set = []
+            gridfs_ns_set = []
             db_list = retry_until_ok(self.primary_client.database_names)
             for database in db_list:
                 if database == "config" or database == "local":
@@ -536,15 +513,21 @@ class OplogThread(threading.Thread):
                     # ignore system collections
                     if coll.startswith("system."):
                         continue
-                    # ignore gridfs collections
-                    if coll.endswith(".files") or coll.endswith(".chunks"):
+                    # ignore gridfs chunks collections
+                    if coll.endswith(".chunks"):
                         continue
-                    namespace = "%s.%s" % (database, coll)
-                    if self.namespace_config.map_namespace(namespace):
-                        all_ns_set.append(namespace)
-            return all_ns_set
+                    if coll.endswith(".files"):
+                        namespace = "%s.%s" % (database, coll)
+                        namespace = namespace[:-len(".files")]
+                        if self.namespace_config.gridfs_namespace(namespace):
+                            gridfs_ns_set.append(namespace)
+                    else:
+                        namespace = "%s.%s" % (database, coll)
+                        if self.namespace_config.map_namespace(namespace):
+                            ns_set.append(namespace)
+            return ns_set, gridfs_ns_set
 
-        dump_set = get_all_ns()
+        dump_set, gridfs_dump_set = get_all_ns()
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
@@ -637,8 +620,12 @@ class OplogThread(threading.Thread):
                           "collection dump")
                 upsert_all(dm)
 
+                if gridfs_dump_set:
+                    LOG.info("OplogThread: dumping GridFS collections: %s",
+                             gridfs_dump_set)
+
                 # Dump GridFS files
-                for gridfs_ns in self.gridfs_set:
+                for gridfs_ns in gridfs_dump_set:
                     mongo_coll = self.get_collection(gridfs_ns)
                     from_coll = self.get_collection(gridfs_ns + '.files')
                     dest_ns = self.namespace_config.map_namespace(gridfs_ns)

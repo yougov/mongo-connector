@@ -253,17 +253,6 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
 
-        # ns_set and ex_ns_set should not exist both
-        args = {
-            "-n": "a.x,b.y",
-            "-x": "c.z"
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
-        d = {
-            'namespaces': {'include': ['a.x', 'b.y'], 'exclude': ['c.z']}
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
-
         # validate ns_set format
         args = {
             "-n": "a*.x*"
@@ -271,16 +260,6 @@ class TestConfig(unittest.TestCase):
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
             'namespaces': {'include': ['a*.x*']}
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
-
-        # validate ex_ns_set format
-        args = {
-            "-x": "a*.x*"
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
-        d = {
-            'namespaces': {'exclude': ['a*.x*']}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 

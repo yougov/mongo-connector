@@ -48,7 +48,7 @@ class TestOplogManager(unittest.TestCase):
     def reset_opman(self, include_ns=None, exclude_ns=None, dest_mapping=None):
         self.namespace_config = NamespaceConfig(namespace_set=include_ns,
                                                 ex_namespace_set=exclude_ns,
-                                                user_mapping=dest_mapping)
+                                                namespace_options=dest_mapping)
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),

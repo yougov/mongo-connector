@@ -56,7 +56,6 @@ class TestMongoConnector(unittest.TestCase):
         """
         conn = Connector(
             mongo_address=self.repl_set.uri,
-            ns_set=['test.test'],
             **connector_opts
         )
         conn.start()
@@ -81,7 +80,6 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             mongo_address=self.repl_set.uri,
             oplog_checkpoint="temp_oplog.timestamp",
-            ns_set=['test.test'],
             **connector_opts
         )
 
@@ -118,7 +116,6 @@ class TestMongoConnector(unittest.TestCase):
         conn = Connector(
             mongo_address=self.repl_set.uri,
             oplog_checkpoint=None,
-            ns_set=['test.test'],
             **connector_opts
         )
 

@@ -29,6 +29,7 @@ from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
 from mongo_connector.util import retry_until_ok
 from mongo_connector.test_utils import (ReplicaSet,
+                                        ReplicaSetSingle,
                                         Server,
                                         connector_opts,
                                         assert_soon,
@@ -70,33 +71,17 @@ class MongoTestCase(unittest.TestCase):
                     yield doc
 
     def _remove(self):
-        self.mongo_conn['test']['test'].drop()
-        self.mongo_conn['test']['test.files'].drop()
-        self.mongo_conn['test']['test.chunks'].drop()
+        for db in self.mongo_conn.database_names():
+            if db not in ["local", "admin"]:
+                self.mongo_conn.drop_database(db)
 
 
-class TestMongo(MongoTestCase):
-    """ Tests the mongo instance
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        MongoTestCase.setUpClass()
-        cls.repl_set = ReplicaSet().start()
-        cls.conn = cls.repl_set.client()
-
-    @classmethod
-    def tearDownClass(cls):
-        """ Kills cluster instance
-        """
-        MongoTestCase.tearDownClass()
-        cls.repl_set.stop()
-
-    def tearDown(self):
-        self.connector.join()
-        self.drop_all_databases()
+class MongoReplicaSetTestCase(MongoTestCase):
 
     def setUp(self):
+        self.repl_set = self.replica_set_class().start()
+        self.conn = self.repl_set.client()
+
         try:
             os.unlink("oplog.timestamp")
         except OSError:
@@ -104,15 +89,14 @@ class TestMongo(MongoTestCase):
         self._remove()
         self.connector = Connector(
             mongo_address=self.repl_set.uri,
-            ns_set=['test.test', 'rename.me'],
-            dest_mapping={'rename.me': 'new.target',
-                          'rename.me2': 'new2.target2'},
             doc_managers=(self.mongo_doc,),
-            gridfs_set=['test.test'],
+            namespace_options={
+                'test.test': {'gridfs': True},
+                'rename.me': 'new.target',
+                'rename.me2': 'new2.target2'
+            },
             **connector_opts
         )
-
-        self.drop_all_databases()
 
         self.connector.start()
         assert_soon(lambda: len(self.connector.shard_set) > 0)
@@ -125,6 +109,19 @@ class TestMongo(MongoTestCase):
         for name in self.conn.database_names():
             if name not in ["local", "admin"]:
                 self.conn.drop_database(name)
+
+    def tearDown(self):
+        self.connector.join()
+        self.drop_all_databases()
+        self.repl_set.stop()
+
+
+class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
+    """ Tests MongoDB to MongoDB DocManager replication with a 1 node replica
+    set.
+    """
+
+    replica_set_class = ReplicaSetSingle
 
     def test_insert(self):
         """Tests insert
@@ -263,6 +260,14 @@ class TestMongo(MongoTestCase):
         assert_soon(
             lambda: "target" not in self.mongo_conn.new.collection_names())
         self.check_renamed_insert("new2.target2")
+
+
+class TestMongoReplicaSet(MongoReplicaSetTestCase):
+    """ Tests MongoDB to MongoDB DocManager replication with a 3 node replica
+    set.
+    """
+
+    replica_set_class = ReplicaSet
 
     def test_rollback(self):
         """Tests rollback. We force a rollback by adding a doc, killing the
