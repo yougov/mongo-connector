@@ -37,18 +37,41 @@
 
     "__fields": ["field1", "field2", "field3"],
 
-    "namespaces": {
-        "__include": ["db.source1", "db.source2", "db2.*"],
-        "__exclude": ["db3.source1", "db3.*"],
-        "__mapping": {
-            "db.source1": "db.dest1",
-            "db.source2": "db.dest2",
-            "db2.*": "db2.dest_*",
-            "db.col_*": {
-                "rename": "db.new_name_*"
-            }
+    "__namespaces": {
+        "excluded.collection": false,
+        "excluded_wildcard.*": false,
+        "*.exclude_collection_from_every_database": false,
+        "included.collection1": true,
+        "included.collection2": {},
+        "included.collection4": {
+            "includeFields": ["included_field", "included.nested.field"]
         },
-        "__gridfs": ["db.fs"]
+        "included.collection5": {
+            "rename": "included.new_collection5_name",
+            "includeFields": ["included_field", "included.nested.field"]
+        },
+        "included.collection6": {
+            "excludeFields": ["excluded_field", "excluded.nested.field"]
+        },
+        "included.collection7": {
+            "rename": "included.new_collection7_name",
+            "excludeFields": ["excluded_field", "excluded.nested.field"]
+        },
+        "included_wildcard1.*": true,
+        "included_wildcard2.*": true,
+        "renamed.collection1": "something.else1",
+        "renamed.collection2": {
+            "rename": "something.else2"
+        },
+        "renamed_wildcard.*": {
+            "rename": "new_name.*"
+        },
+        "gridfs.collection": {
+            "gridfs": true
+        },
+        "gridfs_wildcard.*": {
+            "gridfs": true
+        }
     },
 
     "docManagers": [

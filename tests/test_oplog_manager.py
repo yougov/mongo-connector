@@ -21,6 +21,7 @@ import sys
 import time
 
 import bson
+import gridfs
 import pymongo
 
 sys.path[0:0] = [""]
@@ -49,7 +50,12 @@ class TestOplogManager(unittest.TestCase):
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            namespace_config=NamespaceConfig(),
+            namespace_config=NamespaceConfig(
+                namespace_options={
+                    'test.*': True,
+                    'gridfs.*': {'gridfs': True}
+                }
+            ),
         )
 
     def tearDown(self):
@@ -121,7 +127,7 @@ class TestOplogManager(unittest.TestCase):
         Cases:
 
         1. empty oplog
-        2. non-empty oplog
+        2. non-empty oplog, with gridfs collections
         3. non-empty oplog, specified a namespace-set, none of the oplog
            entries are for collections in the namespace-set
         """
@@ -131,15 +137,21 @@ class TestOplogManager(unittest.TestCase):
         last_ts = self.opman.dump_collection()
         self.assertEqual(last_ts, None)
 
-        # Test with non-empty oplog
+        # Test with non-empty oplog with gridfs collections
         self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
+        # Insert 10 gridfs files
+        for i in range(10):
+            fs = gridfs.GridFS(self.primary_conn["gridfs"],
+                               collection="test" + str(i))
+            fs.put(b"hello world")
+        # Insert 1000 documents
         for i in range(1000):
             self.primary_conn["test"]["test"].insert_one({
                 "i": i + 500
             })
         last_ts = self.opman.get_last_oplog_timestamp()
         self.assertEqual(last_ts, self.opman.dump_collection())
-        self.assertEqual(len(self.opman.doc_managers[0]._search()), 1000)
+        self.assertEqual(len(self.opman.doc_managers[0]._search()), 1010)
 
         # Case 3
         # 1MB oplog so that we can rollover quickly
@@ -314,7 +326,7 @@ class TestOplogManager(unittest.TestCase):
         dest_mapping = {"test.test1": "test.test1_dest",
                         "test.test2": "test.test2_dest"}
         self.opman.namespace_config = NamespaceConfig(
-            namespace_set=source_ns, user_mapping=dest_mapping)
+            namespace_set=source_ns, namespace_options=dest_mapping)
         docman = self.opman.doc_managers[0]
         # start replicating
         self.opman.start()

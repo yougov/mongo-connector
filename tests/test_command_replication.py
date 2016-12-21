@@ -112,7 +112,7 @@ class TestCommandReplication(unittest.TestCase):
         }
 
         helper = CommandHelper(NamespaceConfig(
-            namespace_set=list(mapping) + ['a.z'], user_mapping=mapping))
+            namespace_set=list(mapping) + ['a.z'], namespace_options=mapping))
 
         self.assertEqual(set(helper.map_db('a')), set(['a', 'b', 'c']))
         self.assertEqual(helper.map_db('d'), [])

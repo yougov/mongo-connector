@@ -232,7 +232,7 @@ class TestMongoDocManager(MongoTestCase):
         # renaming a database.
         namespace_config = NamespaceConfig(
             namespace_set=['test.test', 'test.test2', 'test.drop'],
-            user_mapping={
+            namespace_options={
              'test.test': 'test.othertest',
              'test.drop': 'dropped.collection'
             })

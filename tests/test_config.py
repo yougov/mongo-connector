@@ -253,17 +253,6 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
 
-        # ns_set and ex_ns_set should not exist both
-        args = {
-            "-n": "a.x,b.y",
-            "-x": "c.z"
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
-        d = {
-            'namespaces': {'include': ['a.x', 'b.y'], 'exclude': ['c.z']}
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
-
         # validate ns_set format
         args = {
             "-n": "a*.x*"
@@ -271,16 +260,6 @@ class TestConfig(unittest.TestCase):
         self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
         d = {
             'namespaces': {'include': ['a*.x*']}
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
-
-        # validate ex_ns_set format
-        args = {
-            "-x": "a*.x*"
-        }
-        self.assertRaises(errors.InvalidConfiguration, self.load_options, args)
-        d = {
-            'namespaces': {'exclude': ['a*.x*']}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
@@ -302,6 +281,19 @@ class TestConfig(unittest.TestCase):
             }}
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
+
+    def test_validate_mixed_namespace_format(self):
+        # It is invalid to combine new and old namespace formats
+        mix_namespaces = [
+            {'mapping': {'old.format': 'old.format2'}, 'new.format': True},
+            {'gridfs': ['old.format'], 'new.format': True},
+            {'include': ['old.format'], 'new.format': True},
+            {'exclude': ['old.format'], 'new.format': True},
+        ]
+        for namespaces in mix_namespaces:
+            with self.assertRaises(errors.InvalidConfiguration):
+                self.load_json({'namespaces': namespaces})
+
 
     def test_doc_managers_from_args(self):
         # Test basic docmanager construction from args
