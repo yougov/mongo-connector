@@ -782,11 +782,12 @@ def get_config_options():
     def apply_namespaces(option, cli_values):
         if (option.value['include'] or option.value['exclude'] or
                 option.value['mapping'] or option.value['gridfs']):
-            return apply_disjoint_namespace_options(option, cli_values)
+            return apply_old_namespace_options(option, cli_values)
         else:
-            return apply_unified_namespace_options(option, cli_values)
+            return apply_new_namespace_options(option, cli_values)
 
-    def apply_unified_namespace_options(option, cli_values):
+    def apply_new_namespace_options(option, cli_values):
+        """Apply the new format (since 2.5.0) namespaces options."""
         merge_namespaces_cli(option, cli_values)
         namespace_options = copy.deepcopy(option.value)
         ns_set = namespace_options.pop('include', None)
@@ -800,13 +801,30 @@ def get_config_options():
             dest_mapping=dest_mapping,
             namespace_options=namespace_options, gridfs_set=gridfs_set)
 
-    def apply_disjoint_namespace_options(option, cli_values):
+    def apply_old_namespace_options(option, cli_values):
+        """Apply the old format (before 2.5.0) namespaces options."""
         merge_namespaces_cli(option, cli_values)
+
+        LOG.warning("Deprecation warning: the current namespaces "
+                    "configuration format is outdated and support may be "
+                    "removed in a future release. Please update your "
+                    "config file to use the new format.")
 
         ns_set = option.value['include']
         ex_ns_set = option.value['exclude']
         gridfs_set = option.value['gridfs']
         dest_mapping = option.value['mapping']
+
+        valid_names = set(['include', 'exclude', 'gridfs', 'mapping'])
+        valid_names |= set('__' + name for name in valid_names)
+        valid_names.add('__comment__')
+        for key in option.value:
+            if key not in valid_names:
+                raise errors.InvalidConfiguration(
+                    "Invalid option %s in old style (pre 2.5.0) namespaces "
+                    "configuration. The only valid option names are: %r" %
+                    (key, list(valid_names)))
+
 
         validate_namespace_options(
             namespace_set=ns_set, ex_namespace_set=ex_ns_set,

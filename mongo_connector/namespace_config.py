@@ -315,11 +315,11 @@ def wildcards_overlap(name1, name2):
     return False
 
 
-def _validate_collection(name):
-    """Return true if this name looks like a MongoDB collection name."""
+def _validate_namespace(name):
+    """Validate a MongoDB namespace."""
     if name.find('.', 1, len(name) - 1) < 0:
         raise errors.InvalidConfiguration(
-            "Invalid MongoDB collection name '%s'!" % (name,))
+            "Invalid MongoDB namespace '%s'!" % (name,))
 
 
 def _validate_namespaces(namespaces):
@@ -331,8 +331,8 @@ def _validate_namespaces(namespaces):
     """
     for source, namespace in namespaces.items():
         target = namespace.dest_name
-        _validate_collection(source)
-        _validate_collection(target)
+        _validate_namespace(source)
+        _validate_namespace(target)
         if source.count("*") > 1 or target.count("*") > 1:
             raise errors.InvalidConfiguration(
                 "The namespace mapping from '%s' to '%s' cannot contain more "
@@ -374,11 +374,15 @@ def _validate_namespaces(namespaces):
                 (source2, target2, source1, target1))
 
 
-def _construct_namespace_options(namespace_set=None, ex_namespace_set=None,
-                                 gridfs_set=None, dest_mapping=None,
-                                 namespace_options=None,
-                                 include_fields=None, exclude_fields=None):
-    """Convert old style namespace configuration options."""
+def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
+                             gridfs_set=None, dest_mapping=None,
+                             namespace_options=None,
+                             include_fields=None, exclude_fields=None):
+    """Merges namespaces options together.
+
+    The first is the set of excluded namespaces and the second is a mapping
+    from source namespace to Namespace instances.
+    """
     namespace_set = set(namespace_set or [])
     ex_namespace_set = set(ex_namespace_set or [])
     gridfs_set = set(gridfs_set or [])
@@ -442,7 +446,7 @@ def validate_namespace_options(namespace_set=None, ex_namespace_set=None,
                                gridfs_set=None, dest_mapping=None,
                                namespace_options=None,
                                include_fields=None, exclude_fields=None):
-    ex_namespace_set, namespaces = _construct_namespace_options(
+    ex_namespace_set, namespaces = _merge_namespace_options(
         namespace_set=namespace_set,
         ex_namespace_set=ex_namespace_set,
         gridfs_set=gridfs_set,
@@ -452,7 +456,7 @@ def validate_namespace_options(namespace_set=None, ex_namespace_set=None,
         exclude_fields=exclude_fields)
 
     for excluded_name in ex_namespace_set:
-        _validate_collection(excluded_name)
+        _validate_namespace(excluded_name)
         if excluded_name in namespaces:
             raise errors.InvalidConfiguration(
                 "Cannot include namespace '%s', it is already excluded." %
@@ -511,7 +515,6 @@ def validate_exclude_fields(exclude_fields, namespace_fields=None):
     namespace_fields = set(namespace_fields or [])
     merged = exclude_fields | namespace_fields
     if '_id' in merged:
-        LOG.warning("OplogThread: Cannot exclude '_id' field, "
-                    "ignoring")
+        LOG.warning("Cannot exclude '_id' field, ignoring")
         merged.discard('_id')
     return merged

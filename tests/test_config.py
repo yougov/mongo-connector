@@ -282,6 +282,19 @@ class TestConfig(unittest.TestCase):
         }
         self.assertRaises(errors.InvalidConfiguration, self.load_json, d)
 
+    def test_validate_mixed_namespace_format(self):
+        # It is invalid to combine new and old namespace formats
+        mix_namespaces = [
+            {'mapping': {'old.format': 'old.format2'}, 'new.format': True},
+            {'gridfs': ['old.format'], 'new.format': True},
+            {'include': ['old.format'], 'new.format': True},
+            {'exclude': ['old.format'], 'new.format': True},
+        ]
+        for namespaces in mix_namespaces:
+            with self.assertRaises(errors.InvalidConfiguration):
+                self.load_json({'namespaces': namespaces})
+
+
     def test_doc_managers_from_args(self):
         # Test basic docmanager construction from args
         args = {
