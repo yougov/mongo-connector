@@ -110,17 +110,14 @@ class DocManager(DocManagerBase):
             return namespace
 
     @wrap_exceptions
-    def _namespaces(self):
-        """Provides the list of namespaces being replicated to MongoDB
+    def _meta_collections(self):
+        """Provides the meta collections currently being used
         """
         if self.use_single_meta_collection:
-            # This method will not return all the collections, only the ones
-            # with operations currently present in the capped meta collection.
-            # That is okay because _namespaces is only used to search for
-            # documents inside the meta collection.
-            return self.meta_database[self.meta_collection_name].distinct('ns')
+            yield self.meta_collection_name
         else:
-            return self.meta_database.collection_names()
+            for name in self.meta_database.collection_names():
+                yield name
 
     def stop(self):
         """Stops any running threads
@@ -280,13 +277,10 @@ class DocManager(DocManagerBase):
     def search(self, start_ts, end_ts):
         """Called to query Mongo for documents in a time range.
         """
-        for namespace in self._namespaces():
-            meta_collection_name = self._get_meta_collection(namespace)
-            for ts_ns_doc in self.meta_database[meta_collection_name].find(
-                {'ns': namespace,
-                 '_ts': {'$lte': end_ts,
-                         '$gte': start_ts}}
-            ):
+        for meta_collection_name in self._meta_collections():
+            meta_coll = self.meta_database[meta_collection_name]
+            for ts_ns_doc in meta_coll.find(
+                    {'_ts': {'$lte': end_ts, '$gte': start_ts}}):
                 yield ts_ns_doc
 
     def commit(self):
@@ -299,11 +293,9 @@ class DocManager(DocManagerBase):
         """Returns the last document stored in Mongo.
         """
         def docs_by_ts():
-            for namespace in self._namespaces():
-                meta_collection = self._get_meta_collection(namespace)
-                mc_coll = self.meta_database[meta_collection]
-                mc_cursor = mc_coll.find({'ns': namespace}, limit=-1)
-                for ts_ns_doc in mc_cursor.sort('_ts', -1):
+            for meta_collection_name in self._meta_collections():
+                meta_coll = self.meta_database[meta_collection_name]
+                for ts_ns_doc in meta_coll.find(limit=-1).sort('_ts', -1):
                     yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x: x["_ts"])

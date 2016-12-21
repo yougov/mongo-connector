@@ -54,18 +54,23 @@ class TestMongoDocManager(MongoTestCase):
             db, coll = ns.split('.', 1)
             conn[db][coll].drop()
 
-    def test_namespaces(self):
-        """Ensure that a DocManager returns the correct set of replicated
-        namespaces
+    def test_meta_collections(self):
+        """Ensure that a DocManager returns the correct set of meta collection
+        names.
         """
-        # Before replication no namespaces should be returned
-        self.assertEqual(set(self.choosy_docman._namespaces()), set())
-        self.choosy_docman.upsert({"_id": "1"}, *TESTARGS)
-        self.assertEqual(set(self.choosy_docman._namespaces()),
-                         set(["test.test"]))
-        self.choosy_docman.upsert({"_id": "1"}, "foo.bar", 1)
-        self.assertEqual(set(self.choosy_docman._namespaces()),
-                         set(["test.test", "foo.bar"]))
+        meta_collection_names = set()
+        if self.use_single_meta_collection:
+            meta_collection_names.add(self.choosy_docman.meta_collection_name)
+        # Before replication only the single meta_collection should be
+        # returned.
+        self.assertEqual(set(self.choosy_docman._meta_collections()),
+                         meta_collection_names)
+        for namespace in ["test.test", "foo.bar", "test.bar"]:
+            if not self.use_single_meta_collection:
+                meta_collection_names.add(namespace)
+            self.choosy_docman.upsert({"_id": "1"}, namespace, 1)
+            self.assertEqual(set(self.choosy_docman._meta_collections()),
+                             meta_collection_names)
 
     def test_update(self):
         doc_id = '1'
