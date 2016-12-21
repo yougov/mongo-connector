@@ -120,10 +120,10 @@ class TestMongo(MongoTestCase):
 
     def drop_all_databases(self):
         for name in self.mongo_conn.database_names():
-            if name != "local":
+            if name not in ["local", "admin"]:
                 self.mongo_conn.drop_database(name)
         for name in self.conn.database_names():
-            if name != "local":
+            if name not in ["local", "admin"]:
                 self.conn.drop_database(name)
 
     def test_insert(self):

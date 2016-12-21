@@ -37,7 +37,6 @@ class TestMongoDocManager(MongoTestCase):
     def setUpClass(cls):
         MongoTestCase.setUpClass()
         cls.namespaces_inc = ["test.test_include1", "test.test_include2"]
-        cls.namespaces_exc = ["test.test_exclude1", "test.test_exclude2"]
 
     def setUp(self):
         """Empty Mongo at the start of every test
@@ -51,9 +50,22 @@ class TestMongoDocManager(MongoTestCase):
         self._remove()
 
         conn = self.standalone.client()
-        for ns in self.namespaces_inc + self.namespaces_exc:
+        for ns in self.namespaces_inc:
             db, coll = ns.split('.', 1)
-            conn[db][coll].delete_many({})
+            conn[db][coll].drop()
+
+    def test_namespaces(self):
+        """Ensure that a DocManager returns the correct set of replicated
+        namespaces
+        """
+        # Before replication no namespaces should be returned
+        self.assertEqual(set(self.choosy_docman._namespaces()), set())
+        self.choosy_docman.upsert({"_id": "1"}, *TESTARGS)
+        self.assertEqual(set(self.choosy_docman._namespaces()),
+                         set(["test.test"]))
+        self.choosy_docman.upsert({"_id": "1"}, "foo.bar", 1)
+        self.assertEqual(set(self.choosy_docman._namespaces()),
+                         set(["test.test", "foo.bar"]))
 
     def test_update(self):
         doc_id = '1'

@@ -113,18 +113,14 @@ class DocManager(DocManagerBase):
     def _namespaces(self):
         """Provides the list of namespaces being replicated to MongoDB
         """
-        user_namespaces = []
-        db_list = self.mongo.database_names()
-        for database in db_list:
-            if database == "config" or database == "local":
-                continue
-            coll_list = self.mongo[database].collection_names()
-            for coll in coll_list:
-                if coll.startswith("system"):
-                    continue
-                namespace = "%s.%s" % (database, coll)
-                user_namespaces.append(namespace)
-        return user_namespaces
+        if self.use_single_meta_collection:
+            # This method will not return all the collections, only the ones
+            # with operations currently present in the capped meta collection.
+            # That is okay because _namespaces is only used to search for
+            # documents inside the meta collection.
+            return self.meta_database[self.meta_collection_name].distinct('ns')
+        else:
+            return self.meta_database.collection_names()
 
     def stop(self):
         """Stops any running threads
