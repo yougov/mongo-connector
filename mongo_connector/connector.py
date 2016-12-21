@@ -112,13 +112,13 @@ class Connector(threading.Thread):
         ssl_keyfile = kwargs.pop('ssl_keyfile', None)
         ssl_cert_reqs = kwargs.pop('ssl_cert_reqs', None)
         self.ssl_kwargs = {}
-        if ssl_certfile:
+        if ssl_certfile is not None:
             self.ssl_kwargs['ssl_certfile'] = ssl_certfile
-        if ssl_ca_certs:
+        if ssl_ca_certs is not None:
             self.ssl_kwargs['ssl_ca_certs'] = ssl_ca_certs
-        if ssl_keyfile:
+        if ssl_keyfile is not None:
             self.ssl_kwargs['ssl_keyfile'] = ssl_keyfile
-        if ssl_cert_reqs:
+        if ssl_cert_reqs is not None:
             self.ssl_kwargs['ssl_cert_reqs'] = ssl_cert_reqs
 
         # Save the rest of kwargs.
@@ -1056,8 +1056,9 @@ def get_config_options():
         option.value.setdefault('sslCertfile', ssl_certfile)
         option.value.setdefault('sslCACerts', ssl_ca_certs)
         option.value.setdefault('sslKeyfile', ssl_keyfile)
+        option.value.setdefault('sslCertificatePolicy', ssl_cert_reqs)
         option.value['sslCertificatePolicy'] = _SSL_POLICY_MAP.get(
-            ssl_cert_reqs)
+            option.value['sslCertificatePolicy'])
     ssl = add_option(
         config_key="ssl",
         default={},
