@@ -116,7 +116,8 @@ class DocManager(DocManagerBase):
         if self.use_single_meta_collection:
             yield self.meta_collection_name
         else:
-            for name in self.meta_database.collection_names():
+            for name in self.meta_database.collection_names(
+                    include_system_collections=False):
                 yield name
 
     def stop(self):
