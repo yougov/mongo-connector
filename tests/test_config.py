@@ -407,7 +407,7 @@ class TestConnectorConfig(unittest.TestCase):
             "sslCertfile": "certfile.pem",
             "sslKeyfile": "certfile.key",
             "sslCACerts": "ca.pem",
-            "sslCertificatePolicy": "required"
+            "sslCertificatePolicy": "optional"
         },
 
         "fields": ["field1", "field2", "field3"],
@@ -461,7 +461,7 @@ class TestConnectorConfig(unittest.TestCase):
         '-g', 'foo2.bar2,fiz2.biz2',
         '--ssl-certfile', 'certfile2.pem',
         '--ssl-ca-certs', 'ca2.pem',
-        '--ssl-certificate-policy', 'optional'
+        '--ssl-certificate-policy', 'ignored'
     ]
 
     # Set of files to keep in the 'lib' directory after each run.
