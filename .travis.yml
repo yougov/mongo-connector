@@ -14,8 +14,10 @@ matrix:
       env: MONGODB=3.2.11
     - python: 3.3
       env: MONGODB=3.0.14
-    - python: 3.5
+    - python: 3.4
       env: MONGODB=2.6.12
+    - python: 3.5
+      env: MONGODB=2.4.14
 
 install:
   - pip install "mongo-orchestration>=0.6.7,<1.0"
