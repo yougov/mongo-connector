@@ -137,7 +137,10 @@ setup(name='mongo-connector',
       extras_require={
           "solr": ["solr-doc-manager"],
           "elastic": ["elastic-doc-manager"],
-          "elastic2": ["elastic2-doc-manager"]
+          "elastic-aws": ["elastic-doc-manager[aws]"],
+          "elastic2": ["elastic2-doc-manager[elastic2]"],
+          "elastic5": ["elastic2-doc-manager[elastic5]"],
+          "elastic2-aws": ["elastic2-doc-manager[elastic2,aws]"],
       },
       **extra_opts
 )

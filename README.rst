@@ -6,7 +6,8 @@ mongo-connector
    :alt: View build status
    :target: https://travis-ci.org/mongodb-labs/mongo-connector
 
-For complete documentation, check out the `Mongo Connector Wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
+For complete documentation, check out the `Mongo Connector Wiki
+<https://github.com/mongodb-labs/mongo-connector/wiki>`__.
 
 System Overview
 ---------------
@@ -14,30 +15,57 @@ System Overview
 `mongo-connector` creates a pipeline from a MongoDB cluster to one or more
 target systems, such as Solr, Elasticsearch, or another MongoDB cluster.  It
 synchronizes data in MongoDB to the target then tails the MongoDB oplog, keeping
-up with operations in MongoDB in real-time. It has been tested with Python 2.6,
-2.7, and 3.3+. Detailed documentation is available on the `wiki
-<https://github.com/10gen-labs/mongo-connector/wiki>`__.
+up with operations in MongoDB in real-time. Detailed documentation is
+available on the `wiki
+<https://github.com/mongodb-labs/mongo-connector/wiki>`__.
 
 Getting Started
 ---------------
 
+mongo-connector supports Python 2.6, 2.7, and 3.3+ and MongoDB versions
+2.6, 3.0, 3.2, and 3.4.
+
 Installation
 ~~~~~~~~~~~~
 
-The easiest way to install mongo-connector is with
-`pip <https://pypi.python.org/pypi/pip>`__::
+To install mongo-connector with the MongoDB doc manager suitable for
+replicating data to MongoDB, use `pip <https://pypi.python.org/pypi/pip>`__::
 
   pip install mongo-connector
+
+
+The install command can be customized to include the `Doc Managers`_
+and any extra dependencies for the target system.
+
++----------------------------------+-------------------------------------------------+
+|         Target System            |            Install Command                      |
++==================================+=================================================+
+| MongoDB                          | ``pip install mongo-connector``                 |
++----------------------------------+-------------------------------------------------+
+| Elasticsearch 1.x                | ``pip install 'mongo-connector[elastic]'``      |
++----------------------------------+-------------------------------------------------+
+| Amazon Elasticsearch 1.x Service | ``pip install 'mongo-connector[elastic-aws]'``  |
++----------------------------------+-------------------------------------------------+
+| Elasticsearch 2.x                | ``pip install 'mongo-connector[elastic2]'``     |
++----------------------------------+-------------------------------------------------+
+| Amazon Elasticsearch 2.x Service | ``pip install 'mongo-connector[elastic2-aws]'`` |
++----------------------------------+-------------------------------------------------+
+| Elasticsearch 5.x                | ``pip install 'mongo-connector[elastic5]'``     |
++----------------------------------+-------------------------------------------------+
+| Solr                             | ``pip install 'mongo-connector[solr]'``         |
++----------------------------------+-------------------------------------------------+
+
+You may have to run ``pip`` with ``sudo``, depending
+on where you're installing mongo-connector and what privileges you have.
+
+Developement
+~~~~~~~~~~~~
 
 You can also install the development version of mongo-connector
 manually::
 
-  git clone https://github.com/10gen-labs/mongo-connector.git
-  cd mongo-connector
-  python setup.py install
-
-You may have to run ``python setup.py install`` with ``sudo``, depending
-on where you're installing mongo-connector and what privileges you have.
+  git clone https://github.com/mongodb-labs/mongo-connector.git
+  pip install ./mongo-connector
 
 Using mongo-connector
 ~~~~~~~~~~~~~~~~~~~~~
@@ -65,26 +93,30 @@ simplest invocation resembles the following::
 
 mongo-connector has many other options besides those demonstrated above.
 To get a full listing with descriptions, try ``mongo-connector --help``.
-You can also use mongo-connector with a `configuration file <https://github.com/10gen-labs/mongo-connector/wiki/Configuration-File>`__.
+You can also use mongo-connector with a `configuration file <https://github.com/mongodb-labs/mongo-connector/wiki/Configuration-File>`__.
 
 If you want to jump-start into using mongo-connector with a another particular system, check out:
 
-- `Usage with Solr <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20Solr>`__
-- `Usage with Elasticsearch <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
-- `Usage with MongoDB <https://github.com/10gen-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
+- `Usage with Solr <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20Solr>`__
+- `Usage with Elasticsearch <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
+- `Usage with MongoDB <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
 
 Doc Managers
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
 
-Elastic 1.x doc manager: https://github.com/mongodb-labs/elastic-doc-manager
+Elasticsearch 1.x: https://github.com/mongodb-labs/elastic-doc-manager
 
-Elastic 2.x doc manager: https://github.com/mongodb-labs/elastic2-doc-manager
+Elasticsearch 2.x and 5.x: https://github.com/mongodb-labs/elastic2-doc-manager
 
-The Solr doc manager and the MongoDB doc manager come packaged with the mongo-connector project.
+Solr: https://github.com/mongodb-labs/solr-doc-manager
+
+The MongoDB doc manager comes packaged with the mongo-connector project.
 
 Troubleshooting/Questions
 -------------------------
 
 Having trouble with installation? Have a question about Mongo Connector?
-Your question or problem may be answered in the `FAQ <https://github.com/10gen-labs/mongo-connector/wiki/FAQ>`__ or in the `wiki <https://github.com/10gen-labs/mongo-connector/wiki>`__.
-If you can't find the answer to your question or problem there, feel free to `open an issue <https://github.com/10gen-labs/mongo-connector/issues>`__ on Mongo Connector's Github page.
+Your question or problem may be answered in the `FAQ <https://github.com/mongodb-labs/mongo-connector/wiki/FAQ>`__
+or in the `wiki <https://github.com/mongodb-labs/mongo-connector/wiki>`__.
+If you can't find the answer to your question or problem there, feel free to `open an issue
+<https://github.com/mongodb-labs/mongo-connector/issues>`__ on Mongo Connector's Github page.
