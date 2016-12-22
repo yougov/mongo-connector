@@ -4,7 +4,7 @@ Changelog
 Version 2.5.0
 -------------
 
-Version 2.5.0 adds some new features, bug fixes, and few breaking changes.
+Version 2.5.0 adds some new features, bug fixes, and minor breaking changes.
 
 New Features
 ~~~~~~~~~~~~
@@ -16,7 +16,7 @@ New Features
 - Adds a new config file format for the `namespaces` option.
 - Logs environment information on startup.
 - The doc managers can now be installed through extras_require with pip.
-- mongo-connector now tests against MongoDB versions 2.6, 3.0, 3.2, and 3.4.
+- mongo-connector now tests against MongoDB versions 2.4, 2.6, 3.0, 3.2, and 3.4.
 
 
 Bug Fixes
@@ -33,7 +33,6 @@ Bug Fixes
 Breaking Changes
 ~~~~~~~~~~~~~~~~
 
-- Drops testing of MongoDB 2.4.
 - Asterisks (*) in namespaces configuration are now interpreted as wildcards.
 
 Version 2.4.1
