@@ -1,6 +1,41 @@
 Changelog
 =========
 
+Version 2.5.0
+-------------
+
+Version 2.5.0 adds some new features, bug fixes, and few breaking changes.
+
+New Features
+~~~~~~~~~~~~
+
+- Support for MongoDB 3.4.
+- Support including or excluding fields per namespace.
+- Support wildcards (*) in namespaces.
+- Support for including and excluding different namespaces at the same time.
+- Adds a new config file format for the `namespaces` option.
+- Logs environment information on startup.
+- The doc managers can now be installed through extras_require with pip.
+- mongo-connector now tests against MongoDB versions 2.6, 3.0, 3.2, and 3.4.
+
+
+Bug Fixes
+~~~~~~~~~
+
+- mongo-connector now gracefully exits on SIGTERM.
+- Improved handling of rollbacks.
+- Now handles mongos connection failure while looking for shards.
+- mongo-connector can now be cancelled during the initial collection dump.
+- Improved handling of connection failure while tailing the oplog.
+- Command line doc manager specific options now override the config file.
+- Improved filtering of nested fields.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+
+- Drops testing of MongoDB 2.4.
+- Asterisks (*) in namespaces configuration are now interpreted as wildcards.
+
 Version 2.4.1
 -------------
 
