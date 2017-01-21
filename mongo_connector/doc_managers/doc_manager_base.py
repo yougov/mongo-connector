@@ -55,6 +55,31 @@ class DocManagerBase(object):
                     raise ValueError
             return looking_at
 
+        def _set_field(doc, to_set, value):
+            if '.' in to_set:
+                path = to_set.split(".")
+                where = _retrieve_path(doc, path[:-1], create=True)
+                index = _convert_or_raise(where, path[-1])
+                wl = len(where)
+                if isinstance(where, list) and index >= wl:
+                    where.extend([None] * (index + 1 - wl))
+                where[index] = value
+            else:
+                doc[to_set] = value
+
+        def _unset_field(doc, to_unset):
+            try:
+                if '.' in to_unset:
+                    path = to_unset.split(".")
+                    where = _retrieve_path(doc, path[:-1])
+                    where.pop(_convert_or_raise(where, path[-1]))
+                else:
+                    doc.pop(to_unset)
+            except KeyError:
+                # Ignore KeyError since the oplog can contain $unset on fields
+                # that does not exist
+                pass
+
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:
             # update spec contains the new document in its entirety
@@ -64,25 +89,12 @@ class DocManagerBase(object):
                 # $set
                 for to_set in update_spec.get("$set", []):
                     value = update_spec['$set'][to_set]
-                    if '.' in to_set:
-                        path = to_set.split(".")
-                        where = _retrieve_path(doc, path[:-1], create=True)
-                        index = _convert_or_raise(where, path[-1])
-                        wl = len(where)
-                        if isinstance(where, list) and index >= wl:
-                            where.extend([None] * (index + 1 - wl))
-                        where[index] = value
-                    else:
-                        doc[to_set] = value
+                    _set_field(doc, to_set, value)
 
                 # $unset
                 for to_unset in update_spec.get("$unset", []):
-                    if '.' in to_unset:
-                        path = to_unset.split(".")
-                        where = _retrieve_path(doc, path[:-1])
-                        where.pop(_convert_or_raise(where, path[-1]))
-                    else:
-                        doc.pop(to_unset)
+                    _unset_field(doc, to_unset)
+
             except (KeyError, ValueError, AttributeError, IndexError):
                 exc_t, exc_v, exc_tb = sys.exc_info()
                 reraise(UpdateDoesNotApply,
