@@ -76,8 +76,8 @@ class DocManagerBase(object):
                 else:
                     doc.pop(to_unset)
             except KeyError:
-                # Ignore KeyError since the oplog can contain $unset on fields
-                # that does not exist
+                # Ignore KeyError since a MongoDB 2.4 oplog can contain $unset
+                # on fields that do not exist.
                 pass
 
         # wholesale document replacement
