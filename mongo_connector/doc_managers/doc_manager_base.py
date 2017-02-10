@@ -72,12 +72,18 @@ class DocManagerBase(object):
                 if '.' in to_unset:
                     path = to_unset.split(".")
                     where = _retrieve_path(doc, path[:-1])
-                    where.pop(_convert_or_raise(where, path[-1]))
+                    index_or_key = _convert_or_raise(where, path[-1])
+                    if isinstance(where, list):
+                        # Unset an array element sets it to null.
+                        where[index_or_key] = None
+                    else:
+                        # Unset field removes it entirely.
+                        del where[index_or_key]
                 else:
-                    doc.pop(to_unset)
-            except KeyError:
-                # Ignore KeyError since a MongoDB 2.4 oplog can contain $unset
-                # on fields that do not exist.
+                    del doc[to_unset]
+            except (KeyError, IndexError, ValueError):
+                # Ignore unset errors since MongoDB 2.4 records invalid
+                # $unsets in the oplog.
                 pass
 
         # wholesale document replacement

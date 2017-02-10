@@ -197,6 +197,12 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
         # Update by setting an attribute of a sub-document beyond end of array.
         check_update({"$set": {"b.10.c": 42}})
 
+        # Update by un-setting an array element.
+        check_update({"$unset": {"b.10": True}})
+
+        # Update by un-setting a non-existent attribute.
+        check_update({"$unset": {"not-present": True}})
+
         # Update by changing a value within a sub-document (contains array)
         check_update({"$inc": {"b.0.c": 1}})
 
