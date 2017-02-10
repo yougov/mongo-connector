@@ -11,10 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
 import sys
 
 from mongo_connector.compat import reraise
+from mongo_connector.connector import get_mininum_mongodb_version
 from mongo_connector.errors import UpdateDoesNotApply
+
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManagerBase(object):
@@ -72,13 +78,25 @@ class DocManagerBase(object):
                 if '.' in to_unset:
                     path = to_unset.split(".")
                     where = _retrieve_path(doc, path[:-1])
-                    where.pop(_convert_or_raise(where, path[-1]))
+                    index_or_key = _convert_or_raise(where, path[-1])
+                    if isinstance(where, list):
+                        # Unset an array element sets it to null.
+                        where[index_or_key] = None
+                    else:
+                        # Unset field removes it entirely.
+                        del where[index_or_key]
                 else:
-                    doc.pop(to_unset)
-            except KeyError:
-                # Ignore KeyError since a MongoDB 2.4 oplog can contain $unset
-                # on fields that do not exist.
-                pass
+                    del doc[to_unset]
+            except (KeyError, IndexError, ValueError):
+                source_version = get_mininum_mongodb_version()
+                if source_version is None or source_version.at_least(2, 6):
+                    raise
+                # Ignore unset errors since MongoDB 2.4 records invalid
+                # $unsets in the oplog.
+                LOG.warning("Could not unset field %r from document %r. "
+                            "This may be normal when replicating from "
+                            "MongoDB 2.4 or the destination could be out of "
+                            "sync." % (to_unset, doc))
 
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:

@@ -29,18 +29,17 @@ import sys
 import threading
 import time
 
+from pymongo import MongoClient
+
 from mongo_connector import config, constants, errors, util
 from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.doc_managers import doc_manager_simulator as simulator
-from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import (NamespaceConfig,
                                               validate_namespace_options)
-
-from pymongo import MongoClient
+from mongo_connector.version import Version
 
 
 # Monkey patch logging to add Logger.always
@@ -60,6 +59,21 @@ _SSL_POLICY_MAP = {
     'optional': ssl.CERT_OPTIONAL,
     'required': ssl.CERT_REQUIRED
 }
+
+_mininum_mongodb_version = None
+"""The minimum MongoDB version in the source cluster."""
+
+
+def get_mininum_mongodb_version():
+    return _mininum_mongodb_version
+
+
+def update_mininum_mongodb_version(version):
+    global _mininum_mongodb_version
+    if version is None:
+        _mininum_mongodb_version = version
+    if _mininum_mongodb_version is None or version < _mininum_mongodb_version:
+        _mininum_mongodb_version = version
 
 
 class Connector(threading.Thread):
@@ -87,7 +101,9 @@ class Connector(threading.Thread):
             self.doc_managers = doc_managers
         else:
             LOG.warning('No doc managers specified, using simulator.')
-            self.doc_managers = (simulator.DocManager(),)
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers import doc_manager_simulator
+            self.doc_managers = (doc_manager_simulator.DocManager(),)
 
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
@@ -314,10 +330,18 @@ class Connector(threading.Thread):
             client['admin'].authenticate(self.auth_username, self.auth_key)
         return client
 
+    def update_version_from_client(self, client):
+        is_master = client.admin.command("isMaster")
+        for host in is_master['hosts']:
+            update_mininum_mongodb_version(Version.from_client(
+                self.create_authed_client(host)))
+
     @log_fatal_exceptions
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
+        # Reset the global minimum MongoDB version
+        update_mininum_mongodb_version(None)
         self.main_conn = self.create_authed_client()
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
@@ -354,6 +378,8 @@ class Connector(threading.Thread):
             self.main_conn.close()
             self.main_conn = self.create_authed_client(
                 replicaSet=is_master['setName'])
+
+            self.update_version_from_client(self.main_conn)
 
             # non sharded configuration
             oplog = OplogThread(
@@ -412,6 +438,7 @@ class Connector(threading.Thread):
 
                     shard_conn = self.create_authed_client(
                         hosts, replicaSet=repl_set)
+                    self.update_version_from_client(shard_conn)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.namespace_config, mongos_client=self.main_conn,
@@ -958,6 +985,9 @@ def get_config_options():
             return import_dm_by_path(full_name)
 
         def import_dm_by_path(path):
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers.doc_manager_base import (
+                DocManagerBase)
             try:
                 # importlib doesn't exist in 2.6, but __import__ is everywhere
                 package, klass = path.rsplit('.', 1)
