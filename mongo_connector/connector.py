@@ -1189,7 +1189,12 @@ def log_startup_info():
                     __version__)
     LOG.always('Python version: %s', sys.version)
     LOG.always('Platform: %s', platform.platform())
-    LOG.always('pymongo version: %s', pymongo.__version__)
+    pymongo_version = 'unknown'
+    if hasattr(pymongo, 'version'):
+        pymongo_version = pymongo.version
+    if hasattr(pymongo, '__version__'):
+        pymongo_version = pymongo.__version__
+    LOG.always('pymongo version: %s', pymongo_version)
     if not pymongo.has_c():
         LOG.warning(
             'pymongo version %s was installed without the C extensions. '
