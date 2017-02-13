@@ -1202,10 +1202,22 @@ def log_startup_info():
 def main():
     """ Starts the mongo connector (assuming CLI)
     """
+    # Setup an initial logging handler that buffers log messages before
+    # applying the final logging configuration.
+    initial_handler = logging.handlers.MemoryHandler(100)
+    root_logger = logging.getLogger()
+    root_logger.addHandler(initial_handler)
+
+    # Parse configuration and setup logging.
     conf = config.Config(get_config_options())
     conf.parse_args()
-
     setup_logging(conf)
+
+    # Flush the buffered log messages to the final logging handler.
+    initial_handler.setTarget(root_logger.handlers[-1])
+    initial_handler.flush()
+    root_logger.removeHandler(initial_handler)
+
     log_startup_info()
 
     connector = Connector.from_config(conf)
