@@ -1189,11 +1189,10 @@ def log_startup_info():
                     __version__)
     LOG.always('Python version: %s', sys.version)
     LOG.always('Platform: %s', platform.platform())
-    pymongo_version = 'unknown'
-    if hasattr(pymongo, 'version'):
-        pymongo_version = pymongo.version
     if hasattr(pymongo, '__version__'):
         pymongo_version = pymongo.__version__
+    else:
+        pymongo_version = pymongo.version
     LOG.always('pymongo version: %s', pymongo_version)
     if not pymongo.has_c():
         LOG.warning(
