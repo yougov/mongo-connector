@@ -289,6 +289,20 @@ class NamespaceConfig(object):
             return dict((field, include) for field in fields)
         return None
 
+    def get_included_databases(self):
+        """Return the databases we want to include, or empty list for all.
+        """
+        databases = set()
+        databases.update(self._plain_db.keys())
+
+        for _, namespace in self._regex_map:
+            database_name, _ = namespace.source_name.split('.', 1)
+            if '*' in database_name:
+                return []
+            databases.add(database_name)
+
+        return list(databases)
+
 
 def _character_matches(name1, name2):
     """Yield the number of characters that match the beginning of each string.
