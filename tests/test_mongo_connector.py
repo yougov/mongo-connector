@@ -25,9 +25,10 @@ from bson.timestamp import Timestamp
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector
-from mongo_connector.test_utils import ReplicaSetSingle, connector_opts
+from mongo_connector.test_utils import (ReplicaSetSingle, connector_opts,
+                                        assert_soon, db_user, db_password)
 from mongo_connector.util import long_to_bson_ts
-from tests import unittest
+from tests import unittest, SkipTest
 
 
 class TestMongoConnector(unittest.TestCase):
@@ -155,6 +156,34 @@ class TestMongoConnector(unittest.TestCase):
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
         os.unlink("temp_oplog.timestamp")
+
+    def test_connector_minimum_privileges(self):
+        """Test the Connector works with a user with minimum privileges."""
+        if not (db_user and db_password):
+            raise SkipTest('Need to set a user/password to test this.')
+        client = self.repl_set.client()
+        minimum_user = 'read_local_and_included_databases'
+        minimum_pwd = 'password'
+        client.admin.add_user(minimum_user, minimum_pwd,
+                              roles=[{'role': 'read', 'db': 'test'},
+                                     {'role': 'read', 'db': 'wildcard'},
+                                     {'role': 'read', 'db': 'local'}])
+
+        client.test.test.insert_one({"replicated": 1})
+        client.test.ignored.insert_one({"replicated": 0})
+        client.ignored.ignored.insert_one({"replicated": 0})
+        client.wildcard.test.insert_one({"replicated": 1})
+        conn = Connector(
+            mongo_address=self.repl_set.primary.uri,
+            auth_username=minimum_user,
+            auth_key=minimum_pwd,
+            namespace_options={'test.test': True, 'wildcard.*': True}
+        )
+        conn.start()
+        try:
+            assert_soon(conn.doc_managers[0]._search)
+        finally:
+            conn.join()
 
 
 if __name__ == '__main__':

@@ -356,6 +356,21 @@ class TestNamespaceConfig(unittest.TestCase):
                              {"foo": 0, "nested.field": 0})
             self.assertIsNone(namespace_config.projection("ignored.name"))
 
+    def test_get_included_databases(self):
+        """Test get_included_databases."""
+        nc_requires_list_databases = (
+            NamespaceConfig(),
+            NamespaceConfig(namespace_options={"db.c": False}),
+            NamespaceConfig(namespace_options={"db*.c": True}),
+        )
+        for namespace_config in nc_requires_list_databases:
+            self.assertEqual(namespace_config.get_included_databases(), [])
+
+        namespace_config = NamespaceConfig(namespace_options={"db.c": True})
+        self.assertEqual(namespace_config.get_included_databases(), ["db"])
+        namespace_config = NamespaceConfig(namespace_options={"db.*": True})
+        self.assertEqual(namespace_config.get_included_databases(), ["db"])
+
     def test_match_replace_regex(self):
         """Test regex matching and replacing."""
         regex = re.compile(r"\Adb_([^.]*).foo\Z")
