@@ -1106,8 +1106,8 @@ def get_config_options():
         help=('Policy for validating SSL certificates provided from the other '
               'end of the connection. There are three possible values: '
               'required = Require and validate the remote certificate. '
-              'optional = Validate the remote certificate only if one '
-              'is provided. '
+              'optional = The same as "required", unless the server was '
+              'configured to use anonymous ciphers. '
               'ignored = Remote SSL certificates are ignored completely.')
     )
     ssl.add_cli(
