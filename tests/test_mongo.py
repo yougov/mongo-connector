@@ -34,7 +34,9 @@ from mongo_connector.test_utils import (ReplicaSet,
                                         connector_opts,
                                         assert_soon,
                                         close_client)
-from tests import unittest
+
+from tests import unittest, SkipTest
+from tests.version import Version
 
 
 class MongoTestCase(unittest.TestCase):
@@ -46,6 +48,7 @@ class MongoTestCase(unittest.TestCase):
         cls.standalone = Server().start()
         cls.mongo_doc = DocManager(cls.standalone.uri)
         cls.mongo_conn = cls.standalone.client()
+        cls.desination_version = Version.from_client(cls.mongo_conn)
         cls.mongo = cls.mongo_conn['test']['test']
 
     @classmethod
@@ -230,6 +233,10 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
 
     def test_drop_database_renamed(self):
         """Test the dropDatabase command on a renamed database."""
+        if not self.desination_version.at_least(3, 0, 7) or (
+                self.desination_version.at_least(3, 1) and
+                not self.desination_version.at_least(3, 1, 9)):
+            raise SkipTest("This test fails often because of SERVER-13212")
         self.create_renamed_collection("rename.me", "new.target")
         self.create_renamed_collection("rename.me2", "new2.target2")
         # test that drop database removes target databases
