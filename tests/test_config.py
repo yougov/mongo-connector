@@ -19,6 +19,8 @@ import re
 import ssl
 import sys
 
+import pymongo
+
 sys.path[0:0] = [""]
 
 from mongo_connector import config, errors, connector
@@ -381,8 +383,13 @@ class TestConfig(unittest.TestCase):
         """Test setting sslCertificatePolicy."""
         # Setting sslCertificatePolicy to not 'ignored' without a CA file
         # PyMongo will attempt to load system provided CA certificates.
-        self.load_json({'ssl': {'sslCertificatePolicy': 'required'}})
-        self.load_json({'ssl': {'sslCertificatePolicy': 'optional'}})
+        for ssl_cert_req in ['required', 'optional']:
+            no_ca_config = {'ssl': {'sslCertificatePolicy': ssl_cert_req}}
+            if pymongo.version_tuple < (3, 0):
+                self.assertRaises(errors.InvalidConfiguration, self.load_json,
+                                  no_ca_config)
+            else:
+                self.load_json(no_ca_config)
         # Setting sslCertificatePolicy to an invalid option
         self.assertRaises(
             errors.InvalidConfiguration,

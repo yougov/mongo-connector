@@ -1075,10 +1075,20 @@ def get_config_options():
         if ssl_cert_reqs is None:
             ssl_cert_reqs = option.value.get('sslCertificatePolicy')
 
-        if ssl_cert_reqs is not None and ssl_cert_reqs not in _SSL_POLICY_MAP:
-            raise errors.InvalidConfiguration(
-                'sslCertificatePolicy (--ssl-certificate-policy) must be one '
-                'of %s, got "%s"' % (_SSL_POLICY_MAP.keys(), ssl_cert_reqs))
+        if ssl_cert_reqs is not None:
+            if ssl_cert_reqs not in _SSL_POLICY_MAP:
+                raise errors.InvalidConfiguration(
+                    'sslCertificatePolicy (--ssl-certificate-policy) must be '
+                    'one of %s, got "%s"' % (
+                        _SSL_POLICY_MAP.keys(), ssl_cert_reqs))
+            if pymongo.version_tuple < (3, 0) and ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
+                raise errors.InvalidConfiguration(
+                    '--ssl-certificate-policy is not "ignored" and '
+                    '--ssl-ca-certs was not be provided. Either upgrade '
+                    'PyMongo to >= 3.0 to load system provided CA '
+                    'certificates or specify a CA file with --ssl-ca-certs.'
+                )
+
         option.value['sslCertfile'] = ssl_certfile
         option.value['sslCACerts'] = ssl_ca_certs
         option.value['sslKeyfile'] = ssl_keyfile
