@@ -378,14 +378,11 @@ class TestConfig(unittest.TestCase):
                           self.load_json, test_config)
 
     def test_ssl_validation(self):
-        """Test an invalid sslCertificatePolicy."""
+        """Test setting sslCertificatePolicy."""
         # Setting sslCertificatePolicy to not 'ignored' without a CA file
-        self.assertRaises(
-            errors.InvalidConfiguration,
-            self.load_json, {'ssl': {'sslCertificatePolicy': 'required'}})
-        self.assertRaises(
-            errors.InvalidConfiguration,
-            self.load_json, {'ssl': {'sslCertificatePolicy': 'optional'}})
+        # PyMongo will attempt to load system provided CA certificates.
+        self.load_json({'ssl': {'sslCertificatePolicy': 'required'}})
+        self.load_json({'ssl': {'sslCertificatePolicy': 'optional'}})
         # Setting sslCertificatePolicy to an invalid option
         self.assertRaises(
             errors.InvalidConfiguration,

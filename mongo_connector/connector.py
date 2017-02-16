@@ -1075,10 +1075,6 @@ def get_config_options():
         if ssl_cert_reqs is None:
             ssl_cert_reqs = option.value.get('sslCertificatePolicy')
 
-        if ssl_cert_reqs and ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
-            raise errors.InvalidConfiguration(
-                '--ssl-ca-certs must be provided if the '
-                '--ssl-certificate-policy is not "ignored".')
         if ssl_cert_reqs is not None and ssl_cert_reqs not in _SSL_POLICY_MAP:
             raise errors.InvalidConfiguration(
                 'sslCertificatePolicy (--ssl-certificate-policy) must be one '
