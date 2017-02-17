@@ -11,10 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
 import sys
 
 from mongo_connector.compat import reraise
+from mongo_connector.connector import get_mininum_mongodb_version
 from mongo_connector.errors import UpdateDoesNotApply
+
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManagerBase(object):
@@ -82,9 +88,14 @@ class DocManagerBase(object):
                 else:
                     del doc[to_unset]
             except (KeyError, IndexError, ValueError):
+                if get_mininum_mongodb_version().at_least(2, 6):
+                    raise
                 # Ignore unset errors since MongoDB 2.4 records invalid
                 # $unsets in the oplog.
-                pass
+                LOG.warning("Could not unset field %r from document %r."
+                            "This may be a normal error when replicating from"
+                            "MongoDB 2.4 or the destination could be out of "
+                            "sync." % (to_unset, doc))
 
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:

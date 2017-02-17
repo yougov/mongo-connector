@@ -24,10 +24,12 @@ from bson.timestamp import Timestamp
 
 sys.path[0:0] = [""]
 
-from mongo_connector.connector import Connector
+from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.test_utils import (ReplicaSetSingle, connector_opts,
                                         assert_soon, db_user, db_password)
 from mongo_connector.util import long_to_bson_ts
+from mongo_connector.version import Version
+
 from tests import unittest, SkipTest
 
 
@@ -60,13 +62,16 @@ class TestMongoConnector(unittest.TestCase):
             **connector_opts
         )
         conn.start()
+        assert_soon(lambda: bool(conn.shard_set))
 
-        while len(conn.shard_set) != 1:
-            time.sleep(2)
+        # Make sure get_mininum_mongodb_version returns the current version.
+        self.assertEqual(Version.from_client(self.repl_set.client()),
+                         get_mininum_mongodb_version())
+
         conn.join()
 
+        # Make sure the connector is shutdown correctly
         self.assertFalse(conn.can_run)
-        time.sleep(5)
         for thread in conn.shard_set.values():
             self.assertFalse(thread.running)
 

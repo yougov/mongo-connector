@@ -36,7 +36,7 @@ from mongo_connector.test_utils import (ReplicaSet,
                                         close_client)
 
 from tests import unittest, SkipTest
-from tests.version import Version
+from mongo_connector.version import Version
 
 
 class MongoTestCase(unittest.TestCase):

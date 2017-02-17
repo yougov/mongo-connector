@@ -29,18 +29,17 @@ import sys
 import threading
 import time
 
+from pymongo import MongoClient
+
 from mongo_connector import config, constants, errors, util
 from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.doc_managers import doc_manager_simulator as simulator
-from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import (NamespaceConfig,
                                               validate_namespace_options)
-
-from pymongo import MongoClient
+from mongo_connector.version import Version
 
 
 # Monkey patch logging to add Logger.always
@@ -60,6 +59,17 @@ _SSL_POLICY_MAP = {
     'optional': ssl.CERT_OPTIONAL,
     'required': ssl.CERT_REQUIRED
 }
+
+_min_source_version = None
+"""The minimum MongoDB version in the source cluster."""
+
+
+def get_mininum_mongodb_version():
+    return _min_source_version
+
+# Avoid circular import on get_mininum_mongodb_version
+from mongo_connector.doc_managers import doc_manager_simulator as simulator
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
 
 class Connector(threading.Thread):
@@ -319,6 +329,8 @@ class Connector(threading.Thread):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         self.main_conn = self.create_authed_client()
+        global _min_source_version
+        _min_source_version = Version.from_client(self.main_conn)
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
 
