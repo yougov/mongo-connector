@@ -20,12 +20,14 @@ from pymongo import MongoClient, ReadPreference
 
 sys.path[0:0] = [""]
 
-from mongo_connector.connector import Connector
+from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.test_utils import (assert_soon,
                                         db_user,
                                         db_password,
                                         ShardedClusterSingle)
+from mongo_connector.version import Version
+
 from tests import unittest, SkipTest
 
 
@@ -46,7 +48,8 @@ class ShardedConnectorTestCase(unittest.TestCase):
             **auth_args
         )
         cls.connector.start()
-        assert_soon(lambda: len(cls.connector.shard_set) == 2)
+        assert_soon(lambda: len(cls.connector.shard_set) == 2,
+                    message='connector failed to find both shards!')
 
     @classmethod
     def tearDownClass(cls):
@@ -59,6 +62,13 @@ class ShardedConnectorTestCase(unittest.TestCase):
 
 
 class TestConnectorSharded(ShardedConnectorTestCase):
+
+    def test_connector(self):
+        """Test whether the connector initiates properly
+        """
+        # Make sure get_mininum_mongodb_version returns the current version.
+        self.assertEqual(Version.from_client(self.cluster.client()),
+                         get_mininum_mongodb_version())
 
     def test_mongos_connection_failure(self):
         """Test that the connector handles temporary mongos failure"""

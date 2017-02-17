@@ -328,12 +328,17 @@ class Connector(threading.Thread):
             client['admin'].authenticate(self.auth_username, self.auth_key)
         return client
 
+    def update_version_from_client(self, client):
+        is_master = client.admin.command("isMaster")
+        for host in is_master['hosts']:
+            update_mininum_mongodb_version(Version.from_client(
+                self.create_authed_client(host)))
+
     @log_fatal_exceptions
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         self.main_conn = self.create_authed_client()
-        update_mininum_mongodb_version(Version.from_client(self.main_conn))
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
 
@@ -369,6 +374,8 @@ class Connector(threading.Thread):
             self.main_conn.close()
             self.main_conn = self.create_authed_client(
                 replicaSet=is_master['setName'])
+
+            self.update_version_from_client(self.main_conn)
 
             # non sharded configuration
             oplog = OplogThread(
@@ -427,6 +434,7 @@ class Connector(threading.Thread):
 
                     shard_conn = self.create_authed_client(
                         hosts, replicaSet=repl_set)
+                    self.update_version_from_client(shard_conn)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.namespace_config, mongos_client=self.main_conn,
