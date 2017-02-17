@@ -237,8 +237,14 @@ class TestDocManagerBase(unittest.TestCase):
             self.assertUpdateTestFails(test)
 
     def test_apply_update_unset_failures(self):
-        for mock_mongodb_version in [(3, 4), (3, 2), (3, 0), (2, 6), (2, 4)]:
-            update_mininum_mongodb_version(Version(*mock_mongodb_version))
+        # Reset the minimum MongoDB version at the start and end.
+        update_mininum_mongodb_version(None)
+        for mock_mongodb_version in [(3, 4), (3, 2), (3, 0), (2, 6), (2, 4),
+                                     None]:
+            if mock_mongodb_version is None:
+                update_mininum_mongodb_version(None)
+            else:
+                update_mininum_mongodb_version(Version(*mock_mongodb_version))
             for test in UNSET_FAILURE_TEST_CASES:
                 if mock_mongodb_version == (2, 4):
                     self.assertUpdateTestSucceeds(test)

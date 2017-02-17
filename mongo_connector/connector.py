@@ -70,6 +70,8 @@ def get_mininum_mongodb_version():
 
 def update_mininum_mongodb_version(version):
     global _mininum_mongodb_version
+    if version is None:
+        _mininum_mongodb_version = version
     if _mininum_mongodb_version is None or version < _mininum_mongodb_version:
         _mininum_mongodb_version = version
 
@@ -338,6 +340,8 @@ class Connector(threading.Thread):
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
+        # Reset the global minimum MongoDB version
+        update_mininum_mongodb_version(None)
         self.main_conn = self.create_authed_client()
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])

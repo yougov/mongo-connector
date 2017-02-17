@@ -88,12 +88,13 @@ class DocManagerBase(object):
                 else:
                     del doc[to_unset]
             except (KeyError, IndexError, ValueError):
-                if get_mininum_mongodb_version().at_least(2, 6):
+                source_version = get_mininum_mongodb_version()
+                if source_version is None or source_version.at_least(2, 6):
                     raise
                 # Ignore unset errors since MongoDB 2.4 records invalid
                 # $unsets in the oplog.
                 LOG.warning("Could not unset field %r from document %r."
-                            "This may be a normal error when replicating from"
+                            "This may be normal when replicating from "
                             "MongoDB 2.4 or the destination could be out of "
                             "sync." % (to_unset, doc))
 
