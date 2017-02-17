@@ -60,16 +60,18 @@ _SSL_POLICY_MAP = {
     'required': ssl.CERT_REQUIRED
 }
 
-_min_source_version = None
+_mininum_mongodb_version = None
 """The minimum MongoDB version in the source cluster."""
 
 
 def get_mininum_mongodb_version():
-    return _min_source_version
+    return _mininum_mongodb_version
 
-# Avoid circular import on get_mininum_mongodb_version
-from mongo_connector.doc_managers import doc_manager_simulator as simulator
-from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
+
+def update_mininum_mongodb_version(version):
+    global _mininum_mongodb_version
+    if _mininum_mongodb_version is None or version < _mininum_mongodb_version:
+        _mininum_mongodb_version = version
 
 
 class Connector(threading.Thread):
@@ -97,7 +99,9 @@ class Connector(threading.Thread):
             self.doc_managers = doc_managers
         else:
             LOG.warning('No doc managers specified, using simulator.')
-            self.doc_managers = (simulator.DocManager(),)
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers import doc_manager_simulator
+            self.doc_managers = (doc_manager_simulator.DocManager(),)
 
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
@@ -329,8 +333,7 @@ class Connector(threading.Thread):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
         self.main_conn = self.create_authed_client()
-        global _min_source_version
-        _min_source_version = Version.from_client(self.main_conn)
+        update_mininum_mongodb_version(Version.from_client(self.main_conn))
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
 
@@ -970,6 +973,9 @@ def get_config_options():
             return import_dm_by_path(full_name)
 
         def import_dm_by_path(path):
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers.doc_manager_base import (
+                DocManagerBase)
             try:
                 # importlib doesn't exist in 2.6, but __import__ is everywhere
                 package, klass = path.rsplit('.', 1)
