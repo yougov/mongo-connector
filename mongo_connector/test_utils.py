@@ -163,6 +163,21 @@ class ReplicaSet(MCTestObject):
 
     def _init_from_response(self, response):
         self.id = response['id']
+        for _ in range(5):
+            states = set(member['state'] for member in response['members'])
+            if len(states) > 1:
+                if states.issuperset(set([1, 2])):
+                    # Make sure that the response contains a primary and
+                    # secondary.
+                    break
+            elif 1 in states:
+                # Make sure that the response contains a primary.
+                break
+            # Sometimes MO replies when the secondary is still in the STARTUP
+            # state. Wait a bit and retry.
+            time.sleep(1)
+            response = requests.get(_mo_url('replica_sets', self.id)).json()
+
         self.uri = response.get('mongodb_auth_uri', response['mongodb_uri'])
         for member in response['members']:
             if member['state'] == 1:
