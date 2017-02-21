@@ -365,9 +365,10 @@ class Connector(threading.Thread):
 
         else:       # sharded cluster
             while self.can_run:
-
-                for shard_doc in retry_until_ok(self.main_conn.admin.command,
-                                                'listShards')['shards']:
+                # The backup role does not provide the listShards privilege,
+                # so use the config.shards collection instead.
+                for shard_doc in retry_until_ok(
+                        lambda: list(self.main_conn.config.shards.find())):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
