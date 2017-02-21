@@ -70,6 +70,15 @@ class TestMongoConnector(unittest.TestCase):
         for thread in conn.shard_set.values():
             self.assertFalse(thread.running)
 
+    def test_copy_uri_options(self):
+        """Test copy_uri_options returns proper MongoDB URIs."""
+        uri = 'mongodb://host:27017/db?maxPoolSize=1234&w=2'
+        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
+                         'mongodb://a:123,[::1]:321/?maxPoolSize=1234&w=2')
+        uri = 'host:27017'
+        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
+                         'mongodb://a:123,[::1]:321')
+
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
         """
