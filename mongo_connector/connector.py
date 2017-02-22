@@ -290,11 +290,26 @@ class Connector(threading.Thread):
                     (name, util.long_to_bson_ts(timestamp))
                     for name, timestamp in data)
 
-    def create_authed_client(self, address=None, **kwargs):
+    @staticmethod
+    def copy_uri_options(hosts, mongodb_uri):
+        """Returns a MongoDB URI to hosts with the options from mongodb_uri.
+        """
+        if '?' in mongodb_uri:
+            options = mongodb_uri.split('?', 1)[1]
+        else:
+            options = None
+        uri = 'mongodb://' + hosts
+        if options:
+            uri += '/?' + options
+        return uri
+
+    def create_authed_client(self, hosts=None, **kwargs):
         kwargs.update(self.ssl_kwargs)
-        if address is None:
-            address = self.address
-        client = MongoClient(address, tz_aware=self.tz_aware, **kwargs)
+        if hosts is None:
+            new_uri = self.address
+        else:
+            new_uri = self.copy_uri_options(hosts, self.address)
+        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
         if self.auth_key is not None:
             client['admin'].authenticate(self.auth_username, self.auth_key)
         return client
