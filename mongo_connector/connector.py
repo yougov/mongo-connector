@@ -966,18 +966,16 @@ def get_config_options():
                 if not issubclass(dm_impl, DocManagerBase):
                     raise TypeError("DocManager must inherit DocManagerBase.")
                 return dm_impl
-            except ImportError:
+            except ImportError as exc:
                 raise errors.InvalidConfiguration(
                     "Could not import %s. It could be that this doc manager ha"
                     "s been moved out of this project and is maintained elsewh"
                     "ere. Make sure that you have the doc manager installed al"
                     "ongside mongo-connector. Check the README for a list of a"
-                    "vailable doc managers." % package)
-                sys.exit(1)
+                    "vailable doc managers. ImportError:\n%s" % (package, exc))
             except (AttributeError, TypeError):
                 raise errors.InvalidConfiguration(
                     "No definition for DocManager found in %s." % package)
-                sys.exit(1)
 
         # instantiate the doc manager objects
         dm_instances = []
