@@ -93,7 +93,7 @@ class DocManagerBase(object):
                     raise
                 # Ignore unset errors since MongoDB 2.4 records invalid
                 # $unsets in the oplog.
-                LOG.warning("Could not unset field %r from document %r."
+                LOG.warning("Could not unset field %r from document %r. "
                             "This may be normal when replicating from "
                             "MongoDB 2.4 or the destination could be out of "
                             "sync." % (to_unset, doc))
