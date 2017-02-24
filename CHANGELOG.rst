@@ -33,6 +33,8 @@ Bug Fixes
 Breaking Changes
 ~~~~~~~~~~~~~~~~
 
+- The solr-doc-manager has been extracted into a separate package and is not
+  included by default. See https://pypi.python.org/pypi/solr-doc-manager.
 - Asterisks (*) in namespaces configuration are now interpreted as wildcards.
 
 Version 2.4.1

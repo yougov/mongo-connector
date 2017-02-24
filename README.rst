@@ -23,7 +23,7 @@ Getting Started
 ---------------
 
 mongo-connector supports Python 2.6, 2.7, and 3.3+ and MongoDB versions
-2.6, 3.0, 3.2, and 3.4.
+2.4, 2.6, 3.0, 3.2, and 3.4.
 
 Installation
 ~~~~~~~~~~~~
@@ -58,8 +58,8 @@ and any extra dependencies for the target system.
 You may have to run ``pip`` with ``sudo``, depending
 on where you're installing mongo-connector and what privileges you have.
 
-Developement
-~~~~~~~~~~~~
+Development
+~~~~~~~~~~~
 
 You can also install the development version of mongo-connector
 manually::

@@ -899,8 +899,7 @@ def get_config_options():
         "The default is to consider all the namespaces, "
         "excluding the system and config databases, and "
         "also ignoring the \"system.indexes\" collection in "
-        "any database. This cannot be used together with "
-        "'--exclude-namespace-set'!")
+        "any database.")
 
     # -x is to specify the namespaces we dont want to consider. The default
     # is empty
@@ -912,8 +911,7 @@ def get_config_options():
         "namespaces, we could use `-x test.test,alpha.foo`. "
         "You can also use, for example, `-x test.*` to ignore "
         "documents from all the collections of db test. "
-        "The default is not to exclude any namespace. "
-        "This cannot be used together with '--namespace-set'!")
+        "The default is not to exclude any namespace.")
 
     # -g is the destination namespace
     namespaces.add_cli(
@@ -924,12 +922,10 @@ def get_config_options():
         "comma-separated list. These lists must have "
         "equal length. "
         "It also supports mapping using wildcard, for example, "
-        "map foo.* to bar_*.someting, means that if we have two "
-        "collections foo.a and foo.b, they will map to "
-        "bar_a.something and bar_b.something. "
-        "The default is to use the identity "
-        "mapping. This works for mongo-to-mongo as well as"
-        "mongo-to-elasticsearch connections.")
+        "mapping db.* to db.new_*, means that if we have two "
+        "collections db.a and db.b, they will be renamed to "
+        "db.new_a and db.new_b respectively. "
+        "The default is to perform no renaming.")
 
     # --gridfs-set is the set of GridFS namespaces to consider
     namespaces.add_cli(
