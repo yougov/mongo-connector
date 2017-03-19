@@ -18,9 +18,12 @@
 import os
 import sys
 import time
+import types
+import bson
 
 sys.path[0:0] = [""]
 
+from mongo_connector import errors
 from mongo_connector.connector import Connector
 from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.test_utils import (assert_soon,
@@ -151,6 +154,37 @@ class TestSynchronizer(unittest.TestCase):
             # cleanup
             opthread.fields = None
 
+    def test_operation_failure_recovery(self):
+        """Test that synchronizer operation failure does not lose documents."""
+        def check_ids(ids):
+            self.assertEqual(ids, set(doc["_id"] for doc in self.synchronizer._search()))
+
+        id1 = bson.ObjectId("111111111111111111111111")
+        id2 = bson.ObjectId("222222222222222222222222")
+        id3 = bson.ObjectId("333333333333333333333333")
+
+        self.conn.test.test.insert_one({"_id": id1, "x": 1})
+
+        time.sleep(1)
+        check_ids(set([id1]))
+
+        # Monkey patch docmanager to fail to upsert
+        orig_upsert = self.synchronizer.upsert
+
+        def fail_upsert(self, doc, namespace, timestamp):
+            self.upsert = orig_upsert
+            raise errors.TransientOperationFailed("synthetic failure")
+
+        self.synchronizer.upsert = types.MethodType(fail_upsert, self.synchronizer)
+        self.conn.test.test.insert_one({"_id": id2, "x": 2})
+        while self.synchronizer.upsert != orig_upsert:
+            time.sleep(1)
+
+        # Insert another document, ensure the previous failed document is now upserted
+        check_ids(set([id1]))
+        self.conn.test.test.insert_one({"_id": id3, "x": 3})
+        time.sleep(3)
+        check_ids(set([id1, id2, id3]))
 
 if __name__ == '__main__':
     unittest.main()

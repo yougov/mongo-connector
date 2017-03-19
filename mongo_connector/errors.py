@@ -26,7 +26,12 @@ class ConnectionFailed(MongoConnectorError):
 
 
 class OperationFailed(MongoConnectorError):
-    """Raised for failed commands on the destination database
+    """Raised for permanently failed commands on the destination database
+    """
+
+
+class TransientOperationFailed(MongoConnectorError):
+    """Raised for failed commands on the destination database. The command should be retried.
     """
 
 
