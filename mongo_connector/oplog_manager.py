@@ -17,6 +17,7 @@
 
 import bson
 import logging
+import os
 try:
     import Queue as queue
 except ImportError:
@@ -24,6 +25,7 @@ except ImportError:
 import sys
 import time
 import threading
+import datadog
 
 import pymongo
 
@@ -36,6 +38,11 @@ from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 
 LOG = logging.getLogger(__name__)
 
+datadog_options = {
+    'api_key': os.environ['DATADOG_API_KEY'],
+    'app_key': os.environ['DATADOG_APP_KEY']
+}
+datadog.initialize(**datadog_options)
 
 class ReplicationLagLogger(threading.Thread):
     """Thread that periodically logs the current replication lag.
@@ -55,6 +62,7 @@ class ReplicationLagLogger(threading.Thread):
             # OplogThread will perform a rollback, don't log anything
             return
         lag_secs = newest_write.time - checkpoint.time
+        datadog.statsd.gauge('mongo_connector.lag.' + self.opman.replset_name, lag_secs)
         if lag_secs > 0:
             LOG.info("OplogThread for replica set '%s' is %s seconds behind "
                      "the oplog.",
