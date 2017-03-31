@@ -9,15 +9,15 @@ matrix:
   fast_finish: true
   include:
     - python: 2.6
-      env: MONGODB=3.4.2
+      env: MONGODB=3.4.2 DATADOG_API_KEY='' DATADOG_APP_KEY=''
     - python: 2.7
-      env: MONGODB=3.2.12
+      env: MONGODB=3.2.12 DATADOG_API_KEY='' DATADOG_APP_KEY=''
     - python: 3.3
-      env: MONGODB=3.0.14
+      env: MONGODB=3.0.14 DATADOG_API_KEY='' DATADOG_APP_KEY=''
     - python: 3.4
-      env: MONGODB=2.6.12
+      env: MONGODB=2.6.12 DATADOG_API_KEY='' DATADOG_APP_KEY=''
     - python: 3.5
-      env: MONGODB=2.4.14
+      env: MONGODB=2.4.14 DATADOG_API_KEY='' DATADOG_APP_KEY=''
 
 install:
   - pip install "mongo-orchestration>=0.6.7,<1.0"
