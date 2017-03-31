@@ -96,6 +96,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
             return value
         elif isinstance(value, datetime.datetime):
             return value
+        elif isinstance(value, bson.dbref.DBRef):
+            return value.id
         elif value is None:
             return value
         # Default
