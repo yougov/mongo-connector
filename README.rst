@@ -87,7 +87,7 @@ the mongo shell::
 Once the replica set is running, you may start mongo-connector. The
 simplest invocation resembles the following::
 
-  mongo-connector -m <mongodb server hostname>:<replica set port> \
+  mongo-connector -m <server hostname or URL specifying replica set port, e.g. localhost or mongodb://localhost:27017/> \
                   -t <replication endpoint URL, e.g. http://localhost:8983/solr> \
                   -d <name of doc manager, e.g., solr_doc_manager>
 
