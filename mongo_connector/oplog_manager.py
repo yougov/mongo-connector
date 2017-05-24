@@ -138,7 +138,7 @@ class OplogThread(threading.Thread):
             return True, False
 
         # Ignore no-ops
-        if entry.get('op') is None or entry['op'] == 'n':
+        if entry['op'] == 'n':
             return True, False
         ns = entry['ns']
 
