@@ -24,10 +24,13 @@ from bson.timestamp import Timestamp
 
 sys.path[0:0] = [""]
 
-from mongo_connector.connector import Connector
-from mongo_connector.test_utils import ReplicaSetSingle, connector_opts
+from mongo_connector.connector import Connector, get_mininum_mongodb_version
+from mongo_connector.test_utils import (ReplicaSetSingle, connector_opts,
+                                        assert_soon, db_user, db_password)
 from mongo_connector.util import long_to_bson_ts
-from tests import unittest
+from mongo_connector.version import Version
+
+from tests import unittest, SkipTest
 
 
 class TestMongoConnector(unittest.TestCase):
@@ -59,15 +62,27 @@ class TestMongoConnector(unittest.TestCase):
             **connector_opts
         )
         conn.start()
+        assert_soon(lambda: bool(conn.shard_set))
 
-        while len(conn.shard_set) != 1:
-            time.sleep(2)
+        # Make sure get_mininum_mongodb_version returns the current version.
+        self.assertEqual(Version.from_client(self.repl_set.client()),
+                         get_mininum_mongodb_version())
+
         conn.join()
 
+        # Make sure the connector is shutdown correctly
         self.assertFalse(conn.can_run)
-        time.sleep(5)
         for thread in conn.shard_set.values():
             self.assertFalse(thread.running)
+
+    def test_copy_uri_options(self):
+        """Test copy_uri_options returns proper MongoDB URIs."""
+        uri = 'mongodb://host:27017/db?maxPoolSize=1234&w=2'
+        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
+                         'mongodb://a:123,[::1]:321/?maxPoolSize=1234&w=2')
+        uri = 'host:27017'
+        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
+                         'mongodb://a:123,[::1]:321')
 
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
@@ -155,6 +170,34 @@ class TestMongoConnector(unittest.TestCase):
         self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
 
         os.unlink("temp_oplog.timestamp")
+
+    def test_connector_minimum_privileges(self):
+        """Test the Connector works with a user with minimum privileges."""
+        if not (db_user and db_password):
+            raise SkipTest('Need to set a user/password to test this.')
+        client = self.repl_set.client()
+        minimum_user = 'read_local_and_included_databases'
+        minimum_pwd = 'password'
+        client.admin.add_user(minimum_user, minimum_pwd,
+                              roles=[{'role': 'read', 'db': 'test'},
+                                     {'role': 'read', 'db': 'wildcard'},
+                                     {'role': 'read', 'db': 'local'}])
+
+        client.test.test.insert_one({"replicated": 1})
+        client.test.ignored.insert_one({"replicated": 0})
+        client.ignored.ignored.insert_one({"replicated": 0})
+        client.wildcard.test.insert_one({"replicated": 1})
+        conn = Connector(
+            mongo_address=self.repl_set.primary.uri,
+            auth_username=minimum_user,
+            auth_key=minimum_pwd,
+            namespace_options={'test.test': True, 'wildcard.*': True}
+        )
+        conn.start()
+        try:
+            assert_soon(conn.doc_managers[0]._search)
+        finally:
+            conn.join()
 
 
 if __name__ == '__main__':

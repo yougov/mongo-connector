@@ -503,7 +503,11 @@ class OplogThread(threading.Thread):
         def get_all_ns():
             ns_set = []
             gridfs_ns_set = []
-            db_list = retry_until_ok(self.primary_client.database_names)
+            db_list = self.namespace_config.get_included_databases()
+            if not db_list:
+                # Only use listDatabases when the configured databases are not
+                # explicit.
+                db_list = retry_until_ok(self.primary_client.database_names)
             for database in db_list:
                 if database == "config" or database == "local":
                     continue

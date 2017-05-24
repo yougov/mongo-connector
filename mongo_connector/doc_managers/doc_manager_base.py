@@ -11,10 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import logging
 import sys
 
 from mongo_connector.compat import reraise
+from mongo_connector.connector import get_mininum_mongodb_version
 from mongo_connector.errors import UpdateDoesNotApply
+
+
+LOG = logging.getLogger(__name__)
 
 
 class DocManagerBase(object):
@@ -55,6 +61,43 @@ class DocManagerBase(object):
                     raise ValueError
             return looking_at
 
+        def _set_field(doc, to_set, value):
+            if '.' in to_set:
+                path = to_set.split(".")
+                where = _retrieve_path(doc, path[:-1], create=True)
+                index = _convert_or_raise(where, path[-1])
+                wl = len(where)
+                if isinstance(where, list) and index >= wl:
+                    where.extend([None] * (index + 1 - wl))
+                where[index] = value
+            else:
+                doc[to_set] = value
+
+        def _unset_field(doc, to_unset):
+            try:
+                if '.' in to_unset:
+                    path = to_unset.split(".")
+                    where = _retrieve_path(doc, path[:-1])
+                    index_or_key = _convert_or_raise(where, path[-1])
+                    if isinstance(where, list):
+                        # Unset an array element sets it to null.
+                        where[index_or_key] = None
+                    else:
+                        # Unset field removes it entirely.
+                        del where[index_or_key]
+                else:
+                    del doc[to_unset]
+            except (KeyError, IndexError, ValueError):
+                source_version = get_mininum_mongodb_version()
+                if source_version is None or source_version.at_least(2, 6):
+                    raise
+                # Ignore unset errors since MongoDB 2.4 records invalid
+                # $unsets in the oplog.
+                LOG.warning("Could not unset field %r from document %r. "
+                            "This may be normal when replicating from "
+                            "MongoDB 2.4 or the destination could be out of "
+                            "sync." % (to_unset, doc))
+
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:
             # update spec contains the new document in its entirety
@@ -64,25 +107,12 @@ class DocManagerBase(object):
                 # $set
                 for to_set in update_spec.get("$set", []):
                     value = update_spec['$set'][to_set]
-                    if '.' in to_set:
-                        path = to_set.split(".")
-                        where = _retrieve_path(doc, path[:-1], create=True)
-                        index = _convert_or_raise(where, path[-1])
-                        wl = len(where)
-                        if isinstance(where, list) and index >= wl:
-                            where.extend([None] * (index + 1 - wl))
-                        where[index] = value
-                    else:
-                        doc[to_set] = value
+                    _set_field(doc, to_set, value)
 
                 # $unset
                 for to_unset in update_spec.get("$unset", []):
-                    if '.' in to_unset:
-                        path = to_unset.split(".")
-                        where = _retrieve_path(doc, path[:-1])
-                        where.pop(_convert_or_raise(where, path[-1]))
-                    else:
-                        doc.pop(to_unset)
+                    _unset_field(doc, to_unset)
+
             except (KeyError, ValueError, AttributeError, IndexError):
                 exc_t, exc_v, exc_tb = sys.exc_info()
                 reraise(UpdateDoesNotApply,

@@ -16,7 +16,10 @@ import json
 import logging
 import os
 import re
+import ssl
 import sys
+
+import pymongo
 
 sys.path[0:0] = [""]
 
@@ -376,6 +379,23 @@ class TestConfig(unittest.TestCase):
         self.assertRaises(errors.InvalidConfiguration,
                           self.load_json, test_config)
 
+    def test_ssl_validation(self):
+        """Test setting sslCertificatePolicy."""
+        # Setting sslCertificatePolicy to not 'ignored' without a CA file
+        # PyMongo will attempt to load system provided CA certificates.
+        for ssl_cert_req in ['required', 'optional']:
+            no_ca_config = {'ssl': {'sslCertificatePolicy': ssl_cert_req}}
+            if pymongo.version_tuple < (3, 0):
+                self.assertRaises(errors.InvalidConfiguration, self.load_json,
+                                  no_ca_config)
+            else:
+                self.load_json(no_ca_config)
+        # Setting sslCertificatePolicy to an invalid option
+        self.assertRaises(
+            errors.InvalidConfiguration,
+            self.load_json, {'ssl': {
+                'sslCACerts': 'ca.pem', 'sslCertificatePolicy': 'invalid'}})
+
 
 class TestConnectorConfig(unittest.TestCase):
     """Test creating a Connector from a Config."""
@@ -407,7 +427,7 @@ class TestConnectorConfig(unittest.TestCase):
             "sslCertfile": "certfile.pem",
             "sslKeyfile": "certfile.key",
             "sslCACerts": "ca.pem",
-            "sslCertificatePolicy": "required"
+            "sslCertificatePolicy": "optional"
         },
 
         "fields": ["field1", "field2", "field3"],
@@ -461,7 +481,7 @@ class TestConnectorConfig(unittest.TestCase):
         '-g', 'foo2.bar2,fiz2.biz2',
         '--ssl-certfile', 'certfile2.pem',
         '--ssl-ca-certs', 'ca2.pem',
-        '--ssl-certificate-policy', 'optional'
+        '--ssl-certificate-policy', 'ignored'
     ]
 
     # Set of files to keep in the 'lib' directory after each run.
@@ -613,6 +633,33 @@ class TestConnectorConfig(unittest.TestCase):
         config_obj.parse_args(argv=[])
         conn = connector.Connector.from_config(config_obj)
         self.assertEqual(50, conn.doc_managers[0].mongo.max_pool_size)
+
+    def test_ssl_options(self):
+        config_def = {
+            'mainAddress': 'localhost:27017',
+            'oplogFile': from_here('lib', 'dummy.timestamp'),
+            'ssl': {
+                'sslCertfile': 'certfile.pem',
+                'sslKeyfile': 'certfile.key',
+                'sslCACerts': 'ca.pem'
+            },
+        }
+        for cert_policy, expected_ssl_cert_req in [
+                ('ignored',  ssl.CERT_NONE),
+                ('optional', ssl.CERT_OPTIONAL),
+                ('required', ssl.CERT_REQUIRED),
+                (None, None)]:
+            config_def['ssl']['sslCertificatePolicy'] = cert_policy
+            config_obj = config.Config(get_config_options())
+            config_obj.load_json(json.dumps(config_def))
+            config_obj.parse_args(argv=[])
+            mc = connector.Connector.from_config(config_obj)
+            self.assertEqual('certfile.pem',
+                             mc.ssl_kwargs.get('ssl_certfile'))
+            self.assertEqual('ca.pem', mc.ssl_kwargs.get('ssl_ca_certs'))
+            self.assertEqual('certfile.key', mc.ssl_kwargs.get('ssl_keyfile'))
+            self.assertEqual(expected_ssl_cert_req,
+                             mc.ssl_kwargs.get('ssl_cert_reqs'))
 
 
 if __name__ == '__main__':

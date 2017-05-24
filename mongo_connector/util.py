@@ -21,6 +21,8 @@ import time
 
 from bson.timestamp import Timestamp
 
+from pymongo import errors
+
 from mongo_connector.compat import reraise
 
 LOG = logging.getLogger(__name__)
@@ -71,21 +73,29 @@ def retry_until_ok(func, *args, **kwargs):
     error the function raised on its last attempt.
 
     """
-
-    count = 0
-    while True:
+    max_tries = 120
+    for i in range(max_tries):
         try:
             return func(*args, **kwargs)
         except RuntimeError:
-            # Avoid masking RuntimeErrors
+            # Do not mask RuntimeError.
             raise
-        except Exception:
-            count += 1
-            if count > 120:
+        except errors.OperationFailure as exc:
+            if exc.code == 13 or (   # MongoDB >= 2.6 sets the error code,
+                    exc.details and  # MongoDB 2.4 does not.
+                    'unauthorized' == exc.details.get('errmsg')):
+                # Do not mask authorization failures.
+                raise
+            if i == max_tries - 1:
                 LOG.exception('Call to %s failed too many times in '
                               'retry_until_ok', func)
                 raise
-            time.sleep(1)
+        except Exception:
+            if i == max_tries - 1:
+                LOG.exception('Call to %s failed too many times in '
+                              'retry_until_ok', func)
+                raise
+        time.sleep(1)
 
 
 def log_fatal_exceptions(func):

@@ -29,18 +29,17 @@ import sys
 import threading
 import time
 
+from pymongo import MongoClient
+
 from mongo_connector import config, constants, errors, util
 from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.doc_managers import doc_manager_simulator as simulator
-from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import (NamespaceConfig,
                                               validate_namespace_options)
-
-from pymongo import MongoClient
+from mongo_connector.version import Version
 
 
 # Monkey patch logging to add Logger.always
@@ -60,6 +59,21 @@ _SSL_POLICY_MAP = {
     'optional': ssl.CERT_OPTIONAL,
     'required': ssl.CERT_REQUIRED
 }
+
+_mininum_mongodb_version = None
+"""The minimum MongoDB version in the source cluster."""
+
+
+def get_mininum_mongodb_version():
+    return _mininum_mongodb_version
+
+
+def update_mininum_mongodb_version(version):
+    global _mininum_mongodb_version
+    if version is None:
+        _mininum_mongodb_version = version
+    if _mininum_mongodb_version is None or version < _mininum_mongodb_version:
+        _mininum_mongodb_version = version
 
 
 class Connector(threading.Thread):
@@ -87,7 +101,9 @@ class Connector(threading.Thread):
             self.doc_managers = doc_managers
         else:
             LOG.warning('No doc managers specified, using simulator.')
-            self.doc_managers = (simulator.DocManager(),)
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers import doc_manager_simulator
+            self.doc_managers = (doc_manager_simulator.DocManager(),)
 
         # Password for authentication
         self.auth_key = kwargs.pop('auth_key', None)
@@ -114,13 +130,13 @@ class Connector(threading.Thread):
         ssl_keyfile = kwargs.pop('ssl_keyfile', None)
         ssl_cert_reqs = kwargs.pop('ssl_cert_reqs', None)
         self.ssl_kwargs = {}
-        if ssl_certfile:
+        if ssl_certfile is not None:
             self.ssl_kwargs['ssl_certfile'] = ssl_certfile
-        if ssl_ca_certs:
+        if ssl_ca_certs is not None:
             self.ssl_kwargs['ssl_ca_certs'] = ssl_ca_certs
-        if ssl_keyfile:
+        if ssl_keyfile is not None:
             self.ssl_kwargs['ssl_keyfile'] = ssl_keyfile
-        if ssl_cert_reqs:
+        if ssl_cert_reqs is not None:
             self.ssl_kwargs['ssl_cert_reqs'] = ssl_cert_reqs
 
         # Save the rest of kwargs.
@@ -290,19 +306,42 @@ class Connector(threading.Thread):
                     (name, util.long_to_bson_ts(timestamp))
                     for name, timestamp in data)
 
-    def create_authed_client(self, address=None, **kwargs):
+    @staticmethod
+    def copy_uri_options(hosts, mongodb_uri):
+        """Returns a MongoDB URI to hosts with the options from mongodb_uri.
+        """
+        if '?' in mongodb_uri:
+            options = mongodb_uri.split('?', 1)[1]
+        else:
+            options = None
+        uri = 'mongodb://' + hosts
+        if options:
+            uri += '/?' + options
+        return uri
+
+    def create_authed_client(self, hosts=None, **kwargs):
         kwargs.update(self.ssl_kwargs)
-        if address is None:
-            address = self.address
-        client = MongoClient(address, tz_aware=self.tz_aware, **kwargs)
+        if hosts is None:
+            new_uri = self.address
+        else:
+            new_uri = self.copy_uri_options(hosts, self.address)
+        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
         if self.auth_key is not None:
             client['admin'].authenticate(self.auth_username, self.auth_key)
         return client
+
+    def update_version_from_client(self, client):
+        is_master = client.admin.command("isMaster")
+        for host in is_master['hosts']:
+            update_mininum_mongodb_version(Version.from_client(
+                self.create_authed_client(host)))
 
     @log_fatal_exceptions
     def run(self):
         """Discovers the mongo cluster and creates a thread for each primary.
         """
+        # Reset the global minimum MongoDB version
+        update_mininum_mongodb_version(None)
         self.main_conn = self.create_authed_client()
         LOG.always('Source MongoDB version: %s',
                    self.main_conn.admin.command('buildInfo')['version'])
@@ -340,6 +379,8 @@ class Connector(threading.Thread):
             self.main_conn = self.create_authed_client(
                 replicaSet=is_master['setName'])
 
+            self.update_version_from_client(self.main_conn)
+
             # non sharded configuration
             oplog = OplogThread(
                 self.main_conn, self.doc_managers, self.oplog_progress,
@@ -365,9 +406,10 @@ class Connector(threading.Thread):
 
         else:       # sharded cluster
             while self.can_run:
-
-                for shard_doc in retry_until_ok(self.main_conn.admin.command,
-                                                'listShards')['shards']:
+                # The backup role does not provide the listShards privilege,
+                # so use the config.shards collection instead.
+                for shard_doc in retry_until_ok(
+                        lambda: list(self.main_conn.config.shards.find())):
                     shard_id = shard_doc['_id']
                     if shard_id in self.shard_set:
                         shard_thread = self.shard_set[shard_id]
@@ -396,6 +438,7 @@ class Connector(threading.Thread):
 
                     shard_conn = self.create_authed_client(
                         hosts, replicaSet=repl_set)
+                    self.update_version_from_client(shard_conn)
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.namespace_config, mongos_client=self.main_conn,
@@ -856,8 +899,7 @@ def get_config_options():
         "The default is to consider all the namespaces, "
         "excluding the system and config databases, and "
         "also ignoring the \"system.indexes\" collection in "
-        "any database. This cannot be used together with "
-        "'--exclude-namespace-set'!")
+        "any database.")
 
     # -x is to specify the namespaces we dont want to consider. The default
     # is empty
@@ -869,8 +911,7 @@ def get_config_options():
         "namespaces, we could use `-x test.test,alpha.foo`. "
         "You can also use, for example, `-x test.*` to ignore "
         "documents from all the collections of db test. "
-        "The default is not to exclude any namespace. "
-        "This cannot be used together with '--namespace-set'!")
+        "The default is not to exclude any namespace.")
 
     # -g is the destination namespace
     namespaces.add_cli(
@@ -881,12 +922,10 @@ def get_config_options():
         "comma-separated list. These lists must have "
         "equal length. "
         "It also supports mapping using wildcard, for example, "
-        "map foo.* to bar_*.someting, means that if we have two "
-        "collections foo.a and foo.b, they will map to "
-        "bar_a.something and bar_b.something. "
-        "The default is to use the identity "
-        "mapping. This works for mongo-to-mongo as well as"
-        "mongo-to-elasticsearch connections.")
+        "mapping db.* to db.new_*, means that if we have two "
+        "collections db.a and db.b, they will be renamed to "
+        "db.new_a and db.new_b respectively. "
+        "The default is to perform no renaming.")
 
     # --gridfs-set is the set of GridFS namespaces to consider
     namespaces.add_cli(
@@ -942,6 +981,9 @@ def get_config_options():
             return import_dm_by_path(full_name)
 
         def import_dm_by_path(path):
+            # Avoid circular import on get_mininum_mongodb_version.
+            from mongo_connector.doc_managers.doc_manager_base import (
+                DocManagerBase)
             try:
                 # importlib doesn't exist in 2.6, but __import__ is everywhere
                 package, klass = path.rsplit('.', 1)
@@ -950,18 +992,16 @@ def get_config_options():
                 if not issubclass(dm_impl, DocManagerBase):
                     raise TypeError("DocManager must inherit DocManagerBase.")
                 return dm_impl
-            except ImportError:
+            except ImportError as exc:
                 raise errors.InvalidConfiguration(
                     "Could not import %s. It could be that this doc manager ha"
                     "s been moved out of this project and is maintained elsewh"
                     "ere. Make sure that you have the doc manager installed al"
                     "ongside mongo-connector. Check the README for a list of a"
-                    "vailable doc managers." % package)
-                sys.exit(1)
+                    "vailable doc managers. ImportError:\n%s" % (package, exc))
             except (AttributeError, TypeError):
                 raise errors.InvalidConfiguration(
                     "No definition for DocManager found in %s." % package)
-                sys.exit(1)
 
         # instantiate the doc manager objects
         dm_instances = []
@@ -1062,21 +1102,39 @@ def get_config_options():
 
     def apply_ssl(option, cli_values):
         option.value = option.value or {}
-        ssl_certfile = cli_values.pop('ssl_certfile')
-        ssl_keyfile = cli_values.pop('ssl_keyfile')
-        ssl_cert_reqs = cli_values.pop('ssl_cert_reqs')
-        ssl_ca_certs = (
-            cli_values.pop('ssl_ca_certs') or option.value.get('sslCACerts'))
+        ssl_certfile = cli_values.get('ssl_certfile')
+        if ssl_certfile is None:
+            ssl_certfile = option.value.get('sslCertfile')
+        ssl_keyfile = cli_values.get('ssl_keyfile')
+        if ssl_keyfile is None:
+            ssl_keyfile = option.value.get('sslKeyfile')
+        ssl_ca_certs = cli_values.get('ssl_ca_certs')
+        if ssl_ca_certs is None:
+            ssl_ca_certs = option.value.get('sslCACerts')
+        ssl_cert_reqs = cli_values.get('ssl_cert_reqs')
+        if ssl_cert_reqs is None:
+            ssl_cert_reqs = option.value.get('sslCertificatePolicy')
 
-        if ssl_cert_reqs and ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
-            raise errors.InvalidConfiguration(
-                '--ssl-ca-certs must be provided if the '
-                '--ssl-certificate-policy is not "ignored".')
-        option.value.setdefault('sslCertfile', ssl_certfile)
-        option.value.setdefault('sslCACerts', ssl_ca_certs)
-        option.value.setdefault('sslKeyfile', ssl_keyfile)
+        if ssl_cert_reqs is not None:
+            if ssl_cert_reqs not in _SSL_POLICY_MAP:
+                raise errors.InvalidConfiguration(
+                    'sslCertificatePolicy (--ssl-certificate-policy) must be '
+                    'one of %s, got "%s"' % (
+                        _SSL_POLICY_MAP.keys(), ssl_cert_reqs))
+            if pymongo.version_tuple < (3, 0) and ssl_cert_reqs != 'ignored' and not ssl_ca_certs:
+                raise errors.InvalidConfiguration(
+                    '--ssl-certificate-policy is not "ignored" and '
+                    '--ssl-ca-certs was not be provided. Either upgrade '
+                    'PyMongo to >= 3.0 to load system provided CA '
+                    'certificates or specify a CA file with --ssl-ca-certs.'
+                )
+
+        option.value['sslCertfile'] = ssl_certfile
+        option.value['sslCACerts'] = ssl_ca_certs
+        option.value['sslKeyfile'] = ssl_keyfile
         option.value['sslCertificatePolicy'] = _SSL_POLICY_MAP.get(
             ssl_cert_reqs)
+
     ssl = add_option(
         config_key="ssl",
         default={},
@@ -1098,8 +1156,8 @@ def get_config_options():
         help=('Policy for validating SSL certificates provided from the other '
               'end of the connection. There are three possible values: '
               'required = Require and validate the remote certificate. '
-              'optional = Validate the remote certificate only if one '
-              'is provided. '
+              'optional = The same as "required", unless the server was '
+              'configured to use anonymous ciphers. '
               'ignored = Remote SSL certificates are ignored completely.')
     )
     ssl.add_cli(
@@ -1189,7 +1247,11 @@ def log_startup_info():
                     __version__)
     LOG.always('Python version: %s', sys.version)
     LOG.always('Platform: %s', platform.platform())
-    LOG.always('pymongo version: %s', pymongo.__version__)
+    if hasattr(pymongo, '__version__'):
+        pymongo_version = pymongo.__version__
+    else:
+        pymongo_version = pymongo.version
+    LOG.always('pymongo version: %s', pymongo_version)
     if not pymongo.has_c():
         LOG.warning(
             'pymongo version %s was installed without the C extensions. '
@@ -1202,10 +1264,22 @@ def log_startup_info():
 def main():
     """ Starts the mongo connector (assuming CLI)
     """
+    # Setup an initial logging handler that buffers log messages before
+    # applying the final logging configuration.
+    initial_handler = logging.handlers.MemoryHandler(100)
+    root_logger = logging.getLogger()
+    root_logger.addHandler(initial_handler)
+
+    # Parse configuration and setup logging.
     conf = config.Config(get_config_options())
     conf.parse_args()
-
     setup_logging(conf)
+
+    # Flush the buffered log messages to the final logging handler.
+    initial_handler.setTarget(root_logger.handlers[-1])
+    initial_handler.flush()
+    root_logger.removeHandler(initial_handler)
+
     log_startup_info()
 
     connector = Connector.from_config(conf)

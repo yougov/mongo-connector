@@ -1,6 +1,22 @@
 Changelog
 =========
 
+Version 2.5.1
+-------------
+
+Version 2.5.1 improves testing, documentation, and fixes the following bugs:
+
+- Only use listDatabases when necessary.
+- Do not use the listShards command.
+- Fix PyMongo 3.0 compatibility.
+- Fixes support for MongoDB 2.4's invalid $unsets operations.
+- Set array element to null when $unset, do not remove the element completely.
+- Command line SSL options should override the config file.
+- Properly send "ssl.sslCertificatePolicy" to MongoClients.
+- Properly output log messages while configuration is parsed.
+- All source clients should inherit MongoDB URI options from the main address.
+- Do not retry operations that result in authorization failure.
+
 Version 2.5.0
 -------------
 
@@ -33,6 +49,8 @@ Bug Fixes
 Breaking Changes
 ~~~~~~~~~~~~~~~~
 
+- The solr-doc-manager has been extracted into a separate package and is not
+  included by default. See https://pypi.python.org/pypi/solr-doc-manager.
 - Asterisks (*) in namespaces configuration are now interpreted as wildcards.
 
 Version 2.4.1
