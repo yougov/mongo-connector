@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-__version__ = '2.5.1'
+__version__ = '2.5.2.dev0'
 
 # Maximum # of documents to process before recording timestamp
 # default = -1 (no maximum)
