@@ -240,7 +240,7 @@ class DocManager(DocManagerBase):
                          + str(e))
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
-                raise e
+                raise bwe
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):
