@@ -34,7 +34,9 @@ from mongo_connector.version import Version
 from tests import unittest, SkipTest
 
 class AsyncDocManagerExample(DocManagerBase):
-    flush_occurred = False
+    def __init__(self):
+        self.flush_occurred = False
+
     def flush(self):
         self.flush_occurred = True
 
