@@ -241,6 +241,12 @@ class Connector(threading.Thread):
         if not items:
             return
 
+        # ensure DocManagers have completed operations before recording oplog
+        # progress
+
+        for dm in self.doc_managers:
+            dm.flush()
+
         # write to temp file
         backup_file = self.oplog_checkpoint + '.backup'
         os.rename(self.oplog_checkpoint, backup_file)

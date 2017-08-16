@@ -163,6 +163,9 @@ class DocManagerBase(object):
         """
         raise NotImplementedError
 
+    def flush(self):
+        """Flush all outstanding writes."""
+
     def commit(self):
         """Commit all outstanding writes."""
         raise NotImplementedError
