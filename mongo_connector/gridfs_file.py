@@ -16,12 +16,14 @@ class GridFSFile(object):
         self.length = self.f.length
         self.upload_date = self.f.upload_date
         self.md5 = self.f.md5
+        self.metadata = self.f.metadata
 
     def get_metadata(self):
         result = {
             '_id': self._id,
             'upload_date': self.upload_date,
             'md5': self.md5,
+            'metadata': self.metadata
         }
         if self.filename is not None:
             result['filename'] = self.filename
