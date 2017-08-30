@@ -87,7 +87,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
             # Just include body of binary data without subtype
             return base64.b64encode(value).decode()
         elif isinstance(value, UUID):
-            return value.hex
+            return value
         elif isinstance(value, (int, long, float)):
             if isnan(value):
                 raise ValueError("nan")
