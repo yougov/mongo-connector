@@ -384,6 +384,13 @@ class Connector(threading.Thread):
                 self.main_conn = self.create_authed_client(
                     replicaSet=is_master['setName'])
                 self.update_version_from_client(self.main_conn)
+            else:
+                try:
+                    # Check if local.oplog.rs is readable
+                    self.main_conn.local.oplog.rs.find_one()
+                except pymongo.errors.OperationFailure:
+                    LOG.error('Could not read local.oplog.rs!')
+                    sys.exit(1)
 
             # non sharded configuration
             oplog = OplogThread(
