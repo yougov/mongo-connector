@@ -124,6 +124,9 @@ class Connector(threading.Thread):
         # Timezone awareness
         self.tz_aware = kwargs.get('tz_aware', False)
 
+        # If connecting to mongos router for oplog access
+        self.is_oplog_proxy= kwargs.get('is_oplog_proxy', False)
+
         # SSL keyword arguments to MongoClient.
         ssl_certfile = kwargs.pop('ssl_certfile', None)
         ssl_ca_certs = kwargs.pop('ssl_ca_certs', None)
@@ -215,7 +218,8 @@ class Connector(threading.Thread):
             ssl_keyfile=config['ssl.sslKeyfile'],
             ssl_ca_certs=config['ssl.sslCACerts'],
             ssl_cert_reqs=config['ssl.sslCertificatePolicy'],
-            tz_aware=config['timezoneAware']
+            tz_aware=config['timezoneAware'],
+            is_oplog_proxy=config['isOplogProxy']
         )
         return connector
 
@@ -374,12 +378,12 @@ class Connector(threading.Thread):
                 )
                 return
 
-            # Establish a connection to the replica set as a whole
-            self.main_conn.close()
-            self.main_conn = self.create_authed_client(
-                replicaSet=is_master['setName'])
-
-            self.update_version_from_client(self.main_conn)
+            if not self.is_oplog_proxy:
+                # Establish a connection to the replica set as a whole
+                self.main_conn.close()
+                self.main_conn = self.create_authed_client(
+                    replicaSet=is_master['setName'])
+                self.update_version_from_client(self.main_conn)
 
             # non sharded configuration
             oplog = OplogThread(
@@ -485,6 +489,16 @@ def get_config_options():
         " primary. For example, `-m localhost:27217`"
         " would be a valid argument to `-m`. Don't use"
         " quotes around the address.")
+
+    is_oplog_proxy = add_option(
+        config_key="isOplogProxy",
+        default=False,
+        type=bool)
+
+    is_oplog_proxy.add_cli(
+        "--is_oplog_proxy", dest="is_oplog_proxy", help=
+        "True if passing uri to mongos router/proxy with access"
+        "to mongo oplog.rs.")
 
     oplog_file = add_option(
         config_key="oplogFile",
