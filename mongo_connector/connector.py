@@ -124,7 +124,7 @@ class Connector(threading.Thread):
         # Timezone awareness
         self.tz_aware = kwargs.get('tz_aware', False)
 
-        # If connecting to mongos router for oplog access
+        # If oplog access is via the proxy
         self.is_oplog_proxy= kwargs.get('is_oplog_proxy', False)
 
         # SSL keyword arguments to MongoClient.
@@ -504,8 +504,8 @@ def get_config_options():
 
     is_oplog_proxy.add_cli(
         "--is_oplog_proxy", dest="is_oplog_proxy", help=
-        "True if passing uri to mongos router/proxy with access"
-        "to mongo oplog.rs.")
+        "True if passed uri is a proxy with access to mongo"
+        "oplog.rs.")
 
     oplog_file = add_option(
         config_key="oplogFile",
