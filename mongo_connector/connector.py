@@ -199,7 +199,8 @@ class Connector(threading.Thread):
             mongo_address=config['mainAddress'],
             doc_managers=config['docManagers'],
             oplog_checkpoint=os.path.abspath(config['oplogFile']),
-            collection_dump=(not config['noDump']),
+            collection_dump=(True if config['onlyDump'] else not config['noDump']),
+            only_dump=config['onlyDump'],
             batch_size=config['batchSize'],
             continue_on_error=config['continueOnError'],
             auth_username=config['authentication.adminUsername'],
@@ -520,7 +521,20 @@ def get_config_options():
         "--no-dump", action="store_true", dest="no_dump", help=
         "If specified, this flag will ensure that "
         "mongo_connector won't read the entire contents of a "
-        "namespace iff --oplog-ts points to an empty file.")
+        "namespace if --oplog-ts points to an empty file.")
+
+    # --only-dump specifies whether or not we should read the oplog after
+    # the initial dump is finished
+    only_dump = add_option(
+        config_key="onlyDump",
+        default=False,
+        type=bool)
+
+    only_dump.add_cli(
+        "--only-dump", action="store_true", dest="only_dump", help=
+        "If specified, this flag will ensure that "
+        "mongo_connector won't try to read the oplog after "
+        "the namespaces have been dumped.")
 
     batch_size = add_option(
         config_key="batchSize",
