@@ -436,9 +436,18 @@ class Connector(threading.Thread):
                             dm.stop()
                         return
 
-                    shard_conn = self.create_authed_client(
-                        hosts, replicaSet=repl_set)
-                    self.update_version_from_client(shard_conn)
+                    for i in xrange(10):
+                        try:
+                            shard_conn = self.create_authed_client(
+                                hosts, replicaSet=repl_set)
+                            self.update_version_from_client(shard_conn)
+                            break
+                        except Exception, e:
+                            LOG.error("Attempt #%d Failed connecting, exception: %r" % (i, e))
+                            time.sleep(1)
+                            if i >= 9:
+                                raise e
+
                     oplog = OplogThread(
                         shard_conn, self.doc_managers, self.oplog_progress,
                         self.namespace_config, mongos_client=self.main_conn,
