@@ -45,8 +45,9 @@ def for_all_methods(decorator):
 
 @for_all_methods(request_rate_retry)
 class DocManager(MongoDocManager):
-    def __init__(self, *args, **kwargs):
-        super(DocManager, self).__init__(*args, **kwargs)
+    def __init__(self, url, **kwargs):
+        super(DocManager, self).__init__(url, **kwargs)
+        self.timestamp_field = kwargs.get('timestamp_field', '')
 
     def _is_doc_ok(self, doc):
         if len(str(doc)) > 2 * 1024 * 1024:
@@ -67,6 +68,8 @@ class DocManager(MongoDocManager):
     def upsert(self, doc, namespace, timestamp):
         if not self._is_doc_ok(doc):
             return
+        if not self.timestamp_field == '':
+            doc[self.timestamp_field] = timestamp
         super(DocManager, self).upsert(doc, namespace, timestamp)
 
     def bulk_upsert(self, docs, namespace, timestamp):
