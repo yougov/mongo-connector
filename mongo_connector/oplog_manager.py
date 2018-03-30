@@ -142,6 +142,11 @@ class OplogThread(threading.Thread):
             return True, False
         ns = entry['ns']
 
+        # Don't replicate deletes if skipDelete option is enabled.
+        if self.namespace_config.skip_delete_namespace(ns) and entry['op'] == 'd':
+            LOG.info("OplogThread: skipDelete: '%s' " % (entry,))
+            return True, False
+
         if '.' not in ns:
             return True, False
         coll = ns.split('.', 1)[1]
