@@ -41,7 +41,6 @@ from mongo_connector.namespace_config import (NamespaceConfig,
                                               validate_namespace_options)
 from mongo_connector.version import Version
 
-
 # Monkey patch logging to add Logger.always
 ALWAYS = logging.CRITICAL + 10
 logging.addLevelName(ALWAYS, 'ALWAYS')
@@ -1002,6 +1001,7 @@ def get_config_options():
                     raise TypeError("DocManager must inherit DocManagerBase.")
                 return dm_impl
             except ImportError as exc:
+
                 raise errors.InvalidConfiguration(
                     "Could not import %s. It could be that this doc manager ha"
                     "s been moved out of this project and is maintained elsewh"

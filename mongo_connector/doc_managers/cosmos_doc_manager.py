@@ -1,3 +1,16 @@
+#
+#
+#
+
+"""Receives documents from the oplog worker threads and indexes them
+    into the backend.
+
+    This file is a document manager for MongoDB, but the intent
+    is that this file can be used as an example to add on different backends.
+    To extend this to other systems, simply implement the exact same class and
+    replace the method definitions with API calls for the desired backend.
+    """
+
 import inspect
 import time
 import logging
@@ -6,6 +19,17 @@ from random import random
 import pymongo
 from mongo_connector import errors, constants
 from mongo_connector.util import exception_wrapper
+
+# {
+#     "docManager": "elastic_doc_manager",
+#     "targetURL": "localhost:9200",
+#     "__bulkSize": 1000,
+#     "__uniqueKey": "_id",
+#     "__autoCommitInterval": null,
+#     "args": {
+#         "timestamp_field": "cosmos_ts"
+#     }
+# }
 
 wrap_exceptions = exception_wrapper({
     pymongo.errors.ConnectionFailure: errors.ConnectionFailed,
@@ -87,6 +111,10 @@ class DocManager(MongoDocManager):
                         doc = next(docs)
                         if not self._is_doc_ok(doc):
                             continue
+
+                        if not self.timestamp_field == '':
+                            doc[self.timestamp_field] = timestamp
+
                         selector = {'_id': doc['_id']}
                         bulk.find(selector).upsert().replace_one(doc)
                         meta_selector = {self.id_field: doc['_id']}

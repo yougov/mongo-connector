@@ -182,7 +182,8 @@ class OplogThread(threading.Thread):
         # This may nullify the document if there's nothing to do.
         if not self.filter_oplog_entry(
                 entry, include_fields=namespace.include_fields,
-                exclude_fields=namespace.exclude_fields):
+                exclude_fields=namespace.exclude_fields,
+                include_filter=namespace.include_filter):
             return True, False
         return False, is_gridfs_file
 
@@ -421,11 +422,23 @@ class OplogThread(threading.Thread):
 
         return new_doc
 
+    def _apply_include_filter(self, doc, include_fields, update=False):
+        find_fields = self._find_update_fields if update else self._find_field
+        for field in include_fields:
+            for path, value in find_fields(field, doc):
+                # if field exists but has the wrong value, return false so the doc will be dropped
+                if value != include_fields[field]:
+                    return False
+        # did not find any field with a wrong value, returning true so the doc will be passed
+        return True
+
     def filter_oplog_entry(self, entry, include_fields=None,
-                           exclude_fields=None):
+                           exclude_fields=None,
+                           include_filter=None):
         """Remove fields from an oplog entry that should not be replicated.
 
         NOTE: this does not support array indexing, for example 'a.b.2'"""
+
         if not include_fields and not exclude_fields:
             return entry
         elif include_fields:
@@ -435,6 +448,11 @@ class OplogThread(threading.Thread):
 
         fields = include_fields or exclude_fields
         entry_o = entry['o']
+
+        should_continue = self._apply_include_filter(entry_o, include_fields)
+        if not should_continue:
+            return None;
+
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
             entry['o'] = filter_fields(entry_o, fields)
@@ -535,7 +553,7 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(from_coll):
+        def docs_to_dump(from_coll, namespace=None):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
@@ -561,6 +579,16 @@ class OplogThread(threading.Thread):
                             # collection dump.
                             dump_cancelled[0] = True
                             raise StopIteration
+
+                        if namespace:
+                            print namespace
+                            namespaceconfig = self.namespace_config.lookup(namespace)
+                            print namespaceconfig
+                            should_continue = self._apply_include_filter(doc, namespaceconfig.include_fields)
+
+                            if not should_continue:
+                                continue
+
                         last_id = doc["_id"]
                         yield doc
                     break
@@ -576,7 +604,7 @@ class OplogThread(threading.Thread):
                 mapped_ns = self.namespace_config.map_namespace(namespace)
                 total_docs = retry_until_ok(from_coll.count)
                 num = None
-                for num, doc in enumerate(docs_to_dump(from_coll)):
+                for num, doc in enumerate(docs_to_dump(from_coll, namespace)):
                     try:
                         dm.upsert(doc, mapped_ns, long_ts)
                     except Exception:
@@ -607,7 +635,7 @@ class OplogThread(threading.Thread):
                     LOG.info("Bulk upserting approximately %d docs from "
                              "collection '%s'",
                              total_docs, namespace)
-                    dm.bulk_upsert(docs_to_dump(from_coll),
+                    dm.bulk_upsert(docs_to_dump(from_coll, namespace),
                                    mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
@@ -633,7 +661,7 @@ class OplogThread(threading.Thread):
                     mongo_coll = self.get_collection(gridfs_ns)
                     from_coll = self.get_collection(gridfs_ns + '.files')
                     dest_ns = self.namespace_config.map_namespace(gridfs_ns)
-                    for doc in docs_to_dump(from_coll):
+                    for doc in docs_to_dump(from_coll, gridfs_ns):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
             except:
