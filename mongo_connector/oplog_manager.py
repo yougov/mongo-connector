@@ -581,9 +581,7 @@ class OplogThread(threading.Thread):
                             raise StopIteration
 
                         if namespace:
-                            print namespace
                             namespaceconfig = self.namespace_config.lookup(namespace)
-                            print namespaceconfig
                             should_continue = self._apply_include_filter(doc, namespaceconfig.include_fields)
 
                             if not should_continue:
