@@ -17,6 +17,7 @@
 
 import bson
 import logging
+
 try:
     import Queue as queue
 except ImportError:
@@ -40,6 +41,7 @@ LOG = logging.getLogger(__name__)
 class ReplicationLagLogger(threading.Thread):
     """Thread that periodically logs the current replication lag.
     """
+
     def __init__(self, opman, interval):
         super(ReplicationLagLogger, self).__init__()
         self.opman = opman
@@ -81,6 +83,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
+
     def __init__(self, primary_client, doc_managers,
                  oplog_progress_dict, namespace_config,
                  mongos_client=None, **kwargs):
@@ -365,6 +368,7 @@ class OplogThread(threading.Thread):
         notation, eg "a.b.c". Returns a list of tuples (path, field_value) or
         the empty list if the field is not present.
         """
+
         def find_partial_matches():
             for key in doc:
                 if len(key) > len(field):
@@ -424,6 +428,7 @@ class OplogThread(threading.Thread):
 
     def _apply_include_filter(self, doc, include_fields, update=False):
         find_fields = self._find_update_fields if update else self._find_field
+
         for field in include_fields:
             for path, value in find_fields(field, doc):
                 # if field exists but has the wrong value, return false so the doc will be dropped
@@ -557,6 +562,11 @@ class OplogThread(threading.Thread):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
+
+            namespaceconfig = None
+            if namespace is not None:
+                namespaceconfig = self.namespace_config.lookup(namespace)
+
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 if last_id is None:
@@ -580,10 +590,8 @@ class OplogThread(threading.Thread):
                             dump_cancelled[0] = True
                             raise StopIteration
 
-                        if namespace:
-                            namespaceconfig = self.namespace_config.lookup(namespace)
-                            should_continue = self._apply_include_filter(doc, namespaceconfig.include_fields)
-
+                        if namespaceconfig is not None and namespaceconfig.include_filter is not None:
+                            should_continue = self._apply_include_filter(doc, namespaceconfig.include_filter)
                             if not should_continue:
                                 continue
 
@@ -629,7 +637,7 @@ class OplogThread(threading.Thread):
                     from_coll = self.get_collection(namespace)
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.namespace_config.map_namespace(
-                            namespace)
+                        namespace)
                     LOG.info("Bulk upserting approximately %d docs from "
                              "collection '%s'",
                              total_docs, namespace)
@@ -717,8 +725,8 @@ class OplogThread(threading.Thread):
         """
         sort_order = pymongo.DESCENDING if newest_entry else pymongo.ASCENDING
         curr = self.oplog.find({'op': {'$ne': 'n'}}).sort(
-                '$natural', sort_order
-            ).limit(-1)
+            '$natural', sort_order
+        ).limit(-1)
 
         try:
             ts = next(curr)['ts']
@@ -905,7 +913,7 @@ class OplogThread(threading.Thread):
         end_ts = last_inserted_doc['_ts']
 
         for dm in self.doc_managers:
-            rollback_set = {}   # this is a dictionary of ns:list of docs
+            rollback_set = {}  # this is a dictionary of ns:list of docs
 
             # group potentially conflicted documents by namespace
             for doc in dm.search(start_ts, end_ts):
@@ -948,6 +956,7 @@ class OplogThread(threading.Thread):
                         if doc['_id'] in doc_hash:
                             del doc_hash[doc['_id']]
                             to_index.append(doc)
+
                 retry_until_ok(collect_existing_docs)
 
                 # Delete the inconsistent documents

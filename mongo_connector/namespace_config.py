@@ -42,7 +42,8 @@ class Namespace(_Namespace):
         new_options = dict(
             dest_name=self.dest_name, source_name=self.source_name,
             gridfs=self.gridfs, include_fields=self.include_fields,
-            exclude_fields=self.exclude_fields)
+            exclude_fields=self.exclude_fields,
+            include_filter=self.include_filter)
         new_options.update(kwargs)
         return Namespace(**new_options)
 
@@ -415,6 +416,7 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
             namespace_set.add(source_name)
             if options_or_str.get('gridfs'):
                 gridfs_set.add(source_name)
+
             namespaces[source_name] = Namespace(
                 dest_name=options_or_str.get('rename'),
                 include_fields=options_or_str.get('includeFields'),
@@ -452,7 +454,8 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
             include_fields=validate_include_fields(include_fields,
                                                    namespace.include_fields),
             exclude_fields=validate_exclude_fields(exclude_fields,
-                                                   namespace.exclude_fields))
+                                                   namespace.exclude_fields),
+            include_filter=namespace.include_filter)
         # The default destination name is the same as the source.
         if not namespace.dest_name:
             namespace = namespace.with_options(dest_name=included_name)

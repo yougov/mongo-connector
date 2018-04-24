@@ -80,7 +80,12 @@
             "targetURL": "localhost:9200",
             "__bulkSize": 1000,
             "__uniqueKey": "_id",
-            "__autoCommitInterval": null
+            "__autoCommitInterval": null,
+			"args": {
+				"clientOptions": {
+					"ssl_cert_reqs": "CERT_NONE"
+				}
+			}
         }
     ]
 }
