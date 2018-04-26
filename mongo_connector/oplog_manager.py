@@ -670,6 +670,7 @@ class OplogThread(threading.Thread):
                     for doc in docs_to_dump(from_coll, gridfs_ns):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
+                LOG.info("OplogThread: collection dump completed")
             except:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,

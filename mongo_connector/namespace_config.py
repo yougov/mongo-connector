@@ -128,6 +128,7 @@ class NamespaceConfig(object):
         # Fields to include or exclude from all namespaces
         self._include_fields = validate_include_fields(include_fields)
         self._exclude_fields = validate_exclude_fields(exclude_fields)
+        self._include_filter = include_filter
 
         # Add each included namespace. Namespaces have a one-to-one
         # relationship to the target system, meaning multiple source
@@ -198,7 +199,7 @@ class NamespaceConfig(object):
             return Namespace(dest_name=plain_src_ns, source_name=plain_src_ns,
                              include_fields=self._include_fields,
                              exclude_fields=self._exclude_fields,
-                             include_filter=self.include_filter)
+                             include_filter=self._include_filter)
         # First, search for the namespace in the plain namespaces.
         try:
             return self._plain[plain_src_ns]
