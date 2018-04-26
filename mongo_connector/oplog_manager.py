@@ -454,9 +454,10 @@ class OplogThread(threading.Thread):
         fields = include_fields or exclude_fields
         entry_o = entry['o']
 
-        should_continue = self._apply_include_filter(entry_o, include_fields)
-        if not should_continue:
-            return None;
+        if include_filter is not None:
+            should_continue = self._apply_include_filter(entry_o, include_filter)
+            if not should_continue:
+                return None
 
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
