@@ -441,7 +441,7 @@ class Connector(threading.Thread):
                                 hosts, replicaSet=repl_set)
                             self.update_version_from_client(shard_conn)
                             break
-                        except Exception, e:
+                        except Exception as e:
                             LOG.error("Attempt #%d Failed connecting, exception: %r" % (i, e))
                             time.sleep(1)
                             if i >= 9:
