@@ -521,7 +521,7 @@ class TestConnectorConfig(unittest.TestCase):
 
         self.assertEqual(mc.auth_username,
                          self.config['authentication.adminUsername'])
-        self.assertEqual(mc.oplog_checkpoint, self.config['oplogFile'])
+        self.assertEqual(mc.oplog_progress_store.oplog_checkpoint, self.config['oplogFile'])
         self.assertEqual(mc.tz_aware, self.config['timezoneAware'])
         self.assertEqual(mc.ssl_kwargs.get('ssl_certfile'),
                          self.config['ssl.sslCertfile'])
