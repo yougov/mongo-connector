@@ -143,7 +143,7 @@ class TestMongoConnector(unittest.TestCase):
             pass
         open("temp_oplog.timestamp", "w").close()
 
-        conn.oplog_checkpoint = "temp_oplog.timestamp"
+        conn.oplog_progress_store.oplog_checkpoint = "temp_oplog.timestamp"
 
         # testing with empty file
         self.assertEqual(conn.read_oplog_progress(), None)
