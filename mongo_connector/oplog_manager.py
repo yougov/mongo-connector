@@ -639,9 +639,10 @@ class OplogThread(threading.Thread):
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.namespace_config.map_namespace(
                         namespace)
-                    LOG.info("Bulk upserting approximately %d docs from "
+
+                    LOG.info("[%s] Bulk upserting approximately %d docs from "
                              "collection '%s'",
-                             total_docs, namespace)
+                             self.replset_name, total_docs, namespace)
                     dm.bulk_upsert(docs_to_dump(from_coll, namespace),
                                    mapped_ns, long_ts)
             except Exception:
@@ -671,7 +672,7 @@ class OplogThread(threading.Thread):
                     for doc in docs_to_dump(from_coll, gridfs_ns):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
-                LOG.info("OplogThread: collection dump completed")
+                LOG.info("OplogThread [%s]: collection dump completed", self.replset_name)
             except:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,

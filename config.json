@@ -4,6 +4,7 @@
 
     "mainAddress": "localhost:27017",
     "oplogFile": "/var/log/mongo-connector/oplog.timestamp",
+    "__oplogCollection": "",
     "noDump": false,
     "batchSize": -1,
     "verbosity": 0,

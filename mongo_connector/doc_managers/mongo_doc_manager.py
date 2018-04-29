@@ -20,7 +20,7 @@
     To extend this to other systems, simply implement the exact same class and
     replace the method definitions with API calls for the desired backend.
     """
-
+import json
 import logging
 import pymongo
 
@@ -300,3 +300,29 @@ class DocManager(DocManagerBase):
                     yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x: x["_ts"])
+
+    def _get_oplog_collection(self, oplog_collection):
+        oplog_database = self.mongo["__mongo_connector_oplog"]
+        collection = oplog_database[oplog_collection]
+        return collection
+
+    def write_oplog_progress(self, oplog_collection, items):
+        collection = self._get_oplog_collection(oplog_collection)
+
+        bulk = collection.initialize_ordered_bulk_op()
+
+        try:
+            for item in items:
+                selector = {'_id': item["name"]}
+                bulk.find(selector).upsert().replace_one(item)
+            bulk.execute()
+        except:
+            LOG.error("error with dict: " + json.dump(items))
+
+    def read_oplog_progress(self, oplog_collection):
+        results = []
+        collection = self._get_oplog_collection(oplog_collection)
+        cursor = collection.find({})
+        for document in cursor:
+            results.append(document)
+        return results

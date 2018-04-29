@@ -15,14 +15,12 @@
 """
 
 import copy
-import json
 import logging
 import logging.handlers
 import os
 import platform
 import pymongo
 import re
-import shutil
 import signal
 import ssl
 import sys
@@ -31,11 +29,13 @@ import time
 
 from pymongo import MongoClient
 
-from mongo_connector import config, constants, errors, util
+from mongo_connector import config, constants, errors
 from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.command_helper import CommandHelper
+from mongo_connector.oplog_progress_stores.file_progress_store import FileProgressStore
+from mongo_connector.oplog_progress_stores.target_progress_store import TargetProgressStore
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import (NamespaceConfig,
                                               validate_namespace_options)
@@ -110,10 +110,6 @@ class Connector(threading.Thread):
         # Username for authentication
         self.auth_username = kwargs.pop('auth_username', None)
 
-        # The name of the file that stores the progress of the OplogThreads
-        self.oplog_checkpoint = kwargs.pop('oplog_checkpoint',
-                                           'oplog.timestamp')
-
         # The set of OplogThreads created
         self.shard_set = {}
 
@@ -158,26 +154,15 @@ class Connector(threading.Thread):
         for dm in self.doc_managers:
             dm.command_helper = command_helper
 
-        if self.oplog_checkpoint is not None:
-            if not os.path.exists(self.oplog_checkpoint):
-                info_str = ("MongoConnector: Can't find %s, "
-                            "attempting to create an empty progress log" %
-                            self.oplog_checkpoint)
-                LOG.warning(info_str)
-                try:
-                    # Create oplog progress file
-                    open(self.oplog_checkpoint, "w").close()
-                except IOError as e:
-                    LOG.critical("MongoConnector: Could not "
-                                 "create a progress log: %s" %
-                                 str(e))
-                    sys.exit(2)
-            else:
-                if (not os.access(self.oplog_checkpoint, os.W_OK)
-                        and not os.access(self.oplog_checkpoint, os.R_OK)):
-                    LOG.critical("Invalid permissions on %s! Exiting" %
-                                 (self.oplog_checkpoint))
-                    sys.exit(2)
+        oplog_collection = kwargs.pop('oplog_collection', None)
+
+        if oplog_collection:
+            self.oplog_progress_store = TargetProgressStore(self.oplog_progress, self.doc_managers[0], oplog_collection)
+        else:
+            # The name of the file that stores the progress of the OplogThreads
+            oplog_checkpoint = kwargs.pop('oplog_checkpoint',
+                                               'oplog.timestamp')
+            self.oplog_progress_store = FileProgressStore(self.oplog_progress, oplog_checkpoint)
 
     @classmethod
     def from_config(cls, config):
@@ -197,6 +182,7 @@ class Connector(threading.Thread):
         connector = Connector(
             mongo_address=config['mainAddress'],
             doc_managers=config['docManagers'],
+            oplog_collection=config['oplogCollection'],
             oplog_checkpoint=os.path.abspath(config['oplogFile']),
             collection_dump=(not config['noDump']),
             batch_size=config['batchSize'],
@@ -230,80 +216,84 @@ class Connector(threading.Thread):
         """ Writes oplog progress to file provided by user
         """
 
-        if self.oplog_checkpoint is None:
-            return None
-
-        with self.oplog_progress as oplog_prog:
-            oplog_dict = oplog_prog.get_dict()
-        items = [[name, util.bson_ts_to_long(oplog_dict[name])]
-                 for name in oplog_dict]
-        if not items:
-            return
-
-        # write to temp file
-        backup_file = self.oplog_checkpoint + '.backup'
-        os.rename(self.oplog_checkpoint, backup_file)
-
-        # for each of the threads write to file
-        with open(self.oplog_checkpoint, 'w') as dest:
-            if len(items) == 1:
-                # Write 1-dimensional array, as in previous versions.
-                json_str = json.dumps(items[0])
-            else:
-                # Write a 2d array to support sharded clusters.
-                json_str = json.dumps(items)
-            try:
-                dest.write(json_str)
-            except IOError:
-                # Basically wipe the file, copy from backup
-                dest.truncate()
-                with open(backup_file, 'r') as backup:
-                    shutil.copyfile(backup, dest)
-
-        os.remove(backup_file)
+        self.oplog_progress_store.write_oplog_progress()
+        #
+        # if self.oplog_checkpoint is None:
+        #     return None
+        #
+        # with self.oplog_progress as oplog_prog:
+        #     oplog_dict = oplog_prog.get_dict()
+        # items = [[name, util.bson_ts_to_long(oplog_dict[name])]
+        #          for name in oplog_dict]
+        # if not items:
+        #     return
+        #
+        # # write to temp file
+        # backup_file = self.oplog_checkpoint + '.backup'
+        # os.rename(self.oplog_checkpoint, backup_file)
+        #
+        # # for each of the threads write to file
+        # with open(self.oplog_checkpoint, 'w') as dest:
+        #     if len(items) == 1:
+        #         # Write 1-dimensional array, as in previous versions.
+        #         json_str = json.dumps(items[0])
+        #     else:
+        #         # Write a 2d array to support sharded clusters.
+        #         json_str = json.dumps(items)
+        #     try:
+        #         dest.write(json_str)
+        #     except IOError:
+        #         # Basically wipe the file, copy from backup
+        #         dest.truncate()
+        #         with open(backup_file, 'r') as backup:
+        #             shutil.copyfile(backup, dest)
+        #
+        # os.remove(backup_file)
 
     def read_oplog_progress(self):
         """Reads oplog progress from file provided by user.
         This method is only called once before any threads are spanwed.
         """
 
-        if self.oplog_checkpoint is None:
-            return None
+        self.oplog_progress_store.read_oplog_progress()
 
-        # Check for empty file
-        try:
-            if os.stat(self.oplog_checkpoint).st_size == 0:
-                LOG.info("MongoConnector: Empty oplog progress file.")
-                return None
-        except OSError:
-            return None
-
-        with open(self.oplog_checkpoint, 'r') as progress_file:
-            try:
-                data = json.load(progress_file)
-            except ValueError:
-                LOG.exception(
-                    'Cannot read oplog progress file "%s". '
-                    'It may be corrupt after Mongo Connector was shut down'
-                    'uncleanly. You can try to recover from a backup file '
-                    '(may be called "%s.backup") or create a new progress file '
-                    'starting at the current moment in time by running '
-                    'mongo-connector --no-dump <other options>. '
-                    'You may also be trying to read an oplog progress file '
-                    'created with the old format for sharded clusters. '
-                    'See https://github.com/10gen-labs/mongo-connector/wiki'
-                    '/Oplog-Progress-File for complete documentation.'
-                    % (self.oplog_checkpoint, self.oplog_checkpoint))
-                return
-            # data format:
-            # [name, timestamp] = replica set
-            # [[name, timestamp], [name, timestamp], ...] = sharded cluster
-            if not isinstance(data[0], list):
-                data = [data]
-            with self.oplog_progress:
-                self.oplog_progress.dict = dict(
-                    (name, util.long_to_bson_ts(timestamp))
-                    for name, timestamp in data)
+        # if self.oplog_checkpoint is None:
+        #     return None
+        #
+        # # Check for empty file
+        # try:
+        #     if os.stat(self.oplog_checkpoint).st_size == 0:
+        #         LOG.info("MongoConnector: Empty oplog progress file.")
+        #         return None
+        # except OSError:
+        #     return None
+        #
+        # with open(self.oplog_checkpoint, 'r') as progress_file:
+        #     try:
+        #         data = json.load(progress_file)
+        #     except ValueError:
+        #         LOG.exception(
+        #             'Cannot read oplog progress file "%s". '
+        #             'It may be corrupt after Mongo Connector was shut down'
+        #             'uncleanly. You can try to recover from a backup file '
+        #             '(may be called "%s.backup") or create a new progress file '
+        #             'starting at the current moment in time by running '
+        #             'mongo-connector --no-dump <other options>. '
+        #             'You may also be trying to read an oplog progress file '
+        #             'created with the old format for sharded clusters. '
+        #             'See https://github.com/10gen-labs/mongo-connector/wiki'
+        #             '/Oplog-Progress-File for complete documentation.'
+        #             % (self.oplog_checkpoint, self.oplog_checkpoint))
+        #         return
+        #     # data format:
+        #     # [name, timestamp] = replica set
+        #     # [[name, timestamp], [name, timestamp], ...] = sharded cluster
+        #     if not isinstance(data[0], list):
+        #         data = [data]
+        #     with self.oplog_progress:
+        #         self.oplog_progress.dict = dict(
+        #             (name, util.long_to_bson_ts(timestamp))
+        #             for name, timestamp in data)
 
     @staticmethod
     def copy_uri_options(hosts, mongodb_uri):
@@ -516,6 +506,17 @@ def get_config_options():
         "oplog-timestamp config file be emptied - otherwise "
         "the connector will miss some documents and behave "
         "incorrectly.")
+
+    oplog_collection = add_option(
+        config_key="oplogCollection",
+        default="",
+        type=str)
+
+    # -o is to specify the oplog-config file. This file is used by the system
+    # to store the last timestamp read on a specific oplog. This allows for
+    # quick recovery from failure.
+    oplog_collection.add_cli(
+        "--oplog-collection", dest="oplog_collection")
 
     no_dump = add_option(
         config_key="noDump",
