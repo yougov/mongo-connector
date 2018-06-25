@@ -144,6 +144,31 @@ class TestNamespaceConfig(unittest.TestCase):
                              "db1.col1")
             self.assertIsNone(namespace_config.gridfs_namespace("not.gridfs"))
 
+    def test_skip_delete(self):
+        """Test the gridfs property is set correctly."""
+        equivalent_namespace_configs = (
+            NamespaceConfig(skip_delete_set=["db1.*"]),
+            NamespaceConfig(namespace_options={"db1.*": {"skipDelete": True}})
+        )
+        for namespace_config in equivalent_namespace_configs:
+            self.assertEqual(namespace_config.unmap_namespace("db1.col1"),
+                             "db1.col1")
+            self.assertEqual(namespace_config.unmap_namespace("db1.col2"),
+                             "db1.col2")
+            self.assertEqual(namespace_config.lookup("db1.col1"),
+                             Namespace(dest_name="db1.col1",
+                                       source_name="db1.col1",
+                                       skip_delete=True))
+            self.assertListEqual(namespace_config.map_db("db1"), ["db1"])
+            self.assertEqual(namespace_config.map_namespace("db1.col1"),
+                             "db1.col1")
+            self.assertIsNone(namespace_config.map_namespace("db2.col4"))
+            self.assertTrue(namespace_config.lookup("db1.col1").skip_delete)
+            self.assertEqual(namespace_config.skip_delete_namespace("db1.col1"),
+                             "db1.col1")
+            self.assertIsNone(namespace_config.skip_delete_namespace("not.skipDelete"))
+
+
     def test_exclude_plain(self):
         """Test excluding namespaces without wildcards"""
         namespace_config = NamespaceConfig(ex_namespace_set=["ex.clude"])

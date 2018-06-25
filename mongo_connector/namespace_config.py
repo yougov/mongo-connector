@@ -26,23 +26,23 @@ LOG = logging.getLogger(__name__)
 
 
 _Namespace = namedtuple('Namespace', ['dest_name', 'source_name', 'gridfs',
-                                      'include_fields', 'exclude_fields'])
+                                      'include_fields', 'exclude_fields', 'skip_delete'])
 
 
 class Namespace(_Namespace):
     def __new__(cls, dest_name=None, source_name=None, gridfs=False,
-                include_fields=None, exclude_fields=None):
+                include_fields=None, exclude_fields=None, skip_delete=False):
         include_fields = set(include_fields or [])
         exclude_fields = set(exclude_fields or [])
         return super(Namespace, cls).__new__(
             cls, dest_name, source_name, gridfs, include_fields,
-            exclude_fields)
+            exclude_fields, skip_delete)
 
     def with_options(self, **kwargs):
         new_options = dict(
             dest_name=self.dest_name, source_name=self.source_name,
             gridfs=self.gridfs, include_fields=self.include_fields,
-            exclude_fields=self.exclude_fields)
+            exclude_fields=self.exclude_fields, skip_delete=self.skip_delete)
         new_options.update(kwargs)
         return Namespace(**new_options)
 
@@ -105,7 +105,7 @@ class NamespaceConfig(object):
     """
     def __init__(self, namespace_set=None, ex_namespace_set=None,
                  gridfs_set=None, dest_mapping=None, namespace_options=None,
-                 include_fields=None, exclude_fields=None):
+                 include_fields=None, exclude_fields=None, skip_delete_set=None):
         # A mapping from non-wildcard source namespaces to a MappedNamespace
         # containing the non-wildcard target name.
         self._plain = {}
@@ -138,7 +138,8 @@ class NamespaceConfig(object):
             dest_mapping=dest_mapping,
             namespace_options=namespace_options,
             include_fields=include_fields,
-            exclude_fields=exclude_fields)
+            exclude_fields=exclude_fields,
+            skip_delete_set=skip_delete_set)
 
         # The set of, possibly wildcard, namespaces to exclude.
         self._ex_namespace_set = RegexSet.from_namespaces(ex_namespace_set)
@@ -233,6 +234,15 @@ class NamespaceConfig(object):
         """
         namespace = self.lookup(plain_src_ns)
         if namespace and namespace.gridfs:
+            return namespace.dest_name
+        return None
+
+    def skip_delete_namespace(self, plain_src_ns):
+        """Given a plain source namespace, return the corresponding plain
+        target namespace if this namespace is a skip_delete collection.
+        """
+        namespace = self.lookup(plain_src_ns)
+        if namespace and namespace.skip_delete:
             return namespace.dest_name
         return None
 
@@ -391,7 +401,8 @@ def _validate_namespaces(namespaces):
 def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
                              gridfs_set=None, dest_mapping=None,
                              namespace_options=None,
-                             include_fields=None, exclude_fields=None):
+                             include_fields=None, exclude_fields=None,
+                             skip_delete_set=None):
     """Merges namespaces options together.
 
     The first is the set of excluded namespaces and the second is a mapping
@@ -404,6 +415,7 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
     namespace_options = namespace_options or {}
     include_fields = set(include_fields or [])
     exclude_fields = set(exclude_fields or [])
+    skip_delete_set = set(skip_delete_set or [])
     namespaces = {}
 
     for source_name, options_or_str in namespace_options.items():
@@ -411,11 +423,14 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
             namespace_set.add(source_name)
             if options_or_str.get('gridfs'):
                 gridfs_set.add(source_name)
+            if options_or_str.get('skipDelete'):
+                skip_delete_set.add(source_name)
             namespaces[source_name] = Namespace(
                 dest_name=options_or_str.get('rename'),
                 include_fields=options_or_str.get('includeFields'),
                 exclude_fields=options_or_str.get('excludeFields'),
-                gridfs=options_or_str.get('gridfs', False))
+                gridfs=options_or_str.get('gridfs', False),
+                skip_delete=options_or_str.get('skipDelete', False))
         elif compat.is_string(options_or_str):
             namespace_set.add(source_name)
             namespaces[source_name] = Namespace(dest_name=options_or_str)
@@ -439,6 +454,11 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
         namespaces[gridfs_name] = namespaces.get(
             gridfs_name, Namespace()).with_options(gridfs=True)
 
+    # Add namespaces that are excluded but not in namespace_options
+    for skip_delete_name in skip_delete_set:
+        namespaces[skip_delete_name] = namespaces.get(
+            skip_delete_name, Namespace()).with_options(skip_delete=True)
+
     # Add source, destination name, and globally included and excluded fields
     for included_name in namespaces:
         namespace = namespaces[included_name]
@@ -459,7 +479,8 @@ def _merge_namespace_options(namespace_set=None, ex_namespace_set=None,
 def validate_namespace_options(namespace_set=None, ex_namespace_set=None,
                                gridfs_set=None, dest_mapping=None,
                                namespace_options=None,
-                               include_fields=None, exclude_fields=None):
+                               include_fields=None, exclude_fields=None,
+                               skip_delete_set=None):
     ex_namespace_set, namespaces = _merge_namespace_options(
         namespace_set=namespace_set,
         ex_namespace_set=ex_namespace_set,
@@ -467,7 +488,8 @@ def validate_namespace_options(namespace_set=None, ex_namespace_set=None,
         dest_mapping=dest_mapping,
         namespace_options=namespace_options,
         include_fields=include_fields,
-        exclude_fields=exclude_fields)
+        exclude_fields=exclude_fields,
+        skip_delete_set=skip_delete_set)
 
     for excluded_name in ex_namespace_set:
         _validate_namespace(excluded_name)

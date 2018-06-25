@@ -71,6 +71,12 @@
         },
         "gridfs_wildcard.*": {
             "gridfs": true
+        },
+        "skipDelete.collection": {
+            "skipDelete": true
+        },
+        "skipDelete_wildcard.*": {
+            "skipDelete": true
         }
     },
 
