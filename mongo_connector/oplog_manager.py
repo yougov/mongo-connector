@@ -483,6 +483,10 @@ class OplogThread(threading.Thread):
                 query,
                 cursor_type=CursorType.TAILABLE_AWAIT,
                 oplog_replay=True)
+
+        # Setting a big batch size
+        cursor.batch_size(100000)
+
         return cursor
 
     def get_collection(self, namespace):
@@ -559,6 +563,10 @@ class OplogThread(threading.Thread):
                         projection=projection,
                         sort=[("_id", pymongo.ASCENDING)]
                     )
+
+                # Setting a big batch size
+                cursor.batch_size(100000)
+
                 try:
                     for doc in cursor:
                         if not self.running:
