@@ -2,8 +2,8 @@
 mongo-connector
 ===============
 
-mongo-connector is not currently supported by MongoDB, Inc.  If any community members would like to take over
-maintenance, please contact `seth.payne@mongodb.com <mailto:seth.payne@mongodb.com>`_.
+Ownership of the mongo-connector repo has been transferred to YouGov.  MongoDB would like to thank
+Jason Coombs, Executive Technical Director at YouGov, for agreeing to maintain this project.
 
 .. image:: https://travis-ci.org/mongodb-labs/mongo-connector.svg?branch=master
    :alt: View build status
