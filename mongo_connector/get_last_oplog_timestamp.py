@@ -14,17 +14,17 @@ if len(sys.argv) >= 2:
 
 client = pymongo.MongoClient(mongo_url)
 rs_name = client.admin.command('ismaster')['setName']
-print 'Found Replica Set name: {}'.format(str(rs_name))
+print('Found Replica Set name: {}'.format(str(rs_name)))
 
-print 'Now checking for the latest oplog entry...'
+print('Now checking for the latest oplog entry...')
 oplog = client.local.oplog.rs
 last_oplog = oplog.find().sort('$natural', pymongo.DESCENDING).limit(-1).next()
-print 'Found the last oplog ts: {}'.format(str(last_oplog['ts']))
+print('Found the last oplog ts: {}'.format(str(last_oplog['ts'])))
 last_ts = util.bson_ts_to_long(last_oplog['ts'])
 out_str='["{}", {}]'.format(str(rs_name), str(last_ts) ) 
 
-print 'Writing all to file oplog.timestamp.last in the format required for mongo-connector'
+print('Writing all to file oplog.timestamp.last in the format required for mongo-connector')
 f = open('./oplog.timestamp.last', 'w')
 f.write(out_str)
 f.close()
-print 'All done!'
+print('All done!')
