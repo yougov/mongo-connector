@@ -115,7 +115,7 @@ extra_opts['cmdclass'] = {
 }
 
 setup(name='mongo-connector',
-      version="2.5.2.dev0",
+      version="2.5.3.dev22",
       author="MongoDB, Inc.",
       author_email='mongodb-user@googlegroups.com',
       description='Mongo Connector',
@@ -125,7 +125,7 @@ setup(name='mongo-connector',
       platforms=["any"],
       classifiers=filter(None, classifiers.split("\n")),
       install_requires=['pymongo >= 2.9'],
-      packages=["mongo_connector", "mongo_connector.doc_managers"],
+      packages=["mongo_connector", "mongo_connector.doc_managers", "mongo_connector.oplog_progress_stores"],
       package_data={
           'mongo_connector.doc_managers': ['schema.xml']
       },

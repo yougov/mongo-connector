@@ -4,6 +4,7 @@
 
     "mainAddress": "localhost:27017",
     "oplogFile": "/var/log/mongo-connector/oplog.timestamp",
+    "__oplogCollection": "",
     "noDump": false,
     "batchSize": -1,
     "verbosity": 0,
@@ -80,7 +81,12 @@
             "targetURL": "localhost:9200",
             "__bulkSize": 1000,
             "__uniqueKey": "_id",
-            "__autoCommitInterval": null
+            "__autoCommitInterval": null,
+			"args": {
+				"clientOptions": {
+					"ssl_cert_reqs": "CERT_NONE"
+				}
+			}
         }
     ]
 }

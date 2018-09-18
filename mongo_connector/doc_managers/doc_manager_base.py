@@ -174,3 +174,11 @@ class DocManagerBase(object):
     def stop(self):
         """Stop all threads started by this DocManager."""
         raise NotImplementedError
+
+    def write_oplog_progress(self, oplog_collection, items):
+        """Writes oplog progress to DocManager."""
+        raise NotImplementedError
+
+    def read_oplog_progress(self, oplog_collection):
+        """Read oplog progress from DocManager."""
+        raise NotImplementedError

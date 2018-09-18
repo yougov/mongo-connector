@@ -17,6 +17,7 @@
 
 import bson
 import logging
+
 try:
     import Queue as queue
 except ImportError:
@@ -40,6 +41,7 @@ LOG = logging.getLogger(__name__)
 class ReplicationLagLogger(threading.Thread):
     """Thread that periodically logs the current replication lag.
     """
+
     def __init__(self, opman, interval):
         super(ReplicationLagLogger, self).__init__()
         self.opman = opman
@@ -81,6 +83,7 @@ class OplogThread(threading.Thread):
 
     Calls the appropriate method on DocManagers for each relevant oplog entry.
     """
+
     def __init__(self, primary_client, doc_managers,
                  oplog_progress_dict, namespace_config,
                  mongos_client=None, **kwargs):
@@ -182,7 +185,8 @@ class OplogThread(threading.Thread):
         # This may nullify the document if there's nothing to do.
         if not self.filter_oplog_entry(
                 entry, include_fields=namespace.include_fields,
-                exclude_fields=namespace.exclude_fields):
+                exclude_fields=namespace.exclude_fields,
+                include_filter=namespace.include_filter):
             return True, False
         return False, is_gridfs_file
 
@@ -364,6 +368,7 @@ class OplogThread(threading.Thread):
         notation, eg "a.b.c". Returns a list of tuples (path, field_value) or
         the empty list if the field is not present.
         """
+
         def find_partial_matches():
             for key in doc:
                 if len(key) > len(field):
@@ -421,11 +426,24 @@ class OplogThread(threading.Thread):
 
         return new_doc
 
+    def _apply_include_filter(self, doc, include_fields, update=False):
+        find_fields = self._find_update_fields if update else self._find_field
+
+        for field in include_fields:
+            for path, value in find_fields(field, doc):
+                # if field exists but has the wrong value, return false so the doc will be dropped
+                if value != include_fields[field]:
+                    return False
+        # did not find any field with a wrong value, returning true so the doc will be passed
+        return True
+
     def filter_oplog_entry(self, entry, include_fields=None,
-                           exclude_fields=None):
+                           exclude_fields=None,
+                           include_filter=None):
         """Remove fields from an oplog entry that should not be replicated.
 
         NOTE: this does not support array indexing, for example 'a.b.2'"""
+
         if not include_fields and not exclude_fields:
             return entry
         elif include_fields:
@@ -435,6 +453,12 @@ class OplogThread(threading.Thread):
 
         fields = include_fields or exclude_fields
         entry_o = entry['o']
+
+        if include_filter is not None:
+            should_continue = self._apply_include_filter(entry_o, include_filter)
+            if not should_continue:
+                return None
+
         # 'i' indicates an insert. 'o' field is the doc to be inserted.
         if entry['op'] == 'i':
             entry['o'] = filter_fields(entry_o, fields)
@@ -535,10 +559,15 @@ class OplogThread(threading.Thread):
 
         LOG.debug("OplogThread: Dumping set of collections %s " % dump_set)
 
-        def docs_to_dump(from_coll):
+        def docs_to_dump(from_coll, namespace=None):
             last_id = None
             attempts = 0
             projection = self.namespace_config.projection(from_coll.full_name)
+
+            namespaceconfig = None
+            if namespace is not None:
+                namespaceconfig = self.namespace_config.lookup(namespace)
+
             # Loop to handle possible AutoReconnect
             while attempts < 60:
                 if last_id is None:
@@ -561,6 +590,12 @@ class OplogThread(threading.Thread):
                             # collection dump.
                             dump_cancelled[0] = True
                             raise StopIteration
+
+                        if namespaceconfig is not None and namespaceconfig.include_filter is not None:
+                            should_continue = self._apply_include_filter(doc, namespaceconfig.include_filter)
+                            if not should_continue:
+                                continue
+
                         last_id = doc["_id"]
                         yield doc
                     break
@@ -576,7 +611,7 @@ class OplogThread(threading.Thread):
                 mapped_ns = self.namespace_config.map_namespace(namespace)
                 total_docs = retry_until_ok(from_coll.count)
                 num = None
-                for num, doc in enumerate(docs_to_dump(from_coll)):
+                for num, doc in enumerate(docs_to_dump(from_coll, namespace)):
                     try:
                         dm.upsert(doc, mapped_ns, long_ts)
                     except Exception:
@@ -603,11 +638,12 @@ class OplogThread(threading.Thread):
                     from_coll = self.get_collection(namespace)
                     total_docs = retry_until_ok(from_coll.count)
                     mapped_ns = self.namespace_config.map_namespace(
-                            namespace)
-                    LOG.info("Bulk upserting approximately %d docs from "
+                        namespace)
+
+                    LOG.info("[%s] Bulk upserting approximately %d docs from "
                              "collection '%s'",
-                             total_docs, namespace)
-                    dm.bulk_upsert(docs_to_dump(from_coll),
+                             self.replset_name, total_docs, namespace)
+                    dm.bulk_upsert(docs_to_dump(from_coll, namespace),
                                    mapped_ns, long_ts)
             except Exception:
                 if self.continue_on_error:
@@ -633,9 +669,10 @@ class OplogThread(threading.Thread):
                     mongo_coll = self.get_collection(gridfs_ns)
                     from_coll = self.get_collection(gridfs_ns + '.files')
                     dest_ns = self.namespace_config.map_namespace(gridfs_ns)
-                    for doc in docs_to_dump(from_coll):
+                    for doc in docs_to_dump(from_coll, gridfs_ns):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
+                LOG.info("OplogThread [%s]: collection dump completed", self.replset_name)
             except:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,
@@ -691,8 +728,8 @@ class OplogThread(threading.Thread):
         """
         sort_order = pymongo.DESCENDING if newest_entry else pymongo.ASCENDING
         curr = self.oplog.find({'op': {'$ne': 'n'}}).sort(
-                '$natural', sort_order
-            ).limit(-1)
+            '$natural', sort_order
+        ).limit(-1)
 
         try:
             ts = next(curr)['ts']
@@ -879,7 +916,7 @@ class OplogThread(threading.Thread):
         end_ts = last_inserted_doc['_ts']
 
         for dm in self.doc_managers:
-            rollback_set = {}   # this is a dictionary of ns:list of docs
+            rollback_set = {}  # this is a dictionary of ns:list of docs
 
             # group potentially conflicted documents by namespace
             for doc in dm.search(start_ts, end_ts):
@@ -922,6 +959,7 @@ class OplogThread(threading.Thread):
                         if doc['_id'] in doc_hash:
                             del doc_hash[doc['_id']]
                             to_index.append(doc)
+
                 retry_until_ok(collect_existing_docs)
 
                 # Delete the inconsistent documents
