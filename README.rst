@@ -10,7 +10,7 @@ Jason Coombs, Executive Technical Director at YouGov, for agreeing to maintain t
    :target: https://travis-ci.org/mongodb-labs/mongo-connector
 
 For complete documentation, check out the `Mongo Connector Wiki
-<https://github.com/mongodb-labs/mongo-connector/wiki>`__.
+<https://github.com/yougov/mongo-connector/wiki>`__.
 
 System Overview
 ---------------
@@ -20,7 +20,7 @@ target systems, such as Solr, Elasticsearch, or another MongoDB cluster.  It
 synchronizes data in MongoDB to the target then tails the MongoDB oplog, keeping
 up with operations in MongoDB in real-time. Detailed documentation is
 available on the `wiki
-<https://github.com/mongodb-labs/mongo-connector/wiki>`__.
+<https://github.com/yougov/mongo-connector/wiki>`__.
 
 Getting Started
 ---------------
@@ -67,7 +67,7 @@ Development
 You can also install the development version of mongo-connector
 manually::
 
-  git clone https://github.com/mongodb-labs/mongo-connector.git
+  git clone https://github.com/yougov/mongo-connector.git
   pip install ./mongo-connector
 
 Using mongo-connector
@@ -96,13 +96,13 @@ simplest invocation resembles the following::
 
 mongo-connector has many other options besides those demonstrated above.
 To get a full listing with descriptions, try ``mongo-connector --help``.
-You can also use mongo-connector with a `configuration file <https://github.com/mongodb-labs/mongo-connector/wiki/Configuration-File>`__.
+You can also use mongo-connector with a `configuration file <https://github.com/yougov/mongo-connector/wiki/Configuration-File>`__.
 
 If you want to jump-start into using mongo-connector with a another particular system, check out:
 
-- `Usage with Solr <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20Solr>`__
-- `Usage with Elasticsearch <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
-- `Usage with MongoDB <https://github.com/mongodb-labs/mongo-connector/wiki/Usage%20with%20MongoDB>`__
+- `Usage with Solr <https://github.com/yougov/mongo-connector/wiki/Usage%20with%20Solr>`__
+- `Usage with Elasticsearch <https://github.com/yougov/mongo-connector/wiki/Usage%20with%20ElasticSearch>`__
+- `Usage with MongoDB <https://github.com/yougov/mongo-connector/wiki/Usage%20with%20MongoDB>`__
 
 Doc Managers
 ~~~~~~~~~~~~
@@ -119,5 +119,6 @@ Troubleshooting/Questions
 -------------------------
 
 Having trouble with installation? Have a question about Mongo Connector?
-Your question or problem may be answered in the `FAQ <https://github.com/mongodb-labs/mongo-connector/wiki/FAQ>`__
-or in the `wiki <https://github.com/mongodb-labs/mongo-connector/wiki>`__.
+Your question or problem may be answered in the `FAQ <https://github.com/yougov/mongo-connector/wiki/FAQ>`__
+or in the `wiki <https://github.com/yougov/mongo-connector/wiki>`__. If you can't find the answer to your question or problem there, feel free to `open an issue
+<https://github.com/yougov/mongo-connector/issues>`__ on Mongo Connector's Github page.
