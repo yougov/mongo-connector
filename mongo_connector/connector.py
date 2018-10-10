@@ -311,10 +311,19 @@ class Connector(threading.Thread):
         """Returns a MongoDB URI to hosts with the options from mongodb_uri.
         """
         if '?' in mongodb_uri:
-            options = mongodb_uri.split('?', 1)[1]
+            base_url, options = mongodb_uri.split('?', 1)
         else:
-            options = None
-        uri = 'mongodb://' + hosts
+            base_url, options = '', None
+
+        # Parse out username and/or passwords from mongodb uri
+        if '@' in base_url:
+            auth_key = base_url.split('@')[0] + '@'
+            if auth_key.startswith('mongodb://'):
+                auth_key = auth_key[10:]
+        else:
+            auth_key = ''
+
+        uri = 'mongodb://' + auth_key + hosts
         if options:
             uri += '/?' + options
         return uri
