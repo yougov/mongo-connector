@@ -171,14 +171,11 @@ class DocManager(DocManagerBase):
              "_ts": timestamp,
              "ns": namespace},
             upsert=True)
-
-        no_obj_error = "No matching object found"
-        updated = self.mongo[db].command(
-            SON([('findAndModify', coll),
-                 ('query', {'_id': document_id}),
-                 ('update', update_spec),
-                 ('new', True)]),
-            allowable_errors=[no_obj_error])['value']
+        
+        if( "$set" not in update_spec and "$unset" not in update_spec ):
+            update_spec = {"$set": update_spec} # python requires a dollar sign operator
+        updated = self.mongo[db][coll].update_one({'_id': document_id}, update_spec )        
+        
         return updated
 
     @wrap_exceptions
@@ -240,7 +237,7 @@ class DocManager(DocManagerBase):
                          + str(e))
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
-                raise e
+                raise bwe
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):
