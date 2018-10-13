@@ -1,6 +1,15 @@
 Changelog
 =========
 
+Version 2.6.0
+-------------
+
+- Project maintenance transferred to YouGov.
+- #816: Added utility for getting oplog timestamp from replica set.
+- #826: Project now automatically releases tagged commits to PyPI via
+  Travis CI.
+- #781: Improved MongoDB 3.6 support by removing ``$v``.
+
 Version 2.5.1
 -------------
 
