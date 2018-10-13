@@ -35,12 +35,7 @@ import sys
 from distutils.core import Command
 from distutils.dir_util import mkpath, remove_tree
 from distutils.file_util import copy_file
-try:
-    from setuptools import setup
-except ImportError:
-    from ez_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup
+from setuptools import setup
 
 extra_opts = {"test_suite": "tests",
               "tests_require": ["mongo-orchestration>=0.6.7,<1.0",
