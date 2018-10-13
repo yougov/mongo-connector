@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-__version__ = '2.6.0'
+__version__ = "2.6.0"
 
 # Maximum # of documents to process before recording timestamp
 # default = -1 (no maximum)
@@ -44,8 +44,7 @@ DEFAULT_LOGFILE_INTERVAL = 1
 # Number of log files to keep
 DEFAULT_LOGFILE_BACKUPCOUNT = 7
 # The log format
-DEFAULT_LOG_FORMAT = (
-    '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s')
+DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s"
 
 # If a single meta collection is used, defines the default collection name
 DEFAULT_META_COLLECTION_NAME = "__oplog"

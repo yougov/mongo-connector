@@ -29,9 +29,7 @@ from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import (assert_soon,
-                                        close_client,
-                                        ReplicaSetSingle)
+from mongo_connector.test_utils import assert_soon, close_client, ReplicaSetSingle
 from tests import unittest
 
 
@@ -43,42 +41,49 @@ class TestOplogManager(unittest.TestCase):
     def setUp(self):
         self.repl_set = ReplicaSetSingle().start()
         self.primary_conn = self.repl_set.client()
-        self.oplog_coll = self.primary_conn.local['oplog.rs']
+        self.oplog_coll = self.primary_conn.local["oplog.rs"]
 
     def reset_opman(self, include_ns=None, exclude_ns=None, dest_mapping=None):
-        self.namespace_config = NamespaceConfig(namespace_set=include_ns,
-                                                ex_namespace_set=exclude_ns,
-                                                namespace_options=dest_mapping)
+        self.namespace_config = NamespaceConfig(
+            namespace_set=include_ns,
+            ex_namespace_set=exclude_ns,
+            namespace_options=dest_mapping,
+        )
         self.opman = OplogThread(
             primary_client=self.primary_conn,
             doc_managers=(DocManager(),),
             oplog_progress_dict=LockingDict(),
-            namespace_config=self.namespace_config
+            namespace_config=self.namespace_config,
         )
 
     def init_dbs(self):
         # includedb1.* & includedb2.includecol1 are interested collections
         self.primary_conn["includedb1"]["includecol1"].insert_many(
-            [{"idb1col1": i} for i in range(1, 3)])
+            [{"idb1col1": i} for i in range(1, 3)]
+        )
 
         self.primary_conn["includedb1"]["includecol2"].insert_many(
-            [{"idb1col2": i} for i in range(1, 3)])
+            [{"idb1col2": i} for i in range(1, 3)]
+        )
 
         self.primary_conn["includedb2"]["includecol1"].insert_many(
-            [{"idb2col1": i} for i in range(1, 3)])
+            [{"idb2col1": i} for i in range(1, 3)]
+        )
 
         # the others are not interested collections
         self.primary_conn["includedb2"]["excludecol2"].insert_many(
-            [{"idb2col2": i} for i in range(1, 3)])
+            [{"idb2col2": i} for i in range(1, 3)]
+        )
 
         self.primary_conn["excludedb3"]["excludecol1"].insert_many(
-            [{"idb3col1": i} for i in range(1, 3)])
+            [{"idb3col1": i} for i in range(1, 3)]
+        )
 
     def tearDown(self):
         try:
             self.opman.join()
         except RuntimeError:
-            pass                # OplogThread may not have been started
+            pass  # OplogThread may not have been started
 
         for db in self.primary_conn.database_names():
             if db != "local":
@@ -87,7 +92,7 @@ class TestOplogManager(unittest.TestCase):
         self.repl_set.stop()
 
     def test_get_oplog_cursor(self):
-        '''Test the get_oplog_cursor method'''
+        """Test the get_oplog_cursor method"""
 
         # Put something in the dbs
         self.init_dbs()
@@ -97,8 +102,7 @@ class TestOplogManager(unittest.TestCase):
         self.reset_opman(["includedb1.*", "includedb2.includecol1"], [], {})
 
         got_cursor = self.opman.get_oplog_cursor(None)
-        oplog_cursor = self.oplog_coll.find(
-            {'op': {'$ne': 'n'}})
+        oplog_cursor = self.oplog_coll.find({"op": {"$ne": "n"}})
         self.assertNotEqual(got_cursor, None)
         self.assertEqual(got_cursor.count(), oplog_cursor.count())
 
@@ -106,8 +110,7 @@ class TestOplogManager(unittest.TestCase):
         self.reset_opman([], ["includedb2.excludecol2", "excludedb3.*"], {})
 
         got_cursor = self.opman.get_oplog_cursor(None)
-        oplog_cursor = self.oplog_coll.find(
-            {'op': {'$ne': 'n'}})
+        oplog_cursor = self.oplog_coll.find({"op": {"$ne": "n"}})
         self.assertNotEqual(got_cursor, None)
         self.assertEqual(got_cursor.count(), oplog_cursor.count())
 
@@ -118,18 +121,18 @@ class TestOplogManager(unittest.TestCase):
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
         self.assertEqual(cursor.count(), 1)
-        next_entry_id = next(cursor)['o']['_id']
-        retrieved = self.primary_conn.includedb1.includecol1.find_one(
-                    next_entry_id)
+        next_entry_id = next(cursor)["o"]["_id"]
+        retrieved = self.primary_conn.includedb1.includecol1.find_one(next_entry_id)
         self.assertEqual(retrieved, doc)
 
         # many entries before and after timestamp
         self.primary_conn["includedb1"]["includecol1"].insert_many(
-            [{"idb1col1": i} for i in range(2, 1002)])
+            [{"idb1col1": i} for i in range(2, 1002)]
+        )
         oplog_cursor = self.oplog_coll.find(
-            {'op': {'$ne': 'n'},
-             'ns': {'$not': re.compile(r'\.(system|\$cmd)')}},
-            sort=[("ts", pymongo.ASCENDING)])
+            {"op": {"$ne": "n"}, "ns": {"$not": re.compile(r"\.(system|\$cmd)")}},
+            sort=[("ts", pymongo.ASCENDING)],
+        )
 
         # initial insert + 1000 more inserts
         self.assertEqual(oplog_cursor.count(), 11 + 1000)
@@ -151,15 +154,16 @@ class TestOplogManager(unittest.TestCase):
         self.reset_opman(["includedb1.*", "includedb2.includecol1"], [], {})
         self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
         for i in range(1000):
-            self.primary_conn["includedb1"]["includecol1"].insert_one({
-                "idb1col1": i + 500
-            })
+            self.primary_conn["includedb1"]["includecol1"].insert_one(
+                {"idb1col1": i + 500}
+            )
         oplog = self.primary_conn["local"]["oplog.rs"]
-        oplog = oplog.find(
-                {'op': {'$ne': 'n'}}).sort(
-                "$natural", pymongo.DESCENDING).limit(-1)[0]
-        self.assertEqual(self.opman.get_last_oplog_timestamp(),
-                         oplog["ts"])
+        oplog = (
+            oplog.find({"op": {"$ne": "n"}})
+            .sort("$natural", pymongo.DESCENDING)
+            .limit(-1)[0]
+        )
+        self.assertEqual(self.opman.get_last_oplog_timestamp(), oplog["ts"])
 
     def test_dump_collection(self):
         """Test the dump_collection method
@@ -211,21 +215,21 @@ class TestOplogManager(unittest.TestCase):
         self.opman.continue_on_error = True
         self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
 
-        docs = [{'a': i} for i in range(100)]
+        docs = [{"a": i} for i in range(100)]
         for i in range(50, 60):
-            docs[i]['_upsert_exception'] = True
-        self.primary_conn['includedb1']['includecol3'].insert_many(docs)
+            docs[i]["_upsert_exception"] = True
+        self.primary_conn["includedb1"]["includecol3"].insert_many(docs)
 
         last_ts = self.opman.get_last_oplog_timestamp()
         self.assertEqual(last_ts, self.opman.dump_collection())
         docs = self.opman.doc_managers[0]._search()
-        docs = list(filter(lambda doc: 'a' in doc, docs))
-        docs.sort(key=lambda doc: doc['a'])
+        docs = list(filter(lambda doc: "a" in doc, docs))
+        docs.sort(key=lambda doc: doc["a"])
 
         self.assertEqual(len(docs), 90)
         expected_a = itertools.chain(range(0, 50), range(60, 100))
         for doc, correct_a in zip(docs, expected_a):
-            self.assertEqual(doc['a'], correct_a)
+            self.assertEqual(doc["a"], correct_a)
 
     def test_init_cursor(self):
         """Test the init_cursor method
@@ -250,8 +254,7 @@ class TestOplogManager(unittest.TestCase):
         # "change oplog collection" to put nothing in oplog
         self.opman.oplog = self.primary_conn["includedb1"]["emptycollection"]
         self.opman.collection_dump = False
-        self.assertTrue(all(doc['op'] == 'n'
-                            for doc in self.opman.init_cursor()[0]))
+        self.assertTrue(all(doc["op"] == "n" for doc in self.opman.init_cursor()[0]))
         self.assertEqual(self.opman.checkpoint, None)
 
         # No last checkpoint, empty collections, nothing in oplog
@@ -262,7 +265,7 @@ class TestOplogManager(unittest.TestCase):
         self.assertEqual(self.opman.checkpoint, None)
 
         # No last checkpoint, empty collections, something in oplog
-        self.opman.oplog = self.primary_conn['local']['oplog.rs']
+        self.opman.oplog = self.primary_conn["local"]["oplog.rs"]
         collection = self.primary_conn["includedb1"]["includecol1"]
         collection.insert_one({"idb1col1": 1})
         collection.delete_one({"idb1col1": 1})
@@ -282,13 +285,12 @@ class TestOplogManager(unittest.TestCase):
         cursor, cursor_empty = self.opman.init_cursor()
         for doc in cursor:
             last_doc = doc
-        self.assertEqual(last_doc['o']['idb1col1'], 2)
+        self.assertEqual(last_doc["o"]["idb1col1"], 2)
         self.assertIsNone(self.opman.checkpoint)
 
         # Last checkpoint exists
         collection.insert_many([{"idb1col1": i + 500} for i in range(1000)])
-        entry = list(
-            self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
+        entry = list(self.primary_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
         self.opman.update_checkpoint(entry[0]["ts"])
         cursor, cursor_empty = self.opman.init_cursor()
         self.assertEqual(next(cursor)["ts"], entry[1]["ts"])
@@ -310,13 +312,15 @@ class TestOplogManager(unittest.TestCase):
         1. in namespace set, mapping provided
         2. outside of namespace set, mapping provided
         """
-        included_names = ["includedb1.includecol1",
-                          "includedb1.includecol2",
-                          "includedb2.includecol1"]
+        included_names = [
+            "includedb1.includecol1",
+            "includedb1.includecol2",
+            "includedb2.includecol1",
+        ]
         excluded_names = ["includedb2.excludecol2", "excludedb3.excludecol1"]
         dest_mapping = {
             "includedb1.*": "newdb1.*",
-            "includedb2.includecol1": "newdb2.newcol1"
+            "includedb2.includecol1": "newdb2.newcol1",
         }
         self.reset_opman(dest_mapping=dest_mapping)
         docman = self.opman.doc_managers[0]
@@ -334,15 +338,15 @@ class TestOplogManager(unittest.TestCase):
             self.primary_conn[db][coll].insert_one(base_doc)
 
             assert_soon(lambda: len(docman._search()) == 1)
-            self.assertEqual(docman._search()[0]["ns"],
-                             namespace_config.map_namespace(ns))
+            self.assertEqual(
+                docman._search()[0]["ns"], namespace_config.map_namespace(ns)
+            )
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
             # test update
             self.primary_conn[db][coll].update_one(
-                {"_id": 1},
-                {"$set": {"weakness": "kryptonite"}}
+                {"_id": 1}, {"$set": {"weakness": "kryptonite"}}
             )
 
             def update_complete():
@@ -351,17 +355,22 @@ class TestOplogManager(unittest.TestCase):
                     if d.get("weakness") == "kryptonite":
                         return True
                     return False
+
             assert_soon(update_complete)
-            self.assertEqual(docman._search()[0]["ns"],
-                             namespace_config.map_namespace(ns))
+            self.assertEqual(
+                docman._search()[0]["ns"], namespace_config.map_namespace(ns)
+            )
             bad = [d for d in docman._search() if d["ns"] == ns]
             self.assertEqual(len(bad), 0)
 
             # test delete
             self.primary_conn[db][coll].delete_one({"_id": 1})
             assert_soon(lambda: len(docman._search()) == 0)
-            bad = [d for d in docman._search()
-                   if d["ns"] == namespace_config.map_namespace(ns)]
+            bad = [
+                d
+                for d in docman._search()
+                if d["ns"] == namespace_config.map_namespace(ns)
+            ]
             self.assertEqual(len(bad), 0)
 
             # cleanup
@@ -378,8 +387,7 @@ class TestOplogManager(unittest.TestCase):
             self.assertEqual(len(docman._search()), 0)
             # test update
             self.primary_conn[db][coll].update_one(
-                {"_id": 1},
-                {"$set": {"weakness": "kryptonite"}}
+                {"_id": 1}, {"$set": {"weakness": "kryptonite"}}
             )
             time.sleep(1)
             self.assertEqual(len(docman._search()), 0)
@@ -395,35 +403,30 @@ class TestOplogManager(unittest.TestCase):
 
         # start replicating
         self.opman.start()
-        self.primary_conn["includedb1"]["includecol1"].insert_one({
-            "name": "kermit",
-            "color": "green"
-        })
-        self.primary_conn["includedb1"]["includecol2"].insert_one({
-            "name": "elmo",
-            "color": "firetruck red"
-        })
-        self.primary_conn["excludedb2"]["excludecol1"].insert_one({
-            "name": "panda",
-            "color": "white and black"
-        })
+        self.primary_conn["includedb1"]["includecol1"].insert_one(
+            {"name": "kermit", "color": "green"}
+        )
+        self.primary_conn["includedb1"]["includecol2"].insert_one(
+            {"name": "elmo", "color": "firetruck red"}
+        )
+        self.primary_conn["excludedb2"]["excludecol1"].insert_one(
+            {"name": "panda", "color": "white and black"}
+        )
 
         assert_soon(
             lambda: sum(len(d._search()) for d in doc_managers) == 6,
-            "OplogThread should be able to replicate to multiple targets"
+            "OplogThread should be able to replicate to multiple targets",
         )
 
-        self.primary_conn["includedb1"]["includecol2"].delete_one({
-            "name": "elmo"
-        })
+        self.primary_conn["includedb1"]["includecol2"].delete_one({"name": "elmo"})
 
         assert_soon(
             lambda: sum(len(d._search()) for d in doc_managers) == 3,
-            "OplogThread should be able to replicate to multiple targets"
+            "OplogThread should be able to replicate to multiple targets",
         )
         for d in doc_managers:
             self.assertEqual(d._search()[0]["name"], "kermit")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

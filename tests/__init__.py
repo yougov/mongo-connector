@@ -26,4 +26,3 @@ if sys.version_info[:2] == (2, 6):
 else:
     import unittest
     from unittest.case import SkipTest
-

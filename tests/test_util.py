@@ -21,9 +21,7 @@ from pymongo import errors
 
 sys.path[0:0] = [""]
 
-from mongo_connector.util import (bson_ts_to_long,
-                                  long_to_bson_ts,
-                                  retry_until_ok)
+from mongo_connector.util import bson_ts_to_long, long_to_bson_ts, retry_until_ok
 from tests import unittest
 
 
@@ -37,6 +35,7 @@ def err_func(first_error):
         raise TypeError
     else:
         raise first_error
+
 
 err_func.counter = 0
 
@@ -52,12 +51,10 @@ class TestUtil(unittest.TestCase):
         """Test bson_ts_to_long and long_to_bson_ts
         """
 
-        tstamp = timestamp.Timestamp(0x12345678, 0x90abcdef)
+        tstamp = timestamp.Timestamp(0x12345678, 0x90ABCDEF)
 
-        self.assertEqual(0x1234567890abcdef,
-                         bson_ts_to_long(tstamp))
-        self.assertEqual(long_to_bson_ts(0x1234567890abcdef),
-                         tstamp)
+        self.assertEqual(0x1234567890ABCDEF, bson_ts_to_long(tstamp))
+        self.assertEqual(long_to_bson_ts(0x1234567890ABCDEF), tstamp)
 
     def test_retry_until_ok(self):
         """Test retry_until_ok
@@ -68,14 +65,14 @@ class TestUtil(unittest.TestCase):
     def test_retry_until_ok_operation_failure(self):
         """Test retry_until_ok retries on PyMongo OperationFailure.
         """
-        self.assertTrue(retry_until_ok(err_func, errors.OperationFailure('')))
+        self.assertTrue(retry_until_ok(err_func, errors.OperationFailure("")))
         self.assertEqual(err_func.counter, 3)
 
     def test_retry_until_ok_authorization(self):
         """Test retry_until_ok does not mask authorization failures.
         """
         with self.assertRaises(errors.OperationFailure):
-            retry_until_ok(err_func, errors.OperationFailure('', 13, None))
+            retry_until_ok(err_func, errors.OperationFailure("", 13, None))
         self.assertEqual(err_func.counter, 1)
 
     def test_retry_until_ok_authorization_mongodb_24(self):
@@ -83,8 +80,10 @@ class TestUtil(unittest.TestCase):
         MongoDB 2.4.
         """
         with self.assertRaises(errors.OperationFailure):
-            retry_until_ok(err_func, errors.OperationFailure(
-                '', details={'errmsg': 'unauthorized'}))
+            retry_until_ok(
+                err_func,
+                errors.OperationFailure("", details={"errmsg": "unauthorized"}),
+            )
         self.assertEqual(err_func.counter, 1)
 
     def test_retry_until_ok_runtime_error(self):
@@ -95,6 +94,6 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(err_func.counter, 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     unittest.main()

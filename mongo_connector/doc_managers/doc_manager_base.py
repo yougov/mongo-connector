@@ -52,8 +52,7 @@ class DocManagerBase(object):
                     # Do we need to create additional space in the array?
                     if create and len(looking_at) <= index:
                         # Fill buckets with None up to the index we need.
-                        looking_at.extend(
-                            [None] * (index - len(looking_at)))
+                        looking_at.extend([None] * (index - len(looking_at)))
                         # Bucket we need gets the empty dictionary.
                         looking_at.append({})
                     looking_at = looking_at[index]
@@ -62,7 +61,7 @@ class DocManagerBase(object):
             return looking_at
 
         def _set_field(doc, to_set, value):
-            if '.' in to_set:
+            if "." in to_set:
                 path = to_set.split(".")
                 where = _retrieve_path(doc, path[:-1], create=True)
                 index = _convert_or_raise(where, path[-1])
@@ -75,7 +74,7 @@ class DocManagerBase(object):
 
         def _unset_field(doc, to_unset):
             try:
-                if '.' in to_unset:
+                if "." in to_unset:
                     path = to_unset.split(".")
                     where = _retrieve_path(doc, path[:-1])
                     index_or_key = _convert_or_raise(where, path[-1])
@@ -93,10 +92,12 @@ class DocManagerBase(object):
                     raise
                 # Ignore unset errors since MongoDB 2.4 records invalid
                 # $unsets in the oplog.
-                LOG.warning("Could not unset field %r from document %r. "
-                            "This may be normal when replicating from "
-                            "MongoDB 2.4 or the destination could be out of "
-                            "sync." % (to_unset, doc))
+                LOG.warning(
+                    "Could not unset field %r from document %r. "
+                    "This may be normal when replicating from "
+                    "MongoDB 2.4 or the destination could be out of "
+                    "sync." % (to_unset, doc)
+                )
 
         # wholesale document replacement
         if not "$set" in update_spec and not "$unset" in update_spec:
@@ -106,7 +107,7 @@ class DocManagerBase(object):
             try:
                 # $set
                 for to_set in update_spec.get("$set", []):
-                    value = update_spec['$set'][to_set]
+                    value = update_spec["$set"][to_set]
                     _set_field(doc, to_set, value)
 
                 # $unset
@@ -115,9 +116,11 @@ class DocManagerBase(object):
 
             except (KeyError, ValueError, AttributeError, IndexError):
                 exc_t, exc_v, exc_tb = sys.exc_info()
-                reraise(UpdateDoesNotApply,
-                        "Cannot apply update %r to %r" % (update_spec, doc),
-                        exc_tb)
+                reraise(
+                    UpdateDoesNotApply,
+                    "Cannot apply update %r to %r" % (update_spec, doc),
+                    exc_tb,
+                )
             return doc
 
     def bulk_upsert(self, docs, namespace, timestamp):

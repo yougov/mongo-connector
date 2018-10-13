@@ -25,8 +25,13 @@ from bson.timestamp import Timestamp
 sys.path[0:0] = [""]
 
 from mongo_connector.connector import Connector, get_mininum_mongodb_version
-from mongo_connector.test_utils import (ReplicaSetSingle, connector_opts,
-                                        assert_soon, db_user, db_password)
+from mongo_connector.test_utils import (
+    ReplicaSetSingle,
+    connector_opts,
+    assert_soon,
+    db_user,
+    db_password,
+)
 from mongo_connector.util import long_to_bson_ts
 from mongo_connector.version import Version
 
@@ -57,16 +62,14 @@ class TestMongoConnector(unittest.TestCase):
     def test_connector(self):
         """Test whether the connector initiates properly
         """
-        conn = Connector(
-            mongo_address=self.repl_set.uri,
-            **connector_opts
-        )
+        conn = Connector(mongo_address=self.repl_set.uri, **connector_opts)
         conn.start()
         assert_soon(lambda: bool(conn.shard_set))
 
         # Make sure get_mininum_mongodb_version returns the current version.
-        self.assertEqual(Version.from_client(self.repl_set.client()),
-                         get_mininum_mongodb_version())
+        self.assertEqual(
+            Version.from_client(self.repl_set.client()), get_mininum_mongodb_version()
+        )
 
         conn.join()
 
@@ -77,12 +80,16 @@ class TestMongoConnector(unittest.TestCase):
 
     def test_copy_uri_options(self):
         """Test copy_uri_options returns proper MongoDB URIs."""
-        uri = 'mongodb://host:27017/db?maxPoolSize=1234&w=2'
-        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
-                         'mongodb://a:123,[::1]:321/?maxPoolSize=1234&w=2')
-        uri = 'host:27017'
-        self.assertEqual(Connector.copy_uri_options('a:123,[::1]:321', uri),
-                         'mongodb://a:123,[::1]:321')
+        uri = "mongodb://host:27017/db?maxPoolSize=1234&w=2"
+        self.assertEqual(
+            Connector.copy_uri_options("a:123,[::1]:321", uri),
+            "mongodb://a:123,[::1]:321/?maxPoolSize=1234&w=2",
+        )
+        uri = "host:27017"
+        self.assertEqual(
+            Connector.copy_uri_options("a:123,[::1]:321", uri),
+            "mongodb://a:123,[::1]:321",
+        )
 
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
@@ -105,18 +112,18 @@ class TestMongoConnector(unittest.TestCase):
         # pretend to insert a thread/timestamp pair
         conn.write_oplog_progress()
 
-        data = json.load(open("temp_oplog.timestamp", 'r'))
+        data = json.load(open("temp_oplog.timestamp", "r"))
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(12, 34))
 
         # ensure the temp file was deleted
-        self.assertFalse(os.path.exists("temp_oplog.timestamp" + '~'))
+        self.assertFalse(os.path.exists("temp_oplog.timestamp" + "~"))
 
         # ensure that updates work properly
         conn.oplog_progress.get_dict()[1] = Timestamp(44, 22)
         conn.write_oplog_progress()
 
-        config_file = open("temp_oplog.timestamp", 'r')
+        config_file = open("temp_oplog.timestamp", "r")
         data = json.load(config_file)
         self.assertEqual(1, int(data[0]))
         self.assertEqual(long_to_bson_ts(int(data[1])), Timestamp(44, 22))
@@ -129,9 +136,7 @@ class TestMongoConnector(unittest.TestCase):
         """
 
         conn = Connector(
-            mongo_address=self.repl_set.uri,
-            oplog_checkpoint=None,
-            **connector_opts
+            mongo_address=self.repl_set.uri, oplog_checkpoint=None, **connector_opts
         )
 
         # testing with no file
@@ -151,37 +156,42 @@ class TestMongoConnector(unittest.TestCase):
         oplog_dict = conn.oplog_progress.get_dict()
 
         # add a value to the file, delete the dict, and then read in the value
-        oplog_dict['oplog1'] = Timestamp(12, 34)
+        oplog_dict["oplog1"] = Timestamp(12, 34)
         conn.write_oplog_progress()
-        del oplog_dict['oplog1']
+        del oplog_dict["oplog1"]
 
         self.assertEqual(len(oplog_dict), 0)
 
         conn.read_oplog_progress()
         oplog_dict = conn.oplog_progress.get_dict()
 
-        self.assertTrue('oplog1' in oplog_dict.keys())
-        self.assertTrue(oplog_dict['oplog1'], Timestamp(12, 34))
+        self.assertTrue("oplog1" in oplog_dict.keys())
+        self.assertTrue(oplog_dict["oplog1"], Timestamp(12, 34))
 
-        oplog_dict['oplog1'] = Timestamp(55, 11)
+        oplog_dict["oplog1"] = Timestamp(55, 11)
 
         # see if oplog progress dict is properly updated
         conn.read_oplog_progress()
-        self.assertTrue(oplog_dict['oplog1'], Timestamp(55, 11))
+        self.assertTrue(oplog_dict["oplog1"], Timestamp(55, 11))
 
         os.unlink("temp_oplog.timestamp")
 
     def test_connector_minimum_privileges(self):
         """Test the Connector works with a user with minimum privileges."""
         if not (db_user and db_password):
-            raise SkipTest('Need to set a user/password to test this.')
+            raise SkipTest("Need to set a user/password to test this.")
         client = self.repl_set.client()
-        minimum_user = 'read_local_and_included_databases'
-        minimum_pwd = 'password'
-        client.admin.add_user(minimum_user, minimum_pwd,
-                              roles=[{'role': 'read', 'db': 'test'},
-                                     {'role': 'read', 'db': 'wildcard'},
-                                     {'role': 'read', 'db': 'local'}])
+        minimum_user = "read_local_and_included_databases"
+        minimum_pwd = "password"
+        client.admin.add_user(
+            minimum_user,
+            minimum_pwd,
+            roles=[
+                {"role": "read", "db": "test"},
+                {"role": "read", "db": "wildcard"},
+                {"role": "read", "db": "local"},
+            ],
+        )
 
         client.test.test.insert_one({"replicated": 1})
         client.test.ignored.insert_one({"replicated": 0})
@@ -191,7 +201,7 @@ class TestMongoConnector(unittest.TestCase):
             mongo_address=self.repl_set.primary.uri,
             auth_username=minimum_user,
             auth_key=minimum_pwd,
-            namespace_options={'test.test': True, 'wildcard.*': True}
+            namespace_options={"test.test": True, "wildcard.*": True},
         )
         conn.start()
         try:
@@ -200,5 +210,5 @@ class TestMongoConnector(unittest.TestCase):
             conn.join()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
