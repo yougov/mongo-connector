@@ -21,7 +21,7 @@ import sys
 
 import pymongo
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector import config, errors, connector
 from mongo_connector.connector import get_config_options, setup_logging
@@ -29,9 +29,11 @@ from mongo_connector.doc_managers import doc_manager_simulator
 
 from tests import unittest
 
-from_here = lambda *paths: os.path.join(
-    os.path.abspath(os.path.dirname(__file__)), *paths
-)
+
+def from_here(*paths):
+    return os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), *paths
+    )
 
 
 class TestConfig(unittest.TestCase):

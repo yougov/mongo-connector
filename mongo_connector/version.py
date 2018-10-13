@@ -22,11 +22,11 @@ class Version(tuple):
 
     @classmethod
     def _padded(cls, iter, length, padding=0):
-        l = list(iter)
-        if len(l) < length:
-            for _ in range(length - len(l)):
-                l.append(padding)
-        return l
+        items = list(iter)
+        if len(items) < length:
+            for _ in range(length - len(items)):
+                items.append(padding)
+        return items
 
     @classmethod
     def from_string(cls, version_string):
@@ -43,11 +43,11 @@ class Version(tuple):
             mod = -1
         # Deal with '-rcX' substrings
         if "-rc" in version_string:
-            version_string = version_string[0 : version_string.find("-rc")]
+            version_string = version_string[0: version_string.find("-rc")]
             mod = -1
         # Deal with git describe generated substrings
         elif "-" in version_string:
-            version_string = version_string[0 : version_string.find("-")]
+            version_string = version_string[0: version_string.find("-")]
             mod = -1
             bump_patch_level = True
 

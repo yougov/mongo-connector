@@ -17,7 +17,7 @@
 
 import sys
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.command_helper import CommandHelper

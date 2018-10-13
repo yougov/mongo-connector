@@ -28,7 +28,7 @@ import threading
 
 import pymongo
 
-from pymongo import CursorType, errors as pymongo_errors
+from pymongo import CursorType
 
 from mongo_connector import errors, util
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
@@ -409,7 +409,7 @@ class OplogThread(threading.Thread):
                     # 'a.b' and key is 'a'.
                     if field.startswith(key) and field[len(key)] == ".":
                         # Search for the remaining part of the field
-                        matched = cls._find_field(field[len(key) + 1 :], doc[key])
+                        matched = cls._find_field(field[len(key) + 1:], doc[key])
                         if matched:
                             # Add the top level key to the path.
                             match = matched[0]
@@ -464,7 +464,8 @@ class OplogThread(threading.Thread):
 
         fields = include_fields or exclude_fields
         entry_o = entry["o"]
-        # Version 3.6 of mongodb includes a $v, see https://jira.mongodb.org/browse/SERVER-32240
+        # Version 3.6 of mongodb includes a $v,
+        # see https://jira.mongodb.org/browse/SERVER-32240
         if "$v" in entry_o:
             entry_o.pop("$v")
 
@@ -677,7 +678,7 @@ class OplogThread(threading.Thread):
                     for doc in docs_to_dump(from_coll):
                         gridfile = GridFSFile(mongo_coll, doc)
                         dm.insert_file(gridfile, dest_ns, long_ts)
-            except:
+            except Exception:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,
                 # mongo_connector.errors.ConnectionFailed

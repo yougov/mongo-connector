@@ -24,7 +24,7 @@ import bson
 import gridfs
 import pymongo
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict

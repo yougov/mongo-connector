@@ -17,7 +17,7 @@
 
 import sys
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 import pymongo
 

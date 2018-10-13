@@ -16,9 +16,8 @@
 """
 import sys
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
-from mongo_connector import errors
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
@@ -87,12 +86,15 @@ class TestFilterFields(unittest.TestCase):
     def test_filter_exclude_oplog_entry(self):
         # Test oplog entries: these are callables, since
         # filter_oplog_entry modifies the oplog entry in-place
-        insert_op = lambda: {"op": "i", "o": {"_id": 0, "a": 1, "b": 2, "c": 3}}
-        update_op = lambda: {
-            "op": "u",
-            "o": {"$set": {"a": 4, "b": 5}, "$unset": {"c": True}},
-            "o2": {"_id": 1},
-        }
+        def insert_op():
+            return {"op": "i", "o": {"_id": 0, "a": 1, "b": 2, "c": 3}}
+
+        def update_op():
+            return {
+                "op": "u",
+                "o": {"$set": {"a": 4, "b": 5}, "$unset": {"c": True}},
+                "o2": {"_id": 1},
+            }
 
         def filter_doc(document, fields):
             if fields and "_id" in fields:
@@ -144,12 +146,15 @@ class TestFilterFields(unittest.TestCase):
     def test_filter_oplog_entry(self):
         # Test oplog entries: these are callables, since
         # filter_oplog_entry modifies the oplog entry in-place
-        insert_op = lambda: {"op": "i", "o": {"_id": 0, "a": 1, "b": 2, "c": 3}}
-        update_op = lambda: {
-            "op": "u",
-            "o": {"$set": {"a": 4, "b": 5}, "$unset": {"c": True}},
-            "o2": {"_id": 1},
-        }
+        def insert_op():
+            return {"op": "i", "o": {"_id": 0, "a": 1, "b": 2, "c": 3}}
+
+        def update_op():
+            return {
+                "op": "u",
+                "o": {"$set": {"a": 4, "b": 5}, "$unset": {"c": True}},
+                "o2": {"_id": 1},
+            }
 
         def filter_doc(document, fields):
             if fields and "_id" not in fields:

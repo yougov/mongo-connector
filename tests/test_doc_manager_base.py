@@ -14,7 +14,7 @@
 
 import sys
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.connector import (
     get_mininum_mongodb_version,

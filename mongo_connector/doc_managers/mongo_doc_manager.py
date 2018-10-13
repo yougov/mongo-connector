@@ -241,7 +241,7 @@ class DocManager(DocManagerBase):
                 LOG.warn("Continuing after DuplicateKeyError: " + str(e))
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
-                raise e
+                raise
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):

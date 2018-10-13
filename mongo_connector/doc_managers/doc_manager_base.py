@@ -44,7 +44,7 @@ class DocManagerBase(object):
             looking_at = container
             for part in path:
                 if isinstance(looking_at, dict):
-                    if create and not part in looking_at:
+                    if create and part not in looking_at:
                         looking_at[part] = {}
                     looking_at = looking_at[part]
                 elif isinstance(looking_at, list):
@@ -100,7 +100,7 @@ class DocManagerBase(object):
                 )
 
         # wholesale document replacement
-        if not "$set" in update_spec and not "$unset" in update_spec:
+        if "$set" not in update_spec and "$unset" not in update_spec:
             # update spec contains the new document in its entirety
             return update_spec
         else:

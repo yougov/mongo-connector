@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+import os
+import platform
+import sys
+from distutils.core import Command
+from distutils.dir_util import mkpath, remove_tree
+from distutils.file_util import copy_file
+from setuptools import setup
+
 classifiers = """\
 Development Status :: 4 - Beta
 Intended Audience :: Developers
@@ -28,14 +37,6 @@ Operating System :: MacOS :: MacOS X
 Operating System :: Microsoft :: Windows
 Operating System :: POSIX
 """
-
-import os
-import platform
-import sys
-from distutils.core import Command
-from distutils.dir_util import mkpath, remove_tree
-from distutils.file_util import copy_file
-from setuptools import setup
 
 extra_opts = {
     "test_suite": "tests",

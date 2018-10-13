@@ -562,9 +562,9 @@ def namespace_to_regex(namespace):
     """Create a RegexObject from a wildcard namespace."""
     db_name, coll_name = namespace.split(".", 1)
     # A database name cannot contain a '.' character
-    db_regex = re.escape(db_name).replace("\*", "([^.]*)")
+    db_regex = re.escape(db_name).replace(r"\*", "([^.]*)")
     # But a collection name can.
-    coll_regex = re.escape(coll_name).replace("\*", "(.*)")
+    coll_regex = re.escape(coll_name).replace(r"\*", "(.*)")
     return re.compile(r"\A" + db_regex + r"\." + coll_regex + r"\Z")
 
 

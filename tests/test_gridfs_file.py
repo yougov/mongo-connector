@@ -16,7 +16,7 @@ import sys
 
 import gridfs
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector import errors
 from mongo_connector.gridfs_file import GridFSFile

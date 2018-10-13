@@ -1,5 +1,7 @@
 """Utilities for maintaining portability between various Python versions"""
 
+# flake8: noqa
+
 import sys
 
 PY3 = sys.version_info[0] == 3

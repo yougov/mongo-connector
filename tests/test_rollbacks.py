@@ -24,7 +24,7 @@ import time
 from pymongo.read_preferences import ReadPreference
 from pymongo.write_concern import WriteConcern
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
@@ -319,7 +319,9 @@ class TestRollbacks(unittest.TestCase):
         c2 = c.with_options(write_concern=WriteConcern(w=2))
         c2.insert_many([{"i": i} for i in range(STRESS_COUNT)])
         assert_soon(lambda: c2.count() == STRESS_COUNT)
-        condition = lambda: len(docman._search()) == STRESS_COUNT
+
+        def condition():
+            return len(docman._search()) == STRESS_COUNT
         assert_soon(
             condition,
             (

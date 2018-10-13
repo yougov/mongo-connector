@@ -19,7 +19,7 @@ import sys
 from bson import timestamp
 from pymongo import errors
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.util import bson_ts_to_long, long_to_bson_ts, retry_until_ok
 from tests import unittest

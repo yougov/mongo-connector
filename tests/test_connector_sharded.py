@@ -18,7 +18,7 @@ import time
 
 from pymongo import MongoClient, ReadPreference
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager

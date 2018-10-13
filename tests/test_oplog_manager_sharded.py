@@ -22,7 +22,7 @@ import pymongo
 from pymongo.read_preferences import ReadPreference
 from pymongo.write_concern import WriteConcern
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
@@ -565,7 +565,8 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
 
         # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
+        def c():
+            return len(self.opman1.doc_managers[0]._search()) == 3
         assert_soon(c, "not all writes were replicated to doc manager", max_tries=120)
 
         # Kill the new primary
@@ -574,11 +575,15 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Start both servers back up
         self.cluster.shards[0].primary.start()
         primary_admin = self.shard1_conn["admin"]
-        c = lambda: primary_admin.command("isMaster")["ismaster"]
+
+        def c():
+            return primary_admin.command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         query = {"i": {"$lt": 1000}}
         assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
@@ -635,7 +640,9 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         self.assertEqual(db_secondary2.count(), 2)
 
         # Wait for replication on the doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
+
+        def c():
+            return len(self.opman1.doc_managers[0]._search()) == 4
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
@@ -645,19 +652,27 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Start the servers back up...
         # Shard 1
         self.cluster.shards[0].primary.start()
-        c = lambda: self.shard1_conn["admin"].command("isMaster")["ismaster"]
+
+        def c():
+            return self.shard1_conn["admin"].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         # Shard 2
         self.cluster.shards[1].primary.start()
-        c = lambda: self.shard2_conn["admin"].command("isMaster")["ismaster"]
+
+        def c():
+            return self.shard2_conn["admin"].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[1].secondary.start()
         secondary_admin = self.shard2_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
 
         # Wait for the shards to come online

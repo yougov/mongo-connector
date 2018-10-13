@@ -19,7 +19,7 @@ import os
 import sys
 import time
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.connector import Connector
 from mongo_connector.namespace_config import NamespaceConfig

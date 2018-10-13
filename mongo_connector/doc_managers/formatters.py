@@ -7,9 +7,6 @@ from math import isnan, isinf
 
 import logging
 
-LOG = logging.getLogger(__name__)
-
-
 import bson
 import bson.json_util
 
@@ -18,6 +15,8 @@ from mongo_connector.compat import PY3
 if PY3:
     long = int
     unicode = str
+
+LOG = logging.getLogger(__name__)
 
 RE_TYPE = type(re.compile(""))
 try:

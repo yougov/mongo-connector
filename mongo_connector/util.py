@@ -33,7 +33,7 @@ def exception_wrapper(mapping):
         def wrapped(*args, **kwargs):
             try:
                 return f(*args, **kwargs)
-            except:
+            except Exception:
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 new_type = None
                 for src_type in mapping:

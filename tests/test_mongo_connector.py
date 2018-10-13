@@ -18,11 +18,10 @@
 import json
 import os
 import sys
-import time
 
 from bson.timestamp import Timestamp
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.test_utils import (

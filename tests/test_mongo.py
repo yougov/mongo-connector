@@ -23,7 +23,7 @@ import time
 from bson import SON
 from gridfs import GridFS
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.doc_managers.mongo_doc_manager import DocManager
 from mongo_connector.connector import Connector
@@ -301,7 +301,9 @@ class TestMongoReplicaSet(MongoReplicaSetTestCase):
         self.repl_set.primary.stop(destroy=False)
         new_primary_conn = self.repl_set.secondary.client()
         admin = new_primary_conn["admin"]
-        condition = lambda: admin.command("isMaster")["ismaster"]
+
+        def condition():
+            return admin.command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(condition))
 
         retry_until_ok(self.conn.test.test.insert_one, {"name": "pauline"})
