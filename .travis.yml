@@ -16,8 +16,10 @@ jobs:
     env: MONGODB=3.0.14
   - python: 3.4
     env: MONGODB=2.6.12
-  - python: &latest_py3 3.5
+  - python: 3.5
     env: MONGODB=2.4.14
+  - python: &latest_py3 3.6
+    env: MONGODB=3.6.8
   - stage: deploy
     if: tag IS present
     python: *latest_py3
