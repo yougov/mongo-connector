@@ -3,6 +3,7 @@
 # flake8: noqa
 
 import sys
+import warnings
 
 PY3 = sys.version_info[0] == 3
 
@@ -25,6 +26,12 @@ if PY3:
 
 
 else:
+    warnings.warn(
+        "Python 2 support is deprecated and pending removal. Please "
+        "run mongo-connector on Python 3. See "
+        "https://github.com/yougov/mongo-connector/issues/829 "
+        "for more details or to post concerns."
+    )
     exec(
         """def reraise(exctype, value, trace=None):
     raise exctype, value, trace"""
