@@ -2,8 +2,8 @@
 mongo-connector
 ===============
 
-Ownership of the mongo-connector repo has been transferred to YouGov.  MongoDB would like to thank
-Jason Coombs, Executive Technical Director at YouGov, for agreeing to maintain this project.
+The mongo-connector project originated as a MongoDB mongo-labs
+project and is now community-maintained under the custody of YouGov, Plc.
 
 .. image:: https://travis-ci.org/yougov/mongo-connector.svg?branch=master
    :alt: View build status
