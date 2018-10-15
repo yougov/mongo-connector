@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Version 2.7.0
+-------------
+
+- #829: mongo-connector now emits a warning when running under
+  Python 2.
+
 Version 2.6.0
 -------------
 
