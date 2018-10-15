@@ -40,7 +40,6 @@ __version__ = '0.1.0'
 
 
 class DocumentStore(dict):
-
     def __init__(self):
         self._lock = RLock()
 
@@ -57,18 +56,18 @@ class DocumentStore(dict):
             with self._lock:
                 for item in super(DocumentStore, self).__iter__():
                     yield item
+
         return __myiter__()
 
 
 class Entry(object):
-
     def __init__(self, doc, ns, ts):
         self.doc, self.ns, self.ts = doc, ns, ts
-        self._id = self.doc['_id']
+        self._id = self.doc["_id"]
 
     @property
     def meta_dict(self):
-        return {'_id': self._id, 'ns': self.ns, '_ts': self.ts}
+        return {"_id": self._id, "ns": self.ns, "_ts": self.ts}
 
     @property
     def merged_dict(self):
@@ -91,9 +90,14 @@ class DocManager(DocManagerBase):
     multiple, slightly different versions of a doc.
     """
 
-    def __init__(self, url=None, unique_key='_id',
-                 auto_commit_interval=None,
-                 chunk_size=constants.DEFAULT_MAX_BULK, **kwargs):
+    def __init__(
+        self,
+        url=None,
+        unique_key="_id",
+        auto_commit_interval=None,
+        chunk_size=constants.DEFAULT_MAX_BULK,
+        **kwargs
+    ):
         """Creates a dictionary to hold document id keys mapped to the
         documents as values.
         """
@@ -127,7 +131,7 @@ class DocManager(DocManagerBase):
         """
 
         # Allow exceptions to be triggered (for testing purposes)
-        if doc.get('_upsert_exception'):
+        if doc.get("_upsert_exception"):
             raise Exception("upsert exception")
 
         doc_id = doc["_id"]
@@ -137,7 +141,7 @@ class DocManager(DocManagerBase):
         """Inserts a file to the doc dict.
         """
         doc = f.get_metadata()
-        doc['content'] = f.read()
+        doc["content"] = f.read()
         self.doc_dict[f._id] = Entry(doc=doc, ns=namespace, ts=timestamp)
 
     def remove(self, document_id, namespace, timestamp):
@@ -148,8 +152,7 @@ class DocManager(DocManagerBase):
             entry.doc = None
             entry.update(namespace, timestamp)
         except KeyError:
-            raise OperationFailed("Document does not exist: %s"
-                                  % u(document_id))
+            raise OperationFailed("Document does not exist: %s" % u(document_id))
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents that were

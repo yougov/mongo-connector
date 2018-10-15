@@ -22,22 +22,23 @@ import pymongo
 from pymongo.read_preferences import ReadPreference
 from pymongo.write_concern import WriteConcern
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.namespace_config import NamespaceConfig
 from mongo_connector.oplog_manager import OplogThread
-from mongo_connector.test_utils import (assert_soon,
-                                        close_client,
-                                        ShardedCluster,
-                                        ShardedClusterSingle)
+from mongo_connector.test_utils import (
+    assert_soon,
+    close_client,
+    ShardedCluster,
+    ShardedClusterSingle,
+)
 from mongo_connector.util import retry_until_ok, bson_ts_to_long
 from tests import unittest, SkipTest
 
 
 class ShardedClusterTestCase(unittest.TestCase):
-
     def set_up_sharded_cluster(self, sharded_cluster_type):
         """ Initialize the cluster:
 
@@ -60,42 +61,33 @@ class ShardedClusterTestCase(unittest.TestCase):
 
         # Disable the balancer before creating the collection
         self.mongos_conn.config.settings.update_one(
-            {"_id": "balancer"},
-            {"$set": {"stopped": True}},
-            upsert=True
+            {"_id": "balancer"}, {"$set": {"stopped": True}}, upsert=True
         )
 
         # Create and shard the collection test.mcsharded on the "i" field
         self.mongos_conn["test"]["mcsharded"].create_index("i")
         self.mongos_conn.admin.command("enableSharding", "test")
-        self.mongos_conn.admin.command("shardCollection",
-                                       "test.mcsharded",
-                                       key={"i": 1})
+        self.mongos_conn.admin.command(
+            "shardCollection", "test.mcsharded", key={"i": 1}
+        )
 
         # Pre-split the collection so that:
         # i < 1000            lives on shard1
         # i >= 1000           lives on shard2
-        self.mongos_conn.admin.command(bson.SON([
-            ("split", "test.mcsharded"),
-            ("middle", {"i": 1000})
-        ]))
+        self.mongos_conn.admin.command(
+            bson.SON([("split", "test.mcsharded"), ("middle", {"i": 1000})])
+        )
 
         # Move chunks to their proper places
         try:
             self.mongos_conn["admin"].command(
-                "moveChunk",
-                "test.mcsharded",
-                find={"i": 1},
-                to='demo-set-0'
+                "moveChunk", "test.mcsharded", find={"i": 1}, to="demo-set-0"
             )
         except pymongo.errors.OperationFailure:
             pass
         try:
             self.mongos_conn["admin"].command(
-                "moveChunk",
-                "test.mcsharded",
-                find={"i": 1000},
-                to='demo-set-1'
+                "moveChunk", "test.mcsharded", find={"i": 1000}, to="demo-set-1"
             )
         except pymongo.errors.OperationFailure:
             pass
@@ -109,11 +101,17 @@ class ShardedClusterTestCase(unittest.TestCase):
             doc2 = self.shard2_conn.test.mcsharded.find_one()
             if None in (doc1, doc2):
                 return False
-            return doc1['i'] == 1 and doc2['i'] == 1000
-        assert_soon(chunks_moved, max_tries=120,
-                    message='chunks not moved? doc1=%r, doc2=%r' % (
-                        self.shard1_conn.test.mcsharded.find_one(),
-                        self.shard2_conn.test.mcsharded.find_one()))
+            return doc1["i"] == 1 and doc2["i"] == 1000
+
+        assert_soon(
+            chunks_moved,
+            max_tries=120,
+            message="chunks not moved? doc1=%r, doc2=%r"
+            % (
+                self.shard1_conn.test.mcsharded.find_one(),
+                self.shard2_conn.test.mcsharded.find_one(),
+            ),
+        )
         self.mongos_conn.test.mcsharded.delete_many({})
 
         # create a new oplog progress file
@@ -127,20 +125,21 @@ class ShardedClusterTestCase(unittest.TestCase):
         doc_manager = DocManager()
         oplog_progress = LockingDict()
         namespace_config = NamespaceConfig(
-            namespace_set=["test.mcsharded", "test.mcunsharded"])
+            namespace_set=["test.mcsharded", "test.mcunsharded"]
+        )
         self.opman1 = OplogThread(
             primary_client=self.shard1_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             namespace_config=namespace_config,
-            mongos_client=self.mongos_conn
+            mongos_client=self.mongos_conn,
         )
         self.opman2 = OplogThread(
             primary_client=self.shard2_conn,
             doc_managers=(doc_manager,),
             oplog_progress_dict=oplog_progress,
             namespace_config=namespace_config,
-            mongos_client=self.mongos_conn
+            mongos_client=self.mongos_conn,
         )
 
     def tearDown(self):
@@ -171,13 +170,11 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
 
         # timestamp = None
         cursor1 = self.opman1.get_oplog_cursor(None)
-        oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
-            {'op': {'$ne': 'n'}})
+        oplog1 = self.shard1_conn["local"]["oplog.rs"].find({"op": {"$ne": "n"}})
         self.assertEqual(list(cursor1), list(oplog1))
 
         cursor2 = self.opman2.get_oplog_cursor(None)
-        oplog2 = self.shard2_conn["local"]["oplog.rs"].find(
-            {'op': {'$ne': 'n'}})
+        oplog2 = self.shard2_conn["local"]["oplog.rs"].find({"op": {"$ne": "n"}})
         self.assertEqual(list(cursor2), list(oplog2))
 
         # earliest entry is the only one at/after timestamp
@@ -188,15 +185,13 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.assertNotEqual(cursor, None)
         entries = list(cursor)
         self.assertEqual(len(entries), 1)
-        next_entry_id = entries[0]['o']['_id']
+        next_entry_id = entries[0]["o"]["_id"]
         retrieved = self.mongos_conn.test.mcsharded.find_one(next_entry_id)
         self.assertEqual(retrieved, doc)
 
         # many entries before and after timestamp
         for i in range(2, 2002):
-            self.mongos_conn["test"]["mcsharded"].insert_one({
-                "i": i
-            })
+            self.mongos_conn["test"]["mcsharded"].insert_one({"i": i})
         oplog1 = self.shard1_conn["local"]["oplog.rs"].find(
             sort=[("ts", pymongo.ASCENDING)]
         )
@@ -231,19 +226,13 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
         self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
         for i in range(1000):
-            self.mongos_conn["test"]["mcsharded"].insert_one({
-                "i": i + 500
-            })
+            self.mongos_conn["test"]["mcsharded"].insert_one({"i": i + 500})
         oplog1 = self.shard1_conn["local"]["oplog.rs"]
-        oplog1 = oplog1.find().sort("$natural",
-                                    pymongo.DESCENDING).limit(-1)[0]
+        oplog1 = oplog1.find().sort("$natural", pymongo.DESCENDING).limit(-1)[0]
         oplog2 = self.shard2_conn["local"]["oplog.rs"]
-        oplog2 = oplog2.find().sort("$natural",
-                                    pymongo.DESCENDING).limit(-1)[0]
-        self.assertEqual(self.opman1.get_last_oplog_timestamp(),
-                         oplog1["ts"])
-        self.assertEqual(self.opman2.get_last_oplog_timestamp(),
-                         oplog2["ts"])
+        oplog2 = oplog2.find().sort("$natural", pymongo.DESCENDING).limit(-1)[0]
+        self.assertEqual(self.opman1.get_last_oplog_timestamp(), oplog1["ts"])
+        self.assertEqual(self.opman2.get_last_oplog_timestamp(), oplog2["ts"])
 
     def test_dump_collection(self):
         """Test the dump_collection method
@@ -266,9 +255,7 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.opman1.oplog = self.shard1_conn["local"]["oplog.rs"]
         self.opman2.oplog = self.shard2_conn["local"]["oplog.rs"]
         for i in range(1000):
-            self.mongos_conn["test"]["mcsharded"].insert_one({
-                "i": i + 500
-            })
+            self.mongos_conn["test"]["mcsharded"].insert_one({"i": i + 500})
         last_ts1 = self.opman1.get_last_oplog_timestamp()
         last_ts2 = self.opman2.get_last_oplog_timestamp()
         self.assertEqual(last_ts1, self.opman1.dump_collection())
@@ -298,11 +285,9 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         self.opman2.oplog = self.shard2_conn["test"]["emptycollection"]
         self.opman1.collection_dump = False
         self.opman2.collection_dump = False
-        self.assertTrue(all(doc['op'] == 'n'
-                            for doc in self.opman1.init_cursor()[0]))
+        self.assertTrue(all(doc["op"] == "n" for doc in self.opman1.init_cursor()[0]))
         self.assertEqual(self.opman1.checkpoint, None)
-        self.assertTrue(all(doc['op'] == 'n'
-                            for doc in self.opman2.init_cursor()[0]))
+        self.assertTrue(all(doc["op"] == "n" for doc in self.opman2.init_cursor()[0]))
         self.assertEqual(self.opman2.checkpoint, None)
 
         # No last checkpoint, empty collections, nothing in oplog
@@ -355,10 +340,8 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
 
         # Last checkpoint exists
         collection.insert_many([{"i": i + 500} for i in range(1000)])
-        entry1 = list(
-            self.shard1_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
-        entry2 = list(
-            self.shard2_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
+        entry1 = list(self.shard1_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
+        entry2 = list(self.shard2_conn["local"]["oplog.rs"].find(skip=200, limit=-2))
         self.opman1.update_checkpoint(entry1[0]["ts"])
         self.opman2.update_checkpoint(entry2[0]["ts"])
         self.opman1.checkpoint = self.opman2.checkpoint = None
@@ -396,18 +379,13 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         for i in range(1000):
             collection.insert_one({"i": i + 500})
         # Assert current state of the mongoverse
-        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
-                         500)
-        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
-                         500)
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(), 500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(), 500)
         assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 1000)
 
         # Test successful chunk move from shard 1 to shard 2
         self.mongos_conn["admin"].command(
-            "moveChunk",
-            "test.mcsharded",
-            find={"i": 1},
-            to="demo-set-1"
+            "moveChunk", "test.mcsharded", find={"i": 1}, to="demo-set-1"
         )
 
         # doc manager should still have all docs
@@ -418,18 +396,15 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
 
         # Mark the collection as "dropped". This will cause migration to fail.
         self.mongos_conn["config"]["collections"].update_one(
-            {"_id": "test.mcsharded"},
-            {"$set": {"dropped": True}}
+            {"_id": "test.mcsharded"}, {"$set": {"dropped": True}}
         )
 
         # Test unsuccessful chunk move from shard 2 to shard 1
         def fail_to_move_chunk():
             self.mongos_conn["admin"].command(
-                "moveChunk",
-                "test.mcsharded",
-                find={"i": 1},
-                to="demo-set-0"
+                "moveChunk", "test.mcsharded", find={"i": 1}, to="demo-set-0"
             )
+
         self.assertRaises(pymongo.errors.OperationFailure, fail_to_move_chunk)
         # doc manager should still have all docs
         all_docs = self.opman1.doc_managers[0]._search()
@@ -438,12 +413,12 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
             self.assertEqual(doc["i"], i + 500)
 
     def test_upgrade_oplog_progress(self):
-        first_oplog_ts1 = self.opman1.oplog.find_one()['ts']
-        first_oplog_ts2 = self.opman2.oplog.find_one()['ts']
+        first_oplog_ts1 = self.opman1.oplog.find_one()["ts"]
+        first_oplog_ts2 = self.opman2.oplog.find_one()["ts"]
         # Old format oplog progress file:
         progress = {
             str(self.opman1.oplog): bson_ts_to_long(first_oplog_ts1),
-            str(self.opman2.oplog): bson_ts_to_long(first_oplog_ts2)
+            str(self.opman2.oplog): bson_ts_to_long(first_oplog_ts2),
         }
         # Set up oplog managers to use the old format.
         oplog_progress = LockingDict()
@@ -456,16 +431,10 @@ class TestOplogManagerShardedSingle(ShardedClusterTestCase):
         # New format should be in place now.
         new_format = {
             self.opman1.replset_name: first_oplog_ts1,
-            self.opman2.replset_name: first_oplog_ts2
+            self.opman2.replset_name: first_oplog_ts2,
         }
-        self.assertEqual(
-            new_format,
-            self.opman1.oplog_progress.get_dict()
-        )
-        self.assertEqual(
-            new_format,
-            self.opman2.oplog_progress.get_dict()
-        )
+        self.assertEqual(new_format, self.opman1.oplog_progress.get_dict())
+        self.assertEqual(new_format, self.opman2.oplog_progress.get_dict())
 
 
 class TestOplogManagerSharded(ShardedClusterTestCase):
@@ -476,7 +445,8 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
     def setUp(self):
         self.set_up_sharded_cluster(ShardedCluster)
         self.shard1_secondary_conn = self.cluster.shards[0].secondary.client(
-            read_preference=ReadPreference.SECONDARY_PREFERRED)
+            read_preference=ReadPreference.SECONDARY_PREFERRED
+        )
         self.shard2_secondary_conn = self.cluster.shards[1].secondary.client(
             read_preference=ReadPreference.SECONDARY_PREFERRED
         )
@@ -497,28 +467,22 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         collection = self.mongos_conn["test"]["mcsharded"]
         collection.insert_many([{"i": i + 500} for i in range(1000)])
         # Assert current state of the mongoverse
-        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(),
-                         500)
-        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(),
-                         500)
+        self.assertEqual(self.shard1_conn["test"]["mcsharded"].find().count(), 500)
+        self.assertEqual(self.shard2_conn["test"]["mcsharded"].find().count(), 500)
         assert_soon(lambda: len(self.opman1.doc_managers[0]._search()) == 1000)
 
         # Stop replication using the 'rsSyncApplyStop' failpoint.
         # Note: this requires secondaries to ensure the subsequent moveChunk
         # command does not complete.
         self.shard1_conn.admin.command(
-            "configureFailPoint", "rsSyncApplyStop",
-            mode="alwaysOn"
+            "configureFailPoint", "rsSyncApplyStop", mode="alwaysOn"
         )
 
         # Move a chunk from shard2 to shard1
         def move_chunk():
             try:
                 self.mongos_conn["admin"].command(
-                    "moveChunk",
-                    "test.mcsharded",
-                    find={"i": 1000},
-                    to="demo-set-0"
+                    "moveChunk", "test.mcsharded", find={"i": 1000}, to="demo-set-0"
                 )
             except pymongo.errors.OperationFailure:
                 pass
@@ -538,23 +502,22 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
                 opid = op["opid"]
 
         if opid is None:
-            raise SkipTest("could not find moveChunk operation, cannot test "
-                           "failed moveChunk")
+            raise SkipTest(
+                "could not find moveChunk operation, cannot test " "failed moveChunk"
+            )
         # Kill moveChunk with the opid
 
-        if self.mongos_conn.server_info()['versionArray'][:3] >= [3, 1, 2]:
-            self.mongos_conn.admin.command('killOp', op=opid)
+        if self.mongos_conn.server_info()["versionArray"][:3] >= [3, 1, 2]:
+            self.mongos_conn.admin.command("killOp", op=opid)
         else:
             self.mongos_conn["test"]["$cmd.sys.killop"].find_one({"op": opid})
 
         # Mongo Connector should not become confused by unsuccessful chunk move
         docs = self.opman1.doc_managers[0]._search()
         self.assertEqual(len(docs), 1000)
-        self.assertEqual(sorted(d["i"] for d in docs),
-                         list(range(500, 1500)))
+        self.assertEqual(sorted(d["i"] for d in docs), list(range(500, 1500)))
         self.shard1_conn.admin.command(
-            "configureFailPoint", "rsSyncApplyStop",
-            mode="off"
+            "configureFailPoint", "rsSyncApplyStop", mode="off"
         )
         # cleanup
         mover.join()
@@ -584,25 +547,27 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
 
         # Wait for the secondary to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
-        assert_soon(
-            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document. This will be rolled back later
         def insert_one(doc):
             if not db_main.find_one(doc):
                 return db_main.insert_one(doc)
             return True
-        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1}),
-                    "could not insert into shard1 with one node down")
+
+        assert_soon(
+            lambda: retry_until_ok(insert_one, {"i": 1}),
+            "could not insert into shard1 with one node down",
+        )
         db_secondary1 = self.shard1_secondary_conn["test"]["mcsharded"]
         db_secondary2 = self.shard2_secondary_conn["test"]["mcsharded"]
         self.assertEqual(db_secondary1.count(), 2)
 
         # Wait for replication on the doc manager
         # Note that both OplogThreads share the same doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 3
-        assert_soon(c, "not all writes were replicated to doc manager",
-                    max_tries=120)
+        def c():
+            return len(self.opman1.doc_managers[0]._search()) == 3
+        assert_soon(c, "not all writes were replicated to doc manager", max_tries=120)
 
         # Kill the new primary
         self.cluster.shards[0].secondary.stop(destroy=False)
@@ -610,11 +575,15 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Start both servers back up
         self.cluster.shards[0].primary.start()
         primary_admin = self.shard1_conn["admin"]
-        c = lambda: primary_admin.command("isMaster")["ismaster"]
+
+        def c():
+            return primary_admin.command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         query = {"i": {"$lt": 1000}}
         assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
@@ -624,24 +593,27 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         self.assertEqual(db_main.find_one(query)["i"], 0)
 
         def check_docman_rollback():
-            docman_docs = [d for d in self.opman1.doc_managers[0]._search()
-                           if d["i"] < 1000]
+            docman_docs = [
+                d for d in self.opman1.doc_managers[0]._search() if d["i"] < 1000
+            ]
             return len(docman_docs) == 1 and docman_docs[0]["i"] == 0
-        assert_soon(check_docman_rollback,
-                    "doc manager did not roll back")
+
+        assert_soon(check_docman_rollback, "doc manager did not roll back")
 
         # Wait for previous rollback to complete.
         # Insert/delete one document to jump-start replication to secondaries
         # in MongoDB 3.x.
-        db_main.insert_one({'i': -1})
-        db_main.delete_one({'i': -1})
+        db_main.insert_one({"i": -1})
+        db_main.delete_one({"i": -1})
 
         def rollback_done():
             secondary1_count = retry_until_ok(db_secondary1.count)
             secondary2_count = retry_until_ok(db_secondary2.count)
             return (1, 1) == (secondary1_count, secondary2_count)
-        assert_soon(rollback_done,
-                    "rollback never replicated to one or more secondaries")
+
+        assert_soon(
+            rollback_done, "rollback never replicated to one or more secondaries"
+        )
 
         ##############################
 
@@ -652,21 +624,25 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Wait for the secondaries to be promoted
         shard1_secondary_admin = self.shard1_secondary_conn["admin"]
         shard2_secondary_admin = self.shard2_secondary_conn["admin"]
-        assert_soon(
-            lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
-        assert_soon(
-            lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(lambda: shard1_secondary_admin.command("isMaster")["ismaster"])
+        assert_soon(lambda: shard2_secondary_admin.command("isMaster")["ismaster"])
 
         # Insert another document on each shard which will be rolled back later
-        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1}),
-                    "could not insert into shard1 with one node down")
+        assert_soon(
+            lambda: retry_until_ok(insert_one, {"i": 1}),
+            "could not insert into shard1 with one node down",
+        )
         self.assertEqual(db_secondary1.count(), 2)
-        assert_soon(lambda: retry_until_ok(insert_one, {"i": 1001}),
-                    "could not insert into shard2 with one node down")
+        assert_soon(
+            lambda: retry_until_ok(insert_one, {"i": 1001}),
+            "could not insert into shard2 with one node down",
+        )
         self.assertEqual(db_secondary2.count(), 2)
 
         # Wait for replication on the doc manager
-        c = lambda: len(self.opman1.doc_managers[0]._search()) == 4
+
+        def c():
+            return len(self.opman1.doc_managers[0]._search()) == 4
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
@@ -676,19 +652,27 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Start the servers back up...
         # Shard 1
         self.cluster.shards[0].primary.start()
-        c = lambda: self.shard1_conn['admin'].command("isMaster")["ismaster"]
+
+        def c():
+            return self.shard1_conn["admin"].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
         # Shard 2
         self.cluster.shards[1].primary.start()
-        c = lambda: self.shard2_conn['admin'].command("isMaster")["ismaster"]
+
+        def c():
+            return self.shard2_conn["admin"].command("isMaster")["ismaster"]
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[1].secondary.start()
         secondary_admin = self.shard2_secondary_conn["admin"]
-        c = lambda: secondary_admin.command("replSetGetStatus")["myState"] == 2
+
+        def c():
+            return secondary_admin.command("replSetGetStatus")["myState"] == 2
         assert_soon(c)
 
         # Wait for the shards to come online
@@ -709,5 +693,5 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         self.assertIn(1000, i_values)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

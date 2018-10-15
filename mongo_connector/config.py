@@ -42,8 +42,13 @@ class Option(object):
     apply_function reads the cli_values and modifies option.value accordingly
     """
 
-    def __init__(self, config_key=None, default=None, type=None,
-                 apply_function=default_apply_function):
+    def __init__(
+        self,
+        config_key=None,
+        default=None,
+        type=None,
+        apply_function=default_apply_function,
+    ):
         self.config_key = config_key
         self.value = default
         self.type = type
@@ -56,8 +61,7 @@ class Option(object):
         if self.type == str:
             return compat.is_string(self.value)
         else:
-            return isinstance(self.value,
-                              self.type)
+            return isinstance(self.value, self.type)
 
     def add_cli(self, *args, **kwargs):
         """Add a command line argument.
@@ -81,7 +85,8 @@ class Config(object):
         self.options = options
 
         self.config_key_to_option = dict(
-            [(option.config_key, option) for option in self.options])
+            [(option.config_key, option) for option in self.options]
+        )
 
     def parse_args(self, argv=None):
         """Parses command line arguments from stdin (or given argv).
@@ -93,8 +98,7 @@ class Config(object):
         """
 
         # parse the command line options
-        parser = optparse.OptionParser(
-            version='%prog version: ' + __version__)
+        parser = optparse.OptionParser(version="%prog version: " + __version__)
         for option in self.options:
             for args, kwargs in option.cli_options:
                 cli_option = parser.add_option(*args, **kwargs)
@@ -102,8 +106,9 @@ class Config(object):
         parsed_options, args = parser.parse_args(argv)
         if args:
             raise errors.InvalidConfiguration(
-                'The following command line arguments are not recognized: '
-                + ', '.join(args))
+                "The following command line arguments are not recognized: "
+                + ", ".join(args)
+            )
 
         # load the config file
         if parsed_options.config_file:
@@ -117,10 +122,11 @@ class Config(object):
         values = parsed_options.__dict__
         for option in self.options:
             option.apply_function(
-                option, dict((k, values.get(k)) for k in option.cli_names))
+                option, dict((k, values.get(k)) for k in option.cli_names)
+            )
 
     def __getitem__(self, key):
-        keys = key.split('.')
+        keys = key.split(".")
         cur = self.config_key_to_option[keys[0]].value
         for k in keys[1:]:
             if cur is not None:
@@ -145,10 +151,13 @@ class Config(object):
                 # type check
                 if not option.validate_type():
                     raise errors.InvalidConfiguration(
-                        "%s should be a %r, %r was given!" %
-                        (option.config_key,
-                         option.type.__name__,
-                         type(option.value).__name__))
+                        "%s should be a %r, %r was given!"
+                        % (
+                            option.config_key,
+                            option.type.__name__,
+                            type(option.value).__name__,
+                        )
+                    )
             else:
                 if not k.startswith("__"):
                     logging.warning("Unrecognized option: %s" % k)

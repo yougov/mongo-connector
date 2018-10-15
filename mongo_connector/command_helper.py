@@ -43,8 +43,8 @@ class CommandHelper(object):
     # Applies the namespace mapping to a db and collection
     # The input parameter db and coll are plain text
     def map_collection(self, db, coll):
-        ns = self.map_namespace(db + '.' + coll)
+        ns = self.map_namespace(db + "." + coll)
         if ns:
-            return tuple(ns.split('.', 1))
+            return tuple(ns.split(".", 1))
         else:
             return None, None

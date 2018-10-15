@@ -6,8 +6,6 @@ from uuid import UUID
 from math import isnan, isinf
 
 import logging
-LOG = logging.getLogger(__name__)
-
 
 import bson
 import bson.json_util
@@ -18,9 +16,12 @@ if PY3:
     long = int
     unicode = str
 
+LOG = logging.getLogger(__name__)
+
 RE_TYPE = type(re.compile(""))
 try:
     from bson.regex import Regex
+
     RE_TYPES = (RE_TYPE, Regex)
 except ImportError:
     RE_TYPES = (RE_TYPE,)
@@ -81,9 +82,8 @@ class DefaultDocumentFormatter(DocumentFormatter):
                 flags += "x"
             pattern = value.pattern
             # quasi-JavaScript notation (may include non-standard flags)
-            return '/%s/%s' % (pattern, flags)
-        elif (isinstance(value, bson.Binary) or
-              (PY3 and isinstance(value, bytes))):
+            return "/%s/%s" % (pattern, flags)
+        elif isinstance(value, bson.Binary) or (PY3 and isinstance(value, bytes)):
             # Just include body of binary data without subtype
             return base64.b64encode(value).decode()
         elif isinstance(value, UUID):
@@ -106,8 +106,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
             new_value = self.transform_value(value)
             yield key, new_value
         except ValueError as e:
-            LOG.warn("Invalid value for key: %s as %s"
-                     % (key, str(e)))
+            LOG.warn("Invalid value for key: %s as %s" % (key, str(e)))
 
     def format_document(self, document):
         def _kernel(doc):
@@ -115,6 +114,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
                 value = doc[key]
                 for new_k, new_v in self.transform_element(key, value):
                     yield new_k, new_v
+
         return dict(_kernel(document))
 
 
@@ -139,8 +139,7 @@ class DocumentFlattener(DefaultDocumentFormatter):
     def transform_element(self, key, value):
         if isinstance(value, list):
             for li, lv in enumerate(value):
-                for inner_k, inner_v in self.transform_element(
-                        "%s.%s" % (key, li), lv):
+                for inner_k, inner_v in self.transform_element("%s.%s" % (key, li), lv):
                     yield inner_k, inner_v
         elif isinstance(value, dict):
             formatted = self.format_document(value)
@@ -153,7 +152,7 @@ class DocumentFlattener(DefaultDocumentFormatter):
 
     def format_document(self, document):
         def flatten(doc, path):
-            top_level = (len(path) == 0)
+            top_level = len(path) == 0
             if not top_level:
                 path_string = ".".join(path)
             for k in doc:
@@ -170,4 +169,5 @@ class DocumentFlattener(DefaultDocumentFormatter):
                             yield new_k, new_v
                         else:
                             yield "%s.%s" % (path_string, new_k), new_v
+
         return dict(flatten(document, []))
