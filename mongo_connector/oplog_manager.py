@@ -409,7 +409,7 @@ class OplogThread(threading.Thread):
                     # 'a.b' and key is 'a'.
                     if field.startswith(key) and field[len(key)] == ".":
                         # Search for the remaining part of the field
-                        matched = cls._find_field(field[len(key) + 1:], doc[key])
+                        matched = cls._find_field(field[len(key) + 1 :], doc[key])
                         if matched:
                             # Add the top level key to the path.
                             match = matched[0]

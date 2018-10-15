@@ -31,9 +31,7 @@ from tests import unittest
 
 
 def from_here(*paths):
-    return os.path.join(
-        os.path.abspath(os.path.dirname(__file__)), *paths
-    )
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), *paths)
 
 
 class TestConfig(unittest.TestCase):
