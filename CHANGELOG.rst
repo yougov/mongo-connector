@@ -1,6 +1,18 @@
 Changelog
 =========
 
+Version 3.0.0
+-------------
+
+- Dropped support for Python 3.3 and earlier.
+- Dropped support for EOL MongoDB 3.2 and earlier.
+
+Version 2.7.0
+-------------
+
+- #829: mongo-connector now emits a warning when running under
+  Python 2.
+
 Version 2.6.0
 -------------
 

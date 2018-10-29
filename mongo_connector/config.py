@@ -16,9 +16,8 @@ import logging
 import optparse
 import sys
 
-from mongo_connector import compat, errors
+from mongo_connector import errors
 from mongo_connector.constants import __version__
-from mongo_connector.compat import reraise
 
 
 def default_apply_function(option, cli_values):
@@ -59,7 +58,7 @@ class Option(object):
 
     def validate_type(self):
         if self.type == str:
-            return compat.is_string(self.value)
+            return isinstance(self.value, str)
         else:
             return isinstance(self.value, self.type)
 
@@ -115,8 +114,9 @@ class Config(object):
             try:
                 with open(parsed_options.config_file) as f:
                     self.load_json(f.read())
-            except (OSError, IOError, ValueError):
-                reraise(errors.InvalidConfiguration, *sys.exc_info()[1:])
+            except (OSError, IOError, ValueError) as exc:
+                tb = sys.exc_info()[2]
+                raise errors.InvalidConfiguration(str(exc)).with_traceback(tb)
 
         # apply the command line arguments
         values = parsed_options.__dict__
