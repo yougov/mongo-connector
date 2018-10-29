@@ -41,7 +41,7 @@ def exception_wrapper(mapping):
 
                 if new_type is None:
                     raise
-                new_type(str(exc_value)).with_traceback(exc_tb)
+                raise new_type(str(exc_value)).with_traceback(exc_tb)
 
         return wrapped
 
