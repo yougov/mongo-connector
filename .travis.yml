@@ -5,6 +5,10 @@ env:
   global:
     - MO_ADDRESS=127.0.0.1:20000
 
+matrix:
+  allow_failures:
+  - python: 2.6
+
 jobs:
   fast_finish: true
   include:
