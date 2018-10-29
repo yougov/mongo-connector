@@ -23,8 +23,6 @@ from bson.timestamp import Timestamp
 
 from pymongo import errors
 
-from mongo_connector.compat import reraise
-
 LOG = logging.getLogger(__name__)
 
 
@@ -43,7 +41,7 @@ def exception_wrapper(mapping):
 
                 if new_type is None:
                     raise
-                reraise(new_type, exc_value, exc_tb)
+                new_type(str(exc_value)).with_traceback(exc_tb)
 
         return wrapped
 

@@ -15,7 +15,6 @@
 import logging
 import sys
 
-from mongo_connector.compat import reraise
 from mongo_connector.connector import get_mininum_mongodb_version
 from mongo_connector.errors import UpdateDoesNotApply
 
@@ -116,11 +115,8 @@ class DocManagerBase(object):
 
             except (KeyError, ValueError, AttributeError, IndexError):
                 exc_t, exc_v, exc_tb = sys.exc_info()
-                reraise(
-                    UpdateDoesNotApply,
-                    "Cannot apply update %r to %r" % (update_spec, doc),
-                    exc_tb,
-                )
+                msg = "Cannot apply update %r to %r" % (update_spec, doc)
+                raise UpdateDoesNotApply(msg).with_traceback(exc_tb)
             return doc
 
     def bulk_upsert(self, docs, namespace, timestamp):

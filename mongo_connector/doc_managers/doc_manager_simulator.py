@@ -26,7 +26,6 @@ from threading import RLock
 from mongo_connector import constants
 from mongo_connector.errors import OperationFailed
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
-from mongo_connector.compat import u
 
 __version__ = constants.__version__
 """DocManager Simulator version information
@@ -152,7 +151,7 @@ class DocManager(DocManagerBase):
             entry.doc = None
             entry.update(namespace, timestamp)
         except KeyError:
-            raise OperationFailed("Document does not exist: %s" % u(document_id))
+            raise OperationFailed("Document does not exist: %s" % document_id)
 
     def search(self, start_ts, end_ts):
         """Searches through all documents and finds all documents that were
