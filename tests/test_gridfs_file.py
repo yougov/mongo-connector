@@ -16,7 +16,7 @@ import sys
 
 import gridfs
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector import errors
 from mongo_connector.gridfs_file import GridFSFile
@@ -25,7 +25,6 @@ from tests import unittest
 
 
 class TestGridFSFile(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         # Start up a replica set and connect to it
@@ -49,7 +48,7 @@ class TestGridFSFile(unittest.TestCase):
     def test_insert(self):
         def test_insert_file(data, filename, read_size):
             # insert file
-            id = self.fs.put(data, filename=filename, encoding='utf8')
+            id = self.fs.put(data, filename=filename, encoding="utf8")
             doc = self.collection.files.find_one(id)
             f = self.get_file(doc)
 
@@ -62,7 +61,7 @@ class TestGridFSFile(unittest.TestCase):
             while True:
                 s = f.read(read_size)
                 if len(s) > 0:
-                    result.append(s.decode('utf8'))
+                    result.append(s.decode("utf8"))
                     if read_size >= 0:
                         self.assertLessEqual(len(s), read_size)
                 else:
@@ -78,23 +77,21 @@ class TestGridFSFile(unittest.TestCase):
 
         # test with multiple-chunk files
         size = 4 * 1024 * 1024
-        bigger = "".join([chr(ord('a') + (n % 26)) for n in range(size)])
+        bigger = "".join([chr(ord("a") + (n % 26)) for n in range(size)])
         test_insert_file(bigger, "bigger.txt", -1)
         test_insert_file(bigger, "bigger.txt", 1024)
         test_insert_file(bigger, "bigger.txt", 1024 * 1024)
 
     def test_missing_chunk(self):
         data = "test data"
-        id = self.fs.put(data, encoding='utf8')
+        id = self.fs.put(data, encoding="utf8")
         doc = self.collection.files.find_one(id)
         f = self.get_file(doc)
 
-        self.main_connection['test']['fs.chunks'].delete_one({
-            'files_id': id
-        })
+        self.main_connection["test"]["fs.chunks"].delete_one({"files_id": id})
 
         self.assertRaises(errors.OperationFailed, f.read)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

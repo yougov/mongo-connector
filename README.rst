@@ -2,12 +2,12 @@
 mongo-connector
 ===============
 
-Ownership of the mongo-connector repo has been transferred to YouGov.  MongoDB would like to thank
-Jason Coombs, Executive Technical Director at YouGov, for agreeing to maintain this project.
+The mongo-connector project originated as a MongoDB mongo-labs
+project and is now community-maintained under the custody of YouGov, Plc.
 
-.. image:: https://travis-ci.org/mongodb-labs/mongo-connector.svg?branch=master
+.. image:: https://travis-ci.org/yougov/mongo-connector.svg?branch=master
    :alt: View build status
-   :target: https://travis-ci.org/mongodb-labs/mongo-connector
+   :target: https://travis-ci.org/yougov/mongo-connector
 
 For complete documentation, check out the `Mongo Connector Wiki
 <https://github.com/yougov/mongo-connector/wiki>`__.
@@ -107,11 +107,11 @@ If you want to jump-start into using mongo-connector with a another particular s
 Doc Managers
 ~~~~~~~~~~~~
 
-Elasticsearch 1.x: https://github.com/mongodb-labs/elastic-doc-manager
+Elasticsearch 1.x: https://github.com/yougov/elastic-doc-manager
 
-Elasticsearch 2.x and 5.x: https://github.com/mongodb-labs/elastic2-doc-manager
+Elasticsearch 2.x and 5.x: https://github.com/yougov/elastic2-doc-manager
 
-Solr: https://github.com/mongodb-labs/solr-doc-manager
+Solr: https://github.com/yougov/solr-doc-manager
 
 The MongoDB doc manager comes packaged with the mongo-connector project.
 
