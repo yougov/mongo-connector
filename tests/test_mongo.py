@@ -304,6 +304,7 @@ class TestMongoReplicaSet(MongoReplicaSetTestCase):
 
         def condition():
             return admin.command("isMaster")["ismaster"]
+
         assert_soon(lambda: retry_until_ok(condition))
 
         retry_until_ok(self.conn.test.test.insert_one, {"name": "pauline"})

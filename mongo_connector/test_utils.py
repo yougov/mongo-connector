@@ -239,7 +239,7 @@ class MockGridFSFile:
     def read(self, n=-1):
         if n < 0 or self.pos + n > self.length:
             n = self.length - self.pos
-        s = self.data[self.pos: self.pos + n]
+        s = self.data[self.pos : self.pos + n]
         self.pos += n
         return s
 

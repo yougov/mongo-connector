@@ -322,6 +322,7 @@ class TestRollbacks(unittest.TestCase):
 
         def condition():
             return len(docman._search()) == STRESS_COUNT
+
         assert_soon(
             condition,
             (

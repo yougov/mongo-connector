@@ -43,11 +43,11 @@ class Version(tuple):
             mod = -1
         # Deal with '-rcX' substrings
         if "-rc" in version_string:
-            version_string = version_string[0: version_string.find("-rc")]
+            version_string = version_string[0 : version_string.find("-rc")]
             mod = -1
         # Deal with git describe generated substrings
         elif "-" in version_string:
-            version_string = version_string[0: version_string.find("-")]
+            version_string = version_string[0 : version_string.find("-")]
             mod = -1
             bump_patch_level = True
 

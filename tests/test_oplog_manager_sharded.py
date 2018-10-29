@@ -567,6 +567,7 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
         # Note that both OplogThreads share the same doc manager
         def c():
             return len(self.opman1.doc_managers[0]._search()) == 3
+
         assert_soon(c, "not all writes were replicated to doc manager", max_tries=120)
 
         # Kill the new primary
@@ -578,12 +579,14 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
 
         def c():
             return primary_admin.command("isMaster")["ismaster"]
+
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
 
         def c():
             return secondary_admin.command("replSetGetStatus")["myState"] == 2
+
         assert_soon(c)
         query = {"i": {"$lt": 1000}}
         assert_soon(lambda: retry_until_ok(db_main.find(query).count) > 0)
@@ -643,6 +646,7 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
 
         def c():
             return len(self.opman1.doc_managers[0]._search()) == 4
+
         assert_soon(c, "not all writes were replicated to doc manager")
 
         # Kill the new primaries
@@ -655,24 +659,28 @@ class TestOplogManagerSharded(ShardedClusterTestCase):
 
         def c():
             return self.shard1_conn["admin"].command("isMaster")["ismaster"]
+
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[0].secondary.start()
         secondary_admin = self.shard1_secondary_conn["admin"]
 
         def c():
             return secondary_admin.command("replSetGetStatus")["myState"] == 2
+
         assert_soon(c)
         # Shard 2
         self.cluster.shards[1].primary.start()
 
         def c():
             return self.shard2_conn["admin"].command("isMaster")["ismaster"]
+
         assert_soon(lambda: retry_until_ok(c))
         self.cluster.shards[1].secondary.start()
         secondary_admin = self.shard2_secondary_conn["admin"]
 
         def c():
             return secondary_admin.command("replSetGetStatus")["myState"] == 2
+
         assert_soon(c)
 
         # Wait for the shards to come online
