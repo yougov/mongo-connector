@@ -10,11 +10,8 @@ import logging
 import bson
 import bson.json_util
 
-from mongo_connector.compat import PY3
-
-if PY3:
-    long = int
-    unicode = str
+long = int
+unicode = str
 
 LOG = logging.getLogger(__name__)
 
@@ -83,7 +80,7 @@ class DefaultDocumentFormatter(DocumentFormatter):
             pattern = value.pattern
             # quasi-JavaScript notation (may include non-standard flags)
             return "/%s/%s" % (pattern, flags)
-        elif isinstance(value, bson.Binary) or (PY3 and isinstance(value, bytes)):
+        elif isinstance(value, bson.Binary) or isinstance(value, bytes):
             # Just include body of binary data without subtype
             return base64.b64encode(value).decode()
         elif isinstance(value, UUID):

@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Version 3.0.0
+-------------
+
+- Dropped support for Python 3.3 and earlier.
+- Dropped support for EOL MongoDB 3.2 and earlier.
+
 Version 2.7.0
 -------------
 

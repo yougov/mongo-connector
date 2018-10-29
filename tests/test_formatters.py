@@ -21,7 +21,6 @@ import bson
 
 sys.path[0:0] = [""]  # noqa
 
-from mongo_connector.compat import PY3
 from mongo_connector.doc_managers.formatters import (
     DefaultDocumentFormatter,
     DocumentFlattener,
@@ -63,10 +62,7 @@ class TestFormatters(unittest.TestCase):
 
         # binary
         self.assertEqual(trans(self.bin1), "AGhlbGxvAA==")
-        if PY3:
-            self.assertEqual(trans(self.bin2), "AGhlbGxvAA==")
-        else:
-            self.assertEqual(trans(self.bin2), self.bin2)
+        self.assertEqual(trans(self.bin2), "AGhlbGxvAA==")
 
         # datetime
         self.assertEqual(trans(self.date), self.date)

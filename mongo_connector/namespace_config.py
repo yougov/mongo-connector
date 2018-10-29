@@ -19,7 +19,6 @@ from collections import namedtuple, MutableSet
 from itertools import combinations
 
 from mongo_connector import errors
-from mongo_connector import compat
 
 
 LOG = logging.getLogger(__name__)
@@ -456,7 +455,7 @@ def _merge_namespace_options(
                 exclude_fields=options_or_str.get("excludeFields"),
                 gridfs=options_or_str.get("gridfs", False),
             )
-        elif compat.is_string(options_or_str):
+        elif isinstance(options_or_str, str):
             namespace_set.add(source_name)
             namespaces[source_name] = Namespace(dest_name=options_or_str)
         elif options_or_str:
