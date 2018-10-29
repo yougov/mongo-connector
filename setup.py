@@ -38,15 +38,7 @@ Operating System :: Microsoft :: Windows
 Operating System :: POSIX
 """
 
-extra_opts = {
-    "test_suite": "tests",
-    "tests_require": ["mongo-orchestration>=0.6.7,<1.0", "requests>=2.5.1"],
-}
-
-if sys.version_info[:2] == (2, 6):
-    # Need unittest2 to run unittests in Python 2.6
-    extra_opts["tests_require"].append("unittest2")
-    extra_opts["test_suite"] = "unittest2.collector"
+extra_opts = {}
 
 try:
     with open("README.rst", "r") as fd:
