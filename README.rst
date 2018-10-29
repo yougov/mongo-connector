@@ -25,8 +25,8 @@ available on the `wiki
 Getting Started
 ---------------
 
-mongo-connector supports Python 2.6, 2.7, and 3.3+ and MongoDB versions
-2.4, 2.6, 3.0, 3.2, and 3.4.
+mongo-connector supports Python 3.4+ and MongoDB versions
+3.4 and 3.6.
 
 Installation
 ~~~~~~~~~~~~

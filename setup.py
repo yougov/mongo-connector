@@ -25,11 +25,7 @@ classifiers = """\
 Development Status :: 4 - Beta
 Intended Audience :: Developers
 License :: OSI Approved :: Apache Software License
-Programming Language :: Python :: 2.6
-Programming Language :: Python :: 2.7
-Programming Language :: Python :: 3.3
-Programming Language :: Python :: 3.4
-Programming Language :: Python :: 3.5
+Programming Language :: Python :: 3
 Topic :: Database
 Topic :: Software Development :: Libraries :: Python Modules
 Operating System :: Unix
@@ -38,15 +34,7 @@ Operating System :: Microsoft :: Windows
 Operating System :: POSIX
 """
 
-extra_opts = {
-    "test_suite": "tests",
-    "tests_require": ["mongo-orchestration>=0.6.7,<1.0", "requests>=2.5.1"],
-}
-
-if sys.version_info[:2] == (2, 6):
-    # Need unittest2 to run unittests in Python 2.6
-    extra_opts["tests_require"].append("unittest2")
-    extra_opts["test_suite"] = "unittest2.collector"
+extra_opts = {}
 
 try:
     with open("README.rst", "r") as fd:
@@ -113,7 +101,7 @@ extra_opts["cmdclass"] = {
 
 setup(
     name="mongo-connector",
-    version="2.6.0",
+    version="3.0.0",
     author="MongoDB, Inc.",
     author_email="mongodb-user@googlegroups.com",
     description="Mongo Connector",
@@ -136,5 +124,6 @@ setup(
         "elastic5": ["elastic2-doc-manager[elastic5]"],
         "elastic2-aws": ["elastic2-doc-manager[elastic2,aws]"],
     },
+    python_requires=">=3.4",
     **extra_opts
 )

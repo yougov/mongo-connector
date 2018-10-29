@@ -1,23 +1,13 @@
 sudo: false
 language: python
 
-env:
-  global:
-    - MO_ADDRESS=127.0.0.1:20000
-
 jobs:
   fast_finish: true
   include:
-  - python: 2.6
-    env: MONGODB=3.4.2
-  - python: 2.7
-    env: MONGODB=3.2.12
-  - python: 3.3
-    env: MONGODB=3.0.14
   - python: 3.4
-    env: MONGODB=2.6.12
+    env: MONGODB=3.4.17
   - python: &latest_py3 3.5
-    env: MONGODB=2.4.14
+    env: MONGODB=3.4.17
   - stage: deploy
     if: tag IS present
     python: *latest_py3
@@ -35,17 +25,11 @@ jobs:
       skip_cleanup: true
 
 install:
-  - pip install "mongo-orchestration>=0.6.7,<1.0"
+  - pip install -U tox tox-venv
   - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-${MONGODB}.tgz
   - tar zxf mongodb-linux-x86_64-${MONGODB}.tgz
   - export PATH=${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/:${PATH}
   - mongod --version
 
-before_script:
-  - mongo-orchestration start -p 20000 -b 127.0.0.1
-
 script:
-  - python setup.py test
-
-after_script:
-  - mongo-orchestration stop
+  - tox
