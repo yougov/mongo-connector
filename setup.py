@@ -110,7 +110,7 @@ setup(
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
     platforms=["any"],
     classifiers=filter(None, classifiers.split("\n")),
-    install_requires=["pymongo >= 2.9"],
+    install_requires=["pymongo >= 2.9", "importlib_metadata>=0.6"],
     packages=["mongo_connector", "mongo_connector.doc_managers"],
     package_data={"mongo_connector.doc_managers": ["schema.xml"]},
     entry_points={
