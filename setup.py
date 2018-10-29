@@ -106,7 +106,7 @@ setup(
     author_email="mongodb-user@googlegroups.com",
     description="Mongo Connector",
     keywords=["mongo-connector", "mongo", "mongodb", "solr", "elasticsearch"],
-    url="https://github.com/10gen-labs/mongo-connector",
+    url="https://github.com/yougov/mongo-connector",
     license="http://www.apache.org/licenses/LICENSE-2.0.html",
     platforms=["any"],
     classifiers=filter(None, classifiers.split("\n")),
