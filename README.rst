@@ -61,6 +61,15 @@ and any extra dependencies for the target system.
 You may have to run ``pip`` with ``sudo``, depending
 on where you're installing mongo-connector and what privileges you have.
 
+System V Service
+~~~~~~~~~~~~~~~~
+
+Mongo Connector provides support for installing and uninstalling itself as
+a service daemon under System V Init on Linux. Following install of the
+package, install or uninstall using the following command:
+
+    $ python -m mongo_connector.service.system-v [un]install
+
 Development
 ~~~~~~~~~~~
 

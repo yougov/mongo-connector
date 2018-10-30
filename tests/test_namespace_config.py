@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import json
-import os
 import re
+
+import importlib_resources
 
 from tests import unittest
 from mongo_connector.namespace_config import (
@@ -26,11 +27,6 @@ from mongo_connector.namespace_config import (
     wildcards_overlap,
 )
 from mongo_connector import errors
-
-
-CONFIG_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "config.json"
-)
 
 
 class TestNamespaceConfig(unittest.TestCase):
@@ -45,9 +41,11 @@ class TestNamespaceConfig(unittest.TestCase):
 
     def test_config(self):
         """Test that the namespace option in the example config is valid."""
-        with open(CONFIG_PATH) as filep:
-            namespaces = json.load(filep)["__namespaces"]
-            NamespaceConfig(namespace_options=namespaces)
+        package = "mongo_connector.service"
+        stream = importlib_resources.open_text(package, "config.json")
+        with stream:
+            namespaces = json.load(stream)["__namespaces"]
+        NamespaceConfig(namespace_options=namespaces)
 
     def test_include_plain(self):
         """Test including namespaces without wildcards"""
