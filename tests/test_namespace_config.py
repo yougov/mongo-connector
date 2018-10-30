@@ -42,7 +42,7 @@ class TestNamespaceConfig(unittest.TestCase):
     def test_config(self):
         """Test that the namespace option in the example config is valid."""
         package = "mongo_connector.service"
-        stream = importlib_resources.open_binary(package, "config.json")
+        stream = importlib_resources.open_text(package, "config.json")
         with stream:
             namespaces = json.load(stream)["__namespaces"]
         NamespaceConfig(namespace_options=namespaces)
