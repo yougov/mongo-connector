@@ -1,3 +1,4 @@
+dist: xenial
 sudo: false
 language: python
 
@@ -6,7 +7,7 @@ jobs:
   include:
   - python: 3.4
     env: MONGODB=3.4.17
-  - python: &latest_py3 3.5
+  - python: &latest_py3 3.7
     env: MONGODB=3.4.17
   - stage: deploy
     if: tag IS present
