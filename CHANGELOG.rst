@@ -1,6 +1,12 @@
 Changelog
 =========
 
+Version 3.0.1
+-------------
+
+- #843: Restored ``mongo_connector.compat`` for compatibility in
+  the doc managers.
+
 Version 3.0.0
 -------------
 
