@@ -205,7 +205,7 @@ class Connector(threading.Thread):
             mongo_address=config["mainAddress"],
             doc_managers=config["docManagers"],
             oplog_checkpoint=os.path.abspath(config["oplogFile"]),
-            collection_dump=(True if config["onlyDump"] else not config["noDump"]),
+            collection_dump=config["onlyDump"] or not config["noDump"],
             only_dump=config["onlyDump"],
             batch_size=config["batchSize"],
             continue_on_error=config["continueOnError"],
