@@ -112,6 +112,8 @@ class OplogThread(threading.Thread):
         # Are we allowed to perform a collection dump?
         self.collection_dump = kwargs.get("collection_dump", True)
 
+        self.only_dump = kwargs.get('only_dump', False)
+
         # The document manager for each target system.
         # These are the same for all threads.
         self.doc_managers = doc_managers
@@ -779,10 +781,15 @@ class OplogThread(threading.Thread):
         """
         timestamp = self.read_last_checkpoint()
 
-        if timestamp is None:
+        if timestamp is None or self.only_dump:
             if self.collection_dump:
                 # dump collection and update checkpoint
                 timestamp = self.dump_collection()
+                if self.only_dump:
+                    LOG.info("Finished dump. Exiting.")
+                    timestamp = None
+                    self.running = False
+
                 self.update_checkpoint(timestamp)
                 if timestamp is None:
                     return None, True
