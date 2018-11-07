@@ -23,8 +23,6 @@ from bson.timestamp import Timestamp
 
 from pymongo import errors
 
-from mongo_connector.compat import reraise
-
 LOG = logging.getLogger(__name__)
 
 
@@ -33,7 +31,7 @@ def exception_wrapper(mapping):
         def wrapped(*args, **kwargs):
             try:
                 return f(*args, **kwargs)
-            except:
+            except Exception:
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 new_type = None
                 for src_type in mapping:
@@ -43,8 +41,10 @@ def exception_wrapper(mapping):
 
                 if new_type is None:
                     raise
-                reraise(new_type, exc_value, exc_tb)
+                raise new_type(str(exc_value)).with_traceback(exc_tb)
+
         return wrapped
+
     return decorator
 
 
@@ -54,14 +54,14 @@ def bson_ts_to_long(timestamp):
     Conversion rule is based from the specs
     (http://bsonspec.org/#/specification).
     """
-    return ((timestamp.time << 32) + timestamp.inc)
+    return (timestamp.time << 32) + timestamp.inc
 
 
 def long_to_bson_ts(val):
     """Convert integer into BSON timestamp.
     """
     seconds = val >> 32
-    increment = val & 0xffffffff
+    increment = val & 0xFFFFFFFF
 
     return Timestamp(seconds, increment)
 
@@ -81,19 +81,22 @@ def retry_until_ok(func, *args, **kwargs):
             # Do not mask RuntimeError.
             raise
         except errors.OperationFailure as exc:
-            if exc.code == 13 or (   # MongoDB >= 2.6 sets the error code,
-                    exc.details and  # MongoDB 2.4 does not.
-                    'unauthorized' == exc.details.get('errmsg')):
+            if exc.code == 13 or (  # MongoDB >= 2.6 sets the error code,
+                exc.details
+                and "unauthorized" == exc.details.get("errmsg")  # MongoDB 2.4 does not.
+            ):
                 # Do not mask authorization failures.
                 raise
             if i == max_tries - 1:
-                LOG.exception('Call to %s failed too many times in '
-                              'retry_until_ok', func)
+                LOG.exception(
+                    "Call to %s failed too many times in " "retry_until_ok", func
+                )
                 raise
         except Exception:
             if i == max_tries - 1:
-                LOG.exception('Call to %s failed too many times in '
-                              'retry_until_ok', func)
+                LOG.exception(
+                    "Call to %s failed too many times in " "retry_until_ok", func
+                )
                 raise
         time.sleep(1)
 
@@ -105,4 +108,5 @@ def log_fatal_exceptions(func):
         except Exception:
             LOG.exception("Fatal Exception")
             raise
+
     return wrapped
