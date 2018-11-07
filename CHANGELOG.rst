@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 3.1.0
+-------------
+
+- #772: Allow for exit after dump.
+
 Version 3.0.1
 -------------
 
