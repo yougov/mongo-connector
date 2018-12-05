@@ -31,9 +31,12 @@ from mongo_connector import errors, constants
 from mongo_connector.util import exception_wrapper
 from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 
-wrap_exceptions = exception_wrapper({
-    pymongo.errors.ConnectionFailure: errors.ConnectionFailed,
-    pymongo.errors.OperationFailure: errors.OperationFailed})
+wrap_exceptions = exception_wrapper(
+    {
+        pymongo.errors.ConnectionFailure: errors.ConnectionFailed,
+        pymongo.errors.OperationFailure: errors.OperationFailed,
+    }
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -64,44 +67,43 @@ class DocManager(DocManagerBase):
         """ Verify URL and establish a connection.
         """
         try:
-            self.mongo = pymongo.MongoClient(
-                url, **kwargs.get('clientOptions', {}))
+            self.mongo = pymongo.MongoClient(url, **kwargs.get("clientOptions", {}))
         except pymongo.errors.InvalidURI:
             raise errors.ConnectionFailed("Invalid URI for MongoDB")
         except pymongo.errors.ConnectionFailure:
             raise errors.ConnectionFailed("Failed to connect to MongoDB")
-        self.chunk_size = kwargs.get('chunk_size', constants.DEFAULT_MAX_BULK)
+        self.chunk_size = kwargs.get("chunk_size", constants.DEFAULT_MAX_BULK)
         self.use_single_meta_collection = kwargs.get(
-            'use_single_meta_collection',
-            False)
+            "use_single_meta_collection", False
+        )
         self.meta_collection_name = kwargs.get(
-            'meta_collection_name',
-            constants.DEFAULT_META_COLLECTION_NAME)
+            "meta_collection_name", constants.DEFAULT_META_COLLECTION_NAME
+        )
         self.meta_collection_cap_size = kwargs.get(
-            'meta_collection_cap_size',
-            constants.DEFAULT_META_COLLECTION_CAP_SIZE)
+            "meta_collection_cap_size", constants.DEFAULT_META_COLLECTION_CAP_SIZE
+        )
 
         # The '_id' field has to be unique, so if we will be writing data from
         # different namespaces into single collection, we use a different field
         # for storing the document id.
-        self.id_field = 'doc_id' if self.use_single_meta_collection else '_id'
+        self.id_field = "doc_id" if self.use_single_meta_collection else "_id"
         self.meta_database = self.mongo["__mongo_connector"]
 
         # Create the meta collection as capped if a single meta collection is
         # preferred
         if self.use_single_meta_collection:
-            if (self.meta_collection_name not in
-                    self.meta_database.collection_names()):
+            if self.meta_collection_name not in self.meta_database.collection_names():
                 self.meta_database.create_collection(
                     self.meta_collection_name,
                     capped=True,
-                    size=self.meta_collection_cap_size)
+                    size=self.meta_collection_cap_size,
+                )
                 meta_collection = self.meta_database[self.meta_collection_name]
                 meta_collection.create_index(self.id_field)
-                meta_collection.create_index([('ns', 1), ('_ts', 1)])
+                meta_collection.create_index([("ns", 1), ("_ts", 1)])
 
     def _db_and_collection(self, namespace):
-        return namespace.split('.', 1)
+        return namespace.split(".", 1)
 
     def _get_meta_collection(self, namespace):
         if self.use_single_meta_collection:
@@ -117,7 +119,8 @@ class DocManager(DocManagerBase):
             yield self.meta_collection_name
         else:
             for name in self.meta_database.collection_names(
-                    include_system_collections=False):
+                include_system_collections=False
+            ):
                 yield name
 
     def stop(self):
@@ -132,26 +135,23 @@ class DocManager(DocManagerBase):
     @wrap_exceptions
     def handle_command(self, doc, namespace, timestamp):
         db, _ = self._db_and_collection(namespace)
-        if doc.get('dropDatabase'):
+        if doc.get("dropDatabase"):
             for new_db in self.command_helper.map_db(db):
                 self.mongo.drop_database(new_db)
 
-        if doc.get('renameCollection'):
-            a = self.command_helper.map_namespace(doc['renameCollection'])
-            b = self.command_helper.map_namespace(doc['to'])
+        if doc.get("renameCollection"):
+            a = self.command_helper.map_namespace(doc["renameCollection"])
+            b = self.command_helper.map_namespace(doc["to"])
             if a and b:
-                self.mongo.admin.command(
-                    "renameCollection", a, to=b)
+                self.mongo.admin.command("renameCollection", a, to=b)
 
-        if doc.get('create'):
-            new_db, coll = self.command_helper.map_collection(
-                db, doc['create'])
+        if doc.get("create"):
+            new_db, coll = self.command_helper.map_collection(db, doc["create"])
             if new_db:
                 self.mongo[new_db].create_collection(coll)
 
-        if doc.get('drop'):
-            new_db, coll = self.command_helper.map_collection(
-                db, doc['drop'])
+        if doc.get("drop"):
+            new_db, coll = self.command_helper.map_collection(db, doc["drop"])
             if new_db:
                 self.mongo[new_db].drop_collection(coll)
 
@@ -167,18 +167,24 @@ class DocManager(DocManagerBase):
 
         self.meta_database[meta_collection_name].replace_one(
             {self.id_field: document_id, "ns": namespace},
-            {self.id_field: document_id,
-             "_ts": timestamp,
-             "ns": namespace},
-            upsert=True)
+            {self.id_field: document_id, "_ts": timestamp, "ns": namespace},
+            upsert=True,
+        )
 
         no_obj_error = "No matching object found"
+        if "$v" in update_spec:
+            update_spec.pop("$v")
         updated = self.mongo[db].command(
-            SON([('findAndModify', coll),
-                 ('query', {'_id': document_id}),
-                 ('update', update_spec),
-                 ('new', True)]),
-            allowable_errors=[no_obj_error])['value']
+            SON(
+                [
+                    ("findAndModify", coll),
+                    ("query", {"_id": document_id}),
+                    ("update", update_spec),
+                    ("new", True),
+                ]
+            ),
+            allowable_errors=[no_obj_error],
+        )["value"]
         return updated
 
     @wrap_exceptions
@@ -190,16 +196,12 @@ class DocManager(DocManagerBase):
         meta_collection_name = self._get_meta_collection(namespace)
 
         self.meta_database[meta_collection_name].replace_one(
-            {self.id_field: doc['_id'], "ns": namespace},
-            {self.id_field: doc['_id'],
-             "_ts": timestamp,
-             "ns": namespace},
-             upsert=True)
+            {self.id_field: doc["_id"], "ns": namespace},
+            {self.id_field: doc["_id"], "_ts": timestamp, "ns": namespace},
+            upsert=True,
+        )
 
-        self.mongo[database][coll].replace_one(
-            {'_id': doc['_id']},
-            doc,
-            upsert=True)
+        self.mongo[database][coll].replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
@@ -215,14 +217,16 @@ class DocManager(DocManagerBase):
                 for i in range(self.chunk_size):
                     try:
                         doc = next(docs)
-                        selector = {'_id': doc['_id']}
+                        selector = {"_id": doc["_id"]}
                         bulk.find(selector).upsert().replace_one(doc)
-                        meta_selector = {self.id_field: doc['_id']}
-                        bulk_meta.find(meta_selector).upsert().replace_one({
-                            self.id_field: doc['_id'],
-                            'ns': namespace,
-                            '_ts': timestamp
-                        })
+                        meta_selector = {self.id_field: doc["_id"]}
+                        bulk_meta.find(meta_selector).upsert().replace_one(
+                            {
+                                self.id_field: doc["_id"],
+                                "ns": namespace,
+                                "_ts": timestamp,
+                            }
+                        )
                     except StopIteration:
                         more_chunks = False
                         if i > 0:
@@ -236,11 +240,10 @@ class DocManager(DocManagerBase):
                 bulk_op.execute()
                 meta_bulk_op.execute()
             except pymongo.errors.DuplicateKeyError as e:
-                LOG.warn('Continuing after DuplicateKeyError: '
-                         + str(e))
+                LOG.warn("Continuing after DuplicateKeyError: " + str(e))
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
-                raise e
+                raise
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):
@@ -254,11 +257,12 @@ class DocManager(DocManagerBase):
         meta_collection = self._get_meta_collection(namespace)
 
         doc2 = self.meta_database[meta_collection].find_one_and_delete(
-            {self.id_field: document_id})
-        if (doc2 and doc2.get('gridfs_id')):
-            GridFS(self.mongo[database], coll).delete(doc2['gridfs_id'])
+            {self.id_field: document_id}
+        )
+        if doc2 and doc2.get("gridfs_id"):
+            GridFS(self.mongo[database], coll).delete(doc2["gridfs_id"])
         else:
-            self.mongo[database][coll].delete_one({'_id': document_id})
+            self.mongo[database][coll].delete_one({"_id": document_id})
 
     @wrap_exceptions
     def insert_file(self, f, namespace, timestamp):
@@ -270,9 +274,9 @@ class DocManager(DocManagerBase):
 
         self.meta_database[meta_collection].replace_one(
             {self.id_field: f._id, "ns": namespace},
-            {self.id_field: f._id, '_ts': timestamp,
-             'ns': namespace, 'gridfs_id': id},
-            upsert=True)
+            {self.id_field: f._id, "_ts": timestamp, "ns": namespace, "gridfs_id": id},
+            upsert=True,
+        )
 
     @wrap_exceptions
     def search(self, start_ts, end_ts):
@@ -281,7 +285,8 @@ class DocManager(DocManagerBase):
         for meta_collection_name in self._meta_collections():
             meta_coll = self.meta_database[meta_collection_name]
             for ts_ns_doc in meta_coll.find(
-                    {'_ts': {'$lte': end_ts, '$gte': start_ts}}):
+                {"_ts": {"$lte": end_ts, "$gte": start_ts}}
+            ):
                 yield ts_ns_doc
 
     def commit(self):
@@ -293,10 +298,11 @@ class DocManager(DocManagerBase):
     def get_last_doc(self):
         """Returns the last document stored in Mongo.
         """
+
         def docs_by_ts():
             for meta_collection_name in self._meta_collections():
                 meta_coll = self.meta_database[meta_collection_name]
-                for ts_ns_doc in meta_coll.find(limit=-1).sort('_ts', -1):
+                for ts_ns_doc in meta_coll.find(limit=-1).sort("_ts", -1):
                     yield ts_ns_doc
 
         return max(docs_by_ts(), key=lambda x: x["_ts"])

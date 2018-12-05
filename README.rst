@@ -2,8 +2,8 @@
 mongo-connector
 ===============
 
-Ownership of the mongo-connector repo has been transferred to YouGov.  MongoDB would like to thank
-Jason Coombs, Executive Technical Director at YouGov, for agreeing to maintain this project.
+The mongo-connector project originated as a MongoDB mongo-labs
+project and is now community-maintained under the custody of YouGov, Plc.
 
 .. image:: https://travis-ci.org/yougov/mongo-connector.svg?branch=master
    :alt: View build status
@@ -25,8 +25,8 @@ available on the `wiki
 Getting Started
 ---------------
 
-mongo-connector supports Python 2.6, 2.7, and 3.3+ and MongoDB versions
-2.4, 2.6, 3.0, 3.2, 3.4, and 3.6.
+mongo-connector supports Python 3.4+ and MongoDB versions
+3.4 and 3.6.
 
 Installation
 ~~~~~~~~~~~~
@@ -60,6 +60,15 @@ and any extra dependencies for the target system.
 
 You may have to run ``pip`` with ``sudo``, depending
 on where you're installing mongo-connector and what privileges you have.
+
+System V Service
+~~~~~~~~~~~~~~~~
+
+Mongo Connector provides support for installing and uninstalling itself as
+a service daemon under System V Init on Linux. Following install of the
+package, install or uninstall using the following command:
+
+    $ python -m mongo_connector.service.system-v [un]install
 
 Development
 ~~~~~~~~~~~

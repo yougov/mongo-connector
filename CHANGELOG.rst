@@ -1,6 +1,31 @@
 Changelog
 =========
 
+Version 3.1.0
+-------------
+
+- #772: Allow for exit after dump.
+
+Version 3.0.1
+-------------
+
+- #843: Restored ``mongo_connector.compat`` for compatibility in
+  the doc managers.
+
+Version 3.0.0
+-------------
+
+- Dropped support for Python 3.3 and earlier.
+- Dropped support for EOL MongoDB 3.2 and earlier.
+- Moved System V Init script installation and uninstallation to a
+  runpy module.
+
+Version 2.7.0
+-------------
+
+- #829: mongo-connector now emits a warning when running under
+  Python 2.
+
 Version 2.6.0
 -------------
 

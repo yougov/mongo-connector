@@ -1,37 +1,33 @@
-"""Utilities for maintaining portability between various Python versions"""
+"""Deprecated compat library, retained for doc managers"""
 
 import sys
+import warnings
 
-PY3 = (sys.version_info[0] == 3)
+from urllib.request import Request
+from urllib.request import urlopen
+from urllib.parse import urlencode
+from urllib.error import URLError
+from urllib.error import HTTPError
 
-if PY3:
-    def reraise(exctype, value, trace=None):
-        raise exctype(str(value)).with_traceback(trace)
+__all__ = [
+    'Request', 'urlopen', 'urlencode', 'URLError', 'HTTPError',
+    'reraise', 'is_string', 'u', 'PY3',
+]
 
-    def is_string(x):
-        return isinstance(x, str)
+warnings.warn(
+    "mongo_connector.compat should not be used",
+    DeprecationWarning,
+)
 
-    from urllib.request import Request
-    from urllib.request import urlopen
-    from urllib.parse import urlencode
-    from urllib.error import URLError
-    from urllib.error import HTTPError
+PY3 = sys.version_info[0] == 3
 
-    def u(s):
-        return str(s)
 
-else:
-    exec("""def reraise(exctype, value, trace=None):
-    raise exctype, value, trace""")
+def reraise(exctype, value, trace=None):
+    raise exctype(str(value)).with_traceback(trace)
 
-    def is_string(x):
-        return isinstance(x, basestring)
 
-    from urllib import urlencode
-    from urllib2 import Request
-    from urllib2 import urlopen
-    from urllib2 import URLError
-    from urllib2 import HTTPError
+def is_string(x):
+    return isinstance(x, str)
 
-    def u(s):
-        return unicode(s)
+
+u = str
