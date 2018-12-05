@@ -172,8 +172,7 @@ class DocManager(DocManagerBase):
         )
 
         no_obj_error = "No matching object found"
-        if "$v" in update_spec:
-            update_spec.pop("$v")
+        update_spec.pop("$v", None)
         updated = self.mongo[db].command(
             SON(
                 [
