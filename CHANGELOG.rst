@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 3.1.1
+-------------
+
+- #836: Remove $v entry in update. Improves support for MongoDB 3.6.
+
 Version 3.1.0
 -------------
 
