@@ -28,15 +28,6 @@ Operating System :: Microsoft :: Windows
 Operating System :: POSIX
 """
 
-extra_opts = {}
-
-try:
-    with open("README.rst", "r") as fd:
-        extra_opts["long_description"] = fd.read()
-except IOError:
-    pass  # Install without README.rst
-
-
 setup(
     name="mongo-connector",
     use_scm_version=True,
@@ -70,5 +61,4 @@ setup(
         "setuptools_scm>=1.5",
     ],
     python_requires=">=3.4",
-    **extra_opts
 )
