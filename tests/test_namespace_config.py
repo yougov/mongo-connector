@@ -14,6 +14,7 @@
 
 import json
 import re
+import sys
 
 import importlib_resources
 
@@ -415,7 +416,8 @@ class TestNamespaceConfig(unittest.TestCase):
         self.assertEqual(namespace_to_regex("db.foo*"), re.compile(r"\Adb\.foo(.*)\Z"))
         self.assertEqual(namespace_to_regex("db.foo"), re.compile(r"\Adb\.foo\Z"))
 
-    def test_namespace_to_regex_escapes_metacharacters(self):
+    @unittest.skipIf(sys.version_info >= (3, 7), "Python 3.6 and earlier")
+    def test_namespace_to_regex_escapes_metacharacters_legacy(self):
         """Test regex creation escapes metacharacters."""
         self.assertEqual(
             namespace_to_regex("db&*.$a^a#a!a[a]a"),
@@ -424,6 +426,18 @@ class TestNamespaceConfig(unittest.TestCase):
         self.assertEqual(
             namespace_to_regex("db.$a^a#a!a[a]a*"),
             re.compile(r"\Adb\.\$a\^a\#a\!a\[a\]a(.*)\Z"),
+        )
+
+    @unittest.skipIf(sys.version_info < (3, 7), "Python 3.7 and later")
+    def test_namespace_to_regex_escapes_metacharacters(self):
+        """Test regex creation escapes metacharacters."""
+        self.assertEqual(
+            namespace_to_regex("db&*.$a^a#a!a[a]a"),
+            re.compile(r"\Adb\&([^.]*)\.\$a\^a\#a!a\[a\]a\Z"),
+        )
+        self.assertEqual(
+            namespace_to_regex("db.$a^a#a!a[a]a*"),
+            re.compile(r"\Adb\.\$a\^a\#a!a\[a\]a(.*)\Z"),
         )
 
     def test_wildcards_overlap(self):
