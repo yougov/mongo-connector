@@ -159,6 +159,26 @@ class DocumentFlattener(DefaultDocumentFormatter):
                     for inner_k, inner_v in flatten(v, path):
                         yield inner_k, inner_v
                     path.pop()
+                elif isinstance(v, bson.dbref.DBRef):
+                    transformed = self.transform_element("database", v.database)
+
+                    for new_k, new_v in transformed:
+                        if top_level:
+                            yield "$%s.%s" % (k, new_k), new_v
+                        else:
+                            yield "$%s.%s.%s" % (path_string, k, new_k), new_v
+                    transformed = self.transform_element("collection", v.collection)
+                    for new_k, new_v in transformed:
+                        if top_level:
+                            yield "$%s.%s" % (k, new_k), new_v
+                        else:
+                            yield "$%s.%s.%s" % (path_string, k, new_k), new_v
+                    transformed = self.transform_element("id", v.id)
+                    for new_k, new_v in transformed:
+                        if top_level:
+                            yield "$%s.%s" % (k, new_k), new_v
+                        else:
+                            yield "$%s.%s.%s" % (path_string, k, new_k), new_v
                 else:
                     transformed = self.transform_element(k, v)
                     for new_k, new_v in transformed:
