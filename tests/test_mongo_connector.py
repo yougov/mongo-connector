@@ -23,6 +23,7 @@ from bson.timestamp import Timestamp
 
 sys.path[0:0] = [""]  # noqa
 
+from mongo_connector.doc_managers.doc_manager_base import DocManagerBase
 from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.test_utils import (
     ReplicaSetSingle,
@@ -36,6 +37,15 @@ from mongo_connector.version import Version
 
 from tests import unittest, SkipTest
 
+class AsyncDocManagerExample(DocManagerBase):
+    def __init__(self):
+        self.flush_occurred = False
+
+    def flush(self):
+        self.flush_occurred = True
+
+    def flush_did_occur(self):
+        return self.flush_occurred
 
 class TestMongoConnector(unittest.TestCase):
     """ Test Class for the Mongo Connector
@@ -89,6 +99,24 @@ class TestMongoConnector(unittest.TestCase):
             Connector.copy_uri_options("a:123,[::1]:321", uri),
             "mongodb://a:123,[::1]:321",
         )
+
+    def test_write_oplog_progress_flushes_doc_managers(self):
+        """Test that write_oplog_progress flushes doc managers
+        """
+        async_docman = AsyncDocManagerExample()
+
+        conn = Connector(
+            mongo_address=self.repl_set.uri,
+            oplog_checkpoint="temp_oplog.timestamp",
+            doc_managers = [async_docman],
+            **connector_opts
+        )
+
+        # pretend to insert a thread/timestamp pair
+        conn.oplog_progress.get_dict()[1] = Timestamp(12, 34)
+        conn.write_oplog_progress()
+
+        self.assertEqual(async_docman.flush_did_occur(), True)
 
     def test_write_oplog_progress(self):
         """Test write_oplog_progress under several circumstances
