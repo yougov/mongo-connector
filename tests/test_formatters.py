@@ -68,7 +68,7 @@ class TestFormatters(unittest.TestCase):
         self.assertEqual(trans(self.date), self.date)
 
         # UUID
-        self.assertEqual(trans(self.xuuid), self.xuuid.hex)
+        self.assertEqual(trans(self.xuuid), self.xuuid)
 
         # Other type
         self.assertEqual(trans(self.oid), str(self.oid))
