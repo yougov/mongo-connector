@@ -82,9 +82,11 @@ class DocManagerBase(object):
                         where[index_or_key] = None
                     else:
                         # Unset field removes it entirely.
-                        del where[index_or_key]
+                        if where and where.get(index_or_key):
+                            del where[index_or_key]
                 else:
-                    del doc[to_unset]
+                    if doc and doc.get(to_unset):
+                        del doc[to_unset]
             except (KeyError, IndexError, ValueError):
                 source_version = get_mininum_mongodb_version()
                 if source_version is None or source_version.at_least(2, 6):
