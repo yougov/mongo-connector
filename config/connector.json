@@ -1,0 +1,66 @@
+{
+  "continueOnError": true,
+  "verbosity": 2,
+  "namespaces": {
+    "unity.resourceTypes": {
+      "includeFields": [
+        "_id",
+        "name",
+        "definition",
+        "synonyms",
+        "source",
+        "created",
+        "accessibleTo",
+        "public",
+        "deleted"
+      ]
+    },
+    "unity.propertyTypes": {
+      "includeFields": [
+        "_id",
+        "immutable",
+        "name",
+        "definition",
+        "synonyms",
+        "source",
+        "created",
+        "accessibleTo",
+        "public",
+        "deleted"
+      ]
+    },
+    "unity.resources": {
+      "includeFields": [
+        "_id",
+        "typeId",
+        "experimentId",
+        "activityId",
+        "activityName",
+        "experimentName",
+        "topGroupName",
+        "runId",
+        "runLabel",
+        "runGroupId",
+        "resourceDefId",
+        "name",
+        "description",
+        "label",
+        "source",
+        "created",
+        "accessibleTo",
+        "public",
+        "deleted"
+      ]
+    }
+  },
+  "docManagers": [
+    {
+      "docManager": "elastic2_doc_manager",
+      "targetURL": "elastic:9200",
+      "bulkSize":10000,
+      "autoCommitInterval":1,
+      "args": {
+      }
+    }
+  ]
+}

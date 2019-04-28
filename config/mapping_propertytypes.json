@@ -1,0 +1,66 @@
+{
+  "dynamic": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "fields": {
+        "nostem": {
+          "type": "string",
+          "analyzer": "nonword",
+          "index_options": "docs"
+        },
+        "edge_ngram_property_type": {
+          "type": "string",
+          "analyzer": "autocomplete1",
+          "index_options": "docs"
+        }
+      }
+    },
+    "definition": {
+      "type": "string",
+      "analyzer": "english"
+    },
+    "synonyms": {
+      "type": "string",
+      "index_options": "docs",
+      "fields": {
+        "nostem": {
+          "type": "string",
+          "analyzer": "nonword",
+          "index_options": "docs"
+        },
+        "edge_ngram_property_type": {
+          "type": "string",
+          "analyzer": "autocomplete1",
+          "index_options": "docs"
+        }
+      }
+    },
+    "source": {
+      "type": "string",
+      "index": "not_analyzed"
+    },
+    "created": {
+      "type": "date"
+    },
+    "version": {
+      "type": "string"
+    },
+    "immutable": {
+      "type": "boolean",
+      "index": "not_analyzed"
+    },
+    "deleted": {
+      "type": "boolean",
+      "index": "not_analyzed"
+    },
+    "accessibleTo": {
+      "properties": {
+        "_id": {
+          "type": "string",
+          "index": "not_analyzed"
+        }
+      }
+    }
+  }
+}

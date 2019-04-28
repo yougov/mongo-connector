@@ -1,0 +1,69 @@
+{
+  "settings": {
+    "number_of_replicas": 0,
+    "number_of_shards": 1,
+    "analysis": {
+      "filter": {
+        "autocomplete_filter_1gram": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 20
+        },
+        "ngram_3-10": {
+          "type": "ngram",
+          "min_gram": 3,
+          "max_gram": 10
+        },
+        "my_synonym_filter": {
+          "type": "synonym",
+          "synonyms": [
+            "aluminum,aluminium",
+            "cesium,caesium",
+            "sulfur,sulphur"
+          ]
+        },
+        "my_ascii_folding": {
+          "type": "asciifolding",
+          "preserve_original": true
+        }
+      },
+      "analyzer": {
+        "nonword": {
+          "type": "custom",
+          "tokenizer": "my_whitespace_tokenizer",
+          "filter": [
+            "my_ascii_folding",
+            "lowercase",
+            "my_synonym_filter"
+          ]
+        },
+        "autocomplete1": {
+          "type": "custom",
+          "tokenizer": "whitespace",
+          "filter": [
+            "my_ascii_folding",
+            "lowercase",
+            "my_synonym_filter",
+            "autocomplete_filter_1gram"
+          ]
+        },
+        "entity_name": {
+          "type": "custom",
+          "tokenizer": "whitespace",
+          "filter": [
+            "my_ascii_folding",
+            "lowercase",
+            "my_synonym_filter",
+            "ngram_3-10"
+          ]
+        }
+      },
+      "tokenizer": {
+        "my_whitespace_tokenizer": {
+          "type": "pattern",
+          "pattern": "[\\W,)(]+"
+        }
+      }
+    }
+  }
+}
