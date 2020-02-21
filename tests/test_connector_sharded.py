@@ -18,21 +18,22 @@ import time
 
 from pymongo import MongoClient, ReadPreference
 
-sys.path[0:0] = [""]
+sys.path[0:0] = [""]  # noqa
 
 from mongo_connector.connector import Connector, get_mininum_mongodb_version
 from mongo_connector.doc_managers.doc_manager_simulator import DocManager
-from mongo_connector.test_utils import (assert_soon,
-                                        db_user,
-                                        db_password,
-                                        ShardedClusterSingle)
+from mongo_connector.test_utils import (
+    assert_soon,
+    db_user,
+    db_password,
+    ShardedClusterSingle,
+)
 from mongo_connector.version import Version
 
 from tests import unittest, SkipTest
 
 
 class ShardedConnectorTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         if db_user and db_password:
@@ -40,52 +41,52 @@ class ShardedConnectorTestCase(unittest.TestCase):
         else:
             auth_args = {}
         cls.cluster = ShardedClusterSingle().start()
-        cls.main_uri = cls.cluster.uri + '/?readPreference=primaryPreferred'
+        cls.main_uri = cls.cluster.uri + "/?readPreference=primaryPreferred"
         cls.dm = DocManager()
         cls.connector = Connector(
-            mongo_address=cls.main_uri,
-            doc_managers=[cls.dm],
-            **auth_args
+            mongo_address=cls.main_uri, doc_managers=[cls.dm], **auth_args
         )
         cls.connector.start()
-        assert_soon(lambda: len(cls.connector.shard_set) == 2,
-                    message='connector failed to find both shards!')
+        assert_soon(
+            lambda: len(cls.connector.shard_set) == 2,
+            message="connector failed to find both shards!",
+        )
 
     @classmethod
     def tearDownClass(cls):
         cls.connector.join()
         try:
-            os.unlink('oplog.timestamp')
+            os.unlink("oplog.timestamp")
         except OSError:
             pass
         cls.cluster.stop()
 
 
 class TestConnectorSharded(ShardedConnectorTestCase):
-
     def test_connector(self):
         """Test whether the connector initiates properly
         """
         # Make sure get_mininum_mongodb_version returns the current version.
-        self.assertEqual(Version.from_client(self.cluster.client()),
-                         get_mininum_mongodb_version())
+        self.assertEqual(
+            Version.from_client(self.cluster.client()), get_mininum_mongodb_version()
+        )
 
     def test_mongos_connection_failure(self):
         """Test that the connector handles temporary mongos failure"""
         client = self.cluster.client()
         coll = client.test.test
-        coll.insert_one({'doc': 1})
+        coll.insert_one({"doc": 1})
         assert_soon(lambda: len(self.dm._search()) == 1)
 
         # Temporarily shutdown the connector mongos connection
         self.connector.main_conn.close()
         time.sleep(5)
-        coll.insert_one({'doc': 2})
+        coll.insert_one({"doc": 2})
         assert_soon(lambda: len(self.dm._search()) == 2)
 
         # Bring mongos back online
         self.connector.main_conn = self.connector.create_authed_client()
-        coll.insert_one({'doc': 3})
+        coll.insert_one({"doc": 3})
         assert_soon(lambda: len(self.dm._search()) == 3)
         client.close()
 
@@ -95,10 +96,8 @@ class TestConnectorSharded(ShardedConnectorTestCase):
         expected_client = MongoClient(self.main_uri)
 
         def assert_client_options(client):
-            self.assertEqual(client.read_preference,
-                             expected_client.read_preference)
-            self.assertEqual(client.read_preference,
-                             ReadPreference.PRIMARY_PREFERRED)
+            self.assertEqual(client.read_preference, expected_client.read_preference)
+            self.assertEqual(client.read_preference, ReadPreference.PRIMARY_PREFERRED)
 
         assert_client_options(self.connector.create_authed_client())
         assert_client_options(self.connector.main_conn)
@@ -107,20 +106,19 @@ class TestConnectorSharded(ShardedConnectorTestCase):
 
 
 class TestConnectorShardedAuth(ShardedConnectorTestCase):
-
     @classmethod
     def setUp(cls):
         if not (db_user and db_password):
-            raise SkipTest('Need to set a user/password to test this.')
+            raise SkipTest("Need to set a user/password to test this.")
         super(TestConnectorShardedAuth, cls).setUpClass()
 
     def test_start_with_auth(self):
         # Insert some documents into the sharded cluster.  These
         # should go to the DocManager, and the connector should not
         # have an auth failure.
-        self.cluster.client().test.test.insert_one({'auth_failure': False})
+        self.cluster.client().test.test.insert_one({"auth_failure": False})
         assert_soon(lambda: len(self.dm._search()) > 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
