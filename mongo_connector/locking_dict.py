@@ -1,8 +1,7 @@
 import threading
 
 
-class LockingDict():
-
+class LockingDict:
     def __init__(self):
 
         self.dict = {}

@@ -7,3 +7,4 @@
 # IDE settings folders
 .idea/
 .vscode/
+*.log
