@@ -30,7 +30,7 @@ Operating System :: POSIX
 
 setup(
     name="mongo-connector",
-    use_scm_version=True,
+    version='3.1.2',
     author="MongoDB, Inc.",
     author_email="mongodb-user@googlegroups.com",
     description="Mongo Connector",

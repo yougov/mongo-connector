@@ -1,6 +1,11 @@
 Changelog
 =========
 
+Version 3.1.2
+-------------
+
+- Added support for "continueOnError" for GridFS dump
+
 Version 3.1.1
 -------------
 

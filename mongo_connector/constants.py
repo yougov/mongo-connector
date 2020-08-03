@@ -16,7 +16,7 @@
 import importlib_metadata
 
 
-__version__ = importlib_metadata.version("mongo_connector")
+__version__ = "3.1.2"
 
 
 # Maximum # of documents to process before recording timestamp
