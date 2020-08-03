@@ -679,7 +679,12 @@ class OplogThread(threading.Thread):
                     dest_ns = self.namespace_config.map_namespace(gridfs_ns)
                     for doc in docs_to_dump(from_coll):
                         gridfile = GridFSFile(mongo_coll, doc)
-                        dm.insert_file(gridfile, dest_ns, long_ts)
+                        try:
+                            dm.insert_file(gridfile, dest_ns, long_ts)
+                        except Exception:
+                            LOG.exception("OplogThread: caught exception during GridFS file insert")
+                            if not self.continue_on_error:
+                                raise
             except Exception:
                 # Likely exceptions:
                 # pymongo.errors.OperationFailure,
