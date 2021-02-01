@@ -83,7 +83,7 @@ class Connector(threading.Thread):
     Creates, runs, and monitors an OplogThread for each replica set found.
     """
 
-    def __init__(self, mongo_address, doc_managers=None, **kwargs):
+    def __init__(self, mongo_address, unicode_handling, doc_managers=None, **kwargs):
         super(Connector, self).__init__()
 
         # can_run is set to false when we join the thread
@@ -94,6 +94,9 @@ class Connector(threading.Thread):
 
         # main address - either mongos for sharded setups or a primary otherwise
         self.address = mongo_address
+
+        # unicode decode error handling. Can be strict, replace or ignore
+        self.unicode_error = unicode_handling
 
         # connection to the main address
         self.main_conn = None
@@ -209,6 +212,7 @@ class Connector(threading.Thread):
             only_dump=config["onlyDump"],
             batch_size=config["batchSize"],
             continue_on_error=config["continueOnError"],
+            unicode_handling=config["unicodeDecode"],
             auth_username=config["authentication.adminUsername"],
             auth_key=auth_key,
             fields=config["fields"],
@@ -326,13 +330,19 @@ class Connector(threading.Thread):
             uri += "/?" + options
         return uri
 
-    def create_authed_client(self, hosts=None, **kwargs):
+    def create_authed_client(self, hosts=None, unicode=None, **kwargs):
         kwargs.update(self.ssl_kwargs)
         if hosts is None:
             new_uri = self.address
         else:
             new_uri = self.copy_uri_options(hosts, self.address)
-        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
+
+        if unicode is None:
+            unicode_decode = self.unicode_error
+        else:
+            unicode_decode = self.copy_unicode_decode(unicode, self.unicode_error)
+
+        client = MongoClient(new_uri, unicode_decode_error_handler=unicode_decode, tz_aware=self.tz_aware, **kwargs)
         if self.auth_key is not None:
             client["admin"].authenticate(self.auth_username, self.auth_key)
         return client
@@ -506,6 +516,20 @@ def get_config_options():
         " would be a valid argument to `-m`. Don't use"
         " quotes around the address.",
     )
+
+    unicode_decode = add_option(
+        config_key="unicodeDecode", default="strict", type=str
+    )
+
+    # --decode-handler to set pymongo unicode handler options
+    unicode_decode.add_cli(
+        "--decode-handler",
+        dest="unicode_decode",
+        help="Overwrite the default strict unicode decode handler."
+        "Valid arguments are strict, replace or ignore."
+        "For UTF-8 decode errors, use replace or ignore"
+    )
+
 
     oplog_file = add_option(config_key="oplogFile", default="oplog.timestamp", type=str)
 
