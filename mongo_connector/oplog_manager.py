@@ -260,67 +260,24 @@ class OplogThread(threading.Thread):
                             last_ts = entry["ts"]
                             continue
 
-                        # Sync the current oplog operation
-                        operation = entry["op"]
-                        ns = entry["ns"]
                         timestamp = util.bson_ts_to_long(entry["ts"])
-                        for docman in self.doc_managers:
-                            try:
-                                LOG.debug(
-                                    "OplogThread: Operation for this "
-                                    "entry is %s" % str(operation)
-                                )
 
-                                # Remove
-                                if operation == "d":
-                                    docman.remove(entry["o"]["_id"], ns, timestamp)
-                                    remove_inc += 1
-
-                                # Insert
-                                elif operation == "i":  # Insert
-                                    # Retrieve inserted document from
-                                    # 'o' field in oplog record
-                                    doc = entry.get("o")
-                                    # Extract timestamp and namespace
-                                    if is_gridfs_file:
-                                        db, coll = ns.split(".", 1)
-                                        gridfile = GridFSFile(
-                                            self.primary_client[db][coll], doc
-                                        )
-                                        docman.insert_file(gridfile, ns, timestamp)
-                                    else:
-                                        docman.upsert(doc, ns, timestamp)
-                                    upsert_inc += 1
-
-                                # Update
-                                elif operation == "u":
-                                    docman.update(
-                                        entry["o2"]["_id"], entry["o"], ns, timestamp
-                                    )
-                                    update_inc += 1
-
-                                # Command
-                                elif operation == "c":
-                                    # use unmapped namespace
-                                    doc = entry.get("o")
-                                    docman.handle_command(doc, entry["ns"], timestamp)
-
-                            except errors.OperationFailed:
-                                LOG.exception(
-                                    "Unable to process oplog document %r" % entry
-                                )
-                            except errors.ConnectionFailed:
-                                LOG.exception(
-                                    "Connection failed while processing oplog "
-                                    "document %r" % entry
-                                )
-
-                        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.debug(
-                                "OplogThread: Documents removed: %d, "
-                                "inserted: %d, updated: %d so far"
-                                % (remove_inc, upsert_inc, update_inc)
-                            )
+                        if self.is_transaction_entry(entry):
+                            operations = entry['o'].get('applyOps', [])
+                            for _entry in operations:
+                                remove_inc, upsert_inc, update_inc = self.process_operation(_entry,
+                                                                                            timestamp,
+                                                                                            is_gridfs_file,
+                                                                                            remove_inc,
+                                                                                            upsert_inc,
+                                                                                            update_inc)
+                        else:
+                            remove_inc, upsert_inc, update_inc = self.process_operation(entry,
+                                                                                        timestamp,
+                                                                                        is_gridfs_file,
+                                                                                        remove_inc,
+                                                                                        upsert_inc,
+                                                                                        update_inc)
 
                         LOG.debug("OplogThread: Doc is processed.")
 
@@ -364,6 +321,74 @@ class OplogThread(threading.Thread):
                 "upserted: %d, updated: %d" % (remove_inc, upsert_inc, update_inc)
             )
             time.sleep(2)
+
+    def process_operation(self, entry, timestamp, is_gridfs_file, remove_inc, upsert_inc, update_inc):
+        # Sync the current oplog operation
+        operation = entry["op"]
+        ns = entry["ns"]
+        for docman in self.doc_managers:
+            try:
+                LOG.debug(
+                    "OplogThread: Operation for this "
+                    "entry is %s" % str(operation)
+                )
+
+                # Remove
+                if operation == "d":
+                    docman.remove(entry["o"]["_id"], ns, timestamp)
+                    remove_inc += 1
+
+                # Insert
+                elif operation == "i":  # Insert
+                    # Retrieve inserted document from
+                    # 'o' field in oplog record
+                    doc = entry.get("o")
+                    # Extract timestamp and namespace
+                    if is_gridfs_file:
+                        db, coll = ns.split(".", 1)
+                        gridfile = GridFSFile(
+                            self.primary_client[db][coll], doc
+                        )
+                        docman.insert_file(gridfile, ns, timestamp)
+                    else:
+                        docman.upsert(doc, ns, timestamp)
+                    upsert_inc += 1
+
+                # Update
+                elif operation == "u":
+                    docman.update(
+                        entry["o2"]["_id"], entry["o"], ns, timestamp
+                    )
+                    update_inc += 1
+
+                # Command
+                elif operation == "c":
+                    # use unmapped namespace
+                    doc = entry.get("o")
+                    docman.handle_command(doc, entry["ns"], timestamp)
+
+            except errors.OperationFailed:
+                LOG.exception(
+                    "Unable to process oplog document %r" % entry
+                )
+            except errors.ConnectionFailed:
+                LOG.exception(
+                    "Connection failed while processing oplog "
+                    "document %r" % entry
+                )
+
+        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
+            LOG.debug(
+                "OplogThread: Documents removed: %d, "
+                "inserted: %d, updated: %d so far"
+                % (remove_inc, upsert_inc, update_inc)
+            )
+
+        return remove_inc, upsert_inc, update_inc
+
+    def is_transaction_entry(self, entry):
+        return entry.get('ns', '') == "admin.$cmd" and entry.get('txnNumber') and entry.get('o') and\
+               entry['o'].get('applyOps')
 
     def join(self):
         """Stop this thread from managing the oplog.
