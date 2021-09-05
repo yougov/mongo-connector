@@ -264,20 +264,33 @@ class OplogThread(threading.Thread):
 
                         if self.is_transaction_entry(entry):
                             operations = entry['o'].get('applyOps', [])
+                            LOG.debug("OplogThread: Transaction doc will be processed.")
                             for _entry in operations:
-                                remove_inc, upsert_inc, update_inc = self.process_operation(_entry,
-                                                                                            timestamp,
-                                                                                            is_gridfs_file,
-                                                                                            remove_inc,
-                                                                                            upsert_inc,
-                                                                                            update_inc)
+                                LOG.debug("OplogThread: Transaction doc is processing.")
+                                self.process_operation(_entry, timestamp, is_gridfs_file)
+                                op = _entry["op"]
+                                remove_inc, upsert_inc, update_inc = [
+                                    remove_inc + int(op == 'd'),
+                                    upsert_inc + int(op == 'i'),
+                                    update_inc + int(op == 'u')
+                                ]
+
+                            LOG.debug("OplogThread: Transaction doc is processed.")
                         else:
-                            remove_inc, upsert_inc, update_inc = self.process_operation(entry,
-                                                                                        timestamp,
-                                                                                        is_gridfs_file,
-                                                                                        remove_inc,
-                                                                                        upsert_inc,
-                                                                                        update_inc)
+                            self.process_operation(entry, timestamp, is_gridfs_file)
+                            op = entry["op"]
+                            remove_inc, upsert_inc, update_inc = [
+                                remove_inc + int(op == 'd'),
+                                upsert_inc + int(op == 'i'),
+                                update_inc + int(op == 'u')
+                            ]
+
+                        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
+                            LOG.debug(
+                                "OplogThread: Documents removed: %d, "
+                                "inserted: %d, updated: %d so far"
+                                % (remove_inc, upsert_inc, update_inc)
+                            )
 
                         LOG.debug("OplogThread: Doc is processed.")
 
@@ -322,7 +335,7 @@ class OplogThread(threading.Thread):
             )
             time.sleep(2)
 
-    def process_operation(self, entry, timestamp, is_gridfs_file, remove_inc, upsert_inc, update_inc):
+    def process_operation(self, entry, timestamp, is_gridfs_file):
         # Sync the current oplog operation
         operation = entry["op"]
         ns = entry["ns"]
@@ -336,7 +349,6 @@ class OplogThread(threading.Thread):
                 # Remove
                 if operation == "d":
                     docman.remove(entry["o"]["_id"], ns, timestamp)
-                    remove_inc += 1
 
                 # Insert
                 elif operation == "i":  # Insert
@@ -352,14 +364,12 @@ class OplogThread(threading.Thread):
                         docman.insert_file(gridfile, ns, timestamp)
                     else:
                         docman.upsert(doc, ns, timestamp)
-                    upsert_inc += 1
 
                 # Update
                 elif operation == "u":
                     docman.update(
                         entry["o2"]["_id"], entry["o"], ns, timestamp
                     )
-                    update_inc += 1
 
                 # Command
                 elif operation == "c":
@@ -376,15 +386,6 @@ class OplogThread(threading.Thread):
                     "Connection failed while processing oplog "
                     "document %r" % entry
                 )
-
-        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-            LOG.debug(
-                "OplogThread: Documents removed: %d, "
-                "inserted: %d, updated: %d so far"
-                % (remove_inc, upsert_inc, update_inc)
-            )
-
-        return remove_inc, upsert_inc, update_inc
 
     def is_transaction_entry(self, entry):
         return entry.get('ns', '') == "admin.$cmd" and entry.get('txnNumber') and entry.get('o') and\
