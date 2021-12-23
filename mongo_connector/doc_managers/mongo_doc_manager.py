@@ -145,11 +145,6 @@ class DocManager(DocManagerBase):
             if a and b:
                 self.mongo.admin.command("renameCollection", a, to=b)
 
-        if doc.get("create"):
-            new_db, coll = self.command_helper.map_collection(db, doc["create"])
-            if new_db:
-                self.mongo[new_db].create_collection(coll)
-
         if doc.get("drop"):
             new_db, coll = self.command_helper.map_collection(db, doc["drop"])
             if new_db:
