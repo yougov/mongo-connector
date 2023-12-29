@@ -196,6 +196,8 @@ class OplogThread(threading.Thread):
         # Within mongo-6 in case of update the op-log does not contain the
         # complete document, so we must re-fetch it from database
         if entry["op"] == "u" and 'diff' in entry["o"]:
+            LOG.debug("OplogThread: updating entry '%s' from "
+                      "collection '%s'" % (entry["o2"]["_id"], entry["ns"]))
             from_coll = self.get_collection(entry["ns"])
             entry["o"] = from_coll.find_one({'_id': entry["o2"]["_id"]})
 
