@@ -39,6 +39,7 @@ from mongo_connector.command_helper import CommandHelper
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import NamespaceConfig, validate_namespace_options
 from mongo_connector.version import Version
+from bson.codec_options import DatetimeConversion
 
 
 # Monkey patch logging to add Logger.always
@@ -332,7 +333,8 @@ class Connector(threading.Thread):
             new_uri = self.address
         else:
             new_uri = self.copy_uri_options(hosts, self.address)
-        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
+        client = MongoClient(new_uri, tz_aware=self.tz_aware, datetime_conversion=DatetimeConversion.DATETIME_CLAMP, **kwargs)
+
         if self.auth_key is not None:
             client["admin"].authenticate(self.auth_username, self.auth_key)
         return client
