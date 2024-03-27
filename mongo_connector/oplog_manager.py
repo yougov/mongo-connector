@@ -193,6 +193,14 @@ class OplogThread(threading.Thread):
             )
             return True, False
 
+        # Within mongo-6 in case of update the op-log does not contain the
+        # complete document, so we must re-fetch it from database
+        if entry["op"] == "u" and 'diff' in entry["o"]:
+            LOG.debug("OplogThread: updating entry '%s' from "
+                      "collection '%s'" % (entry["o2"]["_id"], entry["ns"]))
+            from_coll = self.get_collection(entry["ns"])
+            entry["o"] = from_coll.find_one({'_id': entry["o2"]["_id"]})
+
         # Update the namespace.
         entry["ns"] = namespace.dest_name
 
@@ -545,7 +553,7 @@ class OplogThread(threading.Thread):
                 if database == "config" or database == "local":
                     continue
                 coll_list = retry_until_ok(
-                    self.primary_client[database].collection_names
+                    self.primary_client[database].list_collection_names
                 )
                 for coll in coll_list:
                     # ignore system collections
@@ -607,7 +615,7 @@ class OplogThread(threading.Thread):
             for namespace in dump_set:
                 from_coll = self.get_collection(namespace)
                 mapped_ns = self.namespace_config.map_namespace(namespace)
-                total_docs = retry_until_ok(from_coll.count)
+                total_docs = retry_until_ok(from_coll.count_documents, {})
                 num = None
                 for num, doc in enumerate(docs_to_dump(from_coll)):
                     try:
@@ -641,7 +649,7 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     from_coll = self.get_collection(namespace)
-                    total_docs = retry_until_ok(from_coll.count)
+                    total_docs = retry_until_ok(from_coll.count_documents, {})
                     mapped_ns = self.namespace_config.map_namespace(namespace)
                     LOG.info(
                         "Bulk upserting approximately %d docs from " "collection '%s'",
