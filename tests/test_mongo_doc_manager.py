@@ -15,6 +15,8 @@
 """Tests each of the functions in mongo_doc_manager
 """
 
+import datetime
+import logging
 import sys
 
 sys.path[0:0] = [""]  # noqa
@@ -240,31 +242,133 @@ class TestMongoDocManager(MongoTestCase):
 
         try:
             self.choosy_docman.handle_command({"create": "test"}, *TESTARGS)
-            self.assertIn("othertest", self.mongo_conn["test"].collection_names())
+            self.assertIn("othertest", self.mongo_conn["test"].list_collection_names())
             self.choosy_docman.handle_command(
                 {"renameCollection": "test.test", "to": "test.test2"}, "admin.$cmd", 1
             )
-            self.assertNotIn("othertest", self.mongo_conn["test"].collection_names())
-            self.assertIn("test2", self.mongo_conn["test"].collection_names())
+            self.assertNotIn("othertest", self.mongo_conn["test"].list_collection_names())
+            self.assertIn("test2", self.mongo_conn["test"].list_collection_names())
 
             self.choosy_docman.handle_command({"drop": "test2"}, "test.$cmd", 1)
-            self.assertNotIn("test2", self.mongo_conn["test"].collection_names())
+            self.assertNotIn("test2", self.mongo_conn["test"].list_collection_names())
 
             # WiredTiger drops the database when the last collection is
             # dropped.
-            if "test" not in self.mongo_conn.database_names():
+            if "test" not in self.mongo_conn.list_database_names():
                 self.choosy_docman.handle_command({"create": "test"}, *TESTARGS)
-            self.assertIn("test", self.mongo_conn.database_names())
+            self.assertIn("test", self.mongo_conn.list_database_names())
             self.choosy_docman.handle_command({"dropDatabase": 1}, "test.$cmd", 1)
-            self.assertNotIn("test", self.mongo_conn.database_names())
+            self.assertNotIn("test", self.mongo_conn.list_database_names())
 
             # Briefly test mapped database name with dropDatabase command.
             self.mongo_conn.dropped.collection.insert_one({"a": 1})
-            self.assertIn("dropped", self.mongo_conn.database_names())
+            self.assertIn("dropped", self.mongo_conn.list_database_names())
             self.choosy_docman.handle_command({"dropDatabase": 1}, "test.$cmd", 1)
-            self.assertNotIn("dropped", self.mongo_conn.database_names())
+            self.assertNotIn("dropped", self.mongo_conn.list_database_names())
         finally:
             self.mongo_conn.drop_database("test")
+
+
+    def test_upsert_datetime_min(self):
+        """T023: Verify datetime.min (clamped value) flows through document
+        processing and produces a valid result.
+        """
+        docc = {"_id": "dt_min", "name": "clamped", "ts": datetime.datetime.min}
+        self.choosy_docman.upsert(docc, *TESTARGS)
+        res = list(self._search())
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc["_id"], "dt_min")
+        self.assertEqual(doc["ts"], datetime.datetime.min)
+
+    def test_upsert_datetime_max(self):
+        """T024: Verify datetime.max boundary value flows through document
+        processing without error.
+        """
+        docc = {"_id": "dt_max", "name": "clamped_max", "ts": datetime.datetime.max}
+        self.choosy_docman.upsert(docc, *TESTARGS)
+        res = list(self._search())
+        self.assertEqual(len(res), 1)
+        doc = res[0]
+        self.assertEqual(doc["_id"], "dt_max")
+        self.assertEqual(doc["ts"], datetime.datetime.max)
+
+    def test_stress_edge_case_datetimes(self):
+        """T027: Process 100 documents with randomized edge-case dates and
+        verify zero exceptions.
+        """
+        edge_dates = [
+            datetime.datetime.min,
+            datetime.datetime.max,
+            datetime.datetime(1, 1, 1),
+            datetime.datetime(9999, 12, 31, 23, 59, 59),
+            datetime.datetime(1970, 1, 1),  # epoch
+            datetime.datetime(1969, 12, 31),  # pre-epoch
+            datetime.datetime(2000, 1, 1),  # Y2K
+            datetime.datetime(2038, 1, 19),  # 32-bit epoch overflow
+        ]
+        docs = iter([
+            {"_id": str(i), "ts": edge_dates[i % len(edge_dates)]}
+            for i in range(100)
+        ])
+        self.choosy_docman.bulk_upsert(docs, *TESTARGS)
+        res = list(self._search())
+        self.assertEqual(len(res), 100)
+        # Spot-check that datetime values survived correctly
+        res_by_id = {r["_id"]: r for r in res}
+        self.assertEqual(res_by_id["0"]["ts"], datetime.datetime.min)
+        self.assertEqual(res_by_id["1"]["ts"], datetime.datetime.max)
+
+    def test_bulk_upsert_mixed_datetimes(self):
+        """T026: Verify bulk_upsert handles a mix of normal, min, and max
+        datetime values without errors.
+        """
+        now = datetime.datetime(2024, 6, 15, 12, 0, 0)
+        docs = iter([
+            {"_id": "normal", "ts": now},
+            {"_id": "dt_min", "ts": datetime.datetime.min},
+            {"_id": "dt_max", "ts": datetime.datetime.max},
+        ])
+        self.choosy_docman.bulk_upsert(docs, *TESTARGS)
+        res = list(self._search(sort=[("_id", 1)]))
+        self.assertEqual(len(res), 3)
+        ids = [r["_id"] for r in res]
+        self.assertIn("normal", ids)
+        self.assertIn("dt_min", ids)
+        self.assertIn("dt_max", ids)
+
+
+    def test_clamped_date_logs_warning(self):
+        """T033: Verify that processing a document with datetime.min produces
+        a WARNING log entry containing the document identifier.
+        """
+        with self.assertLogs(
+            "mongo_connector.doc_managers.mongo_doc_manager", level="WARNING"
+        ) as cm:
+            docc = {"_id": "log_test", "ts": datetime.datetime.min}
+            self.choosy_docman.upsert(docc, *TESTARGS)
+        log_output = "\n".join(cm.output)
+        self.assertIn("log_test", log_output)
+        self.assertIn("Clamped date", log_output)
+
+    def test_normal_date_no_clamping_log(self):
+        """T034: Verify that processing a document with a normal date does NOT
+        produce a clamping log entry.
+        """
+        logger = logging.getLogger(
+            "mongo_connector.doc_managers.mongo_doc_manager"
+        )
+        handler = logging.Handler()
+        handler.records = []
+        handler.emit = lambda record: handler.records.append(record)
+        logger.addHandler(handler)
+        try:
+            docc = {"_id": "no_clamp", "ts": datetime.datetime(2024, 6, 15)}
+            self.choosy_docman.upsert(docc, *TESTARGS)
+            for record in handler.records:
+                self.assertNotIn("Clamped date", record.getMessage())
+        finally:
+            logger.removeHandler(handler)
 
 
 class TestMongoDocManagerWithSingleMetaCollection(TestMongoDocManager):

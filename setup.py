@@ -39,7 +39,7 @@ setup(
     platforms=["any"],
     classifiers=filter(None, classifiers.split("\n")),
     install_requires=[
-        "pymongo >= 2.9",
+        "pymongo >= 4.3, < 5.0",
         "importlib_metadata>=0.6",
         "autocommand",
         "importlib_resources",
@@ -60,5 +60,5 @@ setup(
     setup_requires=[
         "setuptools_scm>=1.5",
     ],
-    python_requires=">=3.4",
+    python_requires=">=3.8",
 )

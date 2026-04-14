@@ -85,7 +85,7 @@ class TestOplogManager(unittest.TestCase):
         except RuntimeError:
             pass  # OplogThread may not have been started
 
-        for db in self.primary_conn.database_names():
+        for db in self.primary_conn.list_database_names():
             if db != "local":
                 self.primary_conn.drop_database(db)
         close_client(self.primary_conn)
@@ -102,17 +102,19 @@ class TestOplogManager(unittest.TestCase):
         self.reset_opman(["includedb1.*", "includedb2.includecol1"], [], {})
 
         got_cursor = self.opman.get_oplog_cursor(None)
-        oplog_cursor = self.oplog_coll.find({"op": {"$ne": "n"}})
         self.assertNotEqual(got_cursor, None)
-        self.assertEqual(got_cursor.count(), oplog_cursor.count())
+        got_count = sum(1 for _ in got_cursor)
+        oplog_count = self.oplog_coll.count_documents({"op": {"$ne": "n"}})
+        self.assertEqual(got_count, oplog_count)
 
         # wildcard exclude case no impact the result
         self.reset_opman([], ["includedb2.excludecol2", "excludedb3.*"], {})
 
         got_cursor = self.opman.get_oplog_cursor(None)
-        oplog_cursor = self.oplog_coll.find({"op": {"$ne": "n"}})
         self.assertNotEqual(got_cursor, None)
-        self.assertEqual(got_cursor.count(), oplog_cursor.count())
+        got_count = sum(1 for _ in got_cursor)
+        oplog_count = self.oplog_coll.count_documents({"op": {"$ne": "n"}})
+        self.assertEqual(got_count, oplog_count)
 
         # earliest entry is the only one at/after timestamp
         doc = {"ts": bson.Timestamp(1000, 0), "idb1col1": 1}
@@ -120,7 +122,10 @@ class TestOplogManager(unittest.TestCase):
         latest_timestamp = self.opman.get_last_oplog_timestamp()
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
-        self.assertEqual(cursor.count(), 1)
+        self.assertEqual(
+            self.oplog_coll.count_documents({"ts": {"$gte": latest_timestamp}, "op": {"$ne": "n"}}),
+            1,
+        )
         next_entry_id = next(cursor)["o"]["_id"]
         retrieved = self.primary_conn.includedb1.includecol1.find_one(next_entry_id)
         self.assertEqual(retrieved, doc)
@@ -135,11 +140,21 @@ class TestOplogManager(unittest.TestCase):
         )
 
         # initial insert + 1000 more inserts
-        self.assertEqual(oplog_cursor.count(), 11 + 1000)
+        self.assertEqual(
+            self.oplog_coll.count_documents(
+                {"op": {"$ne": "n"}, "ns": {"$not": re.compile(r"\.(system|\$cmd)")}}
+            ),
+            11 + 1000,
+        )
         pivot = oplog_cursor.skip(400).limit(-1)[0]
 
         goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
-        self.assertEqual(goc_cursor.count(), 11 + 1000 - 400)
+        self.assertEqual(
+            self.oplog_coll.count_documents(
+                {"ts": {"$gte": pivot["ts"]}, "op": {"$ne": "n"}}
+            ),
+            11 + 1000 - 400,
+        )
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""

@@ -1,6 +1,26 @@
 Changelog
 =========
 
+Version 3.2.0
+-------------
+
+- Upgraded pymongo dependency from ``>=2.9`` to ``>=4.3,<5.0``.
+- Updated minimum Python version from 3.4 to 3.8.
+- Migrated all deprecated pymongo 3.x APIs to 4.x equivalents:
+  ``authenticate()`` to constructor auth, ``isMaster`` to ``hello``
+  (with fallback to ``isMaster`` for MongoDB < 5.0),
+  ``database_names()`` to ``list_database_names()``,
+  ``collection_names()`` to ``list_collection_names()``,
+  ``initialize_ordered_bulk_op()`` to ``bulk_write()``,
+  ``cursor.count()`` to ``count_documents()``/``estimated_document_count()``.
+- Removed unsupported ``oplog_replay=True`` parameter.
+- Added ``DATETIME_CLAMP`` codec options to handle out-of-range BSON
+  dates (e.g., ``ISODate("0001-01-03")``) by clamping to
+  ``datetime.min``/``datetime.max`` instead of raising exceptions.
+  This prevents synchronization failures from out-of-range BSON dates.
+- Added audit logging (WARNING level) for clamped date values in
+  upsert, update, and bulk_upsert operations with document identifiers.
+
 Version 3.1.1
 -------------
 

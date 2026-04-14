@@ -132,5 +132,32 @@ class TestFormatters(unittest.TestCase):
         self.assertEqual(formatter.format_document(self.doc_list), constructed1)
 
 
+    def test_clamped_datetime_iso8601(self):
+        """T029: Verify clamped datetime boundary values produce valid
+        ISO 8601 strings compatible with Solr's date field type.
+        """
+        formatter = DefaultDocumentFormatter()
+
+        # datetime.min should transform and produce a valid isoformat string
+        dt_min = datetime.datetime.min
+        result_min = formatter.transform_value(dt_min)
+        self.assertEqual(result_min, dt_min)
+        iso_min = dt_min.isoformat()
+        self.assertIn("0001-01-01", iso_min)
+
+        # datetime.max should transform and produce a valid isoformat string
+        dt_max = datetime.datetime.max
+        result_max = formatter.transform_value(dt_max)
+        self.assertEqual(result_max, dt_max)
+        iso_max = dt_max.isoformat()
+        self.assertIn("9999-12-31", iso_max)
+
+        # Both should be usable in documents
+        doc = {"_id": "test", "min_ts": dt_min, "max_ts": dt_max}
+        formatted = formatter.format_document(doc)
+        self.assertEqual(formatted["min_ts"], dt_min)
+        self.assertEqual(formatted["max_ts"], dt_max)
+
+
 if __name__ == "__main__":
     unittest.main()

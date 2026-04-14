@@ -30,7 +30,10 @@ import pymongo
 
 from pymongo import CursorType
 
+from bson.codec_options import CodecOptions, DatetimeConversion
+
 from mongo_connector import errors, util
+from mongo_connector.util import hello_or_ismaster
 from mongo_connector.constants import DEFAULT_BATCH_SIZE
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
@@ -137,7 +140,7 @@ class OplogThread(threading.Thread):
         LOG.info("OplogThread: Initializing oplog thread")
 
         self.oplog = self.primary_client.local.oplog.rs
-        self.replset_name = self.primary_client.admin.command("ismaster")["setName"]
+        self.replset_name = hello_or_ismaster(self.primary_client)["setName"]
 
         if not self.oplog.find_one():
             err_msg = "OplogThread: No oplog for thread:"
@@ -509,14 +512,25 @@ class OplogThread(threading.Thread):
         else:
             query["ts"] = {"$gte": timestamp}
             cursor = self.oplog.find(
-                query, cursor_type=CursorType.TAILABLE_AWAIT, oplog_replay=True
+                query, cursor_type=CursorType.TAILABLE_AWAIT
             )
         return cursor
 
+    # Codec options for handling out-of-range BSON dates gracefully.
+    _codec_options = CodecOptions(datetime_conversion=DatetimeConversion.DATETIME_CLAMP)
+
     def get_collection(self, namespace):
-        """Get a pymongo collection from a namespace."""
+        """Get a pymongo collection from a namespace.
+
+        Uses DATETIME_CLAMP codec options to handle out-of-range dates
+        (e.g., year 0001) by clamping to datetime.min/datetime.max instead
+        of raising exceptions.
+        """
         database, coll = namespace.split(".", 1)
-        return self.primary_client[database][coll]
+        db = self.primary_client[database].with_options(
+            codec_options=self._codec_options
+        )
+        return db[coll]
 
     def dump_collection(self):
         """Dumps collection into the target system.
@@ -540,12 +554,12 @@ class OplogThread(threading.Thread):
             if not db_list:
                 # Only use listDatabases when the configured databases are not
                 # explicit.
-                db_list = retry_until_ok(self.primary_client.database_names)
+                db_list = retry_until_ok(self.primary_client.list_database_names)
             for database in db_list:
                 if database == "config" or database == "local":
                     continue
                 coll_list = retry_until_ok(
-                    self.primary_client[database].collection_names
+                    self.primary_client[database].list_collection_names
                 )
                 for coll in coll_list:
                     # ignore system collections
@@ -607,7 +621,7 @@ class OplogThread(threading.Thread):
             for namespace in dump_set:
                 from_coll = self.get_collection(namespace)
                 mapped_ns = self.namespace_config.map_namespace(namespace)
-                total_docs = retry_until_ok(from_coll.count)
+                total_docs = retry_until_ok(from_coll.estimated_document_count)
                 num = None
                 for num, doc in enumerate(docs_to_dump(from_coll)):
                     try:
@@ -641,7 +655,7 @@ class OplogThread(threading.Thread):
             try:
                 for namespace in dump_set:
                     from_coll = self.get_collection(namespace)
-                    total_docs = retry_until_ok(from_coll.count)
+                    total_docs = retry_until_ok(from_coll.estimated_document_count)
                     mapped_ns = self.namespace_config.map_namespace(namespace)
                     LOG.info(
                         "Bulk upserting approximately %d docs from " "collection '%s'",

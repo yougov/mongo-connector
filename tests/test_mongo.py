@@ -16,6 +16,7 @@
     user
 """
 
+import datetime
 import os
 import sys
 import time
@@ -76,7 +77,7 @@ class MongoTestCase(unittest.TestCase):
                     yield doc
 
     def _remove(self):
-        for db in self.mongo_conn.database_names():
+        for db in self.mongo_conn.list_database_names():
             if db not in ["local", "admin"]:
                 self.mongo_conn.drop_database(db)
 
@@ -107,10 +108,10 @@ class MongoReplicaSetTestCase(MongoTestCase):
         assert_soon(lambda: sum(1 for _ in self._search()) == 0)
 
     def drop_all_databases(self):
-        for name in self.mongo_conn.database_names():
+        for name in self.mongo_conn.list_database_names():
             if name not in ["local", "admin"]:
                 self.mongo_conn.drop_database(name)
-        for name in self.conn.database_names():
+        for name in self.conn.list_database_names():
             if name not in ["local", "admin"]:
                 self.conn.drop_database(name)
 
@@ -243,6 +244,39 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
         mongo_source.insert_one({"renamed": 1})
         self.check_renamed_insert(target_coll)
 
+    def test_insert_clamped_date(self):
+        """T025: Verify a document with datetime.min (simulating a clamped
+        out-of-range date) is replicated through the connector without being
+        skipped or causing a crash.
+        """
+        doc = {"name": "clamped_date_doc", "ts": datetime.datetime.min}
+        self.conn["test"]["test"].insert_one(doc)
+        assert_soon(lambda: sum(1 for _ in self._search()) == 1)
+        results = list(self._search())
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["name"], "clamped_date_doc")
+        self.assertEqual(results[0]["ts"], datetime.datetime.min)
+
+    def test_bulk_edge_case_dates(self):
+        """T028: Verify multiple consecutive edge-case dates in a single bulk
+        operation complete without errors or service interruption.
+        """
+        edge_docs = [
+            {"name": "min_date", "ts": datetime.datetime.min},
+            {"name": "max_date", "ts": datetime.datetime.max},
+            {"name": "epoch", "ts": datetime.datetime(1970, 1, 1)},
+            {"name": "pre_epoch", "ts": datetime.datetime(1969, 12, 31)},
+            {"name": "normal", "ts": datetime.datetime(2024, 6, 15)},
+        ]
+        for doc in edge_docs:
+            self.conn["test"]["test"].insert_one(doc)
+        assert_soon(lambda: sum(1 for _ in self._search()) == len(edge_docs))
+        results = list(self._search())
+        self.assertEqual(len(results), len(edge_docs))
+        names = {r["name"] for r in results}
+        for doc in edge_docs:
+            self.assertIn(doc["name"], names)
+
     def test_drop_database_renamed(self):
         """Test the dropDatabase command on a renamed database."""
         if not self.desination_version.at_least(3, 0, 7) or (
@@ -254,8 +288,8 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
         self.create_renamed_collection("rename.me2", "new2.target2")
         # test that drop database removes target databases
         self.conn.drop_database("rename")
-        assert_soon(lambda: "new" not in self.mongo_conn.database_names())
-        assert_soon(lambda: "new2" not in self.mongo_conn.database_names())
+        assert_soon(lambda: "new" not in self.mongo_conn.list_database_names())
+        assert_soon(lambda: "new2" not in self.mongo_conn.list_database_names())
 
     def test_drop_collection_renamed(self):
         """Test the drop collection command on a renamed collection."""
@@ -263,9 +297,9 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
         self.create_renamed_collection("rename.me2", "new2.target2")
         # test that drop collection removes target collection
         self.conn.rename.drop_collection("me")
-        assert_soon(lambda: "target" not in self.mongo_conn.new.collection_names())
+        assert_soon(lambda: "target" not in self.mongo_conn.new.list_collection_names())
         self.conn.rename.drop_collection("me2")
-        assert_soon(lambda: "target2" not in self.mongo_conn.new2.collection_names())
+        assert_soon(lambda: "target2" not in self.mongo_conn.new2.list_collection_names())
 
     def test_rename_collection_renamed(self):
         """Test the renameCollection command on a renamed collection to a
@@ -274,7 +308,7 @@ class TestMongoReplicaSetSingle(MongoReplicaSetTestCase):
         self.create_renamed_collection("rename.me", "new.target")
         self.conn.admin.command("renameCollection", "rename.me", to="rename.me2")
         # In the target, 'new.target' should be renamed to 'new2.target2'
-        assert_soon(lambda: "target" not in self.mongo_conn.new.collection_names())
+        assert_soon(lambda: "target" not in self.mongo_conn.new.list_collection_names())
         self.check_renamed_insert("new2.target2")
 
 
@@ -303,7 +337,7 @@ class TestMongoReplicaSet(MongoReplicaSetTestCase):
         admin = new_primary_conn["admin"]
 
         def condition():
-            return admin.command("isMaster")["ismaster"]
+            return admin.command("hello")["isWritablePrimary"]
 
         assert_soon(lambda: retry_until_ok(condition))
 
@@ -319,7 +353,7 @@ class TestMongoReplicaSet(MongoReplicaSetTestCase):
         self.repl_set.secondary.stop(destroy=False)
 
         self.repl_set.primary.start()
-        assert_soon(lambda: primary_conn["admin"].command("isMaster")["ismaster"])
+        assert_soon(lambda: primary_conn["admin"].command("hello")["isWritablePrimary"])
 
         self.repl_set.secondary.start()
 
@@ -328,8 +362,9 @@ class TestMongoReplicaSet(MongoReplicaSetTestCase):
         self.assertEqual(len(result_set_1), 1)
         for item in result_set_1:
             self.assertEqual(item["name"], "paul")
-        find_cursor = retry_until_ok(self.conn["test"]["test"].find)
-        self.assertEqual(retry_until_ok(find_cursor.count), 1)
+        self.assertEqual(
+            retry_until_ok(self.conn["test"]["test"].count_documents, {}), 1
+        )
 
 
 if __name__ == "__main__":
