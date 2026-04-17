@@ -14,7 +14,11 @@ if len(sys.argv) >= 2:
 
 
 client = pymongo.MongoClient(mongo_url)
-rs_name = client.admin.command("ismaster")["setName"]
+try:
+    _hello_result = client.admin.command("hello")
+except pymongo.errors.OperationFailure:
+    _hello_result = client.admin.command("isMaster")
+rs_name = _hello_result["setName"]
 print("Found Replica Set name: {}".format(str(rs_name)))
 
 print("Now checking for the latest oplog entry...")

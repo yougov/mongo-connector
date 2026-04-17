@@ -21,10 +21,13 @@
     replace the method definitions with API calls for the desired backend.
     """
 
+import datetime
 import logging
 import pymongo
+from pymongo import ReplaceOne
 
 from bson import SON
+from bson.codec_options import CodecOptions, DatetimeConversion
 from gridfs import GridFS
 
 from mongo_connector import errors, constants
@@ -92,7 +95,7 @@ class DocManager(DocManagerBase):
         # Create the meta collection as capped if a single meta collection is
         # preferred
         if self.use_single_meta_collection:
-            if self.meta_collection_name not in self.meta_database.collection_names():
+            if self.meta_collection_name not in self.meta_database.list_collection_names():
                 self.meta_database.create_collection(
                     self.meta_collection_name,
                     capped=True,
@@ -102,8 +105,45 @@ class DocManager(DocManagerBase):
                 meta_collection.create_index(self.id_field)
                 meta_collection.create_index([("ns", 1), ("_ts", 1)])
 
+    # Codec options for handling out-of-range BSON dates gracefully.
+    # DATETIME_CLAMP converts dates outside Python's datetime range to
+    # datetime.min / datetime.max instead of raising exceptions.
+    _codec_options = CodecOptions(datetime_conversion=DatetimeConversion.DATETIME_CLAMP)
+
+    @staticmethod
+    def _check_clamped_dates(doc, doc_id):
+        """Log a WARNING if any datetime field in the document (including
+        nested sub-documents and arrays) has been clamped to datetime.min or
+        datetime.max by DATETIME_CLAMP.  Handles both naive and tz-aware
+        datetimes."""
+        if not isinstance(doc, dict):
+            return
+        for key, val in doc.items():
+            if isinstance(val, datetime.datetime):
+                if val.replace(tzinfo=None) in (datetime.datetime.min, datetime.datetime.max):
+                    LOG.warning(
+                        "Clamped date detected in document %s, field '%s': %s",
+                        doc_id, key, val.isoformat(),
+                    )
+            elif isinstance(val, dict):
+                DocManager._check_clamped_dates(val, doc_id)
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, datetime.datetime):
+                        if item.replace(tzinfo=None) in (datetime.datetime.min, datetime.datetime.max):
+                            LOG.warning(
+                                "Clamped date detected in document %s, field '%s' (list element): %s",
+                                doc_id, key, item.isoformat(),
+                            )
+                    elif isinstance(item, dict):
+                        DocManager._check_clamped_dates(item, doc_id)
+
     def _db_and_collection(self, namespace):
         return namespace.split(".", 1)
+
+    def _get_clamped_db(self, database):
+        """Return a database handle with DATETIME_CLAMP codec options."""
+        return self.mongo[database].with_options(codec_options=self._codec_options)
 
     def _get_meta_collection(self, namespace):
         if self.use_single_meta_collection:
@@ -118,9 +158,7 @@ class DocManager(DocManagerBase):
         if self.use_single_meta_collection:
             yield self.meta_collection_name
         else:
-            for name in self.meta_database.collection_names(
-                include_system_collections=False
-            ):
+            for name in self.meta_database.list_collection_names():
                 yield name
 
     def stop(self):
@@ -173,7 +211,7 @@ class DocManager(DocManagerBase):
 
         no_obj_error = "No matching object found"
         update_spec.pop("$v", None)
-        updated = self.mongo[db].command(
+        updated = self._get_clamped_db(db).command(
             SON(
                 [
                     ("findAndModify", coll),
@@ -184,6 +222,7 @@ class DocManager(DocManagerBase):
             ),
             allowable_errors=[no_obj_error],
         )["value"]
+        self._check_clamped_dates(updated, document_id)
         return updated
 
     @wrap_exceptions
@@ -200,46 +239,52 @@ class DocManager(DocManagerBase):
             upsert=True,
         )
 
-        self.mongo[database][coll].replace_one({"_id": doc["_id"]}, doc, upsert=True)
+        self._check_clamped_dates(doc, doc["_id"])
+        self._get_clamped_db(database)[coll].replace_one({"_id": doc["_id"]}, doc, upsert=True)
 
     @wrap_exceptions
     def bulk_upsert(self, docs, namespace, timestamp):
         def iterate_chunks():
             dbname, collname = self._db_and_collection(namespace)
-            collection = self.mongo[dbname][collname]
+            collection = self._get_clamped_db(dbname)[collname]
             meta_collection_name = self._get_meta_collection(namespace)
             meta_collection = self.meta_database[meta_collection_name]
             more_chunks = True
             while more_chunks:
-                bulk = collection.initialize_ordered_bulk_op()
-                bulk_meta = meta_collection.initialize_ordered_bulk_op()
+                operations = []
+                meta_operations = []
                 for i in range(self.chunk_size):
                     try:
                         doc = next(docs)
-                        selector = {"_id": doc["_id"]}
-                        bulk.find(selector).upsert().replace_one(doc)
-                        meta_selector = {self.id_field: doc["_id"]}
-                        bulk_meta.find(meta_selector).upsert().replace_one(
-                            {
-                                self.id_field: doc["_id"],
-                                "ns": namespace,
-                                "_ts": timestamp,
-                            }
+                        self._check_clamped_dates(doc, doc.get("_id"))
+                        operations.append(
+                            ReplaceOne({"_id": doc["_id"]}, doc, upsert=True)
+                        )
+                        meta_operations.append(
+                            ReplaceOne(
+                                {self.id_field: doc["_id"]},
+                                {
+                                    self.id_field: doc["_id"],
+                                    "ns": namespace,
+                                    "_ts": timestamp,
+                                },
+                                upsert=True,
+                            )
                         )
                     except StopIteration:
                         more_chunks = False
                         if i > 0:
-                            yield bulk, bulk_meta
+                            yield collection, operations, meta_collection, meta_operations
                         break
                 if more_chunks:
-                    yield bulk, bulk_meta
+                    yield collection, operations, meta_collection, meta_operations
 
-        for bulk_op, meta_bulk_op in iterate_chunks():
+        for coll, ops, meta_coll, meta_ops in iterate_chunks():
             try:
-                bulk_op.execute()
-                meta_bulk_op.execute()
+                coll.bulk_write(ops, ordered=True)
+                meta_coll.bulk_write(meta_ops, ordered=True)
             except pymongo.errors.DuplicateKeyError as e:
-                LOG.warn("Continuing after DuplicateKeyError: " + str(e))
+                LOG.warning("Continuing after DuplicateKeyError: " + str(e))
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
                 raise

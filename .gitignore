@@ -4,7 +4,17 @@
 /test/data
 /test/logs
 /dist
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+*.egg
+.eggs/
+build/
 # IDE settings folders
 .idea/
 .vscode/
 *.log
+*.tmp
+*.swp
+.env*

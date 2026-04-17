@@ -90,12 +90,12 @@ class TestRollbacks(unittest.TestCase):
 
         # Insert first document with primary up
         self.main_conn["test"]["mc"].insert_one({"i": 0})
-        self.assertEqual(self.primary_conn["test"]["mc"].find().count(), 1)
+        self.assertEqual(self.primary_conn["test"]["mc"].count_documents({}), 1)
 
         # Make sure the insert is replicated
         secondary = self.secondary_conn
         assert_soon(
-            lambda: secondary["test"]["mc"].count() == 1,
+            lambda: secondary["test"]["mc"].count_documents({}) == 1,
             "first write didn't replicate to secondary",
         )
 
@@ -103,11 +103,11 @@ class TestRollbacks(unittest.TestCase):
         self.repl_set.primary.stop(destroy=False)
 
         # Wait for the secondary to be promoted
-        assert_soon(lambda: secondary["admin"].command("isMaster")["ismaster"])
+        assert_soon(lambda: secondary["admin"].command("hello")["isWritablePrimary"])
 
         # Insert another document. This will be rolled back later
         retry_until_ok(self.main_conn["test"]["mc"].insert_one, {"i": 1})
-        self.assertEqual(secondary["test"]["mc"].count(), 2)
+        self.assertEqual(secondary["test"]["mc"].count_documents({}), 2)
 
         # Wait for replication to doc manager
         assert_soon(
@@ -122,7 +122,7 @@ class TestRollbacks(unittest.TestCase):
         self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(
-            lambda: primary_admin.command("isMaster")["ismaster"],
+            lambda: primary_admin.command("hello")["isWritablePrimary"],
             "restarted primary never resumed primary status",
         )
         self.repl_set.secondary.start()
@@ -134,12 +134,12 @@ class TestRollbacks(unittest.TestCase):
             "restarted secondary never resumed secondary status",
         )
         assert_soon(
-            lambda: retry_until_ok(self.main_conn.test.mc.find().count) > 0,
+            lambda: retry_until_ok(self.main_conn.test.mc.count_documents, {}) > 0,
             "documents not found after primary/secondary restarted",
         )
 
         # Only first document should exist in MongoDB
-        self.assertEqual(self.main_conn["test"]["mc"].count(), 1)
+        self.assertEqual(self.main_conn["test"]["mc"].count_documents({}), 1)
         self.assertEqual(self.main_conn["test"]["mc"].find_one()["i"], 0)
 
         # Same case should hold for the doc manager
@@ -164,12 +164,12 @@ class TestRollbacks(unittest.TestCase):
 
         # Insert a document into each namespace
         self.main_conn["test"]["mc"].insert_one({"i": 0})
-        self.assertEqual(self.primary_conn["test"]["mc"].count(), 1)
+        self.assertEqual(self.primary_conn["test"]["mc"].count_documents({}), 1)
 
         # Make sure the insert is replicated
         secondary = self.secondary_conn
         assert_soon(
-            lambda: secondary["test"]["mc"].count() == 1,
+            lambda: secondary["test"]["mc"].count_documents({}) == 1,
             "first write didn't replicate to secondary",
         )
 
@@ -178,7 +178,7 @@ class TestRollbacks(unittest.TestCase):
 
         # Wait for the secondary to be promoted
         assert_soon(
-            lambda: secondary.admin.command("isMaster")["ismaster"],
+            lambda: secondary.admin.command("hello")["isWritablePrimary"],
             "secondary was never promoted",
         )
 
@@ -193,7 +193,7 @@ class TestRollbacks(unittest.TestCase):
                     self.main_conn["test"]["mc"].insert_one, {"i": i}
                 ).inserted_id
             )
-        self.assertEqual(self.secondary_conn["test"]["mc"].count(), 10)
+        self.assertEqual(self.secondary_conn["test"]["mc"].count_documents({}), 10)
 
         # Wait for replication to the doc managers
         def docmans_done():
@@ -219,7 +219,7 @@ class TestRollbacks(unittest.TestCase):
         self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(
-            lambda: primary_admin.command("isMaster")["ismaster"],
+            lambda: primary_admin.command("hello")["isWritablePrimary"],
             "restarted primary never resumed primary status",
         )
         self.repl_set.secondary.start()
@@ -231,12 +231,12 @@ class TestRollbacks(unittest.TestCase):
             "restarted secondary never resumed secondary status",
         )
         assert_soon(
-            lambda: retry_until_ok(self.primary_conn.test.mc.find().count) > 0,
+            lambda: retry_until_ok(self.primary_conn.test.mc.count_documents, {}) > 0,
             "documents not found after primary/secondary restarted",
         )
 
         # Only first document should exist in MongoDB
-        self.assertEqual(self.primary_conn["test"]["mc"].count(), 1)
+        self.assertEqual(self.primary_conn["test"]["mc"].count_documents({}), 1)
         self.assertEqual(self.primary_conn["test"]["mc"].find_one()["i"], 0)
 
         # Give OplogThread some time to catch up
@@ -257,21 +257,21 @@ class TestRollbacks(unittest.TestCase):
         # Insert a document, wait till it replicates to secondary
         self.main_conn["test"]["mc"].insert_one({"i": 0})
         self.main_conn["test"]["mc"].insert_one({"i": 1})
-        self.assertEqual(self.primary_conn["test"]["mc"].find().count(), 2)
+        self.assertEqual(self.primary_conn["test"]["mc"].count_documents({}), 2)
         assert_soon(
-            lambda: self.secondary_conn["test"]["mc"].count() == 2,
+            lambda: self.secondary_conn["test"]["mc"].count_documents({}) == 2,
             "first write didn't replicate to secondary",
         )
 
         # Kill the primary, wait for secondary to be promoted
         self.repl_set.primary.stop(destroy=False)
         assert_soon(
-            lambda: self.secondary_conn["admin"].command("isMaster")["ismaster"]
+            lambda: self.secondary_conn["admin"].command("hello")["isWritablePrimary"]
         )
 
         # Delete first document
         retry_until_ok(self.main_conn["test"]["mc"].delete_one, {"i": 0})
-        self.assertEqual(self.secondary_conn["test"]["mc"].count(), 1)
+        self.assertEqual(self.secondary_conn["test"]["mc"].count_documents({}), 1)
 
         # Wait for replication to doc manager
         assert_soon(
@@ -286,7 +286,7 @@ class TestRollbacks(unittest.TestCase):
         self.repl_set.primary.start()
         primary_admin = self.primary_conn["admin"]
         assert_soon(
-            lambda: primary_admin.command("isMaster")["ismaster"],
+            lambda: primary_admin.command("hello")["isWritablePrimary"],
             "restarted primary never resumed primary status",
         )
         self.repl_set.secondary.start()
@@ -299,7 +299,7 @@ class TestRollbacks(unittest.TestCase):
         )
 
         # Both documents should exist in mongo
-        assert_soon(lambda: retry_until_ok(self.main_conn["test"]["mc"].count) == 2)
+        assert_soon(lambda: retry_until_ok(self.main_conn["test"]["mc"].count_documents, {}) == 2)
 
         # Both document should exist in doc manager
         doc_manager = self.opman.doc_managers[0]
@@ -318,7 +318,7 @@ class TestRollbacks(unittest.TestCase):
         docman = self.opman.doc_managers[0]
         c2 = c.with_options(write_concern=WriteConcern(w=2))
         c2.insert_many([{"i": i} for i in range(STRESS_COUNT)])
-        assert_soon(lambda: c2.count() == STRESS_COUNT)
+        assert_soon(lambda: c2.count_documents({}) == STRESS_COUNT)
 
         def condition():
             return len(docman._search()) == STRESS_COUNT
@@ -336,7 +336,7 @@ class TestRollbacks(unittest.TestCase):
         new_primary_conn = self.repl_set.secondary.client()
 
         admin = new_primary_conn.admin
-        assert_soon(lambda: retry_until_ok(admin.command, "isMaster")["ismaster"])
+        assert_soon(lambda: retry_until_ok(admin.command, "hello")["isWritablePrimary"])
 
         retry_until_ok(
             c.insert_many, [{"i": str(STRESS_COUNT + i)} for i in range(STRESS_COUNT)]
@@ -346,10 +346,10 @@ class TestRollbacks(unittest.TestCase):
 
         self.repl_set.primary.start()
         admin = primary_conn.admin
-        assert_soon(lambda: retry_until_ok(admin.command, "isMaster")["ismaster"])
+        assert_soon(lambda: retry_until_ok(admin.command, "hello")["isWritablePrimary"])
         self.repl_set.secondary.start()
 
-        assert_soon(lambda: retry_until_ok(c.count) == STRESS_COUNT)
+        assert_soon(lambda: retry_until_ok(c.count_documents, {}) == STRESS_COUNT)
         assert_soon(
             condition,
             (

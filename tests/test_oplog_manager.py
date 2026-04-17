@@ -68,8 +68,8 @@ class TestOplogManager(unittest.TestCase):
         # timestamp is None - all oplog entries excluding no-ops are returned.
         cursor = self.opman.get_oplog_cursor(None)
         self.assertEqual(
-            cursor.count(),
-            self.primary_conn["local"]["oplog.rs"].find({"op": {"$ne": "n"}}).count(),
+            self.oplog_coll.count_documents({"op": {"$ne": "n"}}),
+            self.primary_conn["local"]["oplog.rs"].count_documents({"op": {"$ne": "n"}}),
         )
 
         # earliest entry is the only one at/after timestamp
@@ -78,7 +78,10 @@ class TestOplogManager(unittest.TestCase):
         latest_timestamp = self.opman.get_last_oplog_timestamp()
         cursor = self.opman.get_oplog_cursor(latest_timestamp)
         self.assertNotEqual(cursor, None)
-        self.assertEqual(cursor.count(), 1)
+        self.assertEqual(
+            self.oplog_coll.count_documents({"ts": {"$gte": latest_timestamp}, "op": {"$ne": "n"}}),
+            1,
+        )
         next_entry_id = next(cursor)["o"]["_id"]
         retrieved = self.primary_conn.test.test.find_one(next_entry_id)
         self.assertEqual(retrieved, doc)
@@ -93,11 +96,21 @@ class TestOplogManager(unittest.TestCase):
         )
 
         # initial insert + 1000 more inserts
-        self.assertEqual(oplog_cursor.count(), 1 + 1000)
+        self.assertEqual(
+            self.oplog_coll.count_documents(
+                {"op": {"$ne": "n"}, "ns": {"$not": re.compile(r"\.(system|\$cmd)")}}
+            ),
+            1 + 1000,
+        )
         pivot = oplog_cursor.skip(400).limit(-1)[0]
 
         goc_cursor = self.opman.get_oplog_cursor(pivot["ts"])
-        self.assertEqual(goc_cursor.count(), 1 + 1000 - 400)
+        self.assertEqual(
+            self.oplog_coll.count_documents(
+                {"ts": {"$gte": pivot["ts"]}, "op": {"$ne": "n"}}
+            ),
+            1 + 1000 - 400,
+        )
 
     def test_get_last_oplog_timestamp(self):
         """Test the get_last_oplog_timestamp method"""

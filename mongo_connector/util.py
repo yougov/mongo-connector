@@ -110,3 +110,11 @@ def log_fatal_exceptions(func):
             raise
 
     return wrapped
+
+
+def hello_or_ismaster(client):
+    """Run the 'hello' command, falling back to 'isMaster' for MongoDB < 5.0."""
+    try:
+        return client.admin.command("hello")
+    except errors.OperationFailure:
+        return client.admin.command("isMaster")

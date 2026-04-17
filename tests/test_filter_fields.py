@@ -74,7 +74,7 @@ class TestFilterFields(unittest.TestCase):
         doc = {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5, "f": 6, "_id": 1}
         db = conn["test"]["test"]
         db.insert_one(doc)
-        assert_soon(lambda: db.count() == 1)
+        assert_soon(lambda: db.count_documents({}) == 1)
         self.opman.dump_collection()
 
         result = docman._search()[0]

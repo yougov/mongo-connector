@@ -36,7 +36,7 @@ from mongo_connector.constants import __version__
 from mongo_connector.locking_dict import LockingDict
 from mongo_connector.oplog_manager import OplogThread
 from mongo_connector.command_helper import CommandHelper
-from mongo_connector.util import log_fatal_exceptions, retry_until_ok
+from mongo_connector.util import hello_or_ismaster, log_fatal_exceptions, retry_until_ok
 from mongo_connector.namespace_config import NamespaceConfig, validate_namespace_options
 from mongo_connector.version import Version
 
@@ -332,14 +332,19 @@ class Connector(threading.Thread):
             new_uri = self.address
         else:
             new_uri = self.copy_uri_options(hosts, self.address)
-        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
         if self.auth_key is not None:
-            client["admin"].authenticate(self.auth_username, self.auth_key)
+            kwargs.update(
+                username=self.auth_username,
+                password=self.auth_key,
+                authSource="admin",
+            )
+        client = MongoClient(new_uri, tz_aware=self.tz_aware, **kwargs)
+        client.admin.command("ping")
         return client
 
     def update_version_from_client(self, client):
-        is_master = client.admin.command("isMaster")
-        for host in is_master["hosts"]:
+        hello_result = hello_or_ismaster(client)
+        for host in hello_result["hosts"]:
             update_mininum_mongodb_version(
                 Version.from_client(self.create_authed_client(host))
             )
@@ -376,8 +381,8 @@ class Connector(threading.Thread):
 
         if conn_type == "REPLSET":
             # Make sure we are connected to a replica set
-            is_master = self.main_conn.admin.command("isMaster")
-            if "setName" not in is_master:
+            hello_result = hello_or_ismaster(self.main_conn)
+            if "setName" not in hello_result:
                 LOG.error(
                     'No replica set at "%s"! A replica set is required '
                     "to run mongo-connector. Shutting down..." % self.address
@@ -386,7 +391,7 @@ class Connector(threading.Thread):
 
             # Establish a connection to the replica set as a whole
             self.main_conn.close()
-            self.main_conn = self.create_authed_client(replicaSet=is_master["setName"])
+            self.main_conn = self.create_authed_client(replicaSet=hello_result["setName"])
 
             self.update_version_from_client(self.main_conn)
 

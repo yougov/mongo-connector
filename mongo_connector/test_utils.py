@@ -91,9 +91,14 @@ class MCTestObject(object):
         return ret
 
     def client(self, **kwargs):
-        client = pymongo.MongoClient(self.uri, **kwargs)
         if db_user:
-            client.admin.authenticate(db_user, db_password)
+            kwargs.update(
+                username=db_user,
+                password=db_password,
+                authSource="admin",
+            )
+        client = pymongo.MongoClient(self.uri, **kwargs)
+        client.admin.command("ping")
         return client
 
     def stop(self):
