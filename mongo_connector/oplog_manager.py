@@ -139,7 +139,14 @@ class OplogThread(threading.Thread):
 
         LOG.info("OplogThread: Initializing oplog thread")
 
-        self.oplog = self.primary_client.local.oplog.rs
+        # Apply DATETIME_CLAMP to the oplog tailing cursor so out-of-range BSON
+        # dates (e.g. year 0) embedded in oplog entries decode to datetime.min
+        # instead of raising InvalidBSON and killing the sync thread. The
+        # _codec_options class attribute is defined further below; class
+        # attributes are accessible here regardless of source order.
+        self.oplog = self.primary_client.local.oplog.rs.with_options(
+            codec_options=self._codec_options
+        )
         self.replset_name = hello_or_ismaster(self.primary_client)["setName"]
 
         if not self.oplog.find_one():
