@@ -131,6 +131,36 @@ class TestMongoDocManager(MongoTestCase):
         for i, r in enumerate(res):
             self.assertEqual(r["weight"], 2 * i)
 
+    def test_bulk_apply(self):
+        """Test that bulk_apply applies upserts and removes in order."""
+        ops = [
+            ("upsert", "test.test", {"_id": 1, "a": 1}, 1),
+            ("upsert", "test.test", {"_id": 2, "a": 2}, 1),
+            ("upsert", "test.test", {"_id": 1, "a": 3}, 2),
+            ("remove", "test.test", 2, 3),
+            ("upsert", "test.test", {"_id": 1, "a": 4}, 4),
+        ]
+        self.choosy_docman.bulk_apply(ops)
+
+        doc = self.mongo.find_one({"_id": 1})
+        self.assertEqual(doc["a"], 4)
+        self.assertIsNone(self.mongo.find_one({"_id": 2}))
+
+        collection_name = (
+            self.choosy_docman.meta_collection_name
+            if self.use_single_meta_collection
+            else "test.test"
+        )
+        meta_coll = self.mongo_conn["__mongo_connector"][collection_name]
+        meta_doc = meta_coll.find_one({self.id_field: 1})
+        self.assertEqual(meta_doc["_ts"], 4)
+        self.assertIsNone(meta_coll.find_one({self.id_field: 2}))
+
+    def test_bulk_apply_bad_op_type(self):
+        """Test that bulk_apply rejects unknown op types."""
+        with self.assertRaises(ValueError):
+            self.choosy_docman.bulk_apply([("bogus", "test.test", {}, 1)])
+
     def test_remove(self):
         """Ensure we can properly delete from Mongo via DocManager.
         """

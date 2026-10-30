@@ -127,6 +127,32 @@ class DocManagerBase(object):
         for doc in docs:
             self.upsert(doc, namespace, timestamp)
 
+    def bulk_apply(self, ops):
+        """Apply a sequence of normalized oplog operations.
+
+        ``ops`` is an iterable of ``(op_type, namespace, payload, timestamp)``
+        tuples produced by OplogThread while catching up on a large oplog
+        backlog (see the ``bulkApplyLagSeconds`` option). ``op_type`` is one
+        of:
+
+        - ``"upsert"``: ``payload`` is the full document to upsert. Modifier
+          updates (``$set``/``$unset`` oplog entries) are resolved to whole
+          documents by the OplogThread before reaching this method.
+        - ``"remove"``: ``payload`` is the ``_id`` of the document to remove.
+
+        Operations must be applied in the order given. This default
+        implementation applies each operation serially through
+        :meth:`upsert` and :meth:`remove`. Doc managers may override this to
+        apply operations in bulk.
+        """
+        for op_type, namespace, payload, timestamp in ops:
+            if op_type == "upsert":
+                self.upsert(payload, namespace, timestamp)
+            elif op_type == "remove":
+                self.remove(payload, namespace, timestamp)
+            else:
+                raise ValueError("Unknown bulk_apply op type: %r" % (op_type,))
+
     def update(self, doc, update_spec, namespace, timestamp):
         """Update a document.
 

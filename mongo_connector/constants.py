@@ -31,6 +31,16 @@ DEFAULT_COMMIT_INTERVAL = None
 # DocManager.
 DEFAULT_MAX_BULK = 1000
 
+# Lag (in seconds behind the newest oplog entry) at which the connector
+# switches from serial per-entry application to buffered bulk application.
+# Default = 300 (5 minutes). 0 disables bulk catch-up mode.
+DEFAULT_BULK_APPLY_LAG_SECONDS = 300
+
+# Maximum wall-clock seconds buffered catch-up ops may sit unflushed when
+# the batch doesn't fill and the oplog goes quiet. 0 disables the idle
+# flush (buffered ops flush only at batch size or on order barriers).
+DEFAULT_BULK_APPLY_IDLE_SECONDS = 60
+
 # The default MongoDB field that will serve as the unique key for the
 # target system.
 DEFAULT_UNIQUE_KEY = "_id"

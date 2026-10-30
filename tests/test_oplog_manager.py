@@ -425,6 +425,93 @@ class TestOplogManager(unittest.TestCase):
         for d in doc_managers:
             self.assertEqual(d._search()[0]["name"], "kermit")
 
+    def test_bulk_catchup(self):
+        """Test that bulk catch-up mode applies entries via bulk_apply."""
+        docman = self.opman.doc_managers[0]
+        applied_ops = []
+        original_bulk_apply = docman.bulk_apply
+
+        def spy_bulk_apply(ops):
+            ops = list(ops)
+            applied_ops.extend(ops)
+            return original_bulk_apply(ops)
+
+        docman.bulk_apply = spy_bulk_apply
+        self.opman.bulk_apply_lag_seconds = 1
+        self.opman.bulk_apply_batch_size = 5
+
+        # Write old entries, wait past the lag threshold, then write a
+        # recent entry so the earlier entries qualify for bulk apply.
+        collection = self.primary_conn["test"]["test"]
+        collection.insert_many([{"_id": "bulk%d" % i} for i in range(10)])
+        collection.update_one({"_id": "bulk0"}, {"$set": {"x": 1}})
+        collection.delete_one({"_id": "bulk5"})
+        time.sleep(2)
+        collection.insert_one({"_id": "recent"})
+        self.opman.start()
+
+        try:
+            assert_soon(
+                lambda: len(applied_ops) >= 10,
+                "bulk_apply never received the oplog backlog",
+            )
+            op_types = {}
+            for op in applied_ops:
+                op_types[op[0]] = op_types.get(op[0], 0) + 1
+            # Duplicated entries collapse to the last op per document:
+            # bulk0's insert+update -> one upsert, bulk5's insert+delete ->
+            # one remove, the remaining 8 inserts -> 8 upserts.
+            self.assertEqual(op_types["upsert"], 9)
+            self.assertEqual(op_types["remove"], 1)
+            remove_op = [op for op in applied_ops if op[0] == "remove"][0]
+            self.assertEqual(remove_op[2], "bulk5")
+            bulk0_ops = [
+                op
+                for op in applied_ops
+                if op[0] == "upsert" and op[2]["_id"] == "bulk0"
+            ]
+            self.assertEqual(len(bulk0_ops), 1)
+
+            updated_docs = [
+                op[2]
+                for op in applied_ops
+                if op[0] == "upsert" and op[2]["_id"] == "bulk0"
+            ]
+            self.assertEqual(updated_docs[0]["x"], 1)
+
+            assert_soon(
+                lambda: len(docman._search()) == 11,
+                "documents were not applied to the doc manager",
+            )
+        finally:
+            self.opman.join()
+
+    def test_bulk_catchup_disabled(self):
+        """Test that bulk_apply is not used when the lag threshold is 0."""
+        docman = self.opman.doc_managers[0]
+        calls = []
+        original_bulk_apply = docman.bulk_apply
+
+        def spy_bulk_apply(ops):
+            ops = list(ops)
+            calls.append(ops)
+            return original_bulk_apply(ops)
+
+        docman.bulk_apply = spy_bulk_apply
+        self.opman.bulk_apply_lag_seconds = 0
+        self.assertFalse(self.opman._bulk_catchup_enabled())
+        self.opman.start()
+
+        try:
+            self.primary_conn["test"]["test"].insert_one({"a": 1})
+            assert_soon(
+                lambda: len(docman._search()) == 1,
+                "OplogThread never replicated the inserted document",
+            )
+            self.assertEqual(calls, [])
+        finally:
+            self.opman.join()
+
     def test_upgrade_oplog_progress(self):
         first_oplog_ts = self.opman.oplog.find_one()["ts"]
         # Old format oplog progress file:

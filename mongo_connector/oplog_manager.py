@@ -34,11 +34,20 @@ from bson.codec_options import CodecOptions, DatetimeConversion
 
 from mongo_connector import errors, util
 from mongo_connector.util import hello_or_ismaster
-from mongo_connector.constants import DEFAULT_BATCH_SIZE
+from mongo_connector.constants import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_BULK_APPLY_IDLE_SECONDS,
+    DEFAULT_BULK_APPLY_LAG_SECONDS,
+    DEFAULT_MAX_BULK,
+)
 from mongo_connector.gridfs_file import GridFSFile
 from mongo_connector.util import log_fatal_exceptions, retry_until_ok
 
 LOG = logging.getLogger(__name__)
+
+# How often (in processed oplog entries) to refresh the cached timestamp of
+# the newest oplog entry when deciding whether we are in catch-up mode.
+BULK_LAG_REFRESH_ENTRIES = 500
 
 
 class ReplicationLagLogger(threading.Thread):
@@ -83,6 +92,10 @@ class ReplicationLagLogger(threading.Thread):
 
     def run(self):
         while self.opman.is_alive():
+            # The tailable oplog cursor blocks awaiting new data at the
+            # tail, so a separate thread is needed to flush an under-full
+            # catch-up buffer on an idle source.
+            self.opman._maybe_flush_idle_buffer()
             self.log_replication_lag()
             time.sleep(self.interval)
 
@@ -136,6 +149,47 @@ class OplogThread(threading.Thread):
 
         # Whether the collection dump gracefully handles exceptions
         self.continue_on_error = kwargs.get("continue_on_error", False)
+
+        # Lag (in seconds behind the newest oplog entry) at which oplog
+        # application switches from serial per-entry handling to buffered
+        # bulk application via DocManager.bulk_apply. 0 disables it.
+        self.bulk_apply_lag_seconds = (
+            kwargs.get(
+                "bulk_apply_lag_seconds", DEFAULT_BULK_APPLY_LAG_SECONDS
+            )
+            or 0
+        )
+
+        # Number of oplog entries to buffer before flushing them in bulk.
+        self.bulk_apply_batch_size = kwargs.get(
+            "bulk_apply_batch_size", DEFAULT_MAX_BULK
+        )
+
+        # Maximum wall-clock seconds buffered ops may sit unflushed when
+        # the batch doesn't fill and no further entries arrive. 0 disables.
+        self.bulk_apply_idle_seconds = (
+            kwargs.get(
+                "bulk_apply_idle_seconds", DEFAULT_BULK_APPLY_IDLE_SECONDS
+            )
+            or 0
+        )
+
+        # Normalized ops buffered for bulk application while catching up.
+        # Keyed by (namespace, doc _id) so that only the last op per
+        # document in a flush window is applied; the buffer flushes once it
+        # holds bulk_apply_batch_size deduplicated documents.
+        self._catchup_ops = {}
+        # Timestamp of the last buffered entry; checkpointed after a flush.
+        self._catchup_last_ts = None
+        # Cached newest oplog timestamp used for lag decisions.
+        self._newest_oplog_ts = None
+        self._entries_since_lag_check = 0
+        # Wall-clock time the buffer went from empty to non-empty, used for
+        # the idle flush.
+        self._catchup_first_buffered_at = None
+        # Guards the catch-up buffer and ordered application of ops: the
+        # idle flush can be triggered by the ReplicationLagLogger thread.
+        self._catchup_lock = threading.RLock()
 
         LOG.info("OplogThread: Initializing oplog thread")
 
@@ -216,6 +270,217 @@ class OplogThread(threading.Thread):
             return True, False
         return False, is_gridfs_file
 
+    def _expand_apply_ops(self, entry):
+        """Expand applyOps command entries into their CRUD sub-entries.
+
+        Multi-document writes issued as a single command (insert_many,
+        update_many, delete_many) are recorded as a single applyOps entry
+        on MongoDB >= 5.x. If every sub-operation is a plain CRUD op, yield
+        each sub-op as its own entry so it can be processed like a normal
+        oplog entry, carrying the parent entry's timestamp. Otherwise yield
+        the original command entry unchanged for serial command handling.
+        """
+        o = entry.get("o")
+        if entry["op"] == "c" and isinstance(o, dict) and "applyOps" in o:
+            sub_ops = o["applyOps"]
+            if all(s.get("op") in ("i", "u", "d") for s in sub_ops):
+                for sub in sub_ops:
+                    yield {
+                        "op": sub["op"],
+                        "ns": sub["ns"],
+                        "o": sub.get("o", {}),
+                        "o2": sub.get("o2", {}),
+                        "ts": entry["ts"],
+                    }
+                return
+        yield entry
+
+    def _bulk_catchup_enabled(self):
+        return self.bulk_apply_lag_seconds > 0
+
+    def _is_behind_oplog(self, entry):
+        """Determine if an oplog entry is far enough behind the newest entry
+        to warrant bulk catch-up application.
+
+        The newest oplog timestamp is cached and refreshed every
+        BULK_LAG_REFRESH_ENTRIES processed entries.
+        """
+        self._entries_since_lag_check += 1
+        if (
+            self._newest_oplog_ts is None
+            or self._entries_since_lag_check >= BULK_LAG_REFRESH_ENTRIES
+        ):
+            self._newest_oplog_ts = retry_until_ok(self.get_last_oplog_timestamp)
+            self._entries_since_lag_check = 0
+        newest = self._newest_oplog_ts
+        if newest is None:
+            return False
+        return (newest.time - entry["ts"].time) > self.bulk_apply_lag_seconds
+
+    def _buffer_oplog_entry(self, entry, ns, timestamp):
+        """Buffer a normalized op for this entry, deduplicated per document.
+
+        Buffered ops are ``(op_type, namespace, payload, timestamp)`` tuples
+        as consumed by DocManager.bulk_apply, keyed by ``(namespace, _id)``.
+        Only the last op for a document within a flush window survives:
+        every op carries the document's complete state (or resolves to it at
+        flush time), so intermediate ops for the same document are
+        redundant. Modifier updates are buffered as "fetch" ops and resolved
+        to whole documents at flush time.
+        """
+        operation = entry["op"]
+        if operation == "i":
+            doc_id = entry["o"]["_id"]
+            op = ("upsert", ns, entry["o"], timestamp)
+        elif operation == "u":
+            doc_id = entry["o2"]["_id"]
+            update_spec = entry["o"]
+            if (
+                "$set" in update_spec
+                or "$unset" in update_spec
+                or "diff" in update_spec
+            ):
+                # Modifier update. MongoDB < 5.0 uses $set/$unset specs,
+                # MongoDB >= 5.0 uses "diff" specs. Resolve the current
+                # document from the source at flush time.
+                op = ("fetch", ns, doc_id, timestamp)
+            else:
+                # Replacement-style update: 'o' holds the new document.
+                doc = dict(update_spec)
+                doc.pop("$v", None)
+                doc["_id"] = doc_id
+                op = ("upsert", ns, doc, timestamp)
+        elif operation == "d":
+            doc_id = entry["o"]["_id"]
+            op = ("remove", ns, doc_id, timestamp)
+        else:
+            return
+        with self._catchup_lock:
+            if not self._catchup_ops:
+                self._catchup_first_buffered_at = time.time()
+            self._catchup_ops[(ns, doc_id)] = op
+            self._catchup_last_ts = entry["ts"]
+
+    def _resolve_catchup_fetches(self, ops):
+        """Replace "fetch" ops with "upsert"/"remove" ops by retrieving the
+        current version of each document from the source with batched $in
+        queries. Documents no longer present in the source become removes.
+        """
+        ids_by_ns = {}
+        for op_type, ns, doc_id, _ in ops:
+            if op_type == "fetch":
+                ids_by_ns.setdefault(ns, set()).add(doc_id)
+        if not ids_by_ns:
+            return ops
+
+        client = self.mongos_client or self.primary_client
+        docs = {}
+        for ns, doc_ids in ids_by_ns.items():
+            src_ns = self.namespace_config.unmap_namespace(ns) or ns
+            database, coll = src_ns.split(".", 1)
+            collection = client[database].with_options(
+                codec_options=self._codec_options
+            )[coll]
+            found = retry_until_ok(
+                lambda: list(
+                    collection.find(
+                        {"_id": {"$in": list(doc_ids)}},
+                        projection=self.namespace_config.projection(src_ns),
+                    )
+                )
+            )
+            for doc in found:
+                docs[(ns, doc["_id"])] = doc
+
+        resolved = []
+        for op_type, ns, payload, ts in ops:
+            if op_type != "fetch":
+                resolved.append((op_type, ns, payload, ts))
+            elif (ns, payload) in docs:
+                resolved.append(("upsert", ns, docs[(ns, payload)], ts))
+            else:
+                resolved.append(("remove", ns, payload, ts))
+        return resolved
+
+    def _apply_ops_serially(self, dm, ops):
+        """Fallback path applying normalized ops one at a time."""
+        for op_type, ns, payload, ts in ops:
+            try:
+                if op_type == "upsert":
+                    dm.upsert(payload, ns, ts)
+                elif op_type == "remove":
+                    dm.remove(payload, ns, ts)
+            except errors.OperationFailed:
+                LOG.exception(
+                    "Unable to apply %s op for namespace '%s'" % (op_type, ns)
+                )
+            except errors.ConnectionFailed:
+                LOG.exception(
+                    "Connection failed applying %s op for namespace '%s'"
+                    % (op_type, ns)
+                )
+
+    def _flush_catchup_ops(self):
+        """Flush buffered catch-up ops to each doc manager and checkpoint.
+
+        If a doc manager's bulk_apply fails, that doc manager falls back to
+        applying the buffered ops serially.
+        """
+        with self._catchup_lock:
+            if not self._catchup_ops:
+                return
+            ops = self._resolve_catchup_fetches(
+                list(self._catchup_ops.values())
+            )
+            for dm in self.doc_managers:
+                bulk_apply = getattr(dm, "bulk_apply", None)
+                if bulk_apply is not None:
+                    try:
+                        bulk_apply(ops)
+                        continue
+                    except Exception:
+                        LOG.exception(
+                            "Error during bulk apply for doc manager %r, "
+                            "replaying buffered ops serially" % (dm,)
+                        )
+                self._apply_ops_serially(dm, ops)
+            self._catchup_ops = {}
+            self._catchup_first_buffered_at = None
+            if self._catchup_last_ts is not None:
+                self.update_checkpoint(self._catchup_last_ts)
+                self._catchup_last_ts = None
+
+    def _maybe_flush_idle_buffer(self):
+        """Flush the catch-up buffer if it has been pending too long.
+
+        A tailable cursor blocks awaiting new data at the tail, so when the
+        backlog is smaller than bulk_apply_batch_size buffered ops would
+        otherwise sit unapplied until the next relevant entry arrives. This
+        check runs for every entry read (including skipped/no-op entries,
+        which arrive periodically on an idle replica set), so an under-full
+        buffer flushes within roughly bulk_apply_idle_seconds plus the
+        source's heartbeat interval.
+        """
+        with self._catchup_lock:
+            try:
+                if (
+                    self._catchup_ops
+                    and self.bulk_apply_idle_seconds > 0
+                    and self._catchup_first_buffered_at is not None
+                    and (
+                        time.time() - self._catchup_first_buffered_at
+                        >= self.bulk_apply_idle_seconds
+                    )
+                ):
+                    LOG.debug(
+                        "OplogThread: flushing %d buffered ops after "
+                        "idle timeout",
+                        len(self._catchup_ops),
+                    )
+                    self._flush_catchup_ops()
+            except Exception:
+                LOG.exception("Error flushing idle catch-up buffer")
+
     @log_fatal_exceptions
     def run(self):
         """Start the oplog worker.
@@ -245,6 +510,7 @@ class OplogThread(threading.Thread):
             remove_inc = 0
             upsert_inc = 0
             update_inc = 0
+            bulk_inc = 0
             try:
                 LOG.debug("OplogThread: about to process new oplog entries")
                 while cursor.alive and self.running:
@@ -262,85 +528,121 @@ class OplogThread(threading.Thread):
                             " document number in this cursor is %d" % n
                         )
 
-                        skip, is_gridfs_file = self._should_skip_entry(entry)
-                        if skip:
-                            # update the last_ts on skipped entries to ensure
-                            # our checkpoint does not fall off the oplog. This
-                            # also prevents reprocessing skipped entries.
-                            last_ts = entry["ts"]
-                            continue
+                        for entry in self._expand_apply_ops(entry):
+                            self._maybe_flush_idle_buffer()
 
-                        # Sync the current oplog operation
-                        operation = entry["op"]
-                        ns = entry["ns"]
-                        timestamp = util.bson_ts_to_long(entry["ts"])
-                        for docman in self.doc_managers:
-                            try:
-                                LOG.debug(
-                                    "OplogThread: Operation for this "
-                                    "entry is %s" % str(operation)
-                                )
+                            skip, is_gridfs_file = self._should_skip_entry(entry)
+                            if skip:
+                                # update the last_ts on skipped entries to ensure
+                                # our checkpoint does not fall off the oplog. This
+                                # also prevents reprocessing skipped entries.
+                                last_ts = entry["ts"]
+                                continue
 
-                                # Remove
-                                if operation == "d":
-                                    docman.remove(entry["o"]["_id"], ns, timestamp)
-                                    remove_inc += 1
+                            # Sync the current oplog operation
+                            operation = entry["op"]
+                            ns = entry["ns"]
+                            timestamp = util.bson_ts_to_long(entry["ts"])
 
-                                # Insert
-                                elif operation == "i":  # Insert
-                                    # Retrieve inserted document from
-                                    # 'o' field in oplog record
-                                    doc = entry.get("o")
-                                    # Extract timestamp and namespace
-                                    if is_gridfs_file:
-                                        db, coll = ns.split(".", 1)
-                                        gridfile = GridFSFile(
-                                            self.primary_client[db][coll], doc
+                            # Commands and GridFS file writes must be applied
+                            # serially in oplog order; other operations may be
+                            # buffered and applied in bulk while behind.
+                            if (
+                                self._bulk_catchup_enabled()
+                                and not is_gridfs_file
+                                and operation != "c"
+                                and self._is_behind_oplog(entry)
+                            ):
+                                self._buffer_oplog_entry(entry, ns, timestamp)
+                                bulk_inc += 1
+                                if (
+                                    len(self._catchup_ops)
+                                    >= self.bulk_apply_batch_size
+                                ):
+                                    self._flush_catchup_ops()
+                                continue
+
+                            # Flush buffered ops before serially applying this
+                            # entry to preserve oplog ordering.
+                            if self._catchup_ops:
+                                self._flush_catchup_ops()
+
+                            # The lock prevents a timer-triggered flush
+                            # from interleaving with serial application
+                            # of a newer entry.
+                            with self._catchup_lock:
+                                for docman in self.doc_managers:
+                                    try:
+                                        LOG.debug(
+                                            "OplogThread: Operation for this "
+                                            "entry is %s" % str(operation)
                                         )
-                                        docman.insert_file(gridfile, ns, timestamp)
-                                    else:
-                                        docman.upsert(doc, ns, timestamp)
-                                    upsert_inc += 1
 
-                                # Update
-                                elif operation == "u":
-                                    docman.update(
-                                        entry["o2"]["_id"], entry["o"], ns, timestamp
-                                    )
-                                    update_inc += 1
+                                        # Remove
+                                        if operation == "d":
+                                            docman.remove(entry["o"]["_id"], ns, timestamp)
+                                            remove_inc += 1
 
-                                # Command
-                                elif operation == "c":
-                                    # use unmapped namespace
-                                    doc = entry.get("o")
-                                    docman.handle_command(doc, entry["ns"], timestamp)
+                                        # Insert
+                                        elif operation == "i":  # Insert
+                                            # Retrieve inserted document from
+                                            # 'o' field in oplog record
+                                            doc = entry.get("o")
+                                            # Extract timestamp and namespace
+                                            if is_gridfs_file:
+                                                db, coll = ns.split(".", 1)
+                                                gridfile = GridFSFile(
+                                                    self.primary_client[db][coll], doc
+                                                )
+                                                docman.insert_file(gridfile, ns, timestamp)
+                                            else:
+                                                docman.upsert(doc, ns, timestamp)
+                                            upsert_inc += 1
 
-                            except errors.OperationFailed:
-                                LOG.exception(
-                                    "Unable to process oplog document %r" % entry
+                                        # Update
+                                        elif operation == "u":
+                                            docman.update(
+                                                entry["o2"]["_id"], entry["o"], ns, timestamp
+                                            )
+                                            update_inc += 1
+
+                                        # Command
+                                        elif operation == "c":
+                                            # use unmapped namespace
+                                            doc = entry.get("o")
+                                            docman.handle_command(doc, entry["ns"], timestamp)
+
+                                    except errors.OperationFailed:
+                                        LOG.exception(
+                                            "Unable to process oplog document %r" % entry
+                                        )
+                                    except errors.ConnectionFailed:
+                                        LOG.exception(
+                                            "Connection failed while processing oplog "
+                                            "document %r" % entry
+                                        )
+
+                            if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
+                                LOG.debug(
+                                    "OplogThread: Documents removed: %d, "
+                                    "inserted: %d, updated: %d so far"
+                                    % (remove_inc, upsert_inc, update_inc)
                                 )
-                            except errors.ConnectionFailed:
-                                LOG.exception(
-                                    "Connection failed while processing oplog "
-                                    "document %r" % entry
-                                )
 
-                        if (remove_inc + upsert_inc + update_inc) % 1000 == 0:
-                            LOG.debug(
-                                "OplogThread: Documents removed: %d, "
-                                "inserted: %d, updated: %d so far"
-                                % (remove_inc, upsert_inc, update_inc)
-                            )
+                            LOG.debug("OplogThread: Doc is processed.")
 
-                        LOG.debug("OplogThread: Doc is processed.")
+                            last_ts = entry["ts"]
 
-                        last_ts = entry["ts"]
+                            # update timestamp per batch size
+                            # n % -1 (default for self.batch_size) == 0 for all n
+                            if n % self.batch_size == 1:
+                                self.update_checkpoint(last_ts)
+                                last_ts = None
 
-                        # update timestamp per batch size
-                        # n % -1 (default for self.batch_size) == 0 for all n
-                        if n % self.batch_size == 1:
-                            self.update_checkpoint(last_ts)
-                            last_ts = None
+                    # flush any remaining buffered ops before recording the
+                    # checkpoint; flushing updates the checkpoint itself.
+                    if self._catchup_ops:
+                        self._flush_catchup_ops()
 
                     # update timestamp after running through oplog
                     if last_ts is not None:
@@ -358,6 +660,13 @@ class OplogThread(threading.Thread):
                 LOG.exception(
                     "Cursor closed due to an exception. " "Will attempt to reconnect."
                 )
+                # Discard unflushed buffered ops: the checkpoint has not
+                # advanced past them, so they will be read again after
+                # reconnecting.
+                with self._catchup_lock:
+                    self._catchup_ops = {}
+                    self._catchup_last_ts = None
+                    self._catchup_first_buffered_at = None
 
             # update timestamp before attempting to reconnect to MongoDB,
             # after being join()'ed, or if the cursor closes
@@ -371,7 +680,8 @@ class OplogThread(threading.Thread):
 
             LOG.debug(
                 "OplogThread: Sleeping. Documents removed: %d, "
-                "upserted: %d, updated: %d" % (remove_inc, upsert_inc, update_inc)
+                "upserted: %d, updated: %d, bulk applied: %d"
+                % (remove_inc, upsert_inc, update_inc, bulk_inc)
             )
             time.sleep(2)
 

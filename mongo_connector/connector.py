@@ -208,6 +208,9 @@ class Connector(threading.Thread):
             collection_dump=config["onlyDump"] or not config["noDump"],
             only_dump=config["onlyDump"],
             batch_size=config["batchSize"],
+            bulk_apply_lag_seconds=config["bulkApplyLagSeconds"],
+            bulk_apply_batch_size=config["bulkApplyBatchSize"],
+            bulk_apply_idle_seconds=config["bulkApplyIdleSeconds"],
             continue_on_error=config["continueOnError"],
             auth_username=config["authentication.adminUsername"],
             auth_key=auth_key,
@@ -577,6 +580,57 @@ def get_config_options():
         "updated until we've read through the entire oplog. "
         "You may want more frequent updates if you are at risk "
         "of falling behind the earliest timestamp in the oplog",
+    )
+
+    bulk_apply_lag_seconds = add_option(
+        config_key="bulkApplyLagSeconds",
+        default=constants.DEFAULT_BULK_APPLY_LAG_SECONDS,
+        type=int,
+    )
+
+    # --bulk-apply-lag-seconds enables buffered bulk application of oplog
+    # entries whenever the connector is far enough behind the newest entry
+    bulk_apply_lag_seconds.add_cli(
+        "--bulk-apply-lag-seconds",
+        type="int",
+        dest="bulk_apply_lag_seconds",
+        help="When the connector is more than this many seconds behind the "
+        "newest oplog entry it buffers oplog operations and applies them "
+        "in bulk through each DocManager's bulk_apply method, instead of "
+        "applying them one at a time. Defaults to %d seconds (5 minutes). "
+        "Set to 0 to disable bulk catch-up mode."
+        % constants.DEFAULT_BULK_APPLY_LAG_SECONDS,
+    )
+
+    bulk_apply_batch_size = add_option(
+        config_key="bulkApplyBatchSize", default=constants.DEFAULT_MAX_BULK, type=int
+    )
+
+    bulk_apply_batch_size.add_cli(
+        "--bulk-apply-batch-size",
+        type="int",
+        dest="bulk_apply_batch_size",
+        help="Number of deduplicated documents to buffer before applying "
+        "them in bulk during bulk catch-up mode. Defaults to %d."
+        % constants.DEFAULT_MAX_BULK,
+    )
+
+    bulk_apply_idle_seconds = add_option(
+        config_key="bulkApplyIdleSeconds",
+        default=constants.DEFAULT_BULK_APPLY_IDLE_SECONDS,
+        type=int,
+    )
+
+    bulk_apply_idle_seconds.add_cli(
+        "--bulk-apply-idle-seconds",
+        type="int",
+        dest="bulk_apply_idle_seconds",
+        help="Maximum seconds buffered catch-up ops may sit unflushed when "
+        "the batch doesn't fill and the oplog goes quiet. The tailable "
+        "oplog cursor blocks waiting for new data at the tail, so without "
+        "this flush a small backlog could sit unapplied indefinitely. "
+        "Defaults to %d seconds. Set to 0 to disable the idle flush."
+        % constants.DEFAULT_BULK_APPLY_IDLE_SECONDS,
     )
 
     def apply_verbosity(option, cli_values):

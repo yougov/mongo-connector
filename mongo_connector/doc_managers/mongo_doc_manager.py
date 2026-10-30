@@ -24,7 +24,7 @@
 import datetime
 import logging
 import pymongo
-from pymongo import ReplaceOne
+from pymongo import DeleteOne, ReplaceOne
 
 from bson import SON
 from bson.codec_options import CodecOptions, DatetimeConversion
@@ -288,6 +288,67 @@ class DocManager(DocManagerBase):
             except pymongo.errors.BulkWriteError as bwe:
                 LOG.error(bwe.details)
                 raise
+
+    @wrap_exceptions
+    def bulk_apply(self, ops):
+        """Apply a sequence of normalized oplog operations in bulk.
+
+        ``ops`` is an iterable of ``(op_type, namespace, payload, timestamp)``
+        tuples; see DocManagerBase.bulk_apply for the format. Writes are
+        grouped by target collection and meta collection and sent with
+        ordered bulk_write calls, preserving per-collection operation order.
+        """
+        dest_ops = {}
+        meta_ops = {}
+        for op_type, namespace, payload, timestamp in ops:
+            dbname, collname = self._db_and_collection(namespace)
+            meta_collection_name = self._get_meta_collection(namespace)
+            if op_type == "upsert":
+                doc = payload
+                self._check_clamped_dates(doc, doc.get("_id"))
+                dest_ops.setdefault((dbname, collname), []).append(
+                    ReplaceOne({"_id": doc["_id"]}, doc, upsert=True)
+                )
+                meta_ops.setdefault(meta_collection_name, []).append(
+                    ReplaceOne(
+                        {self.id_field: doc["_id"], "ns": namespace},
+                        {
+                            self.id_field: doc["_id"],
+                            "ns": namespace,
+                            "_ts": timestamp,
+                        },
+                        upsert=True,
+                    )
+                )
+            elif op_type == "remove":
+                dest_ops.setdefault((dbname, collname), []).append(
+                    DeleteOne({"_id": payload})
+                )
+                meta_ops.setdefault(meta_collection_name, []).append(
+                    DeleteOne({self.id_field: payload})
+                )
+            else:
+                raise ValueError("Unknown bulk_apply op type: %r" % (op_type,))
+
+        def bulk_write_in_chunks(collection, write_ops):
+            for i in range(0, len(write_ops), self.chunk_size):
+                collection.bulk_write(
+                    write_ops[i : i + self.chunk_size], ordered=True
+                )
+
+        try:
+            for (dbname, collname), write_ops in dest_ops.items():
+                collection = self._get_clamped_db(dbname)[collname]
+                bulk_write_in_chunks(collection, write_ops)
+            for meta_collection_name, write_ops in meta_ops.items():
+                bulk_write_in_chunks(
+                    self.meta_database[meta_collection_name], write_ops
+                )
+        except pymongo.errors.DuplicateKeyError as e:
+            LOG.warning("Continuing after DuplicateKeyError: " + str(e))
+        except pymongo.errors.BulkWriteError as bwe:
+            LOG.error(bwe.details)
+            raise
 
     @wrap_exceptions
     def remove(self, document_id, namespace, timestamp):
